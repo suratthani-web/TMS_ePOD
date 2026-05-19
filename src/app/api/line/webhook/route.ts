@@ -241,11 +241,15 @@ export async function POST(req: NextRequest) {
             if (!replyToken || !userId) continue
 
             // ── Identify user ──────────────────────────────────────────────
-            const [{ data: boundCustomer }, { data: boundDriver }, { data: boundAdmin }] = await Promise.all([
-                supabase.from('Master_Customers').select('Customer_ID, Customer_Name').eq('Line_User_ID', userId).maybeSingle(),
-                supabase.from('Master_Drivers').select('Driver_ID, Driver_Name, Vehicle_Plate').eq('Line_User_ID', userId).maybeSingle(),
-                supabase.from('Master_Users').select('Username, Name, Role, Role_ID, Branch_ID').eq('Line_User_ID', userId).maybeSingle(),
+            const [custRes, drivRes, userRes] = await Promise.all([
+                supabase.from('Master_Customers').select('Customer_ID, Customer_Name').eq('Line_User_ID', userId).limit(1),
+                supabase.from('Master_Drivers').select('Driver_ID, Driver_Name, Vehicle_Plate, Branch_ID').eq('Line_User_ID', userId).limit(1),
+                supabase.from('Master_Users').select('Username, Name, Role, Role_ID, Branch_ID').eq('Line_User_ID', userId).limit(1),
             ])
+
+            const boundCustomer = custRes.data?.[0] || null
+            const boundDriver = drivRes.data?.[0] || null
+            const boundAdmin = userRes.data?.[0] || null
 
             const userName = boundAdmin?.Name || boundDriver?.Driver_Name || boundCustomer?.Customer_Name || 'ผู้ใช้'
             const branchId = boundAdmin?.Branch_ID || undefined
@@ -295,20 +299,42 @@ export async function POST(req: NextRequest) {
                     const id = parts[1]
                     const phone = parts[2]
 
+                    // Normalize phone number input: strip non-digits, replace international format prefix +66 or 66 with 0
+                    const cleanPhone = phone.replace(/[^0-9]/g, '')
+                    const normalizedPhone = cleanPhone.startsWith('66') ? '0' + cleanPhone.slice(2) : cleanPhone
+
                     // Customer
                     const { data: customer } = await supabase.from('Master_Customers')
-                        .select('Customer_ID, Customer_Name').eq('Customer_ID', id).eq('Phone', phone).maybeSingle()
+                        .select('Customer_ID, Customer_Name')
+                        .ilike('Customer_ID', id.trim())
+                        .eq('Phone', normalizedPhone)
+                        .maybeSingle()
                     if (customer) {
-                        await supabase.from('Master_Customers').update({ Line_User_ID: userId }).eq('Customer_ID', id)
+                        // Enforce unique binding: clear this Line_User_ID from other records first
+                        await Promise.all([
+                            supabase.from('Master_Customers').update({ Line_User_ID: null }).eq('Line_User_ID', userId),
+                            supabase.from('Master_Drivers').update({ Line_User_ID: null }).eq('Line_User_ID', userId),
+                            supabase.from('Master_Users').update({ Line_User_ID: null }).eq('Line_User_ID', userId),
+                        ])
+                        await supabase.from('Master_Customers').update({ Line_User_ID: userId }).eq('Customer_ID', customer.Customer_ID)
                         await replyToUser(replyToken, `✅ คุณ ${customer.Customer_Name} ผูกบัญชีสำเร็จแล้วครับ!\nพิมพ์ HELP เพื่อดูเมนูได้เลย`)
                         continue
                     }
 
                     // Driver
                     const { data: driver } = await supabase.from('Master_Drivers')
-                        .select('Driver_ID, Driver_Name').eq('Driver_ID', id).eq('Mobile_No', phone).maybeSingle()
+                        .select('Driver_ID, Driver_Name')
+                        .ilike('Driver_ID', id.trim())
+                        .eq('Mobile_No', normalizedPhone)
+                        .maybeSingle()
                     if (driver) {
-                        await supabase.from('Master_Drivers').update({ Line_User_ID: userId }).eq('Driver_ID', id)
+                        // Enforce unique binding: clear this Line_User_ID from other records first
+                        await Promise.all([
+                            supabase.from('Master_Customers').update({ Line_User_ID: null }).eq('Line_User_ID', userId),
+                            supabase.from('Master_Drivers').update({ Line_User_ID: null }).eq('Line_User_ID', userId),
+                            supabase.from('Master_Users').update({ Line_User_ID: null }).eq('Line_User_ID', userId),
+                        ])
+                        await supabase.from('Master_Drivers').update({ Line_User_ID: userId }).eq('Driver_ID', driver.Driver_ID)
                         await replyToUser(replyToken, `✅ คุณ ${driver.Driver_Name} (คนขับ) ผูกบัญชีสำเร็จแล้วครับ!\nพิมพ์ "งาน" เพื่อดูงานของคุณ`)
                         continue
                     }
@@ -324,6 +350,12 @@ export async function POST(req: NextRequest) {
                     const adminUser = allAdminMatches?.[0] ?? null
 
                     if (adminUser && phone.toUpperCase() === 'ADMIN') {
+                        // Enforce unique binding: clear this Line_User_ID from other records first
+                        await Promise.all([
+                            supabase.from('Master_Customers').update({ Line_User_ID: null }).eq('Line_User_ID', userId),
+                            supabase.from('Master_Drivers').update({ Line_User_ID: null }).eq('Line_User_ID', userId),
+                            supabase.from('Master_Users').update({ Line_User_ID: null }).eq('Line_User_ID', userId),
+                        ])
                         await supabase.from('Master_Users').update({ Line_User_ID: userId }).eq('Username', adminUser.Username)
                         await replyToUser(replyToken, `✅ ยินดีต้อนรับคุณ ${adminUser.Name}!\nRole: ${adminUser.Role}\nผูกบัญชีสำเร็จแล้วครับ 🎉`)
                         continue
@@ -333,7 +365,7 @@ export async function POST(req: NextRequest) {
                     if (allAdminMatches && allAdminMatches.length > 0 && phone.toUpperCase() !== 'ADMIN') {
                         await replyToUser(replyToken, `พบผู้ใช้ "${allAdminMatches[0].Name}" ในระบบ\nแต่ต้องพิมพ์ ADMIN ต่อท้ายครับ\nตัวอย่าง: BIND ${id} ADMIN`)
                     } else {
-                        await replyToUser(replyToken, `❌ ไม่พบผู้ใช้ "${id}" ในระบบ\nลองใช้ Email หรือ Username ที่ถูกต้องครับ\nรูปแบบ: BIND [username/email] ADMIN`)
+                        await replyToUser(replyToken, `❌ ไม่พบผู้ใช้ "${id}" ในระบบ หรือเบอร์โทรศัพท์/รหัสผ่านไม่ถูกต้อง\nลองตรวจสอบความถูกต้องของรหัสและเบอร์โทรใหม่อีกครั้งครับ\nรูปแบบ: BIND [รหัสคนขับ/ลูกค้า] [เบอร์โทร]`)
                     }
                     continue
                 }
@@ -341,10 +373,19 @@ export async function POST(req: NextRequest) {
                 // 3. Driver shortcuts
                 if (boundDriver) {
                     if (text === 'WORK' || text === 'งาน') {
+                        // Exclude all variations of completed/cancelled statuses in both EN/TH
+                        const excludedStatuses = [
+                            'Completed', 'Delivered', 'Finished', 'Closed', 'Complete', 'Success', 'Done', 'Finish', 'Arrived',
+                            'เสร็จสิ้น', 'เรียบร้อย', 'ส่งสำเร็จ', 'ปิดงาน', 'สำเร็จ', 'ถึงที่หมาย', 'ถึงจุดหมาย', 'ถึงที่ส่ง', 'จบงาน',
+                            'Verified', 'ยืนยันแล้ว', 'ตรวจสอบแล้ว',
+                            'Cancelled', 'Cancel', 'ยกเลิก'
+                        ]
+                        const statusFilter = `(${excludedStatuses.map(s => `"${s}"`).join(',')})`
+
                         const { data: jobs } = await supabase.from('Jobs_Main')
                             .select('Job_ID, Job_Status, Route_Name, Customer_Name')
                             .eq('Driver_ID', boundDriver.Driver_ID)
-                            .not('Job_Status', 'in', '("Completed","Delivered","Cancelled")')
+                            .not('Job_Status', 'in', statusFilter)
                             .order('Plan_Date', { ascending: true })
                             .limit(5)
 
@@ -360,8 +401,11 @@ export async function POST(req: NextRequest) {
                         continue
                     }
 
-                    if (text.includes(' START') || text.includes(' เริ่ม')) {
-                        const jobId = rawText.split(' ')[0].toUpperCase()
+                    if (text.includes('START') || text.includes('เริ่ม')) {
+                        // Regex matching to smartly capture JOB-XXXX even if surrounded by other text
+                        const match = rawText.match(/JOB-[A-Z0-9-]+/i)
+                        const jobId = match ? match[0].toUpperCase() : rawText.split(' ')[0].toUpperCase()
+
                         const { error } = await supabase.from('Jobs_Main')
                             .update({ Job_Status: 'In Progress' })
                             .eq('Job_ID', jobId)

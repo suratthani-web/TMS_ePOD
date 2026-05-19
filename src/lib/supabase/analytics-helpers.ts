@@ -88,7 +88,7 @@ export async function getEffectiveBranchId(branchId?: string) {
     // Super Admin can override with provided branchId
     let target = branchId || userBranchId
     
-    if (!target || target.toLowerCase() === 'all' || target.toLowerCase() === 'ทุกสาขา') return null
+    if (!target || target.toLowerCase() === 'all' || target.toLowerCase() === 'ทุกสาขา' || target.toUpperCase() === 'HQ') return null
 
     // Robust ID Resolution:
     // If target is NOT a known ID (e.g. it's a long name), try to find the ID.

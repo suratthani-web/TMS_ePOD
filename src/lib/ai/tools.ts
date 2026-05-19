@@ -40,10 +40,8 @@ export const aiToolExecutors: Record<string, Function> = {
     const supabase = createAdminClient()
     const targetDate = new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Bangkok' })
     
-    let finalBranchId = args.branchId
-
-    // If branchId is a name (e.g. "SKN"), look up its actual ID in Master_Branches
-    if (args.branchId && args.branchId !== 'All') {
+    let finalBranchId = args.branchId     // If branchId is a name (e.g. "SKN"), look up its actual ID in Master_Branches
+    if (args.branchId && args.branchId !== 'All' && args.branchId.toUpperCase() !== 'HQ') {
         const { data: branchData } = await supabase
             .from('Master_Branches')
             .select('Branch_ID, Branch_Name')
@@ -62,7 +60,7 @@ export const aiToolExecutors: Record<string, Function> = {
         .eq('Plan_Date', targetDate)
 
     // Filter by Mapped Branch ID OR Literal String (to catch manual Supabase edits)
-    if (finalBranchId && finalBranchId !== 'All') {
+    if (finalBranchId && finalBranchId !== 'All' && finalBranchId.toUpperCase() !== 'HQ') {
         if (finalBranchId !== args.branchId) {
             // If we found a mapping (e.g. SKN -> 5), search for both 5 and "SKN"
             query = query.or(`Branch_ID.eq.${finalBranchId},Branch_ID.ilike.%${args.branchId}%`)
