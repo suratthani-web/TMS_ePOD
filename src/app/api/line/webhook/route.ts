@@ -857,6 +857,58 @@ export async function POST(req: NextRequest) {
                         continue
                     }
 
+                    // --- 4.1.8 GPS Location Tracking (อยู่ตรงไหน / อยู่ที่ไหน / WHERE) ---
+                    if ((text.includes('อยู่ไหน') || text.includes('อยู่ตรงไหน') || text.includes('อยู่ที่ไหน') || text.includes('WHERE')) && boundAdmin) {
+                        let query = rawText
+                            .replace(/อยู่ไหน/g, '')
+                            .replace(/อยู่ตรงไหน/g, '')
+                            .replace(/อยู่ที่ไหน/g, '')
+                            .replace(/ทะเบียน/g, '')
+                            .replace(/นาย/g, '')
+                            .replace(/WHERE/g, '')
+                            .replace(/where/g, '')
+                            .trim()
+
+                        if (!query) {
+                            await replyToUser(replyToken, `📍 [ระบบค้นหาตำแหน่งรถ & คนขับ]\n\nกรุณาระบุชื่อคนขับหรือทะเบียนรถที่ต้องการค้นหาด้วยครับ\nเช่น: "ทะเบียน 70-1234 อยู่ตรงไหน" หรือ "สมเกียรติ อยู่ที่ไหน"`)
+                            continue
+                        }
+
+                        const { data: drivers, error } = await supabase.from('Master_Drivers')
+                            .select('Driver_ID, Driver_Name, Vehicle_Plate, Current_Lat, Current_Lon, Last_Seen')
+                            .or(`Driver_Name.ilike.%${query}%,Vehicle_Plate.ilike.%${query}%`)
+                            .limit(5)
+
+                        if (error) {
+                            console.error('[LINE GPS Search Error]', error)
+                            await replyToUser(replyToken, `❌ เกิดข้อผิดพลาดในการดึงข้อมูลตำแหน่งครับ: ${error.message}`)
+                            continue
+                        }
+
+                        if (!drivers || drivers.length === 0) {
+                            await replyToUser(replyToken, `📍 [ค้นหาตำแหน่ง]\n\nไม่พบข้อมูลคนขับหรือรถทะเบียน "${query}" ในระบบที่กำลังออนไลน์อยู่ในขณะนี้ครับ`)
+                            continue
+                        }
+
+                        const lines = [`📍 [ผลการค้นหาตำแหน่งรถ & คนขับ]\n`]
+                        drivers.forEach(d => {
+                            const lastSeenStr = d.Last_Seen ? new Date(d.Last_Seen).toLocaleString('th-TH', { timeZone: 'Asia/Bangkok' }) : 'ไม่ระบุ'
+                            lines.push(`👨‍✈️ คนขับ: ${d.Driver_Name}`)
+                            lines.push(`🛻 ทะเบียนรถ: ${d.Vehicle_Plate || '-'}`)
+                            if (d.Current_Lat && d.Current_Lon) {
+                                lines.push(`🌐 พิกัดล่าสุด: ${d.Current_Lat}, ${d.Current_Lon}`)
+                                lines.push(`⏱️ อัปเดตเมื่อ: ${lastSeenStr}`)
+                                lines.push(`🔗 แผนที่นำทาง: https://www.google.com/maps/search/?api=1&query=${d.Current_Lat},${d.Current_Lon}`)
+                            } else {
+                                lines.push(`⚠️ ไม่พบพิกัด GPS ล่าสุดในระบบ (ออฟไลน์)`)
+                            }
+                            lines.push('')
+                        })
+
+                        await replyToUser(replyToken, lines.join('\n').trim())
+                        continue
+                    }
+
                     // --- 4.2 Financial (Admin only) ---
                     if ((text.includes('รายได้') || text.includes('กำไร') || text.includes('เงิน')) && boundAdmin) {
                         const fin = await aiToolExecutors.get_financial_summary({ branchId: targetBranchId })
