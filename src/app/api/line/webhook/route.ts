@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createAdminClient } from '@/utils/supabase/server'
 import { replyToUser, verifyLineSignature, getMessageContent, pushToUser } from '@/lib/integrations/line'
 import { aiToolExecutors, geminiToolDefinitions } from '@/lib/ai/tools'
+import { uploadFileToSupabase } from '@/lib/actions/supabase-upload'
 
 // ─────────────────────────────────────────────────────────────────
 // Models (same as /api/chat) - Direct REST, no SDK
@@ -456,7 +457,7 @@ export async function POST(req: NextRequest) {
                     const scopeName = boundCustomer ? `ลูกค้า: ${boundCustomer.Customer_Name}` : (targetBranchId ? `สาขา: ${targetBranchId}` : 'ทุกสาขา')
 
                     // --- 4.1 Today Jobs ---
-                    if (text.includes('งานวันนี้') || text.includes('สรุปงาน') || text === 'TODAY' || text === 'สรุปยอด' || text === 'งาน') {
+                    if (text.includes('งานวันนี้') || text.includes('งานของฉัน') || text.includes('ดูงานของฉัน') || text.includes('สรุปงาน') || text === 'TODAY' || text === 'สรุปยอด' || text === 'งาน') {
                         const now = new Date()
                         const timeStr = now.toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Bangkok' })
                         
@@ -650,6 +651,27 @@ export async function POST(req: NextRequest) {
                             continue
                         }
                     }
+
+                    // --- 4.8 SOS Command ---
+                    if (text === 'sos' || text.includes('ฉุกเฉิน') || text.includes('แจ้งเหตุ')) {
+                        if (boundDriver) {
+                            const { data: driverActiveJobs } = await supabase.from('Jobs_Main')
+                                .select('Job_ID, Customer_Name, Route_Name, Job_Status')
+                                .eq('Driver_ID', boundDriver.Driver_ID)
+                                .in('Job_Status', ['Assigned', 'Confirmed', 'Picked Up', 'In Transit', 'Arrived', 'In Progress'])
+                                .order('Created_At', { ascending: false })
+                            
+                            const activeJob = driverActiveJobs?.[0]
+                            if (activeJob) {
+                                await replyToUser(replyToken, `🚨 [แจ้งเหตุฉุกเฉิน SOS]\nคุณกำลังแจ้งเหตุสำหรับงานจัดส่ง #${activeJob.Job_ID}\n\nกรุณากดปุ่มเครื่องหมายบวก (+) ด้านล่างซ้าย แล้วเลือก 'ตำแหน่งที่ตั้ง' (Location) เพื่อแชร์พิกัดเกิดเหตุฉุกเฉินส่งให้เจ้าหน้าที่แอดมินทราบทันทีครับ!`)
+                            } else {
+                                await replyToUser(replyToken, `🚨 [แจ้งเหตุฉุกเฉิน SOS]\nไม่พบงานที่กำลังรันอยู่ในระบบของคุณขณะนี้\n\nแต่หากต้องการความช่วยเหลือด่วน กรุณากดปุ่มเครื่องหมายบวก (+) แล้วแชร์ 'ตำแหน่งที่ตั้ง' (Location) เข้ามาเพื่อแจ้งพิกัดได้เช่นกันครับ!`)
+                            }
+                        } else {
+                            await replyToUser(replyToken, `🚨 [แจ้งเหตุฉุกเฉิน SOS]\nระบบแจ้งเหตุนี้ใช้สำหรับคนขับรถเพื่อแชร์ตำแหน่งเกิดเหตุฉุกเฉินครับ`)
+                        }
+                        continue
+                    }
                 }
 
                 // 5. AI fallback (bound users only)
@@ -711,6 +733,119 @@ export async function POST(req: NextRequest) {
                     const mimeType = event.message.type === 'image' ? 'image/jpeg' : 'application/pdf' // Default to PDF for files
                     
                     const buffer = await getMessageContent(messageId)
+
+                    // ── Driver-specific Smart Photo Processing (ePOD & Fuel Receipts) ──────────────────
+                    if (boundDriver && event.message.type === 'image') {
+                        // 1. Ask Gemini to classify and extract
+                        const classPrompt = `
+                        Analyze this image uploaded by the driver "${userName}".
+                        Classify the image into one of three types:
+                        1. "fuel_receipt" - Fuel purchase receipt, gas station invoice, or refueling log.
+                        2. "delivery_proof" - Signed delivery sheet (POD), cargo proof, dropoff photo, or package delivery.
+                        3. "other" - Any other photo.
+
+                        Provide the result in the following JSON format ONLY, do not write markdown blocks or text other than the JSON:
+                        {
+                          "classification": "fuel_receipt" | "delivery_proof" | "other",
+                          "stationName": "Gas station name (if fuel receipt, e.g. PTT, Shell, Bangchak)",
+                          "priceTotal": 1200.00,
+                          "liters": 45.5,
+                          "vehiclePlate": "Vehicle license plate specified on receipt (if fuel receipt)",
+                          "dateTime": "Refueling date and time in YYYY-MM-DDTHH:mm:ss format"
+                        }
+                        `.trim()
+
+                        let classification = 'other'
+                        let extracted: any = {}
+                        try {
+                            const classResText = await callGeminiMultimodal(
+                                "You are a helpful logistics AI coordinator.",
+                                classPrompt,
+                                mimeType,
+                                buffer
+                            )
+                            if (classResText) {
+                                const cleanJson = classResText.replace(/```json/g, '').replace(/```/g, '').trim()
+                                const parsed = JSON.parse(cleanJson)
+                                classification = parsed.classification || 'other'
+                                extracted = parsed
+                            }
+                        } catch (e) {
+                            console.warn('[Line Driver Image Classify Error]', e)
+                        }
+
+                        // 2. Handle Fuel Receipt
+                        if (classification === 'fuel_receipt') {
+                            const timestamp = Date.now()
+                            const fileNameStr = `fuel_${timestamp}.jpg`
+                            const uploadRes = await uploadFileToSupabase(buffer, fileNameStr, 'image/jpeg', 'Fuel_Photos')
+                            
+                            const dateStr = new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Bangkok' }).replace(/-/g, '')
+                            const randomSuffix = Math.floor(Math.random() * 10000).toString().padStart(4, '0')
+                            const logId = `FUEL-${dateStr}-${randomSuffix}`
+
+                            await supabase.from('Fuel_Logs').insert({
+                                Log_ID: logId,
+                                Date_Time: extracted.dateTime || new Date().toISOString(),
+                                Driver_ID: boundDriver.Driver_ID,
+                                Vehicle_Plate: extracted.vehiclePlate || boundDriver.Vehicle_Plate || null,
+                                Liters: Number(extracted.liters) || 0,
+                                Price_Total: Number(extracted.priceTotal) || 0,
+                                Station_Name: extracted.stationName || 'ปั๊มน้ำมัน',
+                                Photo_Url: uploadRes.directLink,
+                                Branch_ID: boundDriver.Branch_ID || null,
+                                Status: 'Pending'
+                            })
+
+                            await replyToUser(replyToken, `⛽ [บันทึกค่าน้ำมันอัตโนมัติด้วย AI]\n\n✅ ตรวจพบใบเสร็จเติมน้ำมันเรียบร้อยครับ!\n📍 สถานี: ${extracted.stationName || 'ไม่ระบุ'}\n💰 ยอดเงินรวม: ฿${(Number(extracted.priceTotal) || 0).toLocaleString()}\n⛽ จำนวนน้ำมัน: ${Number(extracted.liters) || 0} ลิตร\n🛻 ทะเบียน: ${extracted.vehiclePlate || boundDriver.Vehicle_Plate || '-'}\n\nระบบบันทึกเข้ารายงานบัญชีค่าน้ำมันประจำวันเรียบร้อยแล้วครับ! 🧾✨`)
+                            continue
+                        }
+
+                        // 3. Handle Delivery Proof (ePOD)
+                        if (classification === 'delivery_proof' || classification === 'other') {
+                            // Find active job
+                            const { data: driverActiveJobs } = await supabase.from('Jobs_Main')
+                                .select('Job_ID, Customer_Name, Route_Name, Job_Status, Photo_Proof_Url')
+                                .eq('Driver_ID', boundDriver.Driver_ID)
+                                .in('Job_Status', ['Assigned', 'Confirmed', 'Picked Up', 'In Transit', 'Arrived', 'In Progress'])
+                                .order('Created_At', { ascending: false })
+
+                            const activeJob = driverActiveJobs?.[0]
+                            if (activeJob) {
+                                const timestamp = Date.now()
+                                const fileNameStr = `${activeJob.Job_ID}_${timestamp}.jpg`
+                                const uploadRes = await uploadFileToSupabase(buffer, fileNameStr, 'image/jpeg', 'POD_Photos')
+                                
+                                const newPhotos = activeJob.Photo_Proof_Url 
+                                    ? `${activeJob.Photo_Proof_Url},${uploadRes.directLink}` 
+                                    : uploadRes.directLink
+
+                                const now = new Date()
+                                const timeString = now.toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false, timeZone: 'Asia/Bangkok' })
+                                const dateString = now.toLocaleDateString('en-CA', { timeZone: 'Asia/Bangkok' })
+
+                                await supabase.from('Jobs_Main').update({
+                                    Job_Status: 'Delivered',
+                                    Photo_Proof_Url: newPhotos,
+                                    Actual_Delivery_Time: timeString,
+                                    Delivery_Date: dateString
+                                }).eq('Job_ID', activeJob.Job_ID)
+
+                                await replyToUser(replyToken, `📸 [ยืนยันการส่งมอบสินค้า ePOD]\n\n✅ อัปโหลดรูปภาพหลักฐานส่งมอบสำหรับงาน #${activeJob.Job_ID} เรียบร้อยแล้วครับ!\n\nสถานะงานถูกปรับเป็น 'ส่งของแล้ว' (Delivered) และอัปเดตเข้าระบบส่วนกลางเรียบร้อยครับ 🚛💨`)
+                                continue
+                            }
+
+                            // If classified as other and no active job, let it fall through to standard AI analyzer
+                            if (classification === 'other') {
+                                // Fall through to standard behavior
+                            } else {
+                                await replyToUser(replyToken, `⚠️ ตรวจพบเป็นเอกสาร/ภาพการส่งมอบสินค้า แต่ขณะนี้คุณไม่มีงานที่กำลังดำเนินการอยู่ในระบบครับ\n\nโปรดตรวจสอบสถานะงานในระบบก่อนอัปโหลดรูปภาพครับ`)
+                                continue
+                            }
+                        }
+                    }
+
+                    // ── Admin / Customer / Standard Vision Fallback ──────────────────────────────────
                     const userRole = boundAdmin ? 'Admin' : (boundDriver ? 'Driver' : 'Customer')
                     const systemContext = await buildAIContext(branchId, userName, userRole)
                     
@@ -728,6 +863,54 @@ export async function POST(req: NextRequest) {
                 } catch (err) {
                     console.error('[Line File] Error:', err)
                     await replyToUser(replyToken, '❌ เกิดข้อผิดพลาดในการวิเคราะห์ไฟล์/รูปภาพ')
+                }
+                continue
+            }
+
+            // ─────────────────────────────────────────────────────────────
+            // LOCATION MESSAGE (SOS / Emergency Check-In)
+            // ─────────────────────────────────────────────────────────────
+            if (event.type === 'message' && event.message?.type === 'location') {
+                if (!boundDriver) {
+                    await replyToUser(replyToken, '📍 ได้รับตำแหน่งที่ตั้งของคุณแล้วครับ')
+                    continue
+                }
+
+                try {
+                    const loc = event.message as any
+                    const address = loc.address || 'ไม่ระบุที่อยู่'
+                    const lat = loc.latitude
+                    const lon = loc.longitude
+
+                    // Find driver's active job
+                    const { data: driverActiveJobs } = await supabase.from('Jobs_Main')
+                        .select('Job_ID, Customer_Name, Route_Name, Job_Status, Notes')
+                        .eq('Driver_ID', boundDriver.Driver_ID)
+                        .in('Job_Status', ['Assigned', 'Confirmed', 'Picked Up', 'In Transit', 'Arrived', 'In Progress'])
+                        .order('Created_At', { ascending: false })
+
+                    const activeJob = driverActiveJobs?.[0]
+                    if (activeJob) {
+                        const currentNotes = activeJob.Notes || ''
+                        const updatedNotes = `🚨 [SOS Emergency Alert: Shared Location: ${address}] ${currentNotes}`.slice(0, 1000)
+
+                        // Update job status to SOS and record coordinates
+                        await supabase.from('Jobs_Main')
+                            .update({
+                                Job_Status: 'SOS',
+                                Delivery_Lat: lat,
+                                Delivery_Lon: lon,
+                                Notes: updatedNotes
+                            })
+                            .eq('Job_ID', activeJob.Job_ID)
+
+                        await replyToUser(replyToken, `🚨 [แจ้งเหตุฉุกเฉิน SOS สำเร็จ]\n\n📍 ระบบได้บันทึกพิกัดสถานที่เกิดเหตุของคุณสำหรับงาน #${activeJob.Job_ID} เรียบร้อยแล้วครับ!\n🏠 ที่อยู่: ${address}\n\nเจ้าหน้าที่สาขาและหน่วยกู้ภัยกำลังเร่งประสานการเข้าช่วยเหลือ โปรดเตรียมตัวรับสายโทรศัพท์และรออยู่ในจุดที่ปลอดภัยครับ!`)
+                    } else {
+                        await replyToUser(replyToken, `📍 ได้รับพิกัดตำแหน่งที่ตั้งของคุณแล้วครับ (${address})\n\nเจ้าหน้าที่ได้รับข้อมูลแล้ว หากเกิดเหตุฉุกเฉินด่วน กรุณาติดต่อเบอร์สายตรงสาขาเพิ่มเติมเพื่อความปลอดภัยสูงสุดครับ`)
+                    }
+                } catch (err) {
+                    console.error('[Line Location] Error:', err)
+                    await replyToUser(replyToken, '❌ เกิดข้อผิดพลาดในการบันทึกพิกัดตำแหน่ง')
                 }
                 continue
             }
