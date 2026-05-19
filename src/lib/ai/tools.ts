@@ -155,8 +155,8 @@ export const aiToolExecutors: Record<string, Function> = {
   },
 
   // ---- FINANCIAL ----
-  get_financial_summary: async (args: { branchId?: string }) => {
-    const stats = await getFinancialStats(undefined, undefined, args.branchId)
+  get_financial_summary: async (args: { branchId?: string, startDate?: string, endDate?: string }) => {
+    const stats = await getFinancialStats(args.startDate, args.endDate, args.branchId)
     return {
         revenue: stats.revenue,
         cost: stats.cost?.total,

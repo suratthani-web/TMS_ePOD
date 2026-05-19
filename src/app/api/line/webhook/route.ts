@@ -1069,9 +1069,33 @@ export async function POST(req: NextRequest) {
 
                     // --- 4.2 Financial (Admin only) ---
                     if ((text.includes('รายได้') || text.includes('กำไร') || text.includes('เงิน')) && boundAdmin) {
-                        const fin = await aiToolExecutors.get_financial_summary({ branchId: targetBranchId })
+                        let startDate: string | undefined = undefined
+                        let endDate: string | undefined = undefined
+                        let periodName = 'เดือนปัจจุบัน'
+
+                        if (text.includes('ทั้งปี') || text.includes('ปีนี้') || text.includes('YEAR') || text.includes('ANNUAL')) {
+                            const now = new Date()
+                            startDate = `${now.getFullYear()}-01-01`
+                            endDate = now.toLocaleDateString('en-CA', { timeZone: 'Asia/Bangkok' })
+                            periodName = `ทั้งปี ${now.getFullYear()}`
+                        } else if (text.includes('เดือนที่แล้ว') || text.includes('LAST MONTH') || text.includes('ก่อนหน้า')) {
+                            const now = new Date()
+                            const prevMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1)
+                            const lastDayPrevMonth = new Date(now.getFullYear(), now.getMonth(), 0)
+                            startDate = prevMonth.toLocaleDateString('en-CA', { timeZone: 'Asia/Bangkok' })
+                            endDate = lastDayPrevMonth.toLocaleDateString('en-CA', { timeZone: 'Asia/Bangkok' })
+                            
+                            const monthName = prevMonth.toLocaleString('th-TH', { month: 'long', timeZone: 'Asia/Bangkok' })
+                            periodName = `เดือนที่แล้ว (${monthName})`
+                        }
+
+                        const fin = await aiToolExecutors.get_financial_summary({ 
+                            branchId: targetBranchId,
+                            startDate,
+                            endDate
+                        })
                         await replyToUser(replyToken, [
-                            '💰 สรุปสถานะการเงิน (เดือนปัจจุบัน)',
+                            `💰 สรุปสถานะการเงิน (${periodName})`,
                             `📍 ขอบเขต: ${scopeName}`,
                             '',
                             `💵 รายได้: ฿${fin.revenue?.toLocaleString() ?? 0}`,
