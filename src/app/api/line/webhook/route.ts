@@ -1108,6 +1108,65 @@ export async function POST(req: NextRequest) {
                         continue
                     }
 
+                    // --- 4.2.2 Job Count Summary (Admin only) ---
+                    if ((text.includes('งาน') || text.includes('จำนวนงาน') || text.includes('JOB')) && boundAdmin) {
+                        let startDate: string | undefined = undefined
+                        let endDate: string | undefined = undefined
+                        let periodName = 'เดือนปัจจุบัน'
+
+                        if (text.includes('ทั้งปี') || text.includes('ปีนี้') || text.includes('YEAR') || text.includes('ANNUAL')) {
+                            const now = new Date()
+                            startDate = `${now.getFullYear()}-01-01`
+                            endDate = now.toLocaleDateString('en-CA', { timeZone: 'Asia/Bangkok' })
+                            periodName = `ทั้งปี ${now.getFullYear()}`
+                        } else if (text.includes('เดือนที่แล้ว') || text.includes('LAST MONTH') || text.includes('ก่อนหน้า')) {
+                            const now = new Date()
+                            const prevMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1)
+                            const lastDayPrevMonth = new Date(now.getFullYear(), now.getMonth(), 0)
+                            startDate = prevMonth.toLocaleDateString('en-CA', { timeZone: 'Asia/Bangkok' })
+                            endDate = lastDayPrevMonth.toLocaleDateString('en-CA', { timeZone: 'Asia/Bangkok' })
+                            
+                            const monthName = prevMonth.toLocaleString('th-TH', { month: 'long', timeZone: 'Asia/Bangkok' })
+                            periodName = `เดือนที่แล้ว (${monthName})`
+                        }
+
+                        const jobSummary = await aiToolExecutors.get_job_count_summary({ 
+                            branchId: targetBranchId,
+                            startDate,
+                            endDate
+                        })
+
+                        const lines: string[] = []
+                        
+                        if (text.includes('ลูกค้า') || text.includes('CUSTOMER')) {
+                            lines.push(`📦 สรุปจำนวนงานแยกตามลูกค้า (${periodName})`)
+                            lines.push(`📍 ขอบเขต: ${scopeName}`)
+                            lines.push('')
+                            
+                            if (jobSummary.byCustomer && jobSummary.byCustomer.length > 0) {
+                                jobSummary.byCustomer.slice(0, 15).forEach((c: any, index: number) => {
+                                    lines.push(`${index + 1}. 🏢 ${c.name}: ${c.total?.toLocaleString()} งาน (สำเร็จ ${c.completed?.toLocaleString()})`)
+                                })
+                                if (jobSummary.byCustomer.length > 15) {
+                                    lines.push(`... และลูกค้าอื่น ๆ อีก ${jobSummary.byCustomer.length - 15} ราย`)
+                                }
+                            } else {
+                                lines.push('📭 ไม่พบข้อมูลงานในช่วงเวลานี้ครับ')
+                            }
+                        } else {
+                            lines.push(`📦 สรุปจำนวนงาน (${periodName})`)
+                            lines.push(`📍 ขอบเขต: ${scopeName}`)
+                            lines.push('')
+                            lines.push(`🚚 งานทั้งหมด: ${jobSummary.total?.toLocaleString()} งาน`)
+                            lines.push(`✅ ส่งสำเร็จ: ${jobSummary.completed?.toLocaleString()} งาน`)
+                            lines.push(`🛻 ระหว่างขนส่ง: ${jobSummary.inTransit?.toLocaleString()} งาน`)
+                            lines.push(`⏳ รอดำเนินการ: ${jobSummary.pending?.toLocaleString()} งาน`)
+                        }
+
+                        await replyToUser(replyToken, lines.join('\n'))
+                        continue
+                    }
+
                     // --- 4.3 Maintenance ---
                     if (text.includes('รถเสีย') || text.includes('แจ้งซ่อม') || text.includes('งานซ่อม')) {
                         const repairs = await aiToolExecutors.get_pending_repairs()

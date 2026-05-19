@@ -503,6 +503,87 @@ export async function getFinancialStats(startDate?: string, endDate?: string, br
 // Keep existing trend/distribution functions as fallbacks or for specific ranges, 
 // but the main Dashboard will now use getExecutiveDashboardUnified.
 
+export async function getJobCountSummary(startDate?: string, endDate?: string, branchId?: string) {
+    const supabase = await createAdminClient()
+    const customerId = await getCustomerId()
+    const effectiveBranchId = await getEffectiveBranchId(branchId)
+
+    const sDate = formatDateSafe(startDate) || formatDateSafe(new Date(new Date().getFullYear(), new Date().getMonth(), 1))
+    const eDate = formatDateSafe(endDate) || formatDateSafe(new Date())
+
+    let query = supabase
+        .from('Jobs_Main')
+        .select('Job_ID, Job_Status, Customer_Name, Customer_ID')
+        .gte('Plan_Date', sDate!)
+        .lte('Plan_Date', eDate!)
+
+    if (customerId) query = query.eq('Customer_ID', customerId)
+    if (effectiveBranchId) query = query.eq('Branch_ID', effectiveBranchId)
+
+    const { data: jobs, error } = await query
+    if (error || !jobs) {
+        return {
+            total: 0,
+            completed: 0,
+            inTransit: 0,
+            pending: 0,
+            byCustomer: []
+        }
+    }
+
+    let completed = 0
+    let inTransit = 0
+    let pending = 0
+    const customerMap: Record<string, { total: number, completed: number }> = {}
+
+    const completedStatuses = [
+        'Completed', 'Delivered', 'Finished', 'Closed', 'Complete', 'Success', 'Done', 'Finish', 'Arrived', 'Arrived Destination',
+        'completed', 'delivered', 'finished', 'closed', 'complete', 'success', 'done', 'finish', 'arrived',
+        'เสร็จสิ้น', 'เรียบร้อย', 'ส่งสำเร็จ', 'ปิดงาน', 'สำเร็จ', 'ถึงที่หมาย', 'ถึงจุดหมาย', 'ถึงที่ส่ง', 'จบงาน',
+        'Verified', 'Verified Jobs', 'Verified Success', 'ยืนยันแล้ว', 'ตรวจสอบแล้ว'
+    ]
+
+    const inTransitStatuses = [
+        'Picked Up', 'In Transit', 'Ongoing', 'On Route', 'ระหว่างขนส่ง', 'กำลังเดินทาง', 'กำลังดำเนินการ', 'รับสินค้าแล้ว',
+        'picked up', 'in transit', 'ongoing', 'on route', 'รับงานแล้ว', 'มอบหมายแล้ว'
+    ]
+
+    jobs.forEach(j => {
+        const status = j.Job_Status || 'Pending'
+        const custName = j.Customer_Name || 'ทั่วไป / ไม่ระบุ'
+
+        // Customer aggregation
+        if (!customerMap[custName]) {
+            customerMap[custName] = { total: 0, completed: 0 }
+        }
+        customerMap[custName].total += 1
+
+        if (completedStatuses.includes(status)) {
+            completed += 1
+            customerMap[custName].completed += 1
+        } else if (inTransitStatuses.includes(status)) {
+            inTransit += 1
+        } else {
+            pending += 1
+        }
+    })
+
+    // Sort customers by total jobs descending
+    const byCustomer = Object.entries(customerMap).map(([name, stats]) => ({
+        name,
+        total: stats.total,
+        completed: stats.completed
+    })).sort((a, b) => b.total - a.total)
+
+    return {
+        total: jobs.length,
+        completed,
+        inTransit,
+        pending,
+        byCustomer
+    }
+}
+
 export async function getRevenueTrend(startDate?: string, endDate?: string, branchId?: string) {
   try {
     const supabase = await createAdminClient()
