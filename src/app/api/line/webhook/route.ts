@@ -663,15 +663,23 @@ export async function POST(req: NextRequest) {
                     const userBranchId = boundAdmin?.Branch_ID || boundDriver?.Branch_ID || undefined
                     const userCustomerId = boundCustomer?.Customer_ID || undefined
                     
-                    // Flexible Branch Detection (e.g., "งานวันนี้ SKN" or "งานวันนี้ สาขา SKN")
+                    // Flexible Branch Detection (e.g., "งานวันนี้ SKN" or "งานวันนี้ สาขา SKN" or "รายได้ SKN")
                     let targetBranchId = userBranchId
-                    const cmdWords = ['งานวันนี้', 'สรุปงาน', 'TODAY', 'สรุปยอด']
+                    const cmdWords = [
+                        'งานวันนี้', 'สรุปงาน', 'TODAY', 'สรุปยอด', 'งาน',
+                        'รายได้', 'กำไร', 'เงิน', 'financial', 'income', 'profit',
+                        'รถเสีย', 'แจ้งซ่อม', 'งานซ่อม', 'น้ำมัน', 'สุขภาพรถ', 'fleet', 'สภาพรถ',
+                        'คนขับลา', 'ลาหยุด', 'ลาวันนี้'
+                    ]
                     let cleanedText = rawText
-                    cmdWords.forEach(w => { cleanedText = cleanedText.replace(w, '').trim() })
+                    cmdWords.forEach(w => {
+                        const reg = new RegExp(w, 'gi')
+                        cleanedText = cleanedText.replace(reg, '').trim()
+                    })
                     
                     if (cleanedText) {
-                        // Remove "สาขา" prefix if exists to get the pure ID
-                        targetBranchId = cleanedText.replace('สาขา', '').trim()
+                        // Remove "สาขา" prefix if exists, trim, and convert to uppercase for database match compatibility
+                        targetBranchId = cleanedText.replace(/สาขา/g, '').trim().toUpperCase()
                     }
 
                     const scopeName = boundCustomer ? `ลูกค้า: ${boundCustomer.Customer_Name}` : (targetBranchId ? `สาขา: ${targetBranchId}` : 'ทุกสาขา')
