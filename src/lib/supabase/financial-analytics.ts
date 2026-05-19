@@ -389,31 +389,115 @@ export async function getFinancialStats(startDate?: string, endDate?: string, br
   const customerId = await getCustomerId()
   const effectiveBranchId = await getEffectiveBranchId(branchId)
 
+  const sDate = formatDateSafe(startDate) || formatDateSafe(new Date(new Date().getFullYear(), new Date().getMonth(), 1))
+  const eDate = formatDateSafe(endDate) || formatDateSafe(new Date())
+
   const { data: metrics, error } = await supabase.rpc('get_dashboard_metrics', {
-      start_date: formatDateSafe(startDate) || formatDateSafe(new Date(new Date().getFullYear(), new Date().getMonth(), 1)),
-      end_date: formatDateSafe(endDate) || formatDateSafe(new Date()),
+      start_date: sDate,
+      end_date: eDate,
       filter_branch_id: effectiveBranchId || null,
       filter_customer_id: customerId || null
   })
 
-  if (error || !metrics) return { revenue: 0, cost: { total: 0, driver: 0, fuel: 0, maintenance: 0, extra: 0 }, netProfit: 0, profitMargin: 0 }
+  if (!error && metrics) {
+    const fin = metrics.financial || {}
+    const rev = Number(fin.revenue) || 0
+    const nProfit = rev - (Number(fin.total_cost) || 0)
 
-  const fin = metrics.financial || {}
-  const rev = Number(fin.revenue) || 0
-  const nProfit = rev - (Number(fin.total_cost) || 0)
-
-  return {
-    revenue: rev,
-    cost: { 
-        total: Number(fin.total_cost) || 0, 
-        driver: Number(fin.driver_cost) || 0, 
-        fuel: Number(fin.fuel_cost) || 0, 
-        maintenance: Number(fin.maintenance_cost) || 0, 
-        secondary: Number(fin.extra_cost) || 0 
-    },
-    netProfit: nProfit,
-    profitMargin: rev > 0 ? (nProfit / rev) * 100 : 0
+    return {
+      revenue: rev,
+      cost: { 
+          total: Number(fin.total_cost) || 0, 
+          driver: Number(fin.driver_cost) || 0, 
+          fuel: Number(fin.fuel_cost) || 0, 
+          maintenance: Number(fin.maintenance_cost) || 0, 
+          extra: Number(fin.extra_cost) || 0,
+          secondary: Number(fin.extra_cost) || 0 
+      },
+      netProfit: nProfit,
+      profitMargin: rev > 0 ? (nProfit / rev) * 100 : 0
+    }
   }
+
+  // Fallback: Manual aggregation in JavaScript to bypass RPC type-casting errors
+  console.log('[getFinancialStats] Falling back to manual aggregation due to RPC error:', error)
+  try {
+      let query = supabase
+          .from('Jobs_Main')
+          .select('Price_Cust_Total, Cost_Driver_Total, Price_Cust_Extra, Cost_Driver_Extra, Job_Status')
+          .gte('Plan_Date', sDate!)
+          .lte('Plan_Date', eDate!)
+          
+      if (customerId) query = query.eq('Customer_ID', customerId)
+      if (effectiveBranchId) query = query.eq('Branch_ID', effectiveBranchId)
+
+      const { data: jobs, error: jobsErr } = await query
+      if (!jobsErr && jobs) {
+          let rev = 0
+          let costTotal = 0
+          let costDriver = 0
+          let costExtra = 0
+          
+          jobs.forEach(j => {
+              if (REVENUE_STATUSES.includes(j.Job_Status || '')) {
+                  const jobRev = (Number(j.Price_Cust_Total) || 0) + (Number(j.Price_Cust_Extra) || 0)
+                  const jobCost = (Number(j.Cost_Driver_Total) || 0) + (Number(j.Cost_Driver_Extra) || 0)
+                  
+                  rev += jobRev
+                  costTotal += jobCost
+                  costDriver += (Number(j.Cost_Driver_Total) || 0)
+                  costExtra += (Number(j.Cost_Driver_Extra) || 0)
+              }
+          })
+          
+          // Also fetch fuel logs for this month to add to cost if applicable
+          let fuelCost = 0
+          try {
+              let fuelQuery = supabase
+                  .from('Fuel_Logs')
+                  .select('Cost_Total')
+                  .gte('Refuel_Date', sDate!)
+                  .lte('Refuel_Date', eDate!)
+              
+              if (effectiveBranchId) {
+                  // Helper to get vehicle plates for branch
+                  const { getBranchPlates } = await import('./analytics-helpers')
+                  const plates = await getBranchPlates(effectiveBranchId)
+                  if (plates.length > 0) {
+                      fuelQuery = fuelQuery.in('Vehicle_Plate', plates)
+                  } else {
+                      fuelQuery = fuelQuery.eq('Vehicle_Plate', 'NON_EXISTENT')
+                  }
+              }
+              const { data: fuelLogs } = await fuelQuery
+              if (fuelLogs) {
+                  fuelCost = fuelLogs.reduce((sum, f) => sum + (Number(f.Cost_Total) || 0), 0)
+              }
+          } catch (e) {
+              console.warn('[getFinancialStats] Fuel fetch error:', e)
+          }
+
+          costTotal += fuelCost
+
+          return {
+              revenue: rev,
+              cost: {
+                  total: costTotal,
+                  driver: costDriver,
+                  fuel: fuelCost,
+                  maintenance: 0,
+                  extra: costExtra,
+                  secondary: costExtra
+              },
+              netProfit: rev - costTotal,
+              profitMargin: rev > 0 ? ((rev - costTotal) / rev) * 100 : 0
+          }
+      }
+  } catch (e) {
+      console.error('[getFinancialStats] Fallback execution error:', e)
+  }
+
+  return { revenue: 0, cost: { total: 0, driver: 0, fuel: 0, maintenance: 0, extra: 0, secondary: 0 }, netProfit: 0, profitMargin: 0 }
 }
 
 // Keep existing trend/distribution functions as fallbacks or for specific ranges, 
