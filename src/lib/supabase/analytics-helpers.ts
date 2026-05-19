@@ -3,6 +3,7 @@
 
 import { createAdminClient } from '@/utils/supabase/server'
 import { getUserBranchId, isSuperAdmin } from "@/lib/permissions"
+import { getSession } from "@/lib/session"
 
 export type FinancialJob = {
     Price_Cust_Total: number;
@@ -76,6 +77,34 @@ export async function getBranchPlates(branchId: string) {
 
 // Common helper to resolve branch filtering
 export async function getEffectiveBranchId(branchId?: string) {
+    const session = await getSession().catch(() => null)
+    
+    // If there is NO active session (e.g. server-to-server, LINE webhook, or Cron job)
+    if (!session) {
+        if (!branchId || branchId.toLowerCase() === 'all' || branchId.toLowerCase() === 'ทุกสาขา' || branchId.toUpperCase() === 'HQ') {
+            return null
+        }
+        
+        // Robust ID Resolution for backend context
+        const isName = branchId.length > 4 || branchId.includes(' ')
+        if (isName) {
+            try {
+                const supabase = await createAdminClient()
+                const { data: branches } = await supabase.from('Master_Branches').select('Branch_ID, Branch_Name')
+                if (branches) {
+                    const match = branches.find(b => 
+                        b.Branch_Name.trim().toLowerCase() === branchId.trim().toLowerCase() ||
+                        b.Branch_ID.trim().toLowerCase() === branchId.trim().toLowerCase()
+                    )
+                    if (match) return match.Branch_ID
+                }
+            } catch (e) {
+                console.error('[getEffectiveBranchId] Resolution error:', e)
+            }
+        }
+        return branchId.trim().toUpperCase()
+    }
+
     const userBranchId = await getUserBranchId()
     const isSuper = await isSuperAdmin()
     
