@@ -1173,30 +1173,47 @@ export async function POST(req: NextRequest) {
                     if ((text.includes('สเปค') || text.includes('สเปก') || text.includes('เกณฑ์') || text.includes('คู่มือ') || text.includes('ความจุมาตรฐาน') || text.includes('ความจุรถ') || text.includes('ขนาดรถ') || text.includes('ประเภทรถ') || text.includes('รถแต่ละประเภท') || text.includes('ความจุ')) && 
                         !text.includes('รายงาน') && !text.includes('สะสม') && !text.includes('ทั้งปี') && !text.includes('เดือนที่แล้ว') && !text.includes('วันนี้') && !text.includes('ยอด')) {
                         
-                        await replyToUser(replyToken, [
-                            '🛻 คู่มือสเปคและเกณฑ์ความจุรถขนส่ง (Vehicle Capacities)',
-                            'สำหรับแอดมินใช้อ้างอิงจัดคิวและวางแผนจัดส่งสินค้า:',
-                            '',
-                            '🏍️ 1. Motorcycle (รถจักรยานยนต์)',
-                            '  • น้ำหนักบรรทุกสูงสุด: 30 kg',
-                            '  • ปริมาตรบรรทุกสูงสุด: 0.2 CBM',
-                            '',
-                            '🛻 2. 4-Wheel / Pickup (รถ 4 ล้อ / ปิกอัพ)',
-                            '  • น้ำหนักบรรทุกสูงสุด: 1,500 kg (1.5 ตัน)',
-                            '  • ปริมาตรบรรทุกสูงสุด: 4.0 CBM',
-                            '',
-                            '🚚 3. 6-Wheel (รถบรรทุก 6 ล้อ)',
-                            '  • น้ำหนักบรรทุกสูงสุด: 5,000 kg (5.0 ตัน)',
-                            '  • ปริมาตรบรรทุกสูงสุด: 15.0 CBM',
-                            '',
-                            '🚛 4. 10-Wheel (รถบรรทุก 10 ล้อ)',
-                            '  • น้ำหนักบรรทุกสูงสุด: 12,000 kg (12.0 ตัน)',
-                            '  • ปริมาตรบรรทุกสูงสุด: 35.0 CBM',
-                            '',
-                            '💡 คำแนะนำการวางแผนจัดงาน:',
-                            '- พยายามเฉลี่ยน้ำหนักและ CBM ไม่ให้เกินค่าสูงสุดของประเภทรถที่ระบุ เพื่อความปลอดภัยทางจราจรและประหยัดน้ำมัน',
-                            '- หากต้องการดูประสิทธิภาพการบรรทุกสินค้าจริงของแต่ละสาขาในปัจจุบัน สามารถพิมพ์: "บรรทุก SKN" หรือ "น้ำหนักบรรทุก SKN"'
-                        ].join('\n'))
+                        const is4W = text.includes('4') || text.includes('สี่') || text.includes('pickup') || text.includes('ปิกอัพ') || text.includes('ปิคอัพ')
+                        const is6W = text.includes('6') || text.includes('หก')
+                        const is10W = text.includes('10') || text.includes('สิบ')
+                        const isMoto = text.includes('มอเตอร์') || text.includes('จักรยานยนต์') || text.includes('motorcycle') || text.includes('มอไซ')
+
+                        if (is4W) {
+                            await replyToUser(replyToken, [
+                                '🛻 สเปคและความจุ: 4-Wheel / Pickup (4 ล้อ / ปิกอัพ)',
+                                '• น้ำหนักบรรทุกสูงสุด: 1,500 kg (1.5 ตัน)',
+                                '• ปริมาตรบรรทุกสูงสุด: 4.0 CBM'
+                            ].join('\n'))
+                        } else if (is6W) {
+                            await replyToUser(replyToken, [
+                                '🚚 สเปคและความจุ: 6-Wheel (รถ 6 ล้อ)',
+                                '• น้ำหนักบรรทุกสูงสุด: 5,000 kg (5.0 ตัน)',
+                                '• ปริมาตรบรรทุกสูงสุด: 15.0 CBM'
+                            ].join('\n'))
+                        } else if (is10W) {
+                            await replyToUser(replyToken, [
+                                '🚛 สเปคและความจุ: 10-Wheel (รถ 10 ล้อ)',
+                                '• น้ำหนักบรรทุกสูงสุด: 12,000 kg (12.0 ตัน)',
+                                '• ปริมาตรบรรทุกสูงสุด: 35.0 CBM'
+                            ].join('\n'))
+                        } else if (isMoto) {
+                            await replyToUser(replyToken, [
+                                '🏍️ สเปคและความจุ: Motorcycle (มอเตอร์ไซค์)',
+                                '• น้ำหนักบรรทุกสูงสุด: 30 kg',
+                                '• ปริมาตรบรรทุกสูงสุด: 0.2 CBM'
+                            ].join('\n'))
+                        } else {
+                            await replyToUser(replyToken, [
+                                '🛻 เกณฑ์ความจุรถแต่ละประเภท (Vehicle Capacities):',
+                                '',
+                                '🏍️ มอเตอร์ไซค์: 30 kg | 0.2 CBM',
+                                '🛻 4 ล้อ / ปิกอัพ: 1,500 kg | 4.0 CBM',
+                                '🚚 รถ 6 ล้อ: 5,000 kg | 15.0 CBM',
+                                '🚛 รถ 10 ล้อ: 12,000 kg | 35.0 CBM',
+                                '',
+                                '💡 พิมพ์ระบุประเภทเพื่อดูสเปคเจาะจง เช่น "ความจุ 6 ล้อ"'
+                            ].join('\n'))
+                        }
                         continue
                     }
 
