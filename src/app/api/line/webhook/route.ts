@@ -76,6 +76,83 @@ function setLanguage(userId: string, lang: string) {
 }
 
 // ─────────────────────────────────────────────────────────────────
+// Driver State Management (Feature: Stateful Driver Flow)
+// ─────────────────────────────────────────────────────────────────
+interface DriverState {
+    jobId: string;
+    state: 'waiting_for_pickup_proof' | 'waiting_for_delivery_proof';
+}
+
+function getDriverState(userId: string): DriverState | null {
+    try {
+        const cachePath = '/tmp/line_driver_state.json'
+        if (fs.existsSync(cachePath)) {
+            const cache = JSON.parse(fs.readFileSync(cachePath, 'utf8'))
+            return cache[userId] || null
+        }
+    } catch (e) {
+        console.error('[Driver State Read Error]', e)
+    }
+    return null
+}
+
+function setDriverState(userId: string, jobId: string, state: DriverState['state']) {
+    try {
+        const cachePath = '/tmp/line_driver_state.json'
+        let cache: Record<string, DriverState> = {}
+        if (fs.existsSync(cachePath)) {
+            cache = JSON.parse(fs.readFileSync(cachePath, 'utf8'))
+        }
+        cache[userId] = { jobId, state }
+        fs.writeFileSync(cachePath, JSON.stringify(cache), 'utf8')
+    } catch (e) {
+        console.error('[Driver State Write Error]', e)
+    }
+}
+
+function clearDriverState(userId: string) {
+    try {
+        const cachePath = '/tmp/line_driver_state.json'
+        if (fs.existsSync(cachePath)) {
+            const cache = JSON.parse(fs.readFileSync(cachePath, 'utf8'))
+            delete cache[userId]
+            fs.writeFileSync(cachePath, JSON.stringify(cache), 'utf8')
+        }
+    } catch (e) {
+        console.error('[Driver State Clear Error]', e)
+    }
+}
+
+async function getActiveDriverJob(driverId: string) {
+    const supabase = await createAdminClient()
+    
+    // 1. Try to find an active job that is already In Progress or Picked Up
+    const { data: activeJob } = await supabase.from('Jobs_Main')
+        .select('Job_ID, Job_Status, Customer_Name, Route_Name')
+        .eq('Driver_ID', driverId)
+        .in('Job_Status', ['In Progress', 'Picked Up', 'In Transit', 'กำลังโหลด', 'ระหว่างขนส่ง'])
+        .order('Plan_Date', { ascending: true })
+        .limit(1)
+        .maybeSingle()
+        
+    if (activeJob) return activeJob
+    
+    // 2. If no job is in progress, look for today's earliest Assigned / Confirmed job
+    const now = new Date()
+    const todayDate = now.toLocaleDateString('en-CA', { timeZone: 'Asia/Bangkok' })
+    const { data: assignedJob } = await supabase.from('Jobs_Main')
+        .select('Job_ID, Job_Status, Customer_Name, Route_Name')
+        .eq('Driver_ID', driverId)
+        .eq('Plan_Date', todayDate)
+        .in('Job_Status', ['Assigned', 'Confirmed', 'New', 'Pending'])
+        .order('Created_At', { ascending: true })
+        .limit(1)
+        .maybeSingle()
+        
+    return assignedJob || null
+}
+
+// ─────────────────────────────────────────────────────────────────
 // Models (same as /api/chat) - Direct REST, no SDK
 // ─────────────────────────────────────────────────────────────────
 const GEMINI_MODELS = [
@@ -468,6 +545,68 @@ export async function POST(req: NextRequest) {
                             ))
                             await replyToUser(replyToken, lines.join('\n\n'))
                         }
+                        continue
+                    }
+
+                    // ── Stateful Driver Flow Shortcuts ──────────────────
+                    if (text === 'รับงาน' || text === 'เริ่มงาน') {
+                        const activeJob = await getActiveDriverJob(boundDriver.Driver_ID)
+                        if (!activeJob) {
+                            await replyToUser(replyToken, `❌ พี่ ${boundDriver.Driver_Name} ยังไม่มีใบงานที่ได้รับมอบหมายสำหรับวันนี้ครับ ลองพิมพ์คำว่า "งาน" เพื่อเช็คดูนะครับ`)
+                            continue
+                        }
+                        
+                        const { error } = await supabase.from('Jobs_Main')
+                            .update({ Job_Status: 'In Progress' })
+                            .eq('Job_ID', activeJob.Job_ID)
+                            
+                        if (error) {
+                            await replyToUser(replyToken, `❌ ไม่สามารถบันทึกเริ่มงานได้: ${error.message}`)
+                            continue
+                        }
+                        
+                        clearDriverState(userId)
+                        
+                        let replyMsg = `✅ เริ่มงาน ${activeJob.Job_ID} (${activeJob.Customer_Name}) เรียบร้อยครับ!\n🚛 ขับรถปลอดภัย พิมพ์คำว่า "รับ" เมื่อถึงจุดโหลดสินค้าครับ`
+                        const userLang = getLanguage(userId)
+                        if (userLang === 'MM') {
+                            replyMsg = `✅ လုပ်ငန်း ${activeJob.Job_ID} ကို စတင်လိုက်ပါပြီ။\n🚛 ဂိုဒေါင်သို့ရောက်လျှင် "รับ" ဟု ရိုက်နှိပ်ပါ။`
+                        } else if (userLang === 'KH') {
+                            replyMsg = `✅ ការងារ ${activeJob.Job_ID} ត្រូវបានចាប់ផ្តើមជោគជ័យ!\n🚛 សូមវាយពាក្យ "รับ" នៅពេលដល់ឃ្លាំង`
+                        } else if (userLang === 'EN') {
+                            replyMsg = `✅ Started job ${activeJob.Job_ID} successfully!\n🚛 Drive safely. Type "รับ" when you reach the warehouse.`
+                        }
+                        
+                        await replyToUser(replyToken, replyMsg)
+                        continue
+                    }
+                    
+                    if (text === 'รับ' || text === 'รับของ' || text === 'รับสินค้า' || text === 'PICKUP') {
+                        const activeJob = await getActiveDriverJob(boundDriver.Driver_ID)
+                        if (!activeJob) {
+                            await replyToUser(replyToken, `❌ ยังไม่มีงานที่กำลังวิ่งอยู่ขณะนี้ครับ กรุณาพิมพ์คำว่า "รับงาน" ก่อนครับ`)
+                            continue
+                        }
+                        
+                        setDriverState(userId, activeJob.Job_ID, 'waiting_for_pickup_proof')
+                        
+                        await replyToUser(replyToken, `📦 [รับสินค้า - ${activeJob.Job_ID}]\n\nรบกวนพี่ ${boundDriver.Driver_Name} ส่งรูปถ่ายขณะโหลดสินค้า หรือบิลรับของเพื่อยืนยันการรับของขึ้นรถได้เลยครับ บอทจะทำการลงบันทึกให้ทันที!`)
+                        continue
+                    }
+                    
+                    if (text === 'ส่ง' || text === 'ส่งของ' || text === 'ส่งสินค้า' || text === 'DELIVER' || text === 'EPOD') {
+                        const activeJob = await getActiveDriverJob(boundDriver.Driver_ID)
+                        if (!activeJob) {
+                            await replyToUser(replyToken, `❌ ยังไม่มีงานที่กำลังวิ่งส่งอยู่ในขณะนี้ครับ ลองพิมพ์คำว่า "งาน" เพื่อเช็คงานครับ`)
+                            continue
+                        }
+                        
+                        setDriverState(userId, activeJob.Job_ID, 'waiting_for_delivery_proof')
+                        
+                        const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://tms-app.vercel.app'
+                        const liffUrl = `https://liff.line.me/${process.env.NEXT_PUBLIC_LIFF_SIGNATURE_ID || '2006123456-ABCdefgh'}?jobId=${activeJob.Job_ID}`
+                        
+                        await replyToUser(replyToken, `🚛 [ส่งมอบสินค้า - ${activeJob.Job_ID}]\n\nพี่คนขับสามารถทำการยืนยันจัดส่งได้ผ่าน 2 วิธีนี้ครับ:\n\n📸 วิธีที่ 1: ถ่ายรูปสินค้าที่ส่งมอบ หรือรูปใบเสร็จที่มีลายเซ็นลูกค้าแล้วส่งเข้าห้องแชทนี้\n\n✍️ วิธีที่ 2: ในกรณีไม่มีเอกสารกระดาษ สามารถให้ลูกค้าเซ็นชื่อสดบนหน้าจอมือถือได้ทันทีที่นี่ครับ:\n🔗 เซ็นชื่อรับสินค้า: ${liffUrl}`)
                         continue
                     }
 
@@ -1093,6 +1232,84 @@ export async function POST(req: NextRequest) {
 
                     // ── Driver-specific Smart Photo Processing (ePOD & Fuel Receipts) ──────────────────
                     if (boundDriver && event.message.type === 'image') {
+                        // Check if the driver has an active state from our stateful flow
+                        const driverState = getDriverState(userId)
+                        if (driverState) {
+                            const jobId = driverState.jobId
+                            const stateType = driverState.state
+                            
+                            const { data: activeJob } = await supabase.from('Jobs_Main')
+                                .select('Job_ID, Customer_Name, Route_Name, Job_Status, Photo_Proof_Url')
+                                .eq('Job_ID', jobId)
+                                .eq('Driver_ID', boundDriver.Driver_ID)
+                                .maybeSingle()
+                                
+                            if (activeJob) {
+                                const timestamp = Date.now()
+                                const fileNameStr = `${activeJob.Job_ID}_${timestamp}.jpg`
+                                const uploadRes = await uploadFileToSupabase(buffer, fileNameStr, 'image/jpeg', 'POD_Photos')
+                                
+                                const newPhotos = activeJob.Photo_Proof_Url 
+                                    ? `${activeJob.Photo_Proof_Url},${uploadRes.directLink}` 
+                                    : uploadRes.directLink
+
+                                const now = new Date()
+                                const timeString = now.toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false, timeZone: 'Asia/Bangkok' })
+                                const dateString = now.toLocaleDateString('en-CA', { timeZone: 'Asia/Bangkok' })
+
+                                if (stateType === 'waiting_for_pickup_proof') {
+                                    // Try updating including Actual_Pickup_Time, fallback if column doesn't exist
+                                    let pickupUpdate: any = {
+                                        Job_Status: 'Picked Up',
+                                        Photo_Proof_Url: newPhotos
+                                    }
+                                    try {
+                                        pickupUpdate.Actual_Pickup_Time = timeString
+                                        pickupUpdate.Pickup_Date = dateString
+                                    } catch {}
+                                    
+                                    await supabase.from('Jobs_Main').update(pickupUpdate).eq('Job_ID', activeJob.Job_ID)
+                                    clearDriverState(userId)
+                                    
+                                    await replyToUser(replyToken, `📦 [บันทึกการรับสินค้าเรียบร้อย]\n\n✅ อัปโหลดรูปภาพหลักฐานรับสินค้าสำหรับงาน #${activeJob.Job_ID} เรียบร้อยแล้วครับ!\n\nสถานะงานถูกปรับเป็น 'รับสินค้าแล้ว' (Picked Up) เข้าระบบส่วนกลางเรียบร้อยครับ 🚛💨\n\nเมื่อพี่ขับรถเดินทางไปถึงปลายทางแล้ว สามารถพิมพ์คำว่า "ส่งของ" เพื่อปิดงานได้เลยครับ`)
+                                    continue
+                                } else if (stateType === 'waiting_for_delivery_proof') {
+                                    await supabase.from('Jobs_Main').update({
+                                        Job_Status: 'Delivered',
+                                        Photo_Proof_Url: newPhotos,
+                                        Actual_Delivery_Time: timeString,
+                                        Delivery_Date: dateString
+                                    }).eq('Job_ID', activeJob.Job_ID)
+                                    
+                                    clearDriverState(userId)
+
+                                    // Trigger Customer Satisfaction Survey
+                                    try {
+                                        const { data: jobWithCust } = await supabase.from('Jobs_Main')
+                                            .select('Customer_ID')
+                                            .eq('Job_ID', activeJob.Job_ID)
+                                            .single()
+
+                                        if (jobWithCust?.Customer_ID) {
+                                            const { data: custInfo } = await supabase.from('Master_Customers')
+                                                .select('Line_User_ID')
+                                                .eq('Customer_ID', jobWithCust.Customer_ID)
+                                                .single()
+                                            
+                                            if (custInfo?.Line_User_ID) {
+                                                await pushToUser(custInfo.Line_User_ID, `📦 [แจ้งเตือนการส่งมอบสินค้า]\n\nเรียนคุณลูกค้า สินค้าของงาน #${activeJob.Job_ID} ได้รับการจัดส่งเรียบร้อยแล้วครับ!\n\n⭐️ เพื่อการปรับปรุงและพัฒนาบริการที่ดีขึ้น กรุณาให้คะแนนความพึงพอใจโดยการส่งตัวเลขกลับหาเรา:\nพิมพ์ "5" สำหรับ ดีเยี่ยม ⭐️⭐️⭐️⭐️⭐️\nพิมพ์ "4" สำหรับ ดีมาก ⭐️⭐️⭐️⭐️\nพิมพ์ "3" สำหรับ ปานกลาง ⭐️⭐️⭐️\nพิมพ์ "2" สำหรับ พอใช้ ⭐️⭐️\nพิมพ์ "1" สำหรับ ต้องปรับปรุง ⭐️`)
+                                            }
+                                        }
+                                    } catch (surveyErr) {
+                                        console.error('[LINE Survey Send Error]', surveyErr)
+                                    }
+
+                                    await replyToUser(replyToken, `📸 [ยืนยันการส่งมอบสินค้า ePOD]\n\n✅ อัปโหลดรูปภาพหลักฐานส่งมอบสำหรับงาน #${activeJob.Job_ID} เรียบร้อยแล้วครับ!\n\nสถานะงานถูกปรับเป็น 'ส่งของแล้ว' (Delivered) เข้าระบบส่วนกลางเรียบร้อยครับ 🚛💨`)
+                                    continue
+                                }
+                            }
+                        }
+
                         // 1. Ask Gemini to classify and extract
                         const classPrompt = `
                         Analyze this image uploaded by the driver "${userName}".
