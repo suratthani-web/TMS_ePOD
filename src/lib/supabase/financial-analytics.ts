@@ -584,6 +584,78 @@ export async function getJobCountSummary(startDate?: string, endDate?: string, b
     }
 }
 
+export async function getVehicleUtilizationSummary(startDate?: string, endDate?: string, branchId?: string) {
+    const supabase = await createAdminClient()
+    const customerId = await getCustomerId()
+    const effectiveBranchId = await getEffectiveBranchId(branchId)
+
+    const sDate = formatDateSafe(startDate) || formatDateSafe(new Date(new Date().getFullYear(), new Date().getMonth(), 1))
+    const eDate = formatDateSafe(endDate) || formatDateSafe(new Date())
+
+    let query = supabase
+        .from('Jobs_Main')
+        .select('Job_ID, Weight_Kg, Volume_Cbm, Vehicle_Type')
+        .gte('Plan_Date', sDate!)
+        .lte('Plan_Date', eDate!)
+
+    if (customerId) query = query.eq('Customer_ID', customerId)
+    if (effectiveBranchId) query = query.eq('Branch_ID', effectiveBranchId)
+
+    const { data: jobs, error } = await query
+    if (error || !jobs) {
+        return []
+    }
+
+    const VEHICLE_CAPACITIES: Record<string, { weight: number, volume: number }> = {
+        '4-Wheel': { weight: 1500, volume: 4.0 },
+        'Pickup': { weight: 1500, volume: 4.0 },
+        '6-Wheel': { weight: 5000, volume: 15.0 },
+        '10-Wheel': { weight: 12000, volume: 35.0 },
+        'Motorcycle': { weight: 30, volume: 0.2 },
+    }
+
+    const typeStats: Record<string, { jobCount: number, totalWeight: number, totalVolume: number, maxWeight: number, maxVolume: number }> = {}
+
+    // Initialize with all standard types
+    Object.entries(VEHICLE_CAPACITIES).forEach(([type, cap]) => {
+        typeStats[type] = {
+            jobCount: 0,
+            totalWeight: 0,
+            totalVolume: 0,
+            maxWeight: cap.weight,
+            maxVolume: cap.volume
+        }
+    })
+
+    jobs.forEach(j => {
+        const type = j.Vehicle_Type || 'Pickup'
+        if (!typeStats[type]) {
+            typeStats[type] = {
+                jobCount: 0,
+                totalWeight: 0,
+                totalVolume: 0,
+                maxWeight: 1500,
+                maxVolume: 4.0
+            }
+        }
+        
+        typeStats[type].jobCount += 1
+        typeStats[type].totalWeight += Number(j.Weight_Kg) || 0
+        typeStats[type].totalVolume += Number(j.Volume_Cbm) || 0
+    })
+
+    return Object.entries(typeStats).map(([type, stats]) => ({
+        type,
+        jobCount: stats.jobCount,
+        totalWeight: Math.round(stats.totalWeight),
+        totalVolume: Number(stats.totalVolume.toFixed(2)),
+        maxWeightLimit: stats.maxWeight,
+        maxVolumeLimit: stats.maxVolume,
+        avgWeightPerJob: stats.jobCount > 0 ? Math.round(stats.totalWeight / stats.jobCount) : 0,
+        avgVolumePerJob: stats.jobCount > 0 ? Number((stats.totalVolume / stats.jobCount).toFixed(2)) : 0
+    })).filter(item => item.jobCount > 0)
+}
+
 export async function getRevenueTrend(startDate?: string, endDate?: string, branchId?: string) {
   try {
     const supabase = await createAdminClient()

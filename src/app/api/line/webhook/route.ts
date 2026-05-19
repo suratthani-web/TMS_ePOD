@@ -671,7 +671,8 @@ export async function POST(req: NextRequest) {
                         'รถเสีย', 'แจ้งซ่อม', 'งานซ่อม', 'น้ำมัน', 'สุขภาพรถ', 'fleet', 'สภาพรถ',
                         'คนขับลา', 'ลาหยุด', 'ลาวันนี้',
                         'ทั้งปี', 'ปีนี้', 'YEAR', 'ANNUAL',
-                        'เดือนที่แล้ว', 'LAST MONTH', 'ก่อนหน้า', 'เดือนก่อนหน้า'
+                        'เดือนที่แล้ว', 'LAST MONTH', 'ก่อนหน้า', 'เดือนก่อนหน้า',
+                        'น้ำหนัก', 'CBM', 'ความจุรถ', 'บรรทุก', 'ความจุ'
                     ]
                     let cleanedText = rawText
                     cmdWords.forEach(w => {
@@ -1164,6 +1165,60 @@ export async function POST(req: NextRequest) {
                         }
 
                         await replyToUser(replyToken, lines.join('\n'))
+                        continue
+                    }
+
+                    // --- 4.2.3 Vehicle Utilization (Admin only) ---
+                    if ((text.includes('น้ำหนัก') || text.includes('CBM') || text.includes('ความจุรถ') || text.includes('บรรทุก') || text.includes('ความจุ')) && boundAdmin) {
+                        let startDate: string | undefined = undefined
+                        let endDate: string | undefined = undefined
+                        let periodName = 'เดือนปัจจุบัน'
+
+                        if (text.includes('ทั้งปี') || text.includes('ปีนี้') || text.includes('YEAR') || text.includes('ANNUAL')) {
+                            const now = new Date()
+                            startDate = `${now.getFullYear()}-01-01`
+                            endDate = now.toLocaleDateString('en-CA', { timeZone: 'Asia/Bangkok' })
+                            periodName = `ทั้งปี ${now.getFullYear()}`
+                        } else if (text.includes('เดือนที่แล้ว') || text.includes('LAST MONTH') || text.includes('ก่อนหน้า')) {
+                            const now = new Date()
+                            const prevMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1)
+                            const lastDayPrevMonth = new Date(now.getFullYear(), now.getMonth(), 0)
+                            startDate = prevMonth.toLocaleDateString('en-CA', { timeZone: 'Asia/Bangkok' })
+                            endDate = lastDayPrevMonth.toLocaleDateString('en-CA', { timeZone: 'Asia/Bangkok' })
+                            
+                            const monthName = prevMonth.toLocaleString('th-TH', { month: 'long', timeZone: 'Asia/Bangkok' })
+                            periodName = `เดือนที่แล้ว (${monthName})`
+                        }
+
+                        const utilSummary = await aiToolExecutors.get_vehicle_utilization_summary({ 
+                            branchId: targetBranchId,
+                            startDate,
+                            endDate
+                        })
+
+                        const lines: string[] = [
+                            `🛻 รายงานการบรรทุกสินค้า (${periodName})`,
+                            `📍 ขอบเขต: ${scopeName}`,
+                            ''
+                        ]
+
+                        if (utilSummary && utilSummary.length > 0) {
+                            utilSummary.forEach((v: any) => {
+                                const weightUtil = v.maxWeightLimit > 0 ? ((v.avgWeightPerJob / v.maxWeightLimit) * 100).toFixed(1) : '0'
+                                const volUtil = v.maxVolumeLimit > 0 ? ((v.avgVolumePerJob / v.maxVolumeLimit) * 100).toFixed(1) : '0'
+                                
+                                lines.push(`🚚 ประเภทรถ: ${v.type}`)
+                                lines.push(`  • จำนวนงาน: ${v.jobCount} เที่ยว`)
+                                lines.push(`  • น้ำหนักสะสม: ${v.totalWeight?.toLocaleString()} kg (เฉลี่ย ${v.avgWeightPerJob} kg/เที่ยว)`)
+                                lines.push(`  • CBM สะสม: ${v.totalVolume?.toLocaleString()} CBM (เฉลี่ย ${v.avgVolumePerJob} CBM/เที่ยว)`)
+                                lines.push(`  • อัตราเฉลี่ย: บรรทุก ${weightUtil}% ของน้ำหนักรถ | ${volUtil}% ของ CBM รถ`)
+                                lines.push('')
+                            })
+                        } else {
+                            lines.push('📭 ไม่พบข้อมูลการวิ่งงานในช่วงเวลานี้ครับ')
+                        }
+
+                        await replyToUser(replyToken, lines.join('\n').trim())
                         continue
                     }
 

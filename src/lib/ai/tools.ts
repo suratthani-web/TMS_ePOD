@@ -1,7 +1,7 @@
 import { getJobById, getAllJobs } from "@/lib/supabase/jobs"
 import { getDriverById, getAllDriversFromTable } from "@/lib/supabase/drivers"
 import { getVehicleByPlate, getAllVehiclesFromTable } from "@/lib/supabase/vehicles"
-import { getFinancialStats, getJobCountSummary } from "@/lib/supabase/financial-analytics"
+import { getFinancialStats, getJobCountSummary, getVehicleUtilizationSummary } from "@/lib/supabase/financial-analytics"
 import { getAllCustomers } from "@/lib/supabase/customers"
 import { getDamageReports } from "@/lib/supabase/damage-reports"
 import { getDriverLeaves } from "@/lib/supabase/driver-leaves"
@@ -166,6 +166,9 @@ export const aiToolExecutors: Record<string, Function> = {
   },
   get_job_count_summary: async (args: { branchId?: string, startDate?: string, endDate?: string }) => {
     return await getJobCountSummary(args.startDate, args.endDate, args.branchId)
+  },
+  get_vehicle_utilization_summary: async (args: { branchId?: string, startDate?: string, endDate?: string }) => {
+    return await getVehicleUtilizationSummary(args.startDate, args.endDate, args.branchId)
   },
 
   // ---- CUSTOMERS ----
