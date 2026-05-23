@@ -96,8 +96,8 @@ export function DashboardMap({ drivers, allJobs = [], activeJobs = [], focusPosi
     // Generate Mission Locations (Origins & Destinations) for each job
     const jobMissions = useMemo(() => {
         const missions: any[] = []
-        // Prioritize activeJobs (live missions) over allJobs (heatmap data)
-        const jobsToUse = activeJobs.length > 0 ? activeJobs : allJobs
+        // Only render interactive mission markers for active (live) jobs
+        const jobsToUse = activeJobs
         
         jobsToUse.forEach(j => {
             const oLat = Number(j.Pickup_Lat) || 0

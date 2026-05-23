@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useMemo } from "react"
 import { PremiumCard } from "@/components/ui/premium-card"
 import { 
     TrendingUp, 
@@ -84,10 +84,19 @@ export function ExecutiveDashboardClient({ initialData, initialRemark, branchId,
         }
     }
 
-    // Real-time: Jobs_Main - trigger a lightweight refresh
-    useRealtime('Jobs_Main', (payload) => {
-        loadData(false)
-    })
+    // Real-time: Jobs_Main (Throttled to protect Vercel Serverless quota)
+    const throttledLoadData = useMemo(() => {
+        let inThrottle = false;
+        return () => {
+            if (!inThrottle) {
+                loadData(false)
+                inThrottle = true
+                setTimeout(() => { inThrottle = false }, 15000) // 15 seconds cooldown
+            }
+        }
+    }, [])
+
+    useRealtime('Jobs_Main', throttledLoadData)
 
     const handleSaveRemark = async () => {
         setSavingRemark(true)

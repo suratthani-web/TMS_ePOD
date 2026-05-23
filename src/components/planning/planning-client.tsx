@@ -100,10 +100,19 @@ export function PlanningClient({
     const [templateCustomerId, setTemplateCustomerId] = useState<string>("")
     const { t } = useLanguage()
 
-    // Real-time: Jobs_Main
-    useRealtime('Jobs_Main', () => {
-        router.refresh()
-    })
+    // Real-time: Jobs_Main (Throttled to protect Vercel Serverless quota)
+    const throttledRefresh = useMemo(() => {
+        let inThrottle = false;
+        return () => {
+            if (!inThrottle) {
+                router.refresh()
+                inThrottle = true
+                setTimeout(() => { inThrottle = false }, 15000) // 15 seconds cooldown
+            }
+        }
+    }, [router])
+
+    useRealtime('Jobs_Main', throttledRefresh)
 
     const handleDateChange = (newDate: string) => {
         const params = new URLSearchParams(window.location.search)

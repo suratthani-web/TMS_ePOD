@@ -780,28 +780,28 @@ export async function deleteJob(jobId: string) {
   return { success: true, message: 'Job deleted successfully' }
 }
 
-export async function getJobCreationData() {
+export async function getJobCreationData(selectedBranchId?: string) {
   const isSuper = await isSuperAdmin()
   const isAdminUser = await isAdmin()
-  const branchId = await getUserBranchId()
+  const userBranchId = await getUserBranchId()
+  // Resolve branchId to use for queries and filters
+  const branchId = (isSuper || isAdminUser) ? (selectedBranchId || userBranchId) : userBranchId
   const supabase = (isSuper || isAdminUser) ? createAdminClient() : await createClient()
 
   const [driversResult, vehiclesResult, customersResult, routesResult, subcontractorsResult] = await Promise.all([
-    getAllDriversFromTable(),
-    getAllVehiclesFromTable(),
+    getAllDriversFromTable(branchId),
+    getAllVehiclesFromTable(branchId),
     supabase.from('Master_Customers').select('*').order('Customer_Name', { ascending: true }),
     supabase.from('Master_Routes').select('*').order('Route_Name', { ascending: true }),
     supabase.from('Master_Subcontractors').select('*').order('Sub_Name', { ascending: true })
   ])
 
-  // Filter regular select results by branch if not admin using RLS or manual filter if no RLS
-  // Note: drivers/vehicles already have branch filtering inside their helper functions.
-  // For others, if the user is not an admin, we might need a manual filter if RLS is not fully configured for those tables.
+  // Filter regular select results by branch
   let customers = customersResult.data || []
   let routes = routesResult.data || []
   let subcontractors = subcontractorsResult.data || []
 
-  if (branchId && branchId !== 'All' && !isSuper) {
+  if (branchId && branchId !== 'All') {
       customers = customers.filter(c => c.Branch_ID === branchId)
       routes = routes.filter(r => r.Branch_ID === branchId)
       subcontractors = subcontractors.filter(s => s.Branch_ID === branchId)

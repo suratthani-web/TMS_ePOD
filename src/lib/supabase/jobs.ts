@@ -205,12 +205,14 @@ export async function getAllJobs(
   query = '',
   status = '', // Add status parameter
   startDate = '', // Add startDate parameter
-  endDate = '' // Add endDate parameter
+  endDate = '', // Add endDate parameter
+  providedBranchId = ''
 ): Promise<{ data: Job[], count: number }> {
   try {
     const isSuper = await isSuperAdmin()
     const isRegularAdmin = await isAdmin()
-    const branchId = await getUserBranchId()
+    const userBranchId = await getUserBranchId()
+    const branchId = (isSuper || isRegularAdmin) ? (providedBranchId || userBranchId) : userBranchId
     const customerId = await getCustomerId()
     const supabase = (isSuper || isRegularAdmin || customerId) ? createAdminClient() : await createClient()
     
@@ -326,11 +328,12 @@ export async function getTodayJobStats(branchId?: string, startDate?: string, en
 }
 
 // นับสถิติงานรวม (Global Stats สำหรับหน้า History)
-export async function getJobStatsSummary(query = '', startDate = '', endDate = '') {
+export async function getJobStatsSummary(query = '', startDate = '', endDate = '', providedBranchId = '') {
   try {
     const isSuper = await isSuperAdmin()
     const isRegularAdmin = await isAdmin()
-    const branchId = await getUserBranchId()
+    const userBranchId = await getUserBranchId()
+    const branchId = (isSuper || isRegularAdmin) ? (providedBranchId || userBranchId) : userBranchId
     const customerId = await getCustomerId()
     const supabase = (isSuper || isRegularAdmin || customerId) ? await createAdminClient() : await createClient()
     
@@ -348,6 +351,8 @@ export async function getJobStatsSummary(query = '', startDate = '', endDate = '
             } else {
                 return { success: 0, failed: 0, cancelled: 0, total: 0 }
             }
+        } else if (branchId && branchId !== 'All') {
+            dbQuery = dbQuery.eq('Branch_ID', branchId)
         }
     }
 

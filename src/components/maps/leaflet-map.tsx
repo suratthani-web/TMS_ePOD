@@ -3,7 +3,7 @@
 import { MapContainer, TileLayer, Marker, Popup, useMap, Polyline, CircleMarker, useMapEvents } from 'react-leaflet'
 import L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
-import { useEffect, useState, useRef, Fragment } from 'react'
+import { useEffect, useState, useRef, Fragment, useMemo } from 'react'
 import { Truck, MapPin } from 'lucide-react'
 import { ProfitabilityHeatmap, ProfitPoint } from './profitability-heatmap'
 import { cn } from '@/lib/utils'
@@ -14,21 +14,26 @@ let redIcon: any;
 let goldIcon: any;
 let greenIcon: any;
 
-const createMissionIcon = (type: 'origin' | 'destination', status?: string) => {
-    const color = type === 'origin' ? '#a855f7' : '#f43f5e'
-    return L.divIcon({
-        className: 'custom-mission-icon',
-        html: `
-            <div style="position: relative; display: flex; align-items: center; justify-content: center; width: 32px; height: 32px;">
-                <div style="position: absolute; inset: 0; background: rgba(255, 255, 255, 0.4); backdrop-filter: blur(2px); border-radius: 9999px; box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1); border: 2px solid ${color};"></div>
-                <div style="position: relative; z-index: 10; width: 10px; height: 10px; border-radius: 9999px; background-color: ${color}; opacity: 0.8; ${status === 'SOS' ? 'animation: ping 1s cubic-bezier(0, 0, 0.2, 1) infinite;' : ''}"></div>
-                <div style="position: absolute; inset: 0; border-radius: 9999px; background-color: ${color}; opacity: 0.1; animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;"></div>
-            </div>
-        `,
-        iconSize: [32, 32],
-        iconAnchor: [16, 16],
-        popupAnchor: [0, -10]
-    })
+const missionIconsCache: Record<string, L.DivIcon> = {};
+const getMissionIcon = (type: 'origin' | 'destination', status?: string) => {
+    const cacheKey = `${type}-${status === 'SOS' ? 'SOS' : 'normal'}`;
+    if (!missionIconsCache[cacheKey]) {
+        const color = type === 'origin' ? '#a855f7' : '#f43f5e';
+        missionIconsCache[cacheKey] = L.divIcon({
+            className: 'custom-mission-icon',
+            html: `
+                <div style="position: relative; display: flex; align-items: center; justify-content: center; width: 32px; height: 32px;">
+                    <div style="position: absolute; inset: 0; background: rgba(255, 255, 255, 0.4); backdrop-filter: blur(2px); border-radius: 9999px; box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1); border: 2px solid ${color};"></div>
+                    <div style="position: relative; z-index: 10; width: 10px; height: 10px; border-radius: 9999px; background-color: ${color}; opacity: 0.8; ${status === 'SOS' ? 'animation: ping 1s cubic-bezier(0, 0, 0.2, 1) infinite;' : ''}"></div>
+                    <div style="position: absolute; inset: 0; border-radius: 9999px; background-color: ${color}; opacity: 0.1; animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;"></div>
+                </div>
+            `,
+            iconSize: [32, 32],
+            iconAnchor: [16, 16],
+            popupAnchor: [0, -10]
+        });
+    }
+    return missionIconsCache[cacheKey];
 }
 
 const initIcons = () => {
@@ -225,7 +230,7 @@ export default function LeafletMap({
                 <Fragment key={mission.id}>
                     <Marker 
                         position={[mission.lat, mission.lng]} 
-                        icon={createMissionIcon(mission.type, mission.status)}
+                        icon={getMissionIcon(mission.type, mission.status)}
                     >
                         <Popup>
                             <div className="p-1 min-w-[150px]">
@@ -319,10 +324,10 @@ export default function LeafletMap({
                     pathOptions={{ color: '#2563eb', fillColor: '#3b82f6', fillOpacity: 1 }} 
                 />
             ))}
-            <Marker position={routeHistory[0]} icon={createMissionIcon('origin')}>
+            <Marker position={routeHistory[0]} icon={getMissionIcon('origin')}>
                 <Popup><p className="font-bold">📍 จุดเริ่มต้น</p></Popup>
             </Marker>
-            <Marker position={routeHistory[routeHistory.length - 1]} icon={createMissionIcon('destination')}>
+            <Marker position={routeHistory[routeHistory.length - 1]} icon={getMissionIcon('destination')}>
                 <Popup><p className="font-bold">🚩 ตำแหน่งล่าสุด</p></Popup>
             </Marker>
         </>
@@ -340,7 +345,7 @@ export default function LeafletMap({
                 <Marker 
                     key={idx} 
                     position={[p.lat, p.lng]} 
-                    icon={createMissionIcon(p.type === 'start' ? 'origin' : 'destination')}
+                    icon={getMissionIcon(p.type === 'start' ? 'origin' : 'destination')}
                 >
                     <Popup>
                         <div className="text-xl">
@@ -408,48 +413,52 @@ function MovingMarker({ driver, onShowRoute }: { driver: DriverLocation, onShowR
 
   const isSpeeding = (driver.speed || 0) * 3.6 > 90;
 
+  const driverIcon = useMemo(() => {
+    return L.divIcon({
+        className: 'custom-div-icon',
+        html: `
+            <div class="relative flex items-center justify-center" style="width: 60px; height: 60px;">
+                <!-- Speeding / SOS Alert Background -->
+                ${isSpeeding || driver.status === 'SOS' ? `
+                    <div class="absolute inset-0 bg-red-500/20 rounded-full animate-ping"></div>
+                    <div class="absolute inset-0 border-4 border-red-500/50 rounded-full animate-pulse"></div>
+                ` : ''}
+
+                <!-- Floating License Plate -->
+                <div class="absolute -top-10 left-1/2 -translate-x-1/2 whitespace-nowrap bg-card/90 text-foreground text-base font-bold font-black px-2 py-0.5 rounded-lg border border-border/20 shadow-2xl z-30 pointer-events-none">
+                    ${driver.vehiclePlate || 'N/A'} ${isSpeeding ? `<span class="text-red-500 ml-1">⚡ ${((driver.speed || 0) * 3.6).toFixed(0)}</span>` : ''}
+                </div>
+
+                <!-- Direction indicator -->
+                <div class="absolute" style="transform: rotate(${heading}deg) translateY(-28px);">
+                    <div class="w-0 h-0 border-l-[6px] border-l-transparent border-r-[6px] border-r-transparent border-b-[10px] ${isSpeeding ? 'border-b-red-500 shadow-[0_0_10px_rgba(239,68,68,0.8)]' : 'border-b-emerald-500 shadow-[0_0_10px_rgba(16,185,129,0.8)]'}"></div>
+                </div>
+
+                <!-- Marker Body -->
+                <div class="relative flex items-center justify-center p-2.5 bg-background rounded-2xl shadow-2xl border border-border/20"
+                     style="transform: rotate(${heading}deg); border-bottom: 4px solid ${isSpeeding || driver.status === 'SOS' ? '#ef4444' : '#10b981'};">
+                    
+                    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" class="${isSpeeding || driver.status === 'SOS' ? 'text-red-500' : 'text-emerald-400'}">
+                        <path d="M1 14H17M1 14L2 7H14L17 14M1 14V18H3M17 14V18H15M17 14H23V18H21M17 11H21L23 14M7 18C7 19.1046 6.10457 20 5 20C3.89543 20 3 19.1046 3 18C3 16.8954 3.89543 16 5 18ZM7 18C7 16.8954 7.89543 16 9 16C10.1046 16 11 16.8954 11 18M11 18C11 19.1046 10.1046 20 9 20C7.89543 20 7 19.1046 7 18ZM19 18C19 19.1046 18.1046 20 17 20C15.8954 20 15 19.1046 15 18C15 16.8954 15.8954 16 17 16C18.1046 16 19 16.8954 19 18ZM21 18C21 19.1046 20.1046 20 19 20C17.8954 20 17 19.1046 17 18" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+                    </svg>
+                </div>
+
+                <!-- Online Status Pulse -->
+                <div class="absolute -bottom-1 -right-1 w-4 h-4 rounded-full border-2 border-slate-950 ${driver.status === 'Online' ? 'bg-emerald-500 shadow-[0_0_12px_rgba(16,185,129,1)]' : 'bg-slate-500'} z-20">
+                    ${driver.status === 'Online' ? '<div class="w-full h-full bg-emerald-400 rounded-full animate-ping opacity-75"></div>' : ''}
+                </div>
+            </div>
+        `,
+        iconSize: [60, 60],
+        iconAnchor: [30, 30],
+        popupAnchor: [0, -20]
+    });
+  }, [driver.vehiclePlate, driver.status, isSpeeding, heading]);
+
   return (
     <Marker 
         position={currentPos} 
-        icon={L.divIcon({
-            className: 'custom-div-icon',
-            html: `
-                <div class="relative flex items-center justify-center" style="width: 60px; height: 60px;">
-                    <!-- Speeding / SOS Alert Background -->
-                    ${isSpeeding || driver.status === 'SOS' ? `
-                        <div class="absolute inset-0 bg-red-500/20 rounded-full animate-ping"></div>
-                        <div class="absolute inset-0 border-4 border-red-500/50 rounded-full animate-pulse"></div>
-                    ` : ''}
-
-                    <!-- Floating License Plate -->
-                    <div class="absolute -top-10 left-1/2 -translate-x-1/2 whitespace-nowrap bg-card/90 text-foreground text-base font-bold font-black px-2 py-0.5 rounded-lg border border-border/20 shadow-2xl z-30 pointer-events-none">
-                        ${driver.vehiclePlate || 'N/A'} ${isSpeeding ? `<span class="text-red-500 ml-1">⚡ ${((driver.speed || 0) * 3.6).toFixed(0)}</span>` : ''}
-                    </div>
-
-                    <!-- Direction indicator -->
-                    <div class="absolute" style="transform: rotate(${heading}deg) translateY(-28px);">
-                        <div class="w-0 h-0 border-l-[6px] border-l-transparent border-r-[6px] border-r-transparent border-b-[10px] ${isSpeeding ? 'border-b-red-500 shadow-[0_0_10px_rgba(239,68,68,0.8)]' : 'border-b-emerald-500 shadow-[0_0_10px_rgba(16,185,129,0.8)]'}"></div>
-                    </div>
-
-                    <!-- Marker Body -->
-                    <div class="relative flex items-center justify-center p-2.5 bg-background rounded-2xl shadow-2xl border border-border/20"
-                         style="transform: rotate(${heading}deg); border-bottom: 4px solid ${isSpeeding || driver.status === 'SOS' ? '#ef4444' : '#10b981'};">
-                        
-                        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" class="${isSpeeding || driver.status === 'SOS' ? 'text-red-500' : 'text-emerald-400'}">
-                            <path d="M1 14H17M1 14L2 7H14L17 14M1 14V18H3M17 14V18H15M17 14H23V18H21M17 11H21L23 14M7 18C7 19.1046 6.10457 20 5 20C3.89543 20 3 19.1046 3 18C3 16.8954 3.89543 16 5 18ZM7 18C7 16.8954 7.89543 16 9 16C10.1046 16 11 16.8954 11 18M11 18C11 19.1046 10.1046 20 9 20C7.89543 20 7 19.1046 7 18ZM19 18C19 19.1046 18.1046 20 17 20C15.8954 20 15 19.1046 15 18C15 16.8954 15.8954 16 17 16C18.1046 16 19 16.8954 19 18ZM21 18C21 19.1046 20.1046 20 19 20C17.8954 20 17 19.1046 17 18" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
-                        </svg>
-                    </div>
-
-                    <!-- Online Status Pulse -->
-                    <div class="absolute -bottom-1 -right-1 w-4 h-4 rounded-full border-2 border-slate-950 ${driver.status === 'Online' ? 'bg-emerald-500 shadow-[0_0_12px_rgba(16,185,129,1)]' : 'bg-slate-500'} z-20">
-                        ${driver.status === 'Online' ? '<div class="w-full h-full bg-emerald-400 rounded-full animate-ping opacity-75"></div>' : ''}
-                    </div>
-                </div>
-            `,
-            iconSize: [60, 60],
-            iconAnchor: [30, 30],
-            popupAnchor: [0, -20]
-        })}>
+        icon={driverIcon}>
       <Popup>
          <DriverPopup 
             driver={{ ...driver, lat: currentPos[0], lng: currentPos[1], heading }} 

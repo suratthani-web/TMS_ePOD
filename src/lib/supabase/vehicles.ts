@@ -32,19 +32,20 @@ export type Vehicle = {
   Primary_Driver_Name?: string | null
 }
 
-export async function getAllVehiclesFromTable(): Promise<Vehicle[]> {
+export async function getAllVehiclesFromTable(providedBranchId?: string): Promise<Vehicle[]> {
   try {
     const isSuper = await isSuperAdmin()
     const isAdminUser = await isAdmin()
-    const branchId = await getUserBranchId()
+    const userBranchId = await getUserBranchId()
+    const branchId = (isSuper || isAdminUser) ? (providedBranchId || userBranchId) : userBranchId
     const supabase = (isSuper || isAdminUser) ? await createAdminClient() : await createClient()
     
     let query = supabase.from('Master_Vehicles').select('*')
     
     // STRICT ISOLATION
     if (!isSuper) {
-        if (branchId && branchId !== 'All') {
-            query = query.eq('Branch_ID', branchId)
+        if (userBranchId && userBranchId !== 'All') {
+            query = query.eq('Branch_ID', userBranchId)
         } else {
             return []
         }

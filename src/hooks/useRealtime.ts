@@ -1,12 +1,18 @@
 "use client";
 
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import { createClient } from '@/utils/supabase/client';
 
 import { useIdle } from '@/components/providers/idle-provider';
 
 export function useRealtime(table: string, callback: (payload: any) => void) {
   const { isIdle } = useIdle();
+  const callbackRef = useRef(callback);
+
+  // Keep callback reference updated with the latest value
+  useEffect(() => {
+    callbackRef.current = callback;
+  }, [callback]);
 
   useEffect(() => {
     if (isIdle) return; // Stop listening if idle
@@ -23,7 +29,7 @@ export function useRealtime(table: string, callback: (payload: any) => void) {
         },
         (payload) => {
           console.log(`Real-time update for ${table}:`, payload);
-          callback(payload);
+          callbackRef.current(payload);
         }
       )
       .subscribe();
@@ -31,5 +37,5 @@ export function useRealtime(table: string, callback: (payload: any) => void) {
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [table, callback, isIdle]);
+  }, [table, isIdle]);
 }

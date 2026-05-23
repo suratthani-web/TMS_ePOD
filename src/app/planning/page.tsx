@@ -24,7 +24,7 @@ async function PlanningContent({ branch, date }: { branch: string, date?: string
     getTodayJobStats(currentBranchId, date, date), 
     getTodayJobs(date, currentBranchId),
     getRequestedJobs(currentBranchId),
-    getJobCreationData(),
+    getJobCreationData(currentBranchId),
     hasPermission('navigation.billing_customer'), // Income
     hasPermission('navigation.payouts'),         // Expense/Payout
     hasPermission('job_delete'),

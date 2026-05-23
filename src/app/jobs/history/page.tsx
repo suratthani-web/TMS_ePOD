@@ -4,7 +4,7 @@ export const revalidate = 0
 import { DashboardLayout } from "@/components/layout/dashboard-layout"
 import { getAllJobs, getJobStatsSummary } from "@/lib/supabase/jobs"
 import { getJobCreationData } from "@/app/planning/actions"
-import { isCustomer, hasPermission } from "@/lib/permissions"
+import { isCustomer, hasPermission, getUserBranchId } from "@/lib/permissions"
 import { HistoryClient } from "./history-client"
 import { ShieldCheck } from "lucide-react"
 
@@ -15,6 +15,10 @@ type Props = {
 export default async function JobHistoryPage(props: Props) {
   const customerMode = await isCustomer()
   const searchParams = await props.searchParams
+  const userBranchId = await getUserBranchId()
+  const branch = (userBranchId && userBranchId !== 'All') ? userBranchId : ((searchParams.branch as string) || 'All')
+  const currentBranchId = branch === 'All' ? undefined : branch
+
   const page = Number(searchParams.page) || 1
   const query = (searchParams.q as string) || ''
   const dateFrom = (searchParams.from as string) || ''
@@ -23,9 +27,9 @@ export default async function JobHistoryPage(props: Props) {
   const limit = 25
 
   const [jobsResult, stats, creationData, canViewPrice, canDelete, canExport] = await Promise.all([
-    getAllJobs(page, limit, query, status, dateFrom, dateTo),
-    getJobStatsSummary(query, dateFrom, dateTo),
-    getJobCreationData(),
+    getAllJobs(page, limit, query, status, dateFrom, dateTo, currentBranchId),
+    getJobStatsSummary(query, dateFrom, dateTo, currentBranchId),
+    getJobCreationData(currentBranchId),
     hasPermission('job_price_view'),
     hasPermission('job_delete'),
     hasPermission('job_export')
