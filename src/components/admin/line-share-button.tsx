@@ -22,7 +22,16 @@ export function LineShareButton({ job, variant = "default" }: LineShareButtonPro
 
   const initLiff = React.useCallback(() => {
     if (!window.liff) {
-        setInitError("LINE SDK not found")
+        // Manual fallback if Script tag didn't work for some reason
+        if (!document.getElementById('liff-sdk')) {
+            const script = document.createElement('script');
+            script.id = 'liff-sdk';
+            script.src = 'https://static.line-scdn.net/liff/edge/2/sdk.js';
+            script.async = true;
+            script.onload = () => initLiff();
+            document.head.appendChild(script);
+        }
+        setInitError("LINE SDK loading...")
         return
     }
 
