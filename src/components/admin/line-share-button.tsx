@@ -17,21 +17,30 @@ interface LineShareButtonProps {
 export function LineShareButton({ job, variant = "default" }: LineShareButtonProps) {
   const [isLiffInit, setIsLiffInit] = useState(false)
   const [loading, setLoading] = useState(false)
+  const [initError, setInitError] = useState<string | null>(null)
   const router = useRouter()
 
   const handleLiffScriptLoad = () => {
-    if (!window.liff) return
+    if (!window.liff) {
+        setInitError("LINE SDK not found")
+        return
+    }
 
-    // Using the same LIFF ID as signature for now or a generic one if available
     const liffId = process.env.NEXT_PUBLIC_LIFF_SHARE_ID || process.env.NEXT_PUBLIC_LIFF_SIGNATURE_ID || ""
     
-    if (!liffId) return
+    if (!liffId) {
+        setInitError("Missing LIFF ID in environment variables")
+        console.warn("LIFF ID not found. Please set NEXT_PUBLIC_LIFF_SHARE_ID or NEXT_PUBLIC_LIFF_SIGNATURE_ID")
+        return
+    }
 
     window.liff.init({ liffId })
       .then(() => {
         setIsLiffInit(true)
+        setInitError(null)
       })
       .catch((err: any) => {
+        setInitError(`Init failed: ${err.message || 'Unknown error'}`)
         console.error("LIFF Init failed", err)
       })
   }
@@ -42,8 +51,13 @@ export function LineShareButton({ job, variant = "default" }: LineShareButtonPro
       e.stopPropagation()
     }
 
+    if (initError) {
+        toast.error(`LINE LIFF Error: ${initError}`)
+        return
+    }
+
     if (!window.liff || !isLiffInit) {
-      toast.error("LINE LIFF ยังไม่พร้อมใช้งาน")
+      toast.info("ระบบ LINE กำลังเตรียมความพร้อม... กรุณาลองใหม่ในครู่เดียว")
       return
     }
 
