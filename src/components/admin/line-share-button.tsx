@@ -72,7 +72,7 @@ export function LineShareButton({ job, variant = "default" }: LineShareButtonPro
     }
 
     if (!window.liff.isLoggedIn()) {
-      window.liff.login()
+      window.liff.login({ redirectUri: window.location.href })
       return
     }
 
