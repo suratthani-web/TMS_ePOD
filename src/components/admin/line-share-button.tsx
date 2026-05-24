@@ -230,7 +230,7 @@ export function LineShareButton({ job, variant = "default" }: LineShareButtonPro
     <>
       <Script
         src="https://static.line-scdn.net/liff/edge/2/sdk.js"
-        onLoad={handleLiffScriptLoad}
+        onReady={initLiff}
       />
       {variant === "icon" ? (
         <Button
