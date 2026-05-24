@@ -60,8 +60,15 @@ export async function middleware(request: NextRequest) {
       const userAgent = request.headers.get('user-agent') || ''
       const isDeviceMobile = /Android|webOS|iPhone|iPod|BlackBerry|IEMobile|Opera Mini/i.test(userAgent)
       
-      // If we are on a desktop route but it's a mobile device, redirect to mobile app
-      if (isDeviceMobile) {
+      // Admin/Staff routes that should NOT be redirected to mobile driver login even on mobile devices
+      const isAdminRoute = pathname.startsWith('/admin') || 
+                          pathname.startsWith('/planning') || 
+                          pathname.startsWith('/billing') || 
+                          pathname.startsWith('/dashboard') ||
+                          pathname.startsWith('/settings')
+
+      // If we are on a desktop route but it's a mobile device, redirect to mobile app ONLY if it's not an admin route
+      if (isDeviceMobile && !isAdminRoute) {
         if (driverSession) {
           return NextResponse.redirect(new URL('/mobile/jobs', request.url))
         }
