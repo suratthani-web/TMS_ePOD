@@ -2,21 +2,39 @@ import { messagingApi, validateSignature } from '@line/bot-sdk';
 
 const { MessagingApiClient, MessagingApiBlobClient } = messagingApi;
 
-const channelAccessToken = process.env.LINE_CHANNEL_ACCESS_TOKEN || '';
-const channelSecret = process.env.LINE_CHANNEL_SECRET || '';
+// Lazy client instantiation helpers to ensure process.env variables are accessed at runtime (vital for serverless cold-start HMR)
+let _lineClient: MessagingApiClient | null = null;
+let _lineBlobClient: MessagingApiBlobClient | null = null;
 
-export const lineClient = new MessagingApiClient({
-  channelAccessToken
-});
+export function getLineClient() {
+  const token = process.env.LINE_CHANNEL_ACCESS_TOKEN || '';
+  if (!token) {
+    console.error('LINE_CHANNEL_ACCESS_TOKEN is not set');
+    throw new Error('LINE_CHANNEL_ACCESS_TOKEN is not set');
+  }
+  if (!_lineClient) {
+    _lineClient = new MessagingApiClient({ channelAccessToken: token });
+  }
+  return _lineClient;
+}
 
-export const lineBlobClient = new MessagingApiBlobClient({
-  channelAccessToken
-});
+export function getLineBlobClient() {
+  const token = process.env.LINE_CHANNEL_ACCESS_TOKEN || '';
+  if (!token) {
+    console.error('LINE_CHANNEL_ACCESS_TOKEN is not set');
+    throw new Error('LINE_CHANNEL_ACCESS_TOKEN is not set');
+  }
+  if (!_lineBlobClient) {
+    _lineBlobClient = new MessagingApiBlobClient({ channelAccessToken: token });
+  }
+  return _lineBlobClient;
+}
 
 /**
  * Validates the signature of an incoming LINE webhook request.
  */
 export function verifyLineSignature(body: string, signature: string): boolean {
+  const channelSecret = process.env.LINE_CHANNEL_SECRET || '';
   if (!channelSecret) {
     console.error('LINE_CHANNEL_SECRET is not set');
     return false;
@@ -28,10 +46,8 @@ export function verifyLineSignature(body: string, signature: string): boolean {
  * Fetches binary content (audio, image, etc.) from LINE servers.
  */
 export async function getMessageContent(messageId: string): Promise<Buffer> {
-  const response = await lineBlobClient.getMessageContent(messageId);
-  const chunks = [];
-  // response is a stream-like object in node-fetch or similar
-  // In @line/bot-sdk v10, it's a Fetch response with a body that is a stream.
+  const client = getLineBlobClient();
+  const response = await client.getMessageContent(messageId);
   const reader = response.body;
   if (!reader) throw new Error('Empty message content body');
   
@@ -43,12 +59,8 @@ export async function getMessageContent(messageId: string): Promise<Buffer> {
  */
 export async function replyToUser(replyToken: string, text: string) {
   try {
-    if (!channelAccessToken) {
-        console.error('LINE_CHANNEL_ACCESS_TOKEN is not set');
-        return { success: false, error: 'Token missing' };
-    }
-    
-    await lineClient.replyMessage({
+    const client = getLineClient();
+    await client.replyMessage({
       replyToken,
       messages: [{ type: 'text', text }]
     });
@@ -64,12 +76,8 @@ export async function replyToUser(replyToken: string, text: string) {
  */
 export async function pushToUser(to: string, text: string) {
   try {
-    if (!channelAccessToken) {
-        console.error('LINE_CHANNEL_ACCESS_TOKEN is not set');
-        return { success: false, error: 'Token missing' };
-    }
-    
-    await lineClient.pushMessage({
+    const client = getLineClient();
+    await client.pushMessage({
       to,
       messages: [{ type: 'text', text }]
     });
