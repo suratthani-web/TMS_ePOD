@@ -20,7 +20,7 @@ export function LineShareButton({ job, variant = "default" }: LineShareButtonPro
   const [initError, setInitError] = useState<string | null>(null)
   const router = useRouter()
 
-  const handleLiffScriptLoad = () => {
+  const initLiff = React.useCallback(() => {
     if (!window.liff) {
         setInitError("LINE SDK not found")
         return
@@ -29,10 +29,12 @@ export function LineShareButton({ job, variant = "default" }: LineShareButtonPro
     const liffId = process.env.NEXT_PUBLIC_LIFF_SHARE_ID || process.env.NEXT_PUBLIC_LIFF_SIGNATURE_ID || ""
     
     if (!liffId) {
-        setInitError("Missing LIFF ID in environment variables")
-        console.warn("LIFF ID not found. Please set NEXT_PUBLIC_LIFF_SHARE_ID or NEXT_PUBLIC_LIFF_SIGNATURE_ID")
+        setInitError("Missing LIFF ID")
+        console.warn("LIFF ID not found. Please set NEXT_PUBLIC_LIFF_SHARE_ID or NEXT_PUBLIC_LIFF_SIGNATURE_ID in Vercel.")
         return
     }
+
+    if (isLiffInit) return
 
     window.liff.init({ liffId })
       .then(() => {
@@ -43,7 +45,14 @@ export function LineShareButton({ job, variant = "default" }: LineShareButtonPro
         setInitError(`Init failed: ${err.message || 'Unknown error'}`)
         console.error("LIFF Init failed", err)
       })
-  }
+  }, [isLiffInit])
+
+  React.useEffect(() => {
+    // If liff is already on window (from another page/component), init it
+    if (window.liff && !isLiffInit && !initError) {
+      initLiff()
+    }
+  }, [initLiff, isLiffInit, initError])
 
   const shareJob = async (e?: React.MouseEvent) => {
     if (e) {
@@ -52,12 +61,13 @@ export function LineShareButton({ job, variant = "default" }: LineShareButtonPro
     }
 
     if (initError) {
-        toast.error(`LINE LIFF Error: ${initError}`)
+        toast.error(`LINE LIFF Error: ${initError}. โปรดเช็คการตั้งค่ารหัส LIFF ID ในระบบแอดมิน`)
         return
     }
 
     if (!window.liff || !isLiffInit) {
-      toast.info("ระบบ LINE กำลังเตรียมความพร้อม... กรุณาลองใหม่ในครู่เดียว")
+      initLiff() // Try to re-init if not ready
+      toast.info("ระบบ LINE กำลังเชื่อมต่อ... กรุณาลองใหม่ใน 1-2 วินาที")
       return
     }
 
