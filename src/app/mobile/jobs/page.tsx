@@ -1,6 +1,8 @@
 import { getDriverSession } from "@/lib/actions/auth-actions"
 import { redirect } from "next/navigation"
 import { MobileHeader } from "@/components/mobile/mobile-header"
+
+export const dynamic = 'force-dynamic'
 import { MapPin, Clock, Search, Truck, ChevronRight, ArrowRight, Calendar } from "lucide-react"
 import Link from "next/link"
 import { getDriverJobs } from "@/lib/supabase/jobs"

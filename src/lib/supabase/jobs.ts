@@ -484,6 +484,7 @@ export async function getDriverJobs(
 
 export async function getJobById(jobId: string): Promise<Job | null> {
     try {
+        const decodedJobId = decodeURIComponent(jobId)
         const driverSession = await getDriverSession()
         const isSuper = await isSuperAdmin()
         const isRegularAdmin = await isAdmin()
@@ -498,7 +499,7 @@ export async function getJobById(jobId: string): Promise<Job | null> {
         const baseQuery = supabase
             .from('Jobs_Main')
             .select('*')
-            .eq('Job_ID', jobId)
+            .eq('Job_ID', decodedJobId)
         
         // Apply Filters
         if (isSuper || isRegularAdmin) {
@@ -520,15 +521,36 @@ export async function getJobById(jobId: string): Promise<Job | null> {
         const { data, error: fetchError } = await baseQuery.single()
         
         if (!data || fetchError) {
-            // Second chance: If not found and is admin, try finding strictly by ID (Branch override)
-            if (isSuper || isRegularAdmin) {
-                const { data: adminData } = await supabase
-                    .from('Jobs_Main')
-                    .select('*')
-                    .eq('Job_ID', jobId)
-                    .single()
+            // Second chance: Try finding strictly by ID (bypassing filters) and check in JS
+            // This prevents issues with string padding, case mismatch, or url encoding in SQL queries
+            const { data: directData } = await supabase
+                .from('Jobs_Main')
+                .select('*')
+                .eq('Job_ID', decodedJobId)
+                .single()
+            
+            if (directData) {
+                const jobObj = directData as Job
                 
-                if (adminData) return await enrichJobWithCustomerData(adminData as Job)
+                // If it's an admin/staff, let them access if they are superadmin or branch matches
+                if (isSuper || isRegularAdmin) {
+                    if (isSuper || !branchId || branchId === 'All' || jobObj.Branch_ID === branchId) {
+                        return await enrichJobWithCustomerData(jobObj)
+                    }
+                } 
+                // If it's a customer, check if Customer_ID matches
+                else if (customerId && jobObj.Customer_ID === customerId) {
+                    return await enrichJobWithCustomerData(jobObj)
+                } 
+                // If it's a driver, check if Driver_ID matches or is null/empty
+                else if (driverSession) {
+                    const cleanDriverId = String(driverSession.driverId).trim().toLowerCase()
+                    const cleanJobDriverId = String(jobObj.Driver_ID || '').trim().toLowerCase()
+                    
+                    if (!jobObj.Driver_ID || cleanJobDriverId === cleanDriverId) {
+                        return await enrichJobWithCustomerData(jobObj)
+                    }
+                }
             }
             return null
         }

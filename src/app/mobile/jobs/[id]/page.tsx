@@ -3,6 +3,8 @@ import { redirect } from "next/navigation"
 import { getJobById } from "@/lib/supabase/jobs"
 import { JobDetailClient } from "@/components/mobile/job-detail-client"
 
+export const dynamic = 'force-dynamic'
+
 type Props = {
   params: Promise<{ id: string }>
   searchParams: Promise<{ success?: string }>
