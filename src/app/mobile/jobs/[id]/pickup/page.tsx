@@ -23,6 +23,7 @@ export default function JobPickupPage() {
   const [signature, setSignature] = useState<Blob | null>(null)
   const [loadedQty, setLoadedQty] = useState<string>("")
   const [completed, setCompleted] = useState(false)
+  const [loading, setLoading] = useState(false)
   
   // Job Data for Report
   const [job, setJob] = useState<Job | null>(null)
@@ -59,91 +60,104 @@ export default function JobPickupPage() {
         return
     }
 
-    // --- ULTRA OPTIMISTIC UI ---
-    // Show success screen immediately, process in background
-    setCompleted(true)
-    toast.success("บันทึกข้อมูลเรียบร้อยแล้ว", {
-        description: "กำลังอัปโหลดข้อมูลเบื้องหลัง..."
-    })
+    setLoading(true)
+    toast.info("กำลังประมวลผลและอัปโหลดหลักฐาน...", { id: "pickup-upload" })
     
-    // Background submission - Deferred
-    const runBackgroundSubmission = async () => {
-        try {
-            // Short delay for smooth UI transition
-            await new Promise(resolve => setTimeout(resolve, 800))
-
-            const formData = new FormData()
-            
-            // 1. Capture Report
-            if (reportRef.current && job) {
-                try {
-                    const canvas = await html2canvas(reportRef.current, {
-                        scale: 1.5,
-                        useCORS: true,
-                        logging: false,
-                        windowWidth: 800
-                    })
-                    
-                    const reportBlob = await new Promise<Blob | null>(resolve => 
-                        canvas.toBlob(resolve, 'image/jpeg', 0.7)
-                    )
-                    
-                    if (reportBlob) {
-                        formData.append("pickup_report", reportBlob, `Pickup_Report_${params.id}.jpg`)
-                    }
-                } catch (err) {
-                    console.error("Report capture failed:", err)
-                }
-            }
-
-            // 2. Append Photos & Signature
-            photos.forEach((photo, index) => formData.append(`photo_${index}`, photo))
-            formData.append("photo_count", photos.length.toString())
-            formData.append("signature", signature, "signature.png")
-            if (loadedQty) formData.append("loaded_qty", loadedQty)
-            
-            const result = await submitJobPickup(params.id, formData)
-            
-            if (result.success) {
-                console.log("Pickup Background upload success")
-            } else {
-                throw new Error(typeof result.error === 'string' ? result.error : "Upload failed")
-            }
-        } catch (error) {
-            console.error("Background submission failed, saving to IndexedDB:", error)
+    try {
+        const formData = new FormData()
+        
+        // 1. Capture Report
+        if (reportRef.current && job) {
             try {
-                const { blobToB64, saveJobOffline } = await import("@/lib/utils/offline-storage")
-                const photoB64s = await Promise.all(photos.map(p => blobToB64(p)))
-                const sigB64 = signature ? await blobToB64(signature) : null
-                
-                const offlineData = {
-                    photos: photoB64s,
-                    signature: sigB64,
-                    photo_count: photos.length,
-                    actualCompletionTime: new Date().toISOString()
-                }
-
-                await saveJobOffline(params.id, offlineData, 'PICKUP')
-                toast.info("บันทึกข้อมูลแบบ Offline สำเร็จ", {
-                    description: "ระบบจะอัปโหลดใหม่อัตโนมัติเมื่อเน็ตเสถียร"
+                const canvas = await html2canvas(reportRef.current, {
+                    scale: 1.5,
+                    useCORS: true,
+                    logging: false,
+                    windowWidth: 800
                 })
-            } catch (offlineErr) {
-                console.error("Critical: Failed to save pickup even to IndexedDB")
+                
+                const reportBlob = await new Promise<Blob | null>(resolve => 
+                    canvas.toBlob(resolve, 'image/jpeg', 0.7)
+                )
+                
+                if (reportBlob) {
+                    formData.append("pickup_report", reportBlob, `Pickup_Report_${params.id}.jpg`)
+                }
+            } catch (err) {
+                console.error("Report capture failed:", err)
             }
         }
-    }
 
-    runBackgroundSubmission()
+        // 2. Append Photos & Signature
+        photos.forEach((photo, index) => formData.append(`photo_${index}`, photo))
+        formData.append("photo_count", photos.length.toString())
+        formData.append("signature", signature, "signature.png")
+        if (loadedQty) formData.append("loaded_qty", loadedQty)
+        
+        const result = await submitJobPickup(params.id, formData)
+        
+        if (result.success) {
+            toast.success("บันทึกข้อมูลเรียบร้อยแล้ว", { id: "pickup-upload" })
+            setCompleted(true)
+        } else {
+            throw new Error(typeof result.error === 'string' ? result.error : "Upload failed")
+        }
+    } catch (error) {
+        console.error("Submission failed, saving to IndexedDB:", error)
+        try {
+            const { blobToB64, saveJobOffline } = await import("@/lib/utils/offline-storage")
+            const photoB64s = await Promise.all(photos.map(p => blobToB64(p)))
+            const sigB64 = signature ? await blobToB64(signature) : null
+            
+            const offlineData = {
+                photos: photoB64s,
+                signature: sigB64,
+                photo_count: photos.length,
+                actualCompletionTime: new Date().toISOString()
+            }
+
+            await saveJobOffline(params.id, offlineData, 'PICKUP')
+            toast.info("บันทึกข้อมูลแบบ Offline สำเร็จ", {
+                id: "pickup-upload",
+                description: "ระบบจะอัปโหลดใหม่อัตโนมัติเมื่อเน็ตเสถียร"
+            })
+            setCompleted(true)
+        } catch (offlineErr) {
+            console.error("Critical: Failed to save pickup even to IndexedDB")
+            toast.error("เกิดข้อผิดพลาดในการบันทึกข้อมูล", { id: "pickup-upload" })
+        }
+    } finally {
+        setLoading(false)
+    }
+  }
+
+  if (loading) {
+      return (
+          <div className="min-h-screen bg-slate-950 flex flex-col items-center justify-center p-6 text-center space-y-6 animate-in fade-in duration-500">
+              <div className="relative">
+                  <div className="w-24 h-24 rounded-full border-4 border-amber-500/10 border-t-amber-500 animate-spin" />
+                  <div className="absolute inset-0 flex items-center justify-center text-amber-500">
+                      <Loader2 className="animate-spin" size={36} />
+                  </div>
+              </div>
+              <div className="space-y-2">
+                  <h1 className="text-2xl font-black text-foreground tracking-tight animate-pulse">กำลังบันทึกข้อมูลรับสินค้า</h1>
+                  <p className="text-muted-foreground text-sm font-bold leading-relaxed max-w-[280px] mx-auto">
+                      ระบบกำลังอัปโหลดรายงาน ลายเซ็น และรูปภาพหลักฐานความปลอดภัย...
+                  </p>
+              </div>
+          </div>
+      )
   }
 
   if (completed) {
       return (
-          <div className="min-h-screen bg-slate-950 flex flex-col items-center justify-center p-6 text-center space-y-4">
-              <div className="w-20 h-20 bg-amber-500/20 rounded-full flex items-center justify-center text-amber-500 animate-in zoom-in duration-300">
+          <div className="min-h-screen bg-slate-950 flex flex-col items-center justify-center p-6 text-center space-y-4 animate-in zoom-in duration-300">
+              <div className="w-20 h-20 bg-amber-500/20 rounded-full flex items-center justify-center text-amber-500">
                   <Box size={48} />
               </div>
               <h1 className="text-2xl font-bold text-foreground">รับของสำเร็จ!</h1>
-              <p className="text-muted-foreground italic">ข้อมูลกำลังถูกส่งไปยังระบบเบื้องหลัง...</p>
+              <p className="text-muted-foreground italic">ข้อมูลหลักฐานอัปโหลดเรียบร้อยแล้ว</p>
               <Button 
                 onClick={() => router.push(`/mobile/jobs/${params.id}`)}
                 className="w-full bg-amber-600 hover:bg-amber-700 font-bold h-12 rounded-xl"

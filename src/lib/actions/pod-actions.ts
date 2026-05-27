@@ -52,6 +52,7 @@ async function getSmartUnitPrice(supabase: any, customerId: string, planDate?: s
 }
 
 export async function submitJobPOD(jobId: string, formData: FormData) {
+  jobId = decodeURIComponent(jobId)
   const supabase = createAdminClient()
 
   const photoFile = formData.get("photo") as File
@@ -240,6 +241,7 @@ export async function submitJobPOD(jobId: string, formData: FormData) {
 }
 
 export async function submitJobPickup(jobId: string, formData: FormData) {
+  jobId = decodeURIComponent(jobId)
   const supabase = createAdminClient()
 
   try {
