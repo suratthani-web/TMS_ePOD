@@ -72,15 +72,15 @@ export async function getSafetyAnalytics(
   
   const incidents = sosData || []
   const totalSos = incidents.length
-  const activeSos = incidents.filter(i => i.Job_Status === 'SOS').length
-  const resolvedSos = incidents.filter(i => i.Job_Status === 'Failed').length // Assuming Failed is a resolved state for SOS context? Or maybe 'Complete' after SOS? 
+  const activeSos = incidents.filter((i: any) => i.Job_Status === 'SOS').length
+  const resolvedSos = incidents.filter((i: any) => i.Job_Status === 'Failed').length // Assuming Failed is a resolved state for SOS context? Or maybe 'Complete' after SOS? 
   // Actually, if it was SOS and now Complete, we might miss it if we only filter by SOS/Failed current status.
   // For now, let's stick to current status 'SOS' vs 'Failed'. To be accurate we'd need history logs.
   // We will assume 'Failed' jobs often start as 'SOS' or problem jobs.
   
   // Group by Reason
   const reasonMap = new Map<string, number>()
-  incidents.forEach(i => {
+  incidents.forEach((i: any) => {
     const reason = i.Failed_Reason || 'Unknown'
     reasonMap.set(reason, (reasonMap.get(reason) || 0) + 1)
   })
@@ -116,12 +116,12 @@ export async function getSafetyAnalytics(
   
   const completedJobs = podData || []
   const totalCompleted = completedJobs.length
-  const withPhoto = completedJobs.filter(j => !!j.Photo_Proof_Url).length
-  const withSignature = completedJobs.filter(j => !!j.Signature_Url).length
+  const withPhoto = completedJobs.filter((j: any) => !!j.Photo_Proof_Url).length
+  const withSignature = completedJobs.filter((j: any) => !!j.Signature_Url).length
   
   // Compliance = BOTH Photo AND Signature present
   const complianceRate = totalCompleted > 0 
-    ? (completedJobs.filter(j => !!j.Photo_Proof_Url && !!j.Signature_Url).length / totalCompleted) * 100 
+    ? (completedJobs.filter((j: any) => !!j.Photo_Proof_Url && !!j.Signature_Url).length / totalCompleted) * 100 
     : 0
 
   return {

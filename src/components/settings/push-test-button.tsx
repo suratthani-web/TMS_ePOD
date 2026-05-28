@@ -213,7 +213,7 @@ export function PushTestButton({ driverId: initialDriverId, userId: initialUserI
               <PremiumButton
                 onClick={handleRegister}
                 disabled={registering}
-                variant="glow"
+                variant="primary"
                 className="w-full bg-rose-500 hover:bg-rose-600 text-white border-0 py-4 h-auto shadow-lg shadow-rose-500/25"
               >
                   {registering ? (

@@ -25,6 +25,7 @@ interface Destination {
     name: string
     lat: string
     lng: string
+    so_no?: string
     [key: string]: unknown
 }
 
@@ -254,13 +255,25 @@ export function JobActionButton({ job }: JobActionButtonProps) {
                         
                         {/* Destination Name for current stop */}
                         {(currentStatus === 'In Transit' || currentStatus === 'Arrived Dropoff' || currentStatus === 'Picked Up') && (
-                            <p className="mt-2 text-xs font-medium text-muted-foreground line-clamp-1 italic">
-                                จุดหมาย: {
-                                    isMultiDrop 
-                                        ? (Array.isArray(job.original_destinations_json) ? job.original_destinations_json[currentDropIndex - 1]?.name : 'ไม่ระบุ')
-                                        : (job.Dest_Location || 'ไม่ระบุ')
-                                }
-                            </p>
+                            <div className="mt-2 space-y-1">
+                                <p className="text-xs font-medium text-muted-foreground line-clamp-1 italic">
+                                    จุดหมาย: {
+                                        isMultiDrop 
+                                            ? (Array.isArray(job.original_destinations_json) ? job.original_destinations_json[currentDropIndex - 1]?.name : 'ไม่ระบุ')
+                                            : (job.Dest_Location as string || 'ไม่ระบุ')
+                                    }
+                                </p>
+                                {(() => {
+                                    const currentSO = isMultiDrop 
+                                        ? (Array.isArray(job.original_destinations_json) ? job.original_destinations_json[currentDropIndex - 1]?.so_no : undefined)
+                                        : (Array.isArray(job.original_destinations_json) ? job.original_destinations_json[0]?.so_no : undefined);
+                                    return currentSO ? (
+                                        <p className="text-xs font-bold text-emerald-400">
+                                            ใบสั่งซื้อ (SO): {currentSO}
+                                        </p>
+                                    ) : null;
+                                })()}
+                            </div>
                         )}
                     </div>
                 </div>

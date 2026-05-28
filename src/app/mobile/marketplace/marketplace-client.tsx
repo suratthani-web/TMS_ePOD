@@ -65,7 +65,7 @@ export function MarketplaceClient({ initialJobs, driverId, driverName }: Marketp
                 table: 'Jobs_Main',
             }, (payload) => {
                 // Only refresh if it's a potential marketplace job (no driver assigned)
-                if (!payload.new.Driver_ID) {
+                if (!(payload.new as Record<string, unknown>)?.Driver_ID) {
                     toast.info("มีงานใหม่ในตลาดกลาง! กำลังอัปเดต...")
                     router.refresh()
                 }

@@ -41,7 +41,7 @@ export async function getOperationalStats(branchId?: string, startDate?: string,
 
     const { data: activeJobs } = await activeJobsQuery
 
-    const uniqueActiveVehicles = new Set(activeJobs?.map(j => j.Vehicle_Plate)).size
+    const uniqueActiveVehicles = new Set(activeJobs?.map((j: any) => j.Vehicle_Plate)).size
 
     const twoHoursAgo = new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString()
     let gpsQuery = supabase
@@ -69,7 +69,7 @@ export async function getOperationalStats(branchId?: string, startDate?: string,
     const { data: jobStats } = await jobStatsQuery
         
     const totalJobs = jobStats?.length || 0
-    const completedJobs = jobStats?.filter(j => REVENUE_STATUSES.includes(j.Job_Status || '')).length || 0
+    const completedJobs = jobStats?.filter((j: any) => REVENUE_STATUSES.includes(j.Job_Status || '')).length || 0
     const onTimeDelivery = totalJobs > 0 ? (completedJobs / totalJobs) * 100 : 0
 
     let activePlates: string[] = []
@@ -99,7 +99,7 @@ export async function getOperationalStats(branchId?: string, startDate?: string,
 
     if (fuelLogs && fuelLogs.length > 0) {
         const vehicleLogs: Record<string, { Odometer: number, Liters: number }[]> = {}
-        fuelLogs.forEach(log => {
+        fuelLogs.forEach((log: any) => {
             if (log.Vehicle_Plate && log.Odometer && log.Liters) {
                 if (!vehicleLogs[log.Vehicle_Plate]) vehicleLogs[log.Vehicle_Plate] = []
                 vehicleLogs[log.Vehicle_Plate].push(log)
@@ -153,7 +153,7 @@ export async function getDriverLeaderboard(startDate?: string, endDate?: string,
         name: string, revenue: number, completedJobs: number, totalJobs: number, onTimeJobs: number, lateJobs: number
     }> = {}
 
-    jobs?.forEach(job => {
+    jobs?.forEach((job: any) => {
         const name = job.Driver_Name!
         if (!driverStats[name]) {
             driverStats[name] = { name, revenue: 0, completedJobs: 0, totalJobs: 0, onTimeJobs: 0, lateJobs: 0 }
@@ -213,7 +213,7 @@ export async function getDetailedDriverAnalytics(startDate?: string, endDate?: s
         totalEarnings: number, totalDistance: number, totalWeight: number, ratings: number[], avgRating: number
     }> = {}
 
-    driversResult.data?.forEach(d => {
+    driversResult.data?.forEach((d: any) => {
         if (effectiveBranchId && d.Branch_ID !== effectiveBranchId) return
         
         driverStats[d.Driver_ID] = {
@@ -224,7 +224,7 @@ export async function getDetailedDriverAnalytics(startDate?: string, endDate?: s
         }
     })
 
-    jobsResult.data?.forEach(job => {
+    jobsResult.data?.forEach((job: any) => {
         const id = job.Driver_ID!
         if (!driverStats[id]) return
 
@@ -327,7 +327,7 @@ export async function getVehicleProfitability(startDate?: string, endDate?: stri
 
     const stats: Record<string, { plate: string, revenue: number, driverCost: number, fuelCost: number, maintenanceCost: number, totalCost: number, netProfit: number, totalKm: number, count: number }> = {}
 
-    jobs?.forEach(job => {
+    jobs?.forEach((job: any) => {
         const plate = job.Vehicle_Plate!
         if (!stats[plate]) stats[plate] = { plate, revenue: 0, driverCost: 0, fuelCost: 0, maintenanceCost: 0, totalCost: 0, netProfit: 0, totalKm: 0, count: 0 }
         stats[plate].revenue += (job.Price_Cust_Total || 0)
@@ -336,13 +336,13 @@ export async function getVehicleProfitability(startDate?: string, endDate?: stri
         stats[plate].count += 1
     })
 
-    fuel?.forEach(f => {
+    fuel?.forEach((f: any) => {
         const plate = f.Vehicle_Plate!
         if (!stats[plate]) stats[plate] = { plate, revenue: 0, driverCost: 0, fuelCost: 0, maintenanceCost: 0, totalCost: 0, netProfit: 0, totalKm: 0, count: 0 }
         stats[plate].fuelCost += (f.Price_Total || 0)
     })
 
-    maintenance?.forEach(m => {
+    maintenance?.forEach((m: any) => {
         const plate = m.Vehicle_Plate!
         if (!stats[plate]) stats[plate] = { plate, revenue: 0, driverCost: 0, fuelCost: 0, maintenanceCost: 0, totalCost: 0, netProfit: 0, totalKm: 0, count: 0 }
         stats[plate].maintenanceCost += (m.Cost_Total || 0)
@@ -376,7 +376,7 @@ export async function getProvincialMileageStats(branchId?: string) {
         const colors = ["bg-emerald-500", "bg-blue-500", "bg-amber-500", "bg-purple-500", "bg-rose-500"]
         
         let totalVal = 0
-        data?.forEach(job => {
+        data?.forEach((job: any) => {
             let geoLabel = (job as { Zone?: string }).Zone || 'ไม่ระบุโซน'
             if (geoLabel.includes('BKK') || geoLabel.includes('กรุงเทพ')) geoLabel = 'กรุงเทพมหานคร'
             
@@ -422,7 +422,7 @@ export async function getFleetComplianceMetrics(branchId?: string) {
             { name: "Compulsory ACT (พ.ร.บ.)", status: "valid", date: "-", daysLeft: 0, total: 0, alert: 0 },
         ]
 
-        data.forEach(v => {
+        data.forEach((v: any) => {
             const check = (expiry: string | null, idx: number) => {
                 if (!expiry) return
                 const expDate = new Date(expiry)
@@ -469,7 +469,7 @@ export async function getFleetHealthScore(branchId?: string) {
         const { data, error } = await query
         if (error || !data || data.length === 0) return 100
 
-        const active = data.filter(v => v.Active_Status === 'Active').length
+        const active = data.filter((v: any) => v.Active_Status === 'Active').length
         return Math.round((active / data.length) * 100)
     } catch {
         return 100
@@ -496,7 +496,7 @@ export async function getDelayRootCause(startDate?: string, endDate?: string, br
 
         const { data } = await query
         const reasons: Record<string, number> = {}
-        data?.forEach(j => {
+        data?.forEach((j: any) => {
             const r = j.Failed_Reason || 'อื่นๆ'
             reasons[r] = (reasons[r] || 0) + 1
         })

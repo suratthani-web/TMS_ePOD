@@ -130,7 +130,8 @@ export function JobHistoryActions({ job, drivers, vehicles, customers, routes, c
         vehicles={vehicles}
         customers={customers}
         routes={routes}
-        canViewPrice={canViewPrice}
+        canViewIncome={canViewPrice}
+        canViewExpense={canViewPrice}
         canDelete={canDelete}
       />
 

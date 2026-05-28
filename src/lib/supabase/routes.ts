@@ -230,7 +230,7 @@ export async function createBulkRoutes(routes: Record<string, unknown>[]) {
         const { data: branches } = await supabase.from('Master_Branches').select('Branch_ID, Branch_Name')
         const branchMap = new Map<string, string>()
         if (branches) {
-            branches.forEach(b => {
+            branches.forEach((b: any) => {
                 branchMap.set(b.Branch_Name.trim(), b.Branch_ID)
                 branchMap.set(b.Branch_ID, b.Branch_ID)
             })
@@ -283,7 +283,7 @@ export async function createBulkRoutes(routes: Record<string, unknown>[]) {
                  if (branchMap.has(key)) {
                      branchId = branchMap.get(key) || 'HQ'
                  } else {
-                     const found = branches?.find(b => {
+                     const found = branches?.find((b: any) => {
                          const bName = String(b.Branch_Name || '')
                          return bName && (bName.includes(key) || key.includes(bName))
                      })
@@ -298,10 +298,12 @@ export async function createBulkRoutes(routes: Record<string, unknown>[]) {
                 Origin: r.Origin ?? null,
                 Origin_Lat: r.Origin_Lat ? parseFloat(String(r.Origin_Lat)) : null,
                 Origin_Lon: r.Origin_Lon ? parseFloat(String(r.Origin_Lon)) : null,
+                Origin_Phone: r.Origin_Phone ?? null,
                 Map_Link_Origin: r.Map_Link_Origin ?? null,
                 Destination: r.Destination ?? null,
                 Dest_Lat: r.Dest_Lat ? parseFloat(String(r.Dest_Lat)) : null,
                 Dest_Lon: r.Dest_Lon ? parseFloat(String(r.Dest_Lon)) : null,
+                Dest_Phone: r.Dest_Phone ?? null,
                 Map_Link_Destination: r.Map_Link_Destination ?? null,
                 Distance_KM: r.Distance_KM ? parseFloat(String(r.Distance_KM)) : null,
                 Branch_ID: branchId
@@ -316,7 +318,7 @@ export async function createBulkRoutes(routes: Record<string, unknown>[]) {
             .select('Route_Name')
             .in('Route_Name', namesToCheck)
 
-        const existingNames = new Set(existingRoutes?.map(r => r.Route_Name) || [])
+        const existingNames = new Set(existingRoutes?.map((r: any) => r.Route_Name) || [])
         
         const toInsert: Route[] = []
         const toUpdate: Route[] = []
@@ -406,13 +408,13 @@ export async function getUniqueLocations() {
     const locationSet = new Set<string>()
     
     if (origins) {
-        origins.forEach(o => {
+        origins.forEach((o: any) => {
             if (o.Origin) locationSet.add(o.Origin.trim())
         })
     }
     
     if (destinations) {
-        destinations.forEach(d => {
+        destinations.forEach((d: any) => {
             if (d.Destination) locationSet.add(d.Destination.trim())
         })
     }
@@ -427,7 +429,7 @@ export async function getUniqueLocations() {
 export async function getLocationDirectory() {
   try {
     const isAdminUser = await isAdmin()
-    const supabase = isAdminUser ? await createAdminClient() : await createClient()
+    const supabase = isAdminUser ? createAdminClient() : await createClient()
     
     const branchId = await getUserBranchId()
     const isSuper = await isSuperAdmin()
@@ -444,7 +446,7 @@ export async function getLocationDirectory() {
 
     const directory: Record<string, { lat: number | null, lon: number | null, phone: string | null }> = {}
 
-    data.forEach(r => {
+    data.forEach((r: any) => {
         if (r.Origin) {
             const name = r.Origin.trim()
             if (!directory[name] || (!directory[name].phone && r.Origin_Phone)) {

@@ -47,6 +47,8 @@ export type JobFormData = {
   Delivery_Lon?: number | null
   Ref_No?: string | null
   Round?: string | number | null
+  Loaded_Qty?: number | string | null
+  Price_Per_Unit?: number | null
 }
 
 const parseIfString = (val: string | undefined | null) => {
@@ -243,10 +245,10 @@ export async function createBulkJobs(
     supabase.from('Master_Routes').select('*')
   ])
 
-  const driverMap = new Map(allDrivers?.map(d => [d.Driver_ID, d]) || [])
-  const vehicleMap = new Map(allVehicles?.map(v => [v.Vehicle_Plate, v]) || [])
-  const customerMap = new Map(allCustomers?.map(c => [c.Customer_Name?.toLowerCase().trim(), c.Customer_ID]) || [])
-  const routeMap = new Map(allRoutes?.map(r => [r.Route_Name?.trim(), r]) || [])
+  const driverMap = new Map<string, any>(allDrivers?.map((d: { Driver_ID: string; Driver_Name: string; Sub_ID?: string | null }) => [d.Driver_ID, d]) || [])
+  const vehicleMap = new Map<string, any>(allVehicles?.map((v: { Vehicle_Plate: string; Sub_ID?: string | null }) => [v.Vehicle_Plate, v]) || [])
+  const customerMap = new Map<string, any>(allCustomers?.map((c: { Customer_ID: string; Customer_Name?: string | null }) => [c.Customer_Name?.toLowerCase().trim(), c.Customer_ID]) || [])
+  const routeMap = new Map<string, any>(allRoutes?.map((r: { Route_Name?: string | null; Origin?: string | null; Destination?: string | null; Origin_Lat?: number | null; Origin_Lon?: number | null; Dest_Lat?: number | null; Dest_Lon?: number | null; Distance_KM?: number | null }) => [r.Route_Name?.trim(), r]) || [])
 
   // Helper to normalize keys
   const normalizeData = (row: Partial<JobFormData>) => {
@@ -436,7 +438,7 @@ export async function createBulkJobs(
     if (!route && data.Origin_Location && data.Dest_Location) {
         const o = String(data.Origin_Location).trim().toLowerCase()
         const d = String(data.Dest_Location).trim().toLowerCase()
-        route = allRoutes?.find(r => 
+        route = allRoutes?.find((r: { Origin?: string | null; Destination?: string | null }) => 
             r.Origin?.trim().toLowerCase() === o && 
             r.Destination?.trim().toLowerCase() === d
         )
@@ -484,7 +486,7 @@ export async function createBulkJobs(
   }).filter(j => j.Customer_Name)
 
   // Apply Draft status if requested via options
-  const finalCleanData = options.isDraft 
+  const finalCleanData: any[] = options.isDraft 
     ? cleanData.map(j => ({ ...j, Job_Status: 'Draft' }))
     : cleanData
 
@@ -608,7 +610,7 @@ export async function createBulkJobs(
   revalidatePath('/jobs/history')
   revalidatePath('/mobile/jobs')
 
-  const uniqueDates = Array.from(new Set(finalizedData.map(j => j.Plan_Date))).filter(Boolean)
+  const uniqueDates = Array.from(new Set((finalizedData as any[]).map(j => j.Plan_Date))).filter(Boolean)
   const dateStr = uniqueDates.length === 1 ? ` for ${uniqueDates[0]}` : ""
   
   return { 
@@ -802,9 +804,9 @@ export async function getJobCreationData(selectedBranchId?: string) {
   let subcontractors = subcontractorsResult.data || []
 
   if (branchId && branchId !== 'All') {
-      customers = customers.filter(c => c.Branch_ID === branchId)
-      routes = routes.filter(r => r.Branch_ID === branchId)
-      subcontractors = subcontractors.filter(s => s.Branch_ID === branchId)
+      customers = customers.filter((c: any) => c.Branch_ID === branchId)
+      routes = routes.filter((r: any) => r.Branch_ID === branchId)
+      subcontractors = subcontractors.filter((s: any) => s.Branch_ID === branchId)
   }
 
   return {
@@ -991,7 +993,7 @@ export async function publishAllDrafts(date: string, branchId?: string) {
             // Group jobs by driver to consolidate notifications
             const driverJobs = new Map<string, number>()
             
-            jobs.forEach(job => {
+            jobs.forEach((job: any) => {
                 if (job.Driver_ID) {
                     driverJobs.set(job.Driver_ID, (driverJobs.get(job.Driver_ID) || 0) + 1)
                 }
@@ -1000,7 +1002,7 @@ export async function publishAllDrafts(date: string, branchId?: string) {
             // Fire notifications in parallel (one per driver)
             const notificationPromises = Array.from(driverJobs.entries()).map(([driverId, count]) => {
                 if (count === 1) {
-                    const job = jobs.find(j => j.Driver_ID === driverId)
+                    const job = jobs.find((j: any) => j.Driver_ID === driverId)
                     return notifyDriverNewJob(driverId, job!.Job_ID, job!.Customer_Name || 'N/A')
                 } else {
                     return notifyDriverNewBatch(driverId, count)
@@ -1008,8 +1010,8 @@ export async function publishAllDrafts(date: string, branchId?: string) {
             })
 
             // Marketplace jobs (those without assigned drivers)
-            const marketplaceJobs = jobs.filter(j => !j.Driver_ID)
-            const marketplacePromises = marketplaceJobs.map(job => 
+            const marketplaceJobs = jobs.filter((j: any) => !j.Driver_ID)
+            const marketplacePromises = marketplaceJobs.map((job: any) => 
                 notifyMarketplaceNewJob(job.Job_ID, job.Customer_Name || 'N/A')
             )
 

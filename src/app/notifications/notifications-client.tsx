@@ -8,6 +8,7 @@ import { cn } from "@/lib/utils"
 import { motion } from "framer-motion"
 import { useLanguage } from "@/components/providers/language-provider"
 import { PremiumButton } from "@/components/ui/premium-button"
+import { toast } from "sonner"
 
 const SEVERITY_STYLES = {
   critical: {

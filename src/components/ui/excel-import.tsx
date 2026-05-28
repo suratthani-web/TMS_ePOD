@@ -26,7 +26,7 @@ interface ExcelImportProps {
   trigger: React.ReactNode
   title: string
   description?: string
-  onImport: (data: Record<string, unknown>[], options?: { shouldGroup?: boolean }) => Promise<{ success: boolean; message: string; error?: string }>;
+  onImport: (data: Record<string, unknown>[], options?: { shouldGroup?: boolean; isDraft?: boolean }) => Promise<{ success: boolean; message: string; error?: string }>;
   templateData?: Record<string, unknown>[]
   templateFilename?: string
   groupingLabel?: string

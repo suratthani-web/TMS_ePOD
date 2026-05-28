@@ -26,7 +26,7 @@ export async function generateMonthlyBillingNotes() {
 
         // 2. Group jobs by Customer_Name
         const customerGroups: Record<string, any[]> = {}
-        jobs.forEach(job => {
+        jobs.forEach((job: any) => {
             const customer = job.Customer_Name || 'Unknown'
             if (!customerGroups[customer]) customerGroups[customer] = []
             customerGroups[customer].push(job)
@@ -111,7 +111,7 @@ export async function sendScheduledBillingEmails() {
         if (!notes || notes.length === 0) return { success: true, count: 0, message: "No notes to send" }
 
         // Fetch customer emails separately to avoid relationship errors
-        const customerNames = Array.from(new Set(notes.map(n => n.Customer_Name))).filter(Boolean)
+        const customerNames = Array.from(new Set(notes.map((n: any) => n.Customer_Name))).filter(Boolean)
         let emailMap = new Map()
         
         if (customerNames.length > 0) {
@@ -121,7 +121,7 @@ export async function sendScheduledBillingEmails() {
                 .in('Customer_Name', customerNames)
             
             if (customers) {
-                emailMap = new Map(customers.map(c => [c.Customer_Name, c.Email]))
+                emailMap = new Map(customers.map((c: any) => [c.Customer_Name, c.Email]))
             }
         }
 

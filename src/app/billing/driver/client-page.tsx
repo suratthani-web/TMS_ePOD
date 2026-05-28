@@ -344,7 +344,7 @@ export default function DriverPaymentClient({ initialJobs, drivers, companyProfi
         <PaymentVoucher 
             companyProfile={companyProfile}
             entityName={entityName}
-            entityInfo={entityInfo}
+            entityInfo={entityInfo ?? null}
             today={today}
             selectedData={selectedData}
             selectedSubtotal={selectedSubtotal}

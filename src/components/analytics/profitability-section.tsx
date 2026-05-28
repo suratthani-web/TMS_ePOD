@@ -215,7 +215,7 @@ export function ProfitabilitySection({ data = [], financials, startDate, endDate
                                     }}
                                     labelStyle={{ color: '#fff', marginBottom: '8px', borderBottom: '1px solid rgba(255,255,255,0.1)', paddingBottom: '8px', fontWeight: '900' }}
                                     itemStyle={{ fontSize: '11px', fontWeight: '900', textTransform: 'uppercase', color: '#fff' }}
-                                    formatter={(value: number | string) => [`฿${Number(value || 0).toLocaleString()}`, t('common.net_margin')]}
+                                    formatter={(value: any) => [`฿${Number(value || 0).toLocaleString()}`, t('common.net_margin')]}
                                 />
                                 <Bar dataKey="netProfit" radius={[0, 8, 8, 0]} barSize={32}>
                                     {topPerformers.map((entry, index) => (
@@ -262,7 +262,7 @@ export function ProfitabilitySection({ data = [], financials, startDate, endDate
                                         contentStyle={{ backgroundColor: 'rgba(2, 6, 23, 0.95)', border: '2px solid rgba(255,255,255,0.1)', borderRadius: '24px', backdropFilter: 'blur(12px)' }}
                                         labelStyle={{ color: '#fff', fontWeight: '900', marginBottom: '4px' }}
                                         itemStyle={{ fontSize: '11px', fontWeight: '900', textTransform: 'uppercase', color: '#fff' }}
-                                        formatter={(value: number | string) => [`฿${Number(value || 0).toLocaleString()}`, t('settings.items.accounting')]}
+                                        formatter={(value: any) => [`฿${Number(value || 0).toLocaleString()}`, t('settings.items.accounting')]}
                                     />
                                 </PieChart>
                         </ChartContainer>

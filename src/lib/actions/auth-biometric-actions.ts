@@ -36,7 +36,7 @@ export async function getPasskeyRegistrationOptions() {
     userID: session.driverId,
     userName: session.driverName,
     attestationType: 'none',
-    excludeCredentials: credentials?.map(c => ({
+    excludeCredentials: credentials?.map((c: any) => ({
       id: c.credential_id,
       type: 'public-key',
     })),
@@ -74,7 +74,7 @@ export async function verifyPasskeyRegistration(body: any) {
   })
 
   if (verification.verified && verification.registrationInfo) {
-    const { credentialPublicKey, credentialID, counter } = verification.registrationInfo
+    const { credentialPublicKey, credentialID, counter } = verification.registrationInfo as any
     
     const supabase = createAdminClient()
     await supabase.from('Driver_Passkeys').insert({
@@ -117,7 +117,7 @@ export async function getPasskeyAuthenticationOptions(identifier: string) {
 
   const options = await generateAuthenticationOptions({
     rpID: RP_ID,
-    allowCredentials: credentials.map(c => ({
+    allowCredentials: credentials.map((c: any) => ({
       id: c.credential_id,
       type: 'public-key',
     })),
@@ -162,7 +162,7 @@ export async function verifyPasskeyLogin(body: any) {
       credentialPublicKey: Buffer.from(passkey.public_key, 'base64'),
       counter: passkey.counter,
     },
-  })
+  } as any)
 
   if (verification.verified) {
     // Update counter

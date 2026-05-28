@@ -76,23 +76,23 @@ export default async function FleetStatusPage() {
                 </thead>
                 <tbody className="divide-y divide-gray-50">
                   {vehicles.slice(0, 10).map((v) => (
-                    <tr key={v.vehicle_plate} className="group hover:bg-blue-50/30 transition-colors">
+                    <tr key={v.Vehicle_Plate} className="group hover:bg-blue-50/30 transition-colors">
                       <td className="py-4 px-6">
-                        <p className="text-gray-900 font-black text-xl">{v.vehicle_plate}</p>
-                        <p className="text-base font-bold font-bold text-gray-400 uppercase tracking-tighter">{v.vehicle_type || '-'}</p>
+                        <p className="text-gray-900 font-black text-xl">{v.Vehicle_Plate}</p>
+                        <p className="text-base font-bold font-bold text-gray-400 uppercase tracking-tighter">{v.Vehicle_Type || '-'}</p>
                       </td>
                       <td className="py-4 px-4">
                         <span className={cn(
                           "inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-base font-bold font-black uppercase tracking-widest border",
-                          v.active_status === 'Active' ? "bg-emerald-500/10 text-emerald-600 border-emerald-500/20" :
-                          v.active_status === 'Maintenance' ? "bg-amber-500/10 text-amber-600 border-amber-500/20" :
+                          v.Active_Status === 'Active' ? "bg-emerald-500/10 text-emerald-600 border-emerald-500/20" :
+                          v.Active_Status === 'Maintenance' ? "bg-amber-500/10 text-amber-600 border-amber-500/20" :
                           "bg-gray-100 text-muted-foreground border-gray-200"
                         )}>
-                          {v.active_status}
+                          {v.Active_Status}
                         </span>
                       </td>
                       <td className="py-4 px-6 text-right font-black text-lg font-bold text-gray-600">
-                        {(v.current_mileage || 0).toLocaleString()} km
+                        {(v.Current_Mileage || 0).toLocaleString()} km
                       </td>
                     </tr>
                   ))}
@@ -138,7 +138,7 @@ export default async function FleetStatusPage() {
                       </td>
                       <td className="py-4 px-6 text-right">
                         <div className="flex flex-col items-end">
-                           <p className="text-base font-bold font-black text-gray-600">{d.License_Expiry || '-'}</p>
+                           <p className="text-base font-bold font-black text-gray-600">{d.Expire_Date || '-'}</p>
                            <p className="text-base font-bold font-bold text-gray-400 uppercase italic">License Exp</p>
                         </div>
                       </td>

@@ -16,7 +16,7 @@ export async function getRolePermissions() {
         if (error) throw error
         
         // Map fields for legacy compatibility if needed
-        const legacyData = data?.map(item => ({
+        const legacyData = data?.map((item: any) => ({
             id: item.id,
             Role: item.role_name,
             Permissions: item.allowed_menus

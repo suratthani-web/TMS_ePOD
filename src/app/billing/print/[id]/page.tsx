@@ -243,7 +243,7 @@ export default async function BillingPrintPage(props: Props) {
                             {(note.VAT_Amount || 0) > 0 && (
                                 <div className="grid grid-cols-[1fr_110px] border-b border-slate-800">
                                     <div className="p-2 font-bold border-r border-slate-800 text-[11px]">ภาษีมูลค่าเพิ่ม {note.VAT_Rate}%</div>
-                                    <div className="p-2 text-right">{note.VAT_Amount.toLocaleString(undefined, { minimumFractionDigits: 2 })}</div>
+                                    <div className="p-2 text-right">{(note.VAT_Amount ?? 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}</div>
                                 </div>
                             )}
 

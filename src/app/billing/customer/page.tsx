@@ -13,7 +13,6 @@ export default async function CustomerBillingPage() {
 
   return (
     <CustomerBillingClient 
-        initialJobs={[]} // Jobs moved to Invoices page
         companyProfile={companyProfile} 
         customers={customers.data} 
         initialBillingNotes={billingNotes}

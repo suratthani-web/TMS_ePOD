@@ -23,8 +23,8 @@ export default function AutomationDashboard() {
         try {
             const result = await generateMonthlyBillingNotes()
             if (result.success) {
-                setLastGenCount(result.count)
-                toast.success(t('automation.toast_gen_success', { count: result.count }), { id: toastId })
+                setLastGenCount(result.count ?? 0)
+                toast.success(t('automation.toast_gen_success', { count: result.count ?? 0 }), { id: toastId })
             } else {
                 throw new Error(result.error)
             }
@@ -41,8 +41,8 @@ export default function AutomationDashboard() {
         try {
             const result = await sendScheduledBillingEmails()
             if (result.success) {
-                setLastSendCount(result.count)
-                toast.success(t('automation.toast_send_success', { count: result.count }), { id: toastId })
+                setLastSendCount(result.count ?? 0)
+                toast.success(t('automation.toast_send_success', { count: result.count ?? 0 }), { id: toastId })
             } else {
                 throw new Error(result.error)
             }

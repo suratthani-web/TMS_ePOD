@@ -101,7 +101,7 @@ export function FuelActions({ log, drivers, vehicles }: FuelActionsProps) {
                 onOpenChange={setShowEditDialog}
                 drivers={drivers}
                 vehicles={vehicles}
-                initialData={log}
+                initialData={log as any}
             />
         </div>
     )
@@ -157,7 +157,7 @@ export function FuelActions({ log, drivers, vehicles }: FuelActionsProps) {
         onOpenChange={setShowEditDialog}
         drivers={drivers}
         vehicles={vehicles}
-        initialData={log}
+        initialData={log as any}
       />
     </>
   )

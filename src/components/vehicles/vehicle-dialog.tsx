@@ -79,11 +79,19 @@ export function VehicleDialog({
 
     try {
       let result;
+      const cleanPayload = {
+        ...formData,
+        Current_Mileage: formData.Current_Mileage === '' ? undefined : Number(formData.Current_Mileage),
+        Next_Service_Mileage: formData.Next_Service_Mileage === '' ? undefined : Number(formData.Next_Service_Mileage),
+        Max_Weight_kg: formData.Max_Weight_kg === '' ? undefined : Number(formData.Max_Weight_kg),
+        Max_Volume_cbm: formData.Max_Volume_cbm === '' ? undefined : Number(formData.Max_Volume_cbm),
+      }
+
       if (mode === 'create') {
-        result = await createVehicle(formData)
+        result = await createVehicle(cleanPayload)
       } else {
         if (!vehicle?.Vehicle_Plate) throw new Error("Vehicle Plate not found")
-        result = await updateVehicle(vehicle.Vehicle_Plate, formData)
+        result = await updateVehicle(vehicle.Vehicle_Plate, cleanPayload)
       }
 
       if (result.success) {

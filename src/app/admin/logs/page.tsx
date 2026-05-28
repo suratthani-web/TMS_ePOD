@@ -14,11 +14,10 @@ import { cn } from '@/lib/utils'
 
 export const dynamic = 'force-dynamic'
 
-export default async function LogsPage({
-  searchParams,
-}: {
-  searchParams: { [key: string]: string | string[] | undefined }
+export default async function LogsPage(props: {
+  searchParams: Promise<{ [key: string]: string | string[] | undefined }>
 }) {
+  const searchParams = await props.searchParams
   const branchId = typeof searchParams.branchId === 'string' ? searchParams.branchId : undefined
   const moduleFilter = typeof searchParams.module === 'string' ? searchParams.module : undefined
   
@@ -31,7 +30,7 @@ export default async function LogsPage({
       module: moduleFilter,
       limit: 100
     })
-    branches = await getAllBranches()
+    branches = (await getAllBranches()) ?? []
   } catch {
     // Error fetching logs data
   }

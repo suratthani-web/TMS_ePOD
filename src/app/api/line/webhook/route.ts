@@ -492,7 +492,7 @@ export async function POST(req: NextRequest) {
                         .or(`Username.ilike.%${id}%,Email.ilike.%${id}%`)
                         .limit(5)
 
-                    console.log(`[BIND Admin] Search "${id}" → found ${allAdminMatches?.length ?? 0}:`, allAdminMatches?.map(u => u.Username))
+                    console.log(`[BIND Admin] Search "${id}" → found ${allAdminMatches?.length ?? 0}:`, allAdminMatches?.map((u: { Username: string }) => u.Username))
 
                     const adminUser = allAdminMatches?.[0] ?? null
 
@@ -540,7 +540,7 @@ export async function POST(req: NextRequest) {
                             await replyToUser(replyToken, `📭 คุณ ${boundDriver.Driver_Name}\nไม่มีงานค้างในระบบครับ`)
                         } else {
                             const lines = [`📋 งานของคุณ ${boundDriver.Driver_Name}:\n`]
-                            jobs.forEach((j, i) => lines.push(
+                            jobs.forEach((j: { Job_ID: string; Customer_Name: string | null; Route_Name: string | null; Job_Status: string | null }, i: number) => lines.push(
                                 `${i + 1}. ${j.Job_ID}\n   👤 ${j.Customer_Name}\n   🗺️ ${j.Route_Name}\n   📍 ${j.Job_Status}\n   ➡️ พิมพ์: ${j.Job_ID} START`
                             ))
                             await replyToUser(replyToken, lines.join('\n\n'))
@@ -703,8 +703,8 @@ export async function POST(req: NextRequest) {
                                 .order('Created_At', { ascending: true })
 
                             const jobs = driverJobs || []
-                            const active = jobs.filter(j => ['In Progress', 'In Transit', 'กำลังโหลด', 'ระหว่างขนส่ง'].includes(j.Job_Status || '')).length
-                            const completed = jobs.filter(j => ['Completed', 'Delivered', 'สำเร็จ', 'เสร็จสิ้น'].includes(j.Job_Status || '')).length
+                            const active = jobs.filter((j: { Job_Status: string | null }) => ['In Progress', 'In Transit', 'กำลังโหลด', 'ระหว่างขนส่ง'].includes(j.Job_Status || '')).length
+                            const completed = jobs.filter((j: { Job_Status: string | null }) => ['Completed', 'Delivered', 'สำเร็จ', 'เสร็จสิ้น'].includes(j.Job_Status || '')).length
                             const pending = jobs.length - active - completed
 
                             const lines = [
@@ -720,7 +720,7 @@ export async function POST(req: NextRequest) {
                             if (jobs.length === 0) {
                                 lines.push('✅ วันนี้คุณยังไม่มีงานที่ได้รับมอบหมายครับ')
                             } else {
-                                jobs.forEach(j => lines.push(`- ${j.Job_ID}: ${j.Customer_Name} [${j.Job_Status}]`))
+                                jobs.forEach((j: { Job_ID: string; Customer_Name: string | null; Job_Status: string | null }) => lines.push(`- ${j.Job_ID}: ${j.Customer_Name} [${j.Job_Status}]`))
                             }
                             
                             await replyToUser(replyToken, lines.join('\n'))
@@ -768,7 +768,7 @@ export async function POST(req: NextRequest) {
                                 ''
                             ]
                             
-                            customerJobs.forEach((job) => {
+                            customerJobs.forEach((job: { Job_ID: string; Job_Status: string | null; Driver_Name: string | null; Route_Name: string | null; Delivery_Lat?: number | null; Delivery_Lon?: number | null; Plan_Date?: string | null }) => {
                                 const statusEmoji = job.Job_Status === 'In Transit' ? '🚛' : '⏳'
                                 const statusName = job.Job_Status === 'In Transit' ? 'ระหว่างขนส่ง' : 'กำลังดำเนินการ'
                                 lines.push(`📦 เลขงาน: ${job.Job_ID}`)
@@ -814,7 +814,7 @@ export async function POST(req: NextRequest) {
                                 '📍 รายการงาน:'
                             ]
                             if (!jobs || jobs.length === 0) lines.push('✅ พรุ่งนี้คุณยังไม่มีงานที่วางแผนไว้ครับ')
-                            else jobs.forEach(j => lines.push(`- ${j.Job_ID}: ${j.Customer_Name}`))
+                            else jobs.forEach((j: { Job_ID: string; Customer_Name: string | null }) => lines.push(`- ${j.Job_ID}: ${j.Customer_Name}`))
                             
                             await replyToUser(replyToken, lines.join('\n'))
                             continue

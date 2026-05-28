@@ -150,9 +150,9 @@ export async function getPODStats(dateFrom?: string, dateTo?: string) {
     const jobs = data || []
     return {
       total: jobs.length,
-      withPhoto: jobs.filter(j => j.Photo_Proof_Url).length,
-      withSignature: jobs.filter(j => j.Signature_Url).length,
-      complete: jobs.filter(j => j.Job_Status === 'Delivered' || j.Job_Status === 'Complete' || j.Job_Status === 'Completed').length,
+      withPhoto: jobs.filter((j: any) => j.Photo_Proof_Url).length,
+      withSignature: jobs.filter((j: any) => j.Signature_Url).length,
+      complete: jobs.filter((j: any) => j.Job_Status === 'Delivered' || j.Job_Status === 'Complete' || j.Job_Status === 'Completed').length,
     }
   } catch (err) {
     console.error("POD stats exception:", err)

@@ -4,6 +4,9 @@ import { DashboardLayout } from "@/components/layout/dashboard-layout"
 import { getDriverLeaves } from "@/lib/supabase/driver-leaves"
 import { CalendarDays, ArrowLeft, User, CheckCircle2, XCircle, Clock } from "lucide-react"
 import Link from "next/link"
+import { PremiumCard } from "@/components/ui/premium-card"
+import { Badge } from "@/components/ui/badge"
+import { cn } from "@/lib/utils"
 
 const STATUS_STYLES: Record<string, { bg: string; text: string; label: string }> = {
   Pending: { bg: 'bg-amber-100', text: 'text-amber-700', label: 'รออนุมัติ' },

@@ -32,7 +32,7 @@ export async function getAdminAlerts(): Promise<AdminAlert[]> {
       .gte('created_at', yesterday)
       .order('created_at', { ascending: false })
 
-    sosLogs?.forEach(log => {
+    sosLogs?.forEach((log: any) => {
       const details = log.details || {}
       if (details.alert_type === 'SOS' || details.alert_type === 'SILENT_SOS') {
         // Filter by branch
@@ -76,7 +76,7 @@ export async function getAdminAlerts(): Promise<AdminAlert[]> {
     }
 
     const { data: vehicles } = await vQuery
-    vehicles?.forEach(v => {
+    vehicles?.forEach((v: any) => {
       const checks = [
         { field: v.Tax_Expiry, label: 'ภาษีรถ (Tax)', type: 'tax' },
         { field: v.Insurance_Expiry, label: 'ประกันภัย (Insurance)', type: 'insurance' },
@@ -117,7 +117,7 @@ export async function getAdminAlerts(): Promise<AdminAlert[]> {
 
     const CHECKLIST = ["น้ำมันเครื่อง", "น้ำในหม้อน้ำ", "ลมยาง", "ไฟเบรค/ไฟเลี้ยว", "สภาพยางรถยนต์", "อุปกรณ์ฉุกเฉิน", "เอกสารประจำรถ"]
 
-    checks?.forEach(check => {
+    checks?.forEach((check: any) => {
       const items = (check.Passed_Items || {}) as Record<string, boolean>
       const failedItems = CHECKLIST.filter(item => !items[item])
       if (failedItems.length > 0) {
@@ -149,7 +149,7 @@ export async function getAdminAlerts(): Promise<AdminAlert[]> {
       .limit(20)
 
     const { data: tickets } = await mQuery
-    tickets?.forEach(ticket => {
+    tickets?.forEach((ticket: any) => {
       const reported = new Date(ticket.Date_Report)
       const daysOpen = Math.ceil((today.getTime() - reported.getTime()) / (1000 * 60 * 60 * 24))
       

@@ -11,7 +11,7 @@ async function LeavePageContent() {
   const session = await getDriverSession()
   if (!session) redirect("/mobile/login")
 
-  let leaves = []
+  let leaves: any[] = []
   try {
     leaves = await getMyLeaves(session.driverId)
   } catch (err) {

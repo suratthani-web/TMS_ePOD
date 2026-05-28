@@ -43,7 +43,19 @@ export function ActiveTripTimeline({ job }: ActiveTripTimelineProps) {
     }
 
     const currentWeight = getStatusWeight(job.Job_Status || 'New')
-    const stops = job.original_destinations_json || []
+    let stops: any[] = []
+    if (job.original_destinations_json) {
+        try {
+            const parsed = typeof job.original_destinations_json === 'string'
+                ? JSON.parse(job.original_destinations_json)
+                : job.original_destinations_json
+            if (Array.isArray(parsed)) {
+                stops = parsed
+            }
+        } catch {
+            stops = []
+        }
+    }
     const isMultiStop = stops.length > 0
 
     // Build Dynamic Steps
@@ -70,15 +82,43 @@ export function ActiveTripTimeline({ job }: ActiveTripTimelineProps) {
 
     // If multi-stop, add each stop as a step
     if (isMultiStop) {
-        stops.forEach((stop: { name?: string; lat?: number; lng?: number; status?: string }, idx: number) => {
+        const completedDrops = job.Signature_Url ? job.Signature_Url.split(',').filter(Boolean).length : 0
+        
+        stops.forEach((stop: { name?: string; lat?: number; lng?: number; status?: string; so_no?: string }, idx: number) => {
+            let stopStatus: 'completed' | 'current' | 'upcoming' = 'upcoming'
+            let stopTime = 'Pending'
+            let isCurrent = false
+
+            if (currentWeight >= 5) {
+                stopStatus = 'completed'
+                stopTime = 'Delivered'
+            } else if (currentWeight >= 3) {
+                if (idx < completedDrops) {
+                    stopStatus = 'completed'
+                    stopTime = 'Delivered'
+                } else if (idx === completedDrops) {
+                    stopStatus = 'current'
+                    stopTime = 'In Progress'
+                    isCurrent = true
+                } else {
+                    stopStatus = 'upcoming'
+                    stopTime = 'Scheduled'
+                }
+            } else {
+                stopStatus = 'upcoming'
+                stopTime = 'Scheduled'
+            }
+
             steps.push({
                 id: `stop-${idx}`,
-                title: `Stop: ${stop.name || 'Unknown'}`,
-                description: "จุดจอดพักหรือส่งสินค้ากึ่งกลาง",
-                time: currentWeight >= 3 ? (idx === 0 ? "Next Stop" : "Scheduled") : "Pending",
-                status: currentWeight > 3 ? 'completed' : (currentWeight === 3 ? 'current' : 'upcoming'),
+                title: `Stop ${idx + 1}: ${stop.name || 'Unknown'}`,
+                description: stop.so_no 
+                    ? `ใบสั่งซื้อ (SO): ${stop.so_no}` 
+                    : "จุดจอดพักหรือส่งสินค้ากึ่งกลาง",
+                time: stopTime,
+                status: stopStatus,
                 icon: MapPin,
-                tag: idx === 0 && currentWeight === 3 ? "Next Stop" : undefined
+                tag: isCurrent ? "Next Stop" : undefined
             })
         })
     } else {

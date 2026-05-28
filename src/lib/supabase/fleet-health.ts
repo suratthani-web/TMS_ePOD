@@ -49,12 +49,12 @@ export async function getFleetHealthAlerts(): Promise<HealthAlert[]> {
 
         // 2. Fetch driver names and maintenance standards
         const { data: drivers } = await supabase.from('Master_Drivers').select('Driver_ID, Driver_Name')
-        const driverMap = new Map(drivers?.map(d => [d.Driver_ID, d.Driver_Name]) || [])
+        const driverMap = new Map<string, string>(drivers?.map((d: any) => [d.Driver_ID, d.Driver_Name]) || [])
 
         const { data: standards } = await supabase.from('Fleet_Maintenance_Standards').select('*')
         
         // 3. Fetch all completed repair tickets for these vehicles to calculate component health
-        const vehiclePlates = vehicles.map(v => v.Vehicle_Plate)
+        const vehiclePlates = vehicles.map((v: any) => v.Vehicle_Plate)
         const { data: completedRepairs } = await supabase
             .from('Repair_Tickets')
             .select('Vehicle_Plate, Issue_Type, Date_Finish, Date_Report, Odometer')
@@ -77,7 +77,7 @@ export async function getFleetHealthAlerts(): Promise<HealthAlert[]> {
         const now = new Date()
         const thirtyDaysAhead = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000)
 
-        vehicles.forEach(v => {
+        vehicles.forEach((v: any) => {
             const driverName = v.Driver_ID ? driverMap.get(v.Driver_ID) : undefined
 
             // --- A. Compliance Checks ---
@@ -115,9 +115,9 @@ export async function getFleetHealthAlerts(): Promise<HealthAlert[]> {
 
             // --- B. Per-Component Maintenance Tracking ---
             if (standards && completedRepairs) {
-                standards.forEach(std => {
+                standards.forEach((std: any) => {
                     // Find latest repair for this component on this vehicle
-                    const latestRepair = completedRepairs.find(r => 
+                    const latestRepair = completedRepairs.find((r: any) => 
                         r.Vehicle_Plate === v.Vehicle_Plate && 
                         r.Issue_Type?.toLowerCase().includes(std.Component_Name.toLowerCase())
                     )
@@ -177,8 +177,8 @@ export async function getFleetHealthAlerts(): Promise<HealthAlert[]> {
             }
 
             // --- C. Active Repair Tickets ---
-            const vehicleRepairs = activeRepairs?.filter(r => r.Vehicle_Plate === v.Vehicle_Plate) || []
-            vehicleRepairs.forEach(r => {
+            const vehicleRepairs = activeRepairs?.filter((r: any) => r.Vehicle_Plate === v.Vehicle_Plate) || []
+            vehicleRepairs.forEach((r: any) => {
                 alerts.push({
                     vehicle_plate: v.Vehicle_Plate,
                     driver_id: v.Driver_ID,

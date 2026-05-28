@@ -43,6 +43,7 @@ type LocationPoint = {
   name: string
   lat: string
   lng: string
+  so_no?: string
 }
 
 type ExtraCost = {
@@ -111,7 +112,7 @@ export function JobDialog({
   const router = useRouter()
   const [loading, setLoading] = useState(false)
   const [open, setOpen] = useState(false)
-  const [activeTab, setActiveTab] = useState<'info' | 'location' | 'assign' | 'price' | 'history'>('info')
+  const [activeTab, setActiveTab] = useState<'info' | 'location' | 'items' | 'assign' | 'price' | 'history'>('info')
   const [internalMode, setInternalMode] = useState<'create' | 'edit'>(mode)
 
   // Sync internalMode state with mode prop if it changes
@@ -334,7 +335,7 @@ export function JobDialog({
     setIsSyncingFuel(true)
     const syncToast = toast.loading('กำลังดึงราคาน้ำมันจากบางจาก...')
     try {
-      const result = await syncDailyFuelPrices(formData.Plan_Date)
+      const result = await syncDailyFuelPrices()
       if (result.success) {
         setFuelPrice(result.price || null)
         setFuelPriceTomorrow(result.priceTomorrow || null)
@@ -573,8 +574,11 @@ export function JobDialog({
         Zone: '',
         Branch_ID: '',
         Show_Price_To_Driver: true,
+        Pickup_Lat: null,
+        Pickup_Lon: null,
         Delivery_Lat: null,
         Delivery_Lon: null,
+        Loaded_Qty: '',
       })
       setOrigins([{ name: '', lat: '', lng: '' }])
       setDestinations([{ name: '', lat: '', lng: '' }])
@@ -716,7 +720,7 @@ export function JobDialog({
     }
   }
 
-  const addDestination = () => setDestinations([...destinations, { name: '', lat: '', lng: '' }])
+  const addDestination = () => setDestinations([...destinations, { name: '', lat: '', lng: '', so_no: '' }])
   const removeDestination = (index: number) => {
     if (destinations.length > 1) setDestinations(destinations.filter((_, i) => i !== index))
   }
@@ -947,9 +951,11 @@ export function JobDialog({
         original_origins_json: JSON.stringify(origins),
         original_destinations_json: JSON.stringify(destinations),
         extra_costs_json: JSON.stringify(extraCosts),
-        Est_Distance_KM: formData.Est_Distance_KM,
-        Price_Cust_Extra: formData.Price_Cust_Extra, // Ensure Extra Costs saved
-        Cost_Driver_Extra: formData.Cost_Driver_Extra,
+        Est_Distance_KM: formData.Est_Distance_KM === "" ? null : Number(formData.Est_Distance_KM),
+        Price_Cust_Extra: formData.Price_Cust_Extra === "" ? null : Number(formData.Price_Cust_Extra), // Ensure Extra Costs saved
+        Cost_Driver_Extra: formData.Cost_Driver_Extra === "" ? null : Number(formData.Cost_Driver_Extra),
+        Weight_Kg: formData.Weight_Kg === "" ? null : Number(formData.Weight_Kg),
+        Volume_Cbm: formData.Volume_Cbm === "" ? null : Number(formData.Volume_Cbm),
         Loaded_Qty: formData.Loaded_Qty === "" ? null : Number(formData.Loaded_Qty),
       }
 
@@ -1428,7 +1434,15 @@ export function JobDialog({
                                     className="bg-background border-input text-xl h-14"
                                 />
                                 <div className="flex flex-wrap gap-4">
-                                    <div className="flex-1 min-w-[140px]">
+                                    <div className="flex-[2] min-w-[200px]">
+                                        <Input
+                                            placeholder="เลข SO (เช่น SO-001)"
+                                            value={dest.so_no || ''}
+                                            onChange={(e) => updateDestination(index, 'so_no', e.target.value)}
+                                            className="bg-background border-input text-xl h-14 font-semibold text-indigo-400 placeholder:text-muted-foreground/40 placeholder:font-normal"
+                                        />
+                                    </div>
+                                    <div className="flex-1 min-w-[120px]">
                                         <Input
                                             placeholder="Lat"
                                             value={dest.lat}
@@ -1436,7 +1450,7 @@ export function JobDialog({
                                             className="bg-background border-input text-xl h-14 font-black"
                                         />
                                     </div>
-                                    <div className="flex-1 min-w-[140px]">
+                                    <div className="flex-1 min-w-[120px]">
                                         <Input
                                             placeholder="Lng"
                                             value={dest.lng}
@@ -1837,8 +1851,8 @@ export function JobDialog({
                         const maxWeight = selectedVehicle.Max_Weight_kg || 0
                         const maxVolume = selectedVehicle.Max_Volume_cbm || 0
                         
-                        const jobWeight = formData.Weight_Kg || 0
-                        const jobVolume = formData.Volume_Cbm || 0
+                        const jobWeight = Number(formData.Weight_Kg) || 0
+                        const jobVolume = Number(formData.Volume_Cbm) || 0
                         
                         const jobZone = formData.Zone
                         const vehicleZone = selectedVehicle.Preferred_Zone

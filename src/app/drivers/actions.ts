@@ -60,10 +60,11 @@ export async function createBulkDrivers(drivers: Partial<DriverFormData>[]) {
 
   const supabase = await createAdminClient()
   const currentBranchId = await getUserBranchId()
+  const isSuper = await isSuperAdmin()
 
   // Fetch valid subcontractors to prevent FK violations
   const { data: validSubs } = await supabase.from('Master_Subcontractors').select('Sub_ID')
-  const validSubSet = new Set(validSubs?.map(s => s.Sub_ID) || [])
+  const validSubSet = new Set(validSubs?.map((s: { Sub_ID: string }) => s.Sub_ID) || [])
 
   // Helper to normalize keys
   const normalizeData = (row: Partial<DriverFormData>) => {

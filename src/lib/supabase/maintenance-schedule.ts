@@ -77,21 +77,21 @@ export async function getMaintenanceSchedule(): Promise<MaintenanceScheduleData>
   const allVehicles = vehicles || []
 
   // Active repairs
-  const activeRepairs = allTickets.filter(t => 
+  const activeRepairs = allTickets.filter((t: any) => 
     t.Status === 'Pending' || t.Status === 'In Progress' || 
     t.Status === 'รอดำเนินการ' || t.Status === 'กำลังซ่อม'
   ).length
 
   // Completed in last 30 days (Sliding Window)
-  const recentTickets = allTickets.filter(t => 
+  const recentTickets = allTickets.filter((t: any) => 
     (t.Date_Finish || t.Date_Report || '') >= thirtyDaysAgo
   )
-  const completedThisMonth = recentTickets.filter(t => 
+  const completedThisMonth = recentTickets.filter((t: any) => 
     t.Status === 'Completed' || t.Status === 'เสร็จสิ้น'
   ).length
   const totalCostThisMonth = recentTickets
-    .filter(t => t.Status === 'Completed' || t.Status === 'เสร็จสิ้น')
-    .reduce((s, t) => s + (Number(t.Cost_Total) || 0), 0)
+    .filter((t: any) => t.Status === 'Completed' || t.Status === 'เสร็จสิ้น')
+    .reduce((s: number, t: any) => s + (Number(t.Cost_Total) || 0), 0)
 
   // Build scheduled services from vehicle data
   const services: ScheduledService[] = []

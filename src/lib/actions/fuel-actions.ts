@@ -146,7 +146,7 @@ export async function syncDailyFuelPrices() {
         const syncDate = new Date().toISOString().split('T')[0]
         
         // TRY SOURCE 1: BANGCHAK
-        let result = await fetchFromBangchak()
+        let result: { today: number; tomorrow: number | null } | null = await fetchFromBangchak()
         let source = 'Bangchak'
 
         // TRY SOURCE 2: KAPOOK (Fallback)

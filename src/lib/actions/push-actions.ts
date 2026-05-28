@@ -11,7 +11,7 @@ import { readFileSync } from 'fs'
 // Initialize Firebase Admin for Native Push (FCM)
 if (!admin.apps.length) {
     try {
-        let credential: admin.credential.Credential
+        let credential: admin.credential.Credential | undefined = undefined
 
         const envProjectId = process.env.FIREBASE_PROJECT_ID
         const envClientEmail = process.env.FIREBASE_CLIENT_EMAIL
@@ -198,7 +198,7 @@ export async function sendPushToDriver(driverId: string, payload: PushPayload) {
     console.log(`[PUSH] Sending to ${subs.length} device(s) for driver: ${driverId}`)
 
     const results = await Promise.allSettled(
-        subs.map(async (sub) => {
+        subs.map(async (sub: any) => {
             // FCM Native Push
             if (sub.Keys_Auth === 'FCM') {
                 try {
@@ -275,9 +275,9 @@ export async function sendPushToAdmins(payload: PushPayload, branchId?: string |
     }
 
     // 3. Manual Join & Filter in memory
-    const recipients = subs.filter(sub => {
+    const recipients = subs.filter((sub: any) => {
         // Match subscription's User_ID with Master_Users.Username OR User_ID (UUID)
-        const profile = profiles.find(p => 
+        const profile = profiles.find((p: any) => 
             p.Username === sub.User_ID || (p.User_ID && p.User_ID === sub.User_ID)
         )
         
@@ -301,7 +301,7 @@ export async function sendPushToAdmins(payload: PushPayload, branchId?: string |
     console.log(`[PUSH] Broadcasting to ${recipients.length} admin(s) [Filter: ${branchId || 'All'}]`)
 
     const results = await Promise.allSettled(
-        recipients.map(async (sub) => {
+        recipients.map(async (sub: any) => {
             const result = await sendWebPush(sub, { ...payload, url: payload.url || '/chat' })
             // Clean up expired subscriptions
             if (!result.success && (result.statusCode === 404 || result.statusCode === 410)) {
@@ -425,7 +425,7 @@ export async function broadcastPushToDrivers(payload: PushPayload) {
     console.log(`[PUSH] Broadcasting to ${subs.length} driver(s)`)
 
     const results = await Promise.allSettled(
-        subs.map(async (sub) => {
+        subs.map(async (sub: any) => {
             // FCM
             if (sub.Keys_Auth === 'FCM') {
                 try {
@@ -775,7 +775,7 @@ export async function testPushNotification(target: { driverId?: string; userId?:
         console.log(`[PUSH-TEST] Sending to ${subs.length} device(s) for user: ${target.userId}`)
         
         const results = await Promise.allSettled(
-            subs.map(async (sub) => {
+            subs.map(async (sub: any) => {
                 const result = await sendWebPush(sub, payload)
                 if (!result.success && (result.statusCode === 404 || result.statusCode === 410)) {
                     await supabase.from('Push_Subscriptions').delete().eq('Endpoint', sub.Endpoint)
@@ -864,8 +864,8 @@ export async function notifyAdminIPPending(username: string, ip: string) {
     if (!profiles || profiles.length === 0) return { success: false }
 
     // 3. Filter subscriptions for Super Admins
-    const recipients = subs.filter(sub => {
-        return profiles.some(p => p.Username === sub.User_ID || (p.User_ID && p.User_ID === sub.User_ID))
+    const recipients = subs.filter((sub: any) => {
+        return profiles.some((p: any) => p.Username === sub.User_ID || (p.User_ID && p.User_ID === sub.User_ID))
     })
 
     if (recipients.length === 0) return { success: true }
@@ -873,7 +873,7 @@ export async function notifyAdminIPPending(username: string, ip: string) {
     console.log(`[PUSH] Sending IP pending alert to ${recipients.length} Super Admin(s)`)
 
     await Promise.allSettled(
-        recipients.map(async (sub) => {
+        recipients.map(async (sub: any) => {
             const result = await sendWebPush(sub, {
                 title: '🛡️ มีรายการรออนุมัติ IP ใหม่',
                 body: `ผู้ใช้: ${username} | IP: ${ip}`,

@@ -46,6 +46,7 @@ import Link from "next/link"
 
 export default function SubcontractorsPage() {
     const { selectedBranch, branches } = useBranch()
+    const router = useRouter()
     const { t } = useLanguage()
     const [list, setList] = useState<Subcontractor[]>([])
     const [loading, setLoading] = useState(true)

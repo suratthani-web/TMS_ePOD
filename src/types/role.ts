@@ -6,10 +6,18 @@ export type Permission = {
   category: 'Operations' | 'Fleet' | 'Financial' | 'Executive' | 'System' | 'People'
 }
 
+export type Role = {
+  Role_ID: number
+  Role_Name: string
+  Role_Description?: string | null
+}
+
 export type RolePermission = {
   Role: string
   Permissions: Record<string, boolean>
 }
+
+export type RolePermissions = RolePermission
 
 export const STANDARD_ROLES = ['Super Admin', 'Admin', 'Executive', 'Accountant', 'Dispatcher', 'Driver', 'Customer', 'Staff'] as const
 export type StandardRole = (typeof STANDARD_ROLES)[number]

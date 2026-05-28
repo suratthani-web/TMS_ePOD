@@ -34,6 +34,10 @@ export interface PublicJobDetails {
   pickupLon?: number | null;
   dropoffLat?: number | null;
   dropoffLon?: number | null;
+  priceCustBase?: number | null;
+  priceCustExtra?: number | null;
+  priceCustTotal?: number | null;
+  extraCostsJson?: string | null;
 }
 
 export async function submitJobFeedback(
@@ -150,5 +154,9 @@ export async function getPublicJobDetails(
     pickupLon: job.Pickup_Lon,
     dropoffLat: job.Delivery_Lat || job.Dropoff_Lat, // Use Delivery_Lat for compatibility
     dropoffLon: job.Delivery_Lon || job.Dropoff_Lon,
+    priceCustBase: job.Price_Cust_Base,
+    priceCustExtra: job.Price_Cust_Extra,
+    priceCustTotal: job.Price_Cust_Total,
+    extraCostsJson: job.extra_costs_json || job.extra_costs,
   };
 }

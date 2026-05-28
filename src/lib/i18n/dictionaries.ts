@@ -276,11 +276,11 @@ export const dictionaries = {
       toast_verified: 'อนุมัติงานเรียบร้อยแล้ว',
       toast_rejected: 'ไม่อนุมัติงานเรียบร้อยแล้ว'
     },
-    timeline: {
-      action_create: 'สร้างงาน',
-      action_update: 'อัปเดตข้อมูล',
-      action_delete: 'ลบงาน',
-    },
+
+
+
+
+
     jobs: {
       status_requested: 'รอการตอบรับ',
       status_pending: 'รอเริ่มงาน',
@@ -468,11 +468,11 @@ export const dictionaries = {
       save_success: 'แจ้งซ่อมเรียบร้อยแล้ว',
       edit_success: 'อัปเดตข้อมูลเรียบร้อยแล้ว',
       title_report_btn: 'ยืนยันใบแจ้งซ่อม',
-      workflow_pulse: 'สถานะการทำงาน',
+      workflow_pulse_matrix: 'สถานะการทำงาน',
       workflow_matrix: 'เมทริกซ์การดำเนินงานซ่อมบำรุง',
       integrity_desc: 'ระบบสถาปัตยกรรมการจัดการความพร้อมของกองยานพาหนะ',
-      integrity_index: 'ดัชนีความสมบูรณ์รวม',
-      readiness_engine: 'ระบบประมวลผลความพร้อมใช้งาน',
+      integrity_index_aggregate: 'ดัชนีความสมบูรณ์รวม',
+      readiness_engine_processor: 'ระบบประมวลผลความพร้อมใช้งาน',
       capability_verified: 'ตรวจสอบสถานะเทคนิคเรียบร้อย',
     },
     fuel: {
@@ -703,22 +703,22 @@ export const dictionaries = {
       asset_compliance_feed: 'รายการข้อมูลรถที่ถูกต้อง',
       temporal_maintenance_scheduler: 'ตารางซ่อมบำรุงตามรอบ',
       service_prefix: 'ประเภทบริการ:',
-      strict_breach: 'ผิดระเบียบร้ายแรง',
+      strict_breach_severe: 'ผิดระเบียบร้ายแรง',
       asset_health_matrix: 'ตารางสุขภาพของรถ',
       operational_integrity_breakdown: 'รายละเอียดความสมบูรณ์การทำงาน',
       active_tickets: 'ใบแจ้งซ่อมที่ยังไม่ปิด',
-      safety_intel_registry: 'บันทึกข้อมูลความปลอดภัย',
+
       distress_events: 'เหตุการณ์ฉุกเฉินทั้งหมด',
       sos_trigger_log: 'บันทึกการแจ้ง SOS',
       active_interventions_label: 'การดำเนินการช่วยเหลือขณะนี้',
-      pod_integrity: 'ความถูกต้องของ POD',
+
       strategic_compliance_index: 'ดัชนีการทำตามข้อกำหนด',
       mission_resolution: 'การแก้ปัญหางาน',
       operational_closure_registry: 'บันทึกการปิดงานสำเร็จ',
       success_index: 'ดัชนีความสำเร็จรวม',
       security_status_label: 'สถานะความปลอดภัยรวม',
       environmental_safety_thresh: 'ระดับความปลอดภัยสิ่งแวดล้อม',
-      nominal: 'ปกติ',
+      nominal_status: 'ปกติ',
       biometric_sync_active: 'ซิงค์ข้อมูลยืนยันตัวตนแล้ว',
       incident_taxonomy: 'ประเภทของอุบัติเหตุ',
       distress_category_distribution: 'การกระจายประเภทความเสียหาย',
@@ -743,9 +743,9 @@ export const dictionaries = {
       operational_risk_audit: 'การตรวจสอบความเสี่ยงงาน',
       env_impact: 'ผลกระทบสิ่งแวดล้อม',
       esg_intel: 'ข้อมูล ESG',
-      fuel_energy: 'น้ำมันและพลังงาน',
-      energy_expenditure: 'ค่าใช้จ่ายพลังงาน',
-      operational_fuel_matrix: 'สรุปการใช้น้ำมัน',
+      fuel_energy_summary: 'น้ำมันและพลังงาน',
+      energy_expenditure_summary: 'ค่าใช้จ่ายพลังงาน',
+      operational_fuel_matrix_summary: 'สรุปการใช้น้ำมัน',
       system_optimal: 'ระบบทำงานได้อย่างเหมาะสม',
       no_anomalies: 'ไม่พบสิ่งผิดปกติ',
       efficiency_prefix: 'ประสิทธิภาพ:',
@@ -763,9 +763,9 @@ export const dictionaries = {
       status_attention: 'ต้องการการดูแล (ATTENTION)',
       access_sector: 'เข้าสู่พื้นที่',
     },
-    analytics: {
-      fleet_deployment: 'การวางกำลังกองรถ',
-    },
+
+
+
     planning: {
       title: 'วางแผนงานขนส่ง',
       mission_orchestration: 'ระบบสั่งการและวางแผนงาน',
@@ -951,6 +951,7 @@ export const dictionaries = {
       documents: 'เอกสารและหลักฐาน',
     },
     analytics: {
+      fleet_deployment: 'การวางกำลังกองรถ',
       critical_divergence: 'พบความผิดปกติของข้อมูลสำคัญ',
       structural_intervention: 'ระบบต้องการการตรวจสอบทันทีเพื่อความปลอดภัย',
       initiate_recovery: 'ดำเนินการแก้ไขทันที',
@@ -2154,11 +2155,11 @@ export const dictionaries = {
           name_required: 'Route name is required',
       }
     },
-    timeline: {
-      action_create: 'Job Created',
-      action_update: 'Information Updated',
-      action_delete: 'Job Deleted',
-    },
+
+
+
+
+
     jobs: {
       status_requested: 'Requested',
       status_pending: 'Pending',
@@ -2347,11 +2348,11 @@ export const dictionaries = {
       save_success: 'Report saved',
       edit_success: 'Report updated',
       title_report_btn: 'Submit Repair Log',
-      workflow_pulse: 'Status',
+      workflow_pulse_matrix: 'Status',
       workflow_matrix: 'Maintenance Workflow Matrix',
       integrity_desc: 'Fleet Readiness Management Architecture',
-      integrity_index: 'Aggregate Integrity Index',
-      readiness_engine: 'Readiness Engine',
+      integrity_index_aggregate: 'Aggregate Integrity Index',
+      readiness_engine_processor: 'Readiness Engine',
       capability_verified: 'Technical Capability Verified',
     },
     fuel: {
@@ -2603,11 +2604,6 @@ export const dictionaries = {
       energy_expenditure: 'Energy Expenditure',
       operational_fuel_matrix: 'Operational Fuel Matrix',
       driver_active: 'Active Drivers',
-      fuel_intelligence: 'Fuel Intelligence',
-      fuel_energy: 'Fuel & Energy',
-      energy_expenditure: 'Energy Expenditure',
-      operational_fuel_matrix: 'Operational Fuel Matrix',
-      driver_active: 'Active Drivers',
       active_duty_roster: 'Active Duty',
       workforce_matrix: 'Staff Matrix',
       optimal_utilization_label: 'Optimal Usage',
@@ -2623,9 +2619,9 @@ export const dictionaries = {
       operational_risk_audit: 'Risk Audit',
       env_impact: 'Env Impact',
       esg_intel: 'ESG Intel',
-      fuel_energy: 'Energy',
-      energy_expenditure: 'Energy Cost',
-      operational_fuel_matrix: 'Fuel Summary',
+      fuel_energy_summary: 'Energy',
+      energy_expenditure_summary: 'Energy Cost',
+      operational_fuel_matrix_summary: 'Fuel Summary',
       system_optimal: 'System Optimal',
       no_anomalies: 'No anomalies',
       efficiency_prefix: 'Efficiency:',
@@ -2643,9 +2639,9 @@ export const dictionaries = {
       status_attention: 'ATTENTION',
       access_sector: 'Enter Area',
     },
-    analytics: {
-      fleet_deployment: 'Fleet Deployment',
-    },
+
+
+
     planning: {
       title: 'Job Planning',
       mission_orchestration: 'Order & Planning Hub',
@@ -2831,6 +2827,7 @@ export const dictionaries = {
       documents: 'Documents',
     },
     analytics: {
+      fleet_deployment: 'Fleet Deployment',
       critical_divergence: 'Data anomaly detected',
       structural_intervention: 'Immediate check required',
       initiate_recovery: 'Resolve Now',

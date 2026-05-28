@@ -58,7 +58,7 @@ interface PlanningClientProps {
     canCreate: boolean
     canAssign: boolean
     createBulkJobs: (data: Partial<JobFormData>[], effectiveBranchId?: string | null, options?: { shouldGroup?: boolean }) => Promise<{ success: boolean; message: string }>
-    publishAllDrafts: (date: string, branchId?: string) => Promise<{ success: boolean, error: any, jobsCount?: number }>
+    publishAllDrafts: (date: string, branchId?: string) => Promise<{ success: boolean, error?: any, jobsCount?: number }>
     branchId: string
     selectedDate: string
 }

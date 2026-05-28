@@ -1,4 +1,5 @@
 import type { NextConfig } from "next";
+import path from "path";
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 const withPWA = require("@ducanh2912/next-pwa").default({
   dest: "public",
@@ -21,6 +22,7 @@ const withPWA = require("@ducanh2912/next-pwa").default({
 
 const nextConfig: NextConfig = {
   output: "standalone",
+  outputFileTracingRoot: path.resolve(__dirname),
   productionBrowserSourceMaps: false,
   typescript: {
     ignoreBuildErrors: true,

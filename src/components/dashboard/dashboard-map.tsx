@@ -212,7 +212,7 @@ export function DashboardMap({ drivers, allJobs = [], activeJobs = [], focusPosi
                 toast.info("No route data found for this period")
                 setRouteHistory([])
             } else {
-                setRouteHistory(data.map(d => [d.lat, d.lng] as [number, number]))
+                setRouteHistory(data.map((d: any) => [d.lat, d.lng] as [number, number]))
                 toast.success(`Loaded ${data.length} GPS points`)
             }
         } catch {
@@ -236,7 +236,7 @@ export function DashboardMap({ drivers, allJobs = [], activeJobs = [], focusPosi
         const loadVehicles = async () => {
             if (showHistory && vehicles.length === 0) {
                 const data = await getAllVehiclePlates()
-                setVehicles(data)
+                setVehicles(data as string[])
             }
         }
         loadVehicles()

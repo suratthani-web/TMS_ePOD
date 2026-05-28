@@ -48,7 +48,7 @@ export async function verifyJob(
     // Log the verification event
     await logActivity({
       module: 'Jobs',
-      action_type: status === 'Verified' ? 'APPROVE' : 'REJECT',
+      action_type: (status === 'Verified' ? 'APPROVE' : 'REJECT') as any,
       target_id: jobId,
       details: { status, note, verified_by: session.username }
     })

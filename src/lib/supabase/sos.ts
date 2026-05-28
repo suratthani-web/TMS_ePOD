@@ -160,8 +160,8 @@ export async function getSOSDriverIds(): Promise<string[]> {
     }
     
     return (data || [])
-      .map(item => item.Driver_ID)
-      .filter((id): id is string => id !== null)
+      .map((item: any) => item.Driver_ID)
+      .filter((id: string | null): id is string => id !== null)
   } catch {
     return []
   }

@@ -75,7 +75,7 @@ export async function saveGPSLog(data: {
             activeZones = globalZoneCache[branchId].zones;
         } else {
             const zones = await getDangerZones(branchId);
-            activeZones = zones.filter(z => z.Is_Active);
+            activeZones = zones.filter((z: any) => z.Is_Active);
             globalZoneCache[branchId] = { zones: activeZones, timestamp: now };
             console.log(`[GPS] Cache updated for branch: ${branchId} (${activeZones.length} zones)`);
         }
@@ -219,7 +219,7 @@ export async function getDriverRouteForDate(driverId: string, date: string) {
 
     // Normalize data
     return (
-      data?.map((d) => ({
+      data?.map((d: any) => ({
         Latitude: d.latitude || d.Latitude,
         Longitude: d.longitude || d.Longitude,
         Timestamp: d.timestamp || d.Timestamp,
@@ -259,7 +259,7 @@ export async function getActiveFleetStatus(branchId?: string | null, customerId?
         .not("Job_Status", "in", '("Complete", "Completed", "Cancelled", "Delivered")');
 
       const activeDriverIds = Array.from(
-        new Set(activeJobs?.map((j) => j.Driver_ID) || []),
+        new Set(activeJobs?.map((j: any) => j.Driver_ID) || []),
       );
       if (activeDriverIds.length === 0) return [];
 
@@ -280,7 +280,7 @@ export async function getActiveFleetStatus(branchId?: string | null, customerId?
     }
 
     // 2. Fetch latest GPS logs for these drivers (Last 24 hours to keep it efficient)
-    const driverIds = drivers.map(d => d.Driver_ID || d.driver_id);
+    const driverIds = drivers.map((d: any) => d.Driver_ID || d.driver_id);
     const yesterday = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
     
     const { data: latestLogs } = await supabase
@@ -293,7 +293,7 @@ export async function getActiveFleetStatus(branchId?: string | null, customerId?
 
     // 3. Map logs to drivers
     const logMap = new Map();
-    latestLogs?.forEach(log => {
+    latestLogs?.forEach((log: any) => {
         const dId = log.driver_id || log.Driver_ID;
         if (dId && !logMap.has(dId)) {
             logMap.set(dId, log);
@@ -348,7 +348,7 @@ export async function getVehicleRouteHistory(plate: string, startDate: string, e
                 .eq('Vehicle_Plate', plate);
             
             if (drivers && drivers.length > 0) {
-                const driverIds = drivers.map(d => d.Driver_ID);
+                const driverIds = drivers.map((d: any) => d.Driver_ID);
                 const { data: driverLogs } = await supabase
                     .from("gps_logs")
                     .select("latitude, longitude, timestamp")
@@ -361,7 +361,7 @@ export async function getVehicleRouteHistory(plate: string, startDate: string, e
             }
         }
 
-        return logs.map(d => ({
+        return logs.map((d: any) => ({
             lat: Number(d.latitude || d.Latitude),
             lng: Number(d.longitude || d.Longitude),
             timestamp: d.timestamp || d.Timestamp

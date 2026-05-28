@@ -15,7 +15,7 @@ interface PageProps {
   }>
 }
 
-async function PlanningContent({ branch, date }: { branch: string, date?: string }) {
+async function PlanningContent({ branch, date = '' }: { branch: string, date?: string }) {
   const currentBranchId = branch === 'All' ? undefined : branch
   const isAdminUser = await isAdmin()
 

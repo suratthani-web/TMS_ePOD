@@ -64,64 +64,26 @@ interface DashboardContentProps {
 
 // Split state into two priority layers
 interface PriorityData {
-  financials: {
-    totalRevenue: number
-    totalProfit: number
-    margin: number
-    growth: number
-  }
-  revenueTrend: Array<{ date: string; revenue: number; cost: number; jobCount: number }>
-  forecastData: Array<{ month: string; actual: number; forecast: number }>
-  exeKPIs: {
-    revenue: { current: number; previous: number; growth: number; target?: number; attainment?: number }
-    profit:  { current: number; previous: number; growth: number }
-    margin:  { current: number; growth: number; target?: number }
-    revenue_pipeline?: number
-    predicted_fuel?: number
-    predicted_maintenance?: number
-  }
-  opStats: Record<string, number>
-  statusDist: Array<{ name: string; value: number }>
-  driverLeaderboard: Array<{ id: string; name: string; score: number; trips: number }>
-  vehicleProfitability: Array<{ id: string; plate: string; profit: number }>
-  branchPerf: Array<{ name: string; performance: number }>
+  financials: any
+  revenueTrend: any[]
+  forecastData: any[]
+  exeKPIs: any
+  opStats: any
+  statusDist: any[]
+  driverLeaderboard: any[]
+  vehicleProfitability: any[]
+  branchPerf: any[]
 }
 
 interface SecondaryData {
-  topCustomers: Array<{ name: string; revenue: number }>
-  subPerf: Array<{ name: string; rating: number }>
-  routes: Array<{ id: string; start: string; end: string; efficiency: number }>
+  topCustomers: any[]
+  subPerf: any[]
+  routes: any[]
   billing: any
-  fuel: {
-    totalLiters: number
-    totalCost: number
-    avgCostPerLiter: number
-    avgKmPerLiter: number
-    vehicleBreakdown: any[]
-    monthlyTrends: any[]
-    anomalies: any[]
-  }
+  fuel: any
   maintenance: any
-  safety: {
-    sos: {
-      total: number
-      active: number
-      resolved: number
-      byReason: { reason: string; count: number }[]
-      recentAlerts: { id: string; vehicle: string; driver: string; reason: string; time: string }[]
-    }
-    pod: {
-      totalCompleted: number
-      withPhoto: number
-      withSignature: number
-      complianceRate: number
-    }
-  }
-  workforce: {
-    kpis: { totalBox: number; activeToday: number; licenseExpiring: number; licenseExpired: number }
-    topPerformers: { name: string; revenue: number; jobCount: number; successRate: number }[]
-    driversWithIssues: { id: string; name: string; issue: string; daysAuth: number }[]
-  }
+  safety: any
+  workforce: any
   esgStats: any
   delayRootCause: any[]
 }
@@ -389,7 +351,16 @@ export function DashboardContent({
                                 <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
                              </div>
                              <div className="h-[210px] overflow-hidden">
-                                <ActivityFeed limit={5} compact />
+                                <ActivityFeed 
+                                    jobStats={{
+                                        total: statusDist.reduce((a: number, b: any) => a + (Number(b.value) || 0), 0) || 0,
+                                        pending: statusDist.find((x: any) => x.name === 'Pending' || x.name === 'New' || x.name === 'Draft')?.value || 0,
+                                        inProgress: statusDist.find((x: any) => x.name === 'In Transit' || x.name === 'Picked Up' || x.name === 'Accepted')?.value || 0,
+                                        delivered: statusDist.find((x: any) => x.name === 'Completed' || x.name === 'Delivered')?.value || 0
+                                    }}
+                                    sosCount={0}
+                                    logs={[]}
+                                />
                              </div>
                         </PremiumCard>
                     </div>

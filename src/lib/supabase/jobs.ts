@@ -34,8 +34,22 @@ export type Job = {
   Total_Drop: number | null
   Price_Cust_Total: number
   Cost_Driver_Total: number
+  Price_Cust_Base?: number | null
   Price_Cust_Extra?: number | null
+  Charge_Labor?: number | null
+  Charge_Wait?: number | null
+  Price_Cust_Return?: number | null
+  Price_Cust_Fuel?: number | null
+  Price_Cust_Trailer?: number | null
+  Price_Cust_Other?: number | null
+  Cost_Driver_Base?: number | null
   Cost_Driver_Extra?: number | null
+  Cost_Driver_Labor?: number | null
+  Cost_Driver_Wait?: number | null
+  Cost_Driver_Return?: number | null
+  Cost_Driver_Fuel?: number | null
+  Cost_Driver_Trailer?: number | null
+  Cost_Driver_Other?: number | null
   Cargo_Type: string | null
   Notes: string | null
   original_origins_json: string | null
@@ -322,11 +336,11 @@ export async function getTodayJobStats(branchId?: string, startDate?: string, en
     const jobs = data || []
     return {
       total: jobs.length,
-      delivered: jobs.filter(j => j.Job_Status === 'Delivered' || j.Job_Status === 'Completed').length,
-      inProgress: jobs.filter(j => j.Job_Status === 'In Transit' || j.Job_Status === 'In Progress' || j.Job_Status === 'Arrived Pickup' || j.Job_Status === 'Arrived Dropoff').length,
-      pending: jobs.filter(j => j.Job_Status === 'New' || j.Job_Status === 'Assigned' || j.Job_Status === 'Requested' || j.Job_Status === 'Pending').length,
-      sos: jobs.filter(j => j.Job_Status === 'SOS').length,
-      totalQty: jobs.reduce((sum, j) => sum + (Number(j.Loaded_Qty) || 0), 0)
+      delivered: jobs.filter((j: any) => j.Job_Status === 'Delivered' || j.Job_Status === 'Completed').length,
+      inProgress: jobs.filter((j: any) => j.Job_Status === 'In Transit' || j.Job_Status === 'In Progress' || j.Job_Status === 'Arrived Pickup' || j.Job_Status === 'Arrived Dropoff').length,
+      pending: jobs.filter((j: any) => j.Job_Status === 'New' || j.Job_Status === 'Assigned' || j.Job_Status === 'Requested' || j.Job_Status === 'Pending').length,
+      sos: jobs.filter((j: any) => j.Job_Status === 'SOS').length,
+      totalQty: jobs.reduce((sum: number, j: any) => sum + (Number(j.Loaded_Qty) || 0), 0)
     }
   } catch {
     return { total: 0, delivered: 0, inProgress: 0, pending: 0, totalQty: 0 }
@@ -374,9 +388,9 @@ export async function getJobStatsSummary(query = '', startDate = '', endDate = '
     
     return {
       total: data.length,
-      success: data.filter(j => ['Delivered', 'Complete', 'Completed'].includes(j.Job_Status || '')).length,
-      failed: data.filter(j => j.Job_Status === 'Failed').length,
-      cancelled: data.filter(j => j.Job_Status === 'Cancelled').length
+      success: data.filter((j: any) => ['Delivered', 'Complete', 'Completed'].includes(j.Job_Status || '')).length,
+      failed: data.filter((j: any) => j.Job_Status === 'Failed').length,
+      cancelled: data.filter((j: any) => j.Job_Status === 'Cancelled').length
     }
   } catch {
     return { success: 0, failed: 0, cancelled: 0, total: 0 }
@@ -419,7 +433,7 @@ export async function getTodayFinancials(branchId?: string) {
     
     if (!data) return { revenue: 0 }
 
-    const revenue = data.reduce((sum, job) => sum + (job.Price_Cust_Total || 0), 0) || 0
+    const revenue = data.reduce((sum: number, job: any) => sum + (job.Price_Cust_Total || 0), 0) || 0
     return { revenue }
   } catch {
     return { revenue: 0 }
@@ -658,7 +672,7 @@ export async function getWeeklyJobStats(branchId?: string) {
         dailyStats[dateStr] = { date: dayName, total: 0, completed: 0 }
     }
 
-    data?.forEach(job => {
+    data?.forEach((job: any) => {
         const dateStr = job.Plan_Date as string // Assuming Plan_Date is string YYYY-MM-DD
         if (dailyStats[dateStr]) {
             dailyStats[dateStr].total += 1
@@ -703,7 +717,7 @@ export async function getJobStatusDistribution(branchId?: string) {
         if (!data) return []
 
         const statusCounts: Record<string, number> = {}
-        data?.forEach(job => {
+        data?.forEach((job: any) => {
             const status = job.Job_Status || 'Unknown'
             statusCounts[status] = (statusCounts[status] || 0) + 1
         })
@@ -844,7 +858,7 @@ export async function getAllDrivers() {
 
         // De-duplicate by Driver_ID
         const uniqueDrivers = new Map()
-        data?.forEach(item => {
+        data?.forEach((item: any) => {
             if (item.Driver_ID && !uniqueDrivers.has(item.Driver_ID)) {
                 uniqueDrivers.set(item.Driver_ID, item)
             }
@@ -884,7 +898,7 @@ export async function getAllVehicles() {
         if (!data) return []
 
         const uniqueVehicles = new Map()
-        data?.forEach(item => {
+        data?.forEach((item: any) => {
             if (item.Vehicle_Plate && !uniqueVehicles.has(item.Vehicle_Plate)) {
                 uniqueVehicles.set(item.Vehicle_Plate, item)
             }
@@ -960,16 +974,16 @@ export async function getJobsForBilling(
             return []
         }
 
-        const uniqueCustomerIds = Array.from(new Set(data.filter(j => j.Customer_ID).map(j => j.Customer_ID)))
+        const uniqueCustomerIds = Array.from(new Set(data.filter((j: any) => j.Customer_ID).map((j: any) => j.Customer_ID)))
         const { data: customerPrices } = await supabase
             .from('Master_Customers')
             .select('Customer_ID, Price_Per_Unit')
             .in('Customer_ID', uniqueCustomerIds)
 
-        const priceMap = new Map(customerPrices?.map(c => [c.Customer_ID, c.Price_Per_Unit]) || [])
+        const priceMap = new Map(customerPrices?.map((c: any) => [c.Customer_ID, c.Price_Per_Unit]) || [])
 
         // Process each job to find the best matching price for its specific date
-        const enhancedJobs = await Promise.all(data.map(async (job) => {
+        const enhancedJobs = await Promise.all(data.map(async (job: any) => {
             const dateStr = String(job.Plan_Date || "")
             const jobDate = job.Plan_Date ? new Date(job.Plan_Date) : null
             const isApril21_23 = (jobDate && jobDate.getFullYear() === 2026 && jobDate.getMonth() === 3 && [21, 22, 23].includes(jobDate.getDate())) ||
@@ -1066,13 +1080,13 @@ export async function getDriverDashboardStats(driverId: string) {
     const isIncomeVisible = driverProfile?.Show_Price_Default !== false
 
     // Calculate today's income
-    const todayIncome = isIncomeVisible ? (jobs?.filter(j => 
+    const todayIncome = isIncomeVisible ? (jobs?.filter((j: any) => 
         j.Plan_Date === today && 
         j.Job_Status !== 'Cancelled' &&
         j.Show_Price_To_Driver !== false
-    ).reduce((sum, j) => sum + (j.Cost_Driver_Total || 0), 0) || 0) : 0
+    ).reduce((sum: number, j: any) => sum + (j.Cost_Driver_Total || 0), 0) || 0) : 0
 
-    const activeJobs = jobs?.filter(j => !['Completed', 'Delivered', 'Cancelled', 'Draft'].includes(j.Job_Status || '')) || []
+    const activeJobs = jobs?.filter((j: any) => !['Completed', 'Delivered', 'Cancelled', 'Draft'].includes(j.Job_Status || '')) || []
     const currentJob = activeJobs.length > 0 ? activeJobs[0] : null
     const totalRemaining = activeJobs.length
 
@@ -1152,17 +1166,17 @@ export async function getBillableJobs(customerId?: string, startDate?: string, e
 
     // Map unit prices from Master_Customers + Dynamic Fuel Matrix
     try {
-        const uniqueCustomerIds = Array.from(new Set(data.filter(j => j.Customer_ID).map(j => j.Customer_ID)))
+        const uniqueCustomerIds = Array.from(new Set(data.filter((j: any) => j.Customer_ID).map((j: any) => j.Customer_ID)))
         
         const { data: customerPrices } = await supabase
             .from('Master_Customers')
             .select('Customer_ID, Price_Per_Unit')
             .in('Customer_ID', uniqueCustomerIds)
 
-        const priceMap = new Map(customerPrices?.map(c => [c.Customer_ID, c.Price_Per_Unit]) || [])
+        const priceMap = new Map(customerPrices?.map((c: any) => [c.Customer_ID, c.Price_Per_Unit]) || [])
 
         // Process each job to find the best matching price for its specific date
-        const enhancedJobs = await Promise.all(data.map(async (job) => {
+        const enhancedJobs = await Promise.all(data.map(async (job: any) => {
             const dateStr = String(job.Plan_Date || "")
             const jobDate = job.Plan_Date ? new Date(job.Plan_Date) : null
             const isApril21_23 = (jobDate && jobDate.getFullYear() === 2026 && jobDate.getMonth() === 3 && [21, 22, 23].includes(jobDate.getDate())) ||
@@ -1283,7 +1297,7 @@ export async function getRequestedJobs(providedBranchId?: string): Promise<Job[]
         }
 
         // Map column name Branch_ID to type field branch_id for frontend consistency
-        const mappedData = data.map(job => ({
+        const mappedData = data.map((job: any) => ({
             ...job,
             branch_id: job.Branch_ID || job.branch_id
         }))
@@ -1307,7 +1321,7 @@ export async function getAllVehiclePlates() {
             .not('Vehicle_Plate', 'is', null)
             .order('Vehicle_Plate', { ascending: true });
         
-        return Array.from(new Set((data || []).map(v => v.Vehicle_Plate)));
+        return Array.from(new Set((data || []).map((v: any) => v.Vehicle_Plate)));
     } catch {
         return [];
     }

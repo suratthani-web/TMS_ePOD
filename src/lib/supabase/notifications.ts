@@ -40,7 +40,7 @@ export async function getNotifications(): Promise<AppNotification[]> {
       .order('created_at', { ascending: false })
 
     if (adminLogs) {
-      adminLogs.forEach(log => {
+      adminLogs.forEach((log: any) => {
         const details = log.details || {}
         
         // Filter by branch (Flexible comparison)
@@ -139,7 +139,7 @@ export async function getNotifications(): Promise<AppNotification[]> {
 
     const { data: activeSOS } = await activeSOSQuery
     if (activeSOS) {
-        activeSOS.forEach(job => {
+        activeSOS.forEach((job: any) => {
             // Avoid duplicate if already in logs
             if (notifications.some(n => n.id.includes(job.Job_ID))) return
 
@@ -179,7 +179,7 @@ export async function getNotifications(): Promise<AppNotification[]> {
 
     if (statusJobs) {
       // Only show failures prominently
-      statusJobs.filter(j => j.Job_Status === 'Failed' || j.Job_Status === 'Cancelled').forEach(job => {
+      statusJobs.filter((j: any) => j.Job_Status === 'Failed' || j.Job_Status === 'Cancelled').forEach((job: any) => {
         notifications.push({
           id: `job-fail-${job.Job_ID}`,
           type: 'job_status',
@@ -193,7 +193,7 @@ export async function getNotifications(): Promise<AppNotification[]> {
       })
 
       // Show completed count as info
-      const completedCount = statusJobs.filter(j => j.Job_Status === 'Completed' || j.Job_Status === 'Delivered').length
+      const completedCount = statusJobs.filter((j: any) => j.Job_Status === 'Completed' || j.Job_Status === 'Delivered').length
       if (completedCount > 0) {
         notifications.push({
           id: `job-completed-${today}`,
@@ -258,7 +258,7 @@ export async function getNotifications(): Promise<AppNotification[]> {
       .limit(5)
 
     if (maintenanceDue) {
-      maintenanceDue.forEach(m => {
+      maintenanceDue.forEach((m: any) => {
         notifications.push({
           id: `maint-${m.id}`,
           type: 'maintenance',
@@ -299,7 +299,7 @@ export async function getNotifications(): Promise<AppNotification[]> {
 
       const driverMap = new Map<string, Record<string, string>>()
       if (drivers) {
-        drivers.forEach(d => driverMap.set(d.Driver_ID, d))
+        drivers.forEach((d: any) => driverMap.set(d.Driver_ID, d))
       }
 
       (unreadMsgs as Record<string, string>[]).forEach((msg: Record<string, string>) => {
@@ -337,7 +337,7 @@ export async function getNotifications(): Promise<AppNotification[]> {
       .not('Driver_ID', 'is', null)
 
     if (activeJobs.data && activeJobs.data.length > 0) {
-      const driverIds = activeJobs.data.map(j => j.Driver_ID)
+      const driverIds = activeJobs.data.map((j: any) => j.Driver_ID)
       
       // Get the latest 2 logs for all active drivers in one go
       // Note: Supabase doesn't easily support "limit 2 per group" in a simple query, 
@@ -351,7 +351,7 @@ export async function getNotifications(): Promise<AppNotification[]> {
       if (latestLogs && latestLogs.length > 0) {
         // Group by driver to get the absolute latest for each
         const driverLatestMap = new Map<string, any>()
-        latestLogs.forEach(log => {
+        latestLogs.forEach((log: any) => {
           if (!driverLatestMap.has(log.driver_id)) {
             driverLatestMap.set(log.driver_id, log)
           }

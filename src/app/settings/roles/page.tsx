@@ -10,12 +10,13 @@ import {
     Lock, AlertCircle, Zap, Fingerprint, ArrowLeft
 } from "lucide-react"
 import { motion } from "framer-motion"
-import { getRolePermissions, updateRolePermissions, RolePermission } from "@/lib/actions/permission-actions"
+import { getRolePermissions, updateRolePermissions } from "@/lib/actions/permission-actions"
 import { toast } from "sonner"
 import { 
     SYSTEM_PERMISSIONS, 
     STANDARD_ROLES,
-    PERMISSION_CATEGORIES
+    PERMISSION_CATEGORIES,
+    RolePermission
 } from "@/types/role"
 import { Switch } from "@/components/ui/switch"
 import { cn } from "@/lib/utils"
@@ -46,7 +47,7 @@ export default function RolesPage() {
         let fetchedData: RolePermission[] = []
         
         if (result.success && result.data) {
-             fetchedData = result.data.map(item => ({
+             fetchedData = result.data.map((item: any) => ({
                  ...item,
                  Permissions: typeof item.Permissions === 'string' 
                      ? JSON.parse(item.Permissions) 

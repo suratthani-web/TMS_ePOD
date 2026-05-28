@@ -55,7 +55,7 @@ export async function createBillingNote(
 
         if (jobsError) throw new Error("Failed to fetch jobs for calculation")
         
-        const totalAmount = jobs?.reduce((sum, job) => {
+        const totalAmount = jobs?.reduce((sum: number, job: any) => {
              const basePrice = job.Price_Cust_Total || 0
              let extra = 0
              
@@ -198,7 +198,7 @@ export async function createDriverPayment(
 
         if (jobsError) throw new Error("Failed to fetch jobs for calculation")
         
-        const totalAmount = jobs?.reduce((sum, job) => sum + (job.Cost_Driver_Total || 0), 0) || 0
+        const totalAmount = jobs?.reduce((sum: number, job: any) => sum + (job.Cost_Driver_Total || 0), 0) || 0
 
         // 2. Generate Driver Payment ID (DP-YYYYMM-XXXX)
         const dateObj = new Date()
@@ -322,7 +322,7 @@ export async function getBillingNotes(filters?: { dateFrom?: string, dateTo?: st
                 .in('Customer_Name', customerNames)
             
             if (customers) {
-                const emailMap = new Map(customers.map(c => [c.Customer_Name, c.Email]))
+                const emailMap = new Map<string, string>(customers.map((c: any) => [c.Customer_Name, c.Email]))
                 notes.forEach(n => {
                     n.Customer_Email = emailMap.get(n.Customer_Name) || ""
                 })
@@ -408,7 +408,7 @@ export async function getBillingNoteByIdWithJobs(id: string) {
                         .in('Customer_ID', uniqueCustomerIds)
 
                     if (customerPrices) {
-                        const priceMap = new Map(customerPrices.map(c => [c.Customer_ID, c.Price_Per_Unit]))
+                        const priceMap = new Map<string, number>(customerPrices.map((c: any) => [c.Customer_ID, c.Price_Per_Unit]))
                         jobs = jobs.map(job => ({
                             ...job,
                             Price_Per_Unit: job.Price_Per_Unit || priceMap.get(job.Customer_ID) || 0
@@ -850,7 +850,7 @@ export async function getPublicBillingNoteById(id: string) {
                     .in('Customer_ID', uniqueCustomerIds)
 
                 if (customerPrices) {
-                    const priceMap = new Map(customerPrices.map(c => [c.Customer_ID, c.Price_Per_Unit]))
+                    const priceMap = new Map<string, number>(customerPrices.map((c: any) => [c.Customer_ID, c.Price_Per_Unit]))
                     jobs = jobs.map(job => ({
                         ...job,
                         Price_Per_Unit: job.Price_Per_Unit || priceMap.get(job.Customer_ID) || 0

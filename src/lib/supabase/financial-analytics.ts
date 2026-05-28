@@ -131,14 +131,14 @@ export async function getExecutiveDashboardUnified(branchId?: string, startDate?
 
         const [fuelData, maintData] = await Promise.all([fuelQuery, maintQuery])
 
-        const fuelCost = (fuelData.data || []).reduce((sum, l) => sum + (Number(l.Price_Total) || 0), 0)
-        const maintCost = (maintData.data || []).reduce((sum, r) => sum + (Number(r.Cost_Total) || 0), 0)
+        const fuelCost = (fuelData.data || []).reduce((sum: number, l: any) => sum + (Number(l.Price_Total) || 0), 0)
+        const maintCost = (maintData.data || []).reduce((sum: number, r: any) => sum + (Number(r.Cost_Total) || 0), 0)
         
         const totalCostManual = curr.cost + fuelCost + maintCost
 
         // Trend calculation
         const trendMap: Record<string, { total: number, completed: number, revenue: number, cost: number }> = {}
-        currJobs.forEach(j => {
+        currJobs.forEach((j: any) => {
             const d = j.Plan_Date ? String(j.Plan_Date).split('T')[0] : 'Unknown'
             if (d !== 'Unknown') {
                 if (!trendMap[d]) trendMap[d] = { total: 0, completed: 0, revenue: 0, cost: 0 }
@@ -159,7 +159,7 @@ export async function getExecutiveDashboardUnified(branchId?: string, startDate?
 
         // Status Distribution
         const statusMap: Record<string, number> = {}
-        currJobs.forEach(j => {
+        currJobs.forEach((j: any) => {
             const s = j.Job_Status || 'Unknown'
             statusMap[s] = (statusMap[s] || 0) + 1
         })
@@ -272,9 +272,9 @@ export async function getExecutiveDashboardUnified(branchId?: string, startDate?
             fetchMaint
         ])
 
-        revenuePipeline = (pipeRes.data || []).reduce((sum, j) => sum + (Number(j.Price_Cust_Total) || 0), 0)
-        fuelCost = (fuelRes.data || []).reduce((sum, f) => sum + (Number(f.Price_Total) || 0), 0)
-        maintenanceCost = (maintRes.data || []).reduce((sum, m) => sum + (Number(m.Cost_Total) || 0), 0)
+        revenuePipeline = (pipeRes.data || []).reduce((sum: number, j: any) => sum + (Number(j.Price_Cust_Total) || 0), 0)
+        fuelCost = (fuelRes.data || []).reduce((sum: number, f: any) => sum + (Number(f.Price_Total) || 0), 0)
+        maintenanceCost = (maintRes.data || []).reduce((sum: number, m: any) => sum + (Number(m.Cost_Total) || 0), 0)
 
     } catch (e) {
         console.warn('[getExecutiveDashboardUnified] Operational cost aggregation failed', e)
@@ -438,7 +438,7 @@ export async function getFinancialStats(startDate?: string, endDate?: string, br
           let costDriver = 0
           let costExtra = 0
           
-          jobs.forEach(j => {
+          jobs.forEach((j: any) => {
               if (REVENUE_STATUSES.includes(j.Job_Status || '')) {
                   const jobRev = (Number(j.Price_Cust_Total) || 0) + (Number(j.Price_Cust_Extra) || 0)
                   const jobCost = (Number(j.Cost_Driver_Total) || 0) + (Number(j.Cost_Driver_Extra) || 0)
@@ -471,7 +471,7 @@ export async function getFinancialStats(startDate?: string, endDate?: string, br
               }
               const { data: fuelLogs } = await fuelQuery
               if (fuelLogs) {
-                  fuelCost = fuelLogs.reduce((sum, f) => sum + (Number(f.Cost_Total) || 0), 0)
+              fuelCost = fuelLogs.reduce((sum: number, f: any) => sum + (Number(f.Cost_Total) || 0), 0)
               }
           } catch (e) {
               console.warn('[getFinancialStats] Fuel fetch error:', e)
@@ -548,7 +548,7 @@ export async function getJobCountSummary(startDate?: string, endDate?: string, b
         'picked up', 'in transit', 'ongoing', 'on route', 'รับงานแล้ว', 'มอบหมายแล้ว'
     ]
 
-    jobs.forEach(j => {
+    jobs.forEach((j: any) => {
         const status = j.Job_Status || 'Pending'
         const custName = j.Customer_Name || 'ทั่วไป / ไม่ระบุ'
 
@@ -627,7 +627,7 @@ export async function getVehicleUtilizationSummary(startDate?: string, endDate?:
         }
     })
 
-    jobs.forEach(j => {
+    jobs.forEach((j: any) => {
         const type = j.Vehicle_Type || 'Pickup'
         if (!typeStats[type]) {
             typeStats[type] = {
@@ -691,9 +691,9 @@ export async function getRevenueTrend(startDate?: string, endDate?: string, bran
     if (effectiveBranchId) query = query.eq('Branch_ID', effectiveBranchId)
 
     const { data: jobs } = await query
-    const trendMap: Record<string, { revenue: number, cost: number, jobCount: number }> = {}
+    const trendMap: Record<string, { revenue: number, cost: number, jobCount: number }> = {};
     
-    (jobs || []).forEach(j => {
+    (jobs || []).forEach((j: any) => {
         const d = j.Plan_Date ? String(j.Plan_Date).split('T')[0] : 'Unknown'
         if (d !== 'Unknown') {
             if (!trendMap[d]) trendMap[d] = { revenue: 0, cost: 0, jobCount: 0 }
@@ -746,9 +746,9 @@ export async function getJobStatusDistribution(startDate?: string, endDate?: str
         if (effectiveBranchId) query = query.eq('Branch_ID', effectiveBranchId)
 
         const { data: jobs } = await query
-        const statusMap: Record<string, number> = {}
+        const statusMap: Record<string, number> = {};
         
-        (jobs || []).forEach(j => {
+        (jobs || []).forEach((j: any) => {
             const s = j.Job_Status || 'Unknown'
             statusMap[s] = (statusMap[s] || 0) + 1
         })
@@ -787,7 +787,7 @@ export async function getTopCustomers(startDate?: string, endDate?: string, bran
     const { data: jobs } = await query
     const customerStats: Record<string, { name: string, revenue: number, jobCount: number }> = {}
 
-    jobs?.forEach(job => {
+    jobs?.forEach((job: any) => {
         const name = job.Customer_Name || 'Unknown'
         if (!customerStats[name]) customerStats[name] = { name, revenue: 0, jobCount: 0 }
         customerStats[name].revenue += (Number(job.Price_Cust_Total) || 0)
@@ -811,12 +811,12 @@ export async function getBranchPerformance(startDate?: string, endDate?: string)
     if (eDate) query = query.lte('Plan_Date', eDate)
 
     const { data: jobs } = await query
-    return branches.map(branch => {
-        const branchJobs = jobs?.filter(j => j.Branch_ID === branch.Branch_ID) || []
-        const revenue = branchJobs.reduce((sum, j) => sum + (Number(j.Price_Cust_Total) || 0), 0)
-        const cost = branchJobs.reduce((sum, j) => sum + (Number(j.Cost_Driver_Total) || 0), 0)
+    return branches.map((branch: any) => {
+        const branchJobs = jobs?.filter((j: any) => j.Branch_ID === branch.Branch_ID) || []
+        const revenue = branchJobs.reduce((sum: number, j: any) => sum + (Number(j.Price_Cust_Total) || 0), 0)
+        const cost = branchJobs.reduce((sum: number, j: any) => sum + (Number(j.Cost_Driver_Total) || 0), 0)
         return { branchId: branch.Branch_ID, branchName: branch.Branch_Name, revenue, jobsCount: branchJobs.length, profit: revenue - cost }
-    }).sort((a, b) => b.revenue - a.revenue)
+    }).sort((a: any, b: any) => b.revenue - a.revenue)
 }
 
 export async function getSubcontractorPerformance(startDate?: string, endDate?: string, branchId?: string) {
@@ -833,7 +833,7 @@ export async function getSubcontractorPerformance(startDate?: string, endDate?: 
     const { data: jobs } = await query
     const stats = { internal: { revenue: 0, cost: 0, count: 0 }, subcontractor: { revenue: 0, cost: 0, count: 0 } }
 
-    jobs?.forEach(job => {
+    jobs?.forEach((job: any) => {
         const target = job.Sub_ID ? stats.subcontractor : stats.internal
         target.revenue += (Number(job.Price_Cust_Total) || 0)
         target.cost += (Number(job.Cost_Driver_Total) || 0)
@@ -870,7 +870,7 @@ export async function getRouteEfficiency(startDate?: string, endDate?: string, b
     const { data: jobs } = await query
     const routeStats: Record<string, any> = {}
 
-    jobs?.forEach(job => {
+    jobs?.forEach((job: any) => {
         const route = job.Route_Name || 'Unknown Route'
         if (!routeStats[route]) routeStats[route] = { route, revenue: 0, cost: 0, count: 0, extra: 0, totalKm: 0 }
         routeStats[route].revenue += (Number(job.Price_Cust_Total) || 0)
@@ -916,7 +916,7 @@ export async function getDetailedProfitability(startDate?: string, endDate?: str
     if (eDate) query = query.lte('Plan_Date', eDate)
 
     const { data: jobs } = await query
-    return (jobs || []).map(job => {
+    return (jobs || []).map((job: any) => {
         const rev = (Number(job.Price_Cust_Total) || 0) + (Number(job.Price_Cust_Extra) || 0)
         const cost = (Number(job.Cost_Driver_Total) || 0) + (Number(job.Cost_Driver_Extra) || 0)
         return { id: job.Job_ID, date: job.Plan_Date, customer: job.Customer_Name, route: job.Route_Name, revenue: rev, cost, profit: rev - cost, margin: rev > 0 ? ((rev - cost) / rev) * 100 : 0 }
@@ -930,31 +930,31 @@ export async function getRegionalDeepDive(startDate?: string, endDate?: string) 
     const duration = differenceInDays(new Date(cEnd), new Date(cStart))
     const prevPerformance = await getBranchPerformance(formatDateSafe(subDays(new Date(cStart), duration + 1))!, formatDateSafe(subDays(new Date(cStart), 1))!)
 
-    return performance.map(curr => {
-        const prev = prevPerformance.find(p => p.branchId === curr.branchId)
+    return performance.map((curr: any) => {
+        const prev = prevPerformance.find((p: any) => p.branchId === curr.branchId)
         return { ...curr, revenueGrowth: (prev && prev.revenue > 0) ? ((curr.revenue - prev.revenue) / prev.revenue) * 100 : 0, previousRevenue: prev?.revenue || 0 }
-    })
+    });
 }
 
 export async function getFuelAnomalyAlerts(branchId?: string) {
-    const supabase = await createAdminClient()
-    const effectiveBranchId = await getEffectiveBranchId(branchId)
-    const thirtyDaysAgo = new Date(); thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30)
+    const supabase = await createAdminClient();
+    const effectiveBranchId = await getEffectiveBranchId(branchId);
+    const thirtyDaysAgo = new Date(); thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
     
-    let query = supabase.from('Fuel_Logs').select('*').gte('Date_Time', thirtyDaysAgo.toISOString()).order('Date_Time', { ascending: false })
-    if (effectiveBranchId) query = query.eq('Branch_ID', effectiveBranchId)
+    let query = supabase.from('Fuel_Logs').select('*').gte('Date_Time', thirtyDaysAgo.toISOString()).order('Date_Time', { ascending: false });
+    if (effectiveBranchId) query = query.eq('Branch_ID', effectiveBranchId);
 
-    const { data: logs } = await query
-    if (!logs || logs.length === 0) return []
+    const { data: logs } = await query;
+    if (!logs || logs.length === 0) return [];
 
-    const plates = Array.from(new Set(logs.map(l => l.Vehicle_Plate)))
-    const { data: vehicles } = await supabase.from('Master_Vehicles').select('Vehicle_Plate, Tank_Capacity').in('Vehicle_Plate', plates)
-    const vMap = new Map(vehicles?.map(v => [v.Vehicle_Plate, v]) || [])
+    const plates = Array.from(new Set(logs.map((l: any) => l.Vehicle_Plate)));
+    const { data: vehicles } = await supabase.from('Master_Vehicles').select('Vehicle_Plate, Tank_Capacity').in('Vehicle_Plate', plates);
+    const vMap = new Map<string, any>(vehicles?.map((v: any) => [v.Vehicle_Plate, v]) || []);
 
-    return logs.filter(l => {
-        const v = vMap.get(l.Vehicle_Plate)
-        return v && v.Tank_Capacity > 0 && Number(l.Liters) > (v.Tank_Capacity || 0) * 1.05
-    }).map(l => ({ 
+    return logs.filter((l: any) => {
+        const v = vMap.get(l.Vehicle_Plate);
+        return v && (v as any).Tank_Capacity > 0 && Number(l.Liters) > ((v as any).Tank_Capacity || 0) * 1.05;
+    }).map((l: any) => ({ 
         type: 'CRITICAL', 
         category: 'Fuel Over-fill', 
         plate: l.Vehicle_Plate, 
@@ -979,7 +979,7 @@ export async function getRevenueForecast(branchId?: string): Promise<{ month: st
         if (!history) return []
 
         const monthlyData: Record<string, number> = {}
-        history.forEach(j => { const m = (j.Plan_Date as string).substring(0, 7); monthlyData[m] = (monthlyData[m] || 0) + Number(j.Price_Cust_Total) })
+        history.forEach((j: any) => { const m = (j.Plan_Date as string).substring(0, 7); monthlyData[m] = (monthlyData[m] || 0) + Number(j.Price_Cust_Total) })
 
         const sortedMonths = Object.keys(monthlyData).sort()
         if (sortedMonths.length < 2) return sortedMonths.map(m => ({ month: m, actual: monthlyData[m] }))
@@ -990,7 +990,7 @@ export async function getRevenueForecast(branchId?: string): Promise<{ month: st
         const slope = (n * sumXY - sumX * sumY) / (n * sumXX - sumX * sumX)
         const intercept = (sumY - slope * sumX) / n
 
-        const result = sortedMonths.map(m => ({ month: m, actual: monthlyData[m] }))
+        const result: { month: string; actual?: number; forecast?: number }[] = sortedMonths.map(m => ({ month: m, actual: monthlyData[m] }))
         for (let i = 1; i <= 3; i++) {
             const nextM = new Date(sortedMonths[n-1] + "-01"); nextM.setMonth(nextM.getMonth() + i)
             result.push({ month: nextM.toISOString().substring(0, 7), forecast: Math.max(0, Math.round(slope * (n + i - 1) + intercept)) })
@@ -1016,7 +1016,7 @@ export async function getVehicleProfitability(startDate?: string, endDate?: stri
 
     const { data: jobs } = await query
     const stats: Record<string, any> = {}
-    jobs?.forEach(j => {
+    jobs?.forEach((j: any) => {
         const p = j.Vehicle_Plate || 'Unknown'
         if (!stats[p]) stats[p] = { plate: p, revenue: 0, driverCost: 0, fuelCost: 0, maintenanceCost: 0, totalKm: 0, count: 0, predictedFuel: 0, predictedMaintenance: 0, netProfit: 0 }
         stats[p].revenue += Number(j.Price_Cust_Total) || 0
@@ -1068,7 +1068,7 @@ export async function getProfitHeatmapData(startDate?: string, endDate?: string,
     const { data } = await query
     
     // Process and normalize profit including extras
-    return (data || []).map(j => ({
+    return (data || []).map((j: any) => ({
         ...j,
         Price_Cust_Total: canViewProfit ? (Number(j.Price_Cust_Total) || 0) + (Number(j.Price_Cust_Extra) || 0) : 0,
         Cost_Driver_Total: canViewProfit ? (Number(j.Cost_Driver_Total) || 0) + (Number(j.Cost_Driver_Extra) || 0) : 0

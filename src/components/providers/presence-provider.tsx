@@ -41,10 +41,10 @@ export function PresenceProvider({ children, user }: { children: React.ReactNode
                 console.log(`[Presence] Sync: ${users.length} users online`)
                 setOnlineUsers(users)
             })
-            .on('presence', { event: 'join', key: user.Username }, ({ newPresences }) => {
+            .on('presence', { event: 'join' }, ({ newPresences }) => {
                 console.log('[Presence] New users joined:', newPresences)
             })
-            .on('presence', { event: 'leave', key: user.Username }, ({ leftPresences }) => {
+            .on('presence', { event: 'leave' }, ({ leftPresences }) => {
                 console.log('[Presence] Users left:', leftPresences)
             })
             .subscribe(async (status) => {

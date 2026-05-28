@@ -12,8 +12,8 @@ async function DamageReportContent() {
   const session = await getDriverSession()
   if (!session) redirect("/mobile/login")
 
-  let reports = []
-  let jobs = []
+  let reports: any[] = []
+  let jobs: any[] = []
 
   try {
     reports = await getMyDamageReports(session.driverId)

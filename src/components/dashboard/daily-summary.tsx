@@ -176,29 +176,33 @@ export function DailySummary({ stats, driverStats, biddingCount, sosCount, fleet
             {/* Fleet Intelligence Card (1x1) - NEW */}
             {!customerMode && (
                 <motion.div variants={item} className="md:col-span-1 md:row-span-1">
-                    <Card 
-                        variant="default" 
-                        className={cn(
-                            "h-full border-0 group transition-colors cursor-pointer",
-                            fleetAlertsCount > 0 ? "bg-rose-600 hover:bg-rose-700" : "bg-emerald-600 hover:bg-emerald-700"
-                        )}
+                    <div 
+                        className="h-full cursor-pointer"
                         onClick={() => window.location.href = '/vehicles/intelligence'}
                     >
-                        <CardContent className="h-full flex flex-col justify-between p-8 text-white">
-                            <div className="flex items-center justify-between">
-                                <div className="p-2 bg-white/20 rounded-xl backdrop-blur-md">
-                                    <Zap size={20} />
+                        <Card 
+                            variant="default" 
+                            className={cn(
+                                "h-full border-0 group transition-colors",
+                                fleetAlertsCount > 0 ? "bg-rose-600 hover:bg-rose-700" : "bg-emerald-600 hover:bg-emerald-700"
+                            )}
+                        >
+                            <CardContent className="h-full flex flex-col justify-between p-8 text-white">
+                                <div className="flex items-center justify-between">
+                                    <div className="p-2 bg-white/20 rounded-xl backdrop-blur-md">
+                                        <Zap size={20} />
+                                    </div>
+                                    <span className="text-xs font-black uppercase tracking-widest opacity-60">Fleet Intel</span>
                                 </div>
-                                <span className="text-xs font-black uppercase tracking-widest opacity-60">Fleet Intel</span>
-                            </div>
-                            <div>
-                                <p className="text-4xl font-black mb-1">{fleetAlertsCount}</p>
-                                <p className="text-sm font-bold opacity-80 uppercase tracking-widest leading-tight">
-                                    {fleetAlertsCount > 0 ? "พบความผิดปกติ" : "สถานะปกติ"}
-                                </p>
-                            </div>
-                        </CardContent>
-                    </Card>
+                                <div>
+                                    <p className="text-4xl font-black mb-1">{fleetAlertsCount}</p>
+                                    <p className="text-sm font-bold opacity-80 uppercase tracking-widest leading-tight">
+                                        {fleetAlertsCount > 0 ? "พบความผิดปกติ" : "สถานะปกติ"}
+                                    </p>
+                                </div>
+                            </CardContent>
+                        </Card>
+                    </div>
                 </motion.div>
             )}
 

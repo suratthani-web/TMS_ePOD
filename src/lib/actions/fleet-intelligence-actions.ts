@@ -37,7 +37,7 @@ export async function syncWithVehicleTypes() {
             .from('Fleet_Fuel_Standards')
             .select('Vehicle_Type')
         
-        const existingNames = new Set(existingStandards?.map(s => s.Vehicle_Type) || [])
+        const existingNames = new Set(existingStandards?.map((s: any) => s.Vehicle_Type) || [])
         
         const toInsert = vehicleTypes
             .filter(t => !existingNames.has(t.type_name))

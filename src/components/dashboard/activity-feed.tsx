@@ -104,7 +104,8 @@ export function ActivityFeed({ jobStats, sosCount, logs = [] }: ActivityFeedProp
       className="space-y-4 font-sans"
     >
       {hasActivities ? (
-        activities.map((activity, index) => {
+        activities.map((rawActivity, index) => {
+          const activity = rawActivity as any
           const Icon = activity.icon
           return (
             <motion.div

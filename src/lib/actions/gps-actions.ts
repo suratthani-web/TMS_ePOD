@@ -52,7 +52,7 @@ export async function getJobGPSData(jobId: string, driverId: string, date: strin
         const latest = latestData?.[0]
         
         // Final mapping with robustness
-        const route = finalRoute?.map(r => {
+        const route = finalRoute?.map((r: any) => {
             const lat = r.latitude ?? (r as any).Latitude ?? (r as any).lat ?? 0;
             const lng = r.longitude ?? (r as any).Longitude ?? (r as any).lng ?? 0;
             return [Number(lat), Number(lng)] as [number, number];

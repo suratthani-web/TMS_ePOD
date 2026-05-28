@@ -21,8 +21,8 @@ import { RepairTicket } from "@/lib/supabase/maintenance"
 
 interface MaintenanceActionsProps {
   ticket: RepairTicket
-  drivers: { Driver_ID: string; Driver_Name: string }[]
-  vehicles: { Vehicle_Plate: string; Vehicle_Type: string }[]
+  drivers: { Driver_ID: string; Driver_Name: string | null }[]
+  vehicles: { Vehicle_Plate: string; Vehicle_Type: string | null }[]
 }
 
 export function MaintenanceActions({ ticket, drivers, vehicles }: MaintenanceActionsProps) {
@@ -48,7 +48,7 @@ export function MaintenanceActions({ ticket, drivers, vehicles }: MaintenanceAct
   const handleStatusUpdate = async (status: string) => {
     setLoading(true)
     try {
-      const result = await updateRepairTicket(ticket.Ticket_ID, { ...ticket, Status: status })
+      const result = await updateRepairTicket(ticket.Ticket_ID, { ...ticket, Status: status } as any)
       if (result.success) {
         toast.success(`อัปเดตสถานะเป็น ${status} เรียบร้อยแล้ว`)
       } else {
@@ -120,9 +120,9 @@ export function MaintenanceActions({ ticket, drivers, vehicles }: MaintenanceAct
             <MaintenanceDialog 
                 open={showEditDialog} 
                 onOpenChange={setShowEditDialog}
-                drivers={drivers}
-                vehicles={vehicles}
-                initialData={ticket}
+                drivers={drivers as any}
+                vehicles={vehicles as any}
+                initialData={ticket as any}
             />
         </div>
     )
@@ -183,9 +183,9 @@ export function MaintenanceActions({ ticket, drivers, vehicles }: MaintenanceAct
       <MaintenanceDialog 
         open={showEditDialog} 
         onOpenChange={setShowEditDialog}
-        drivers={drivers}
-        vehicles={vehicles}
-        initialData={ticket}
+        drivers={drivers as any}
+        vehicles={vehicles as any}
+        initialData={ticket as any}
       />
     </>
   )

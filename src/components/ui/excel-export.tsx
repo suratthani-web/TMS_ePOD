@@ -4,7 +4,8 @@ import { Button } from "@/components/ui/button"
 import * as XLSX from "xlsx"
 
 interface ExcelExportProps {
-  data: Record<string, unknown>[]
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  data: any[]
   filename?: string
   title?: string
   trigger?: React.ReactNode

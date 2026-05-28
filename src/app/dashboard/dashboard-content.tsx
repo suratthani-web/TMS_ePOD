@@ -34,15 +34,18 @@ export async function DashboardContent({ searchParams }: DashboardContentProps) 
   const isAdminUser = await isAdmin()
   
   // Parallel Fetching - Server Side (Ultra Fast)
-  let unified, sosIds, marketplaceJobs, heatmapJobs, activeJobs, customerMode, custId, dailyStats, driverStats, fleetAlerts, esgResult, allCustomers;
+  let unified, sosIds, marketplaceJobs: any[], heatmapJobs, activeJobs, customerMode = false, custId: string | null = null, dailyStats, driverStats, fleetAlerts, esgResult, allCustomers;
 
   try {
+    customerMode = await isCustomer()
+    custId = (await getCustomerId()) ?? null
+
     const results = await Promise.allSettled([
       getExecutiveDashboardUnified(currentBranchId, start || undefined, end || undefined, customers),
       getSOSDriverIds(),
       getMarketplaceJobs(currentBranchId),
-      isCustomer(),
-      getCustomerId(),
+      Promise.resolve(customerMode),
+      Promise.resolve(custId),
       getTodayJobStats(currentBranchId, start || undefined, end || undefined, customers),
       getDriverStats(currentBranchId),
       getESGStats(start || undefined, end || undefined, currentBranchId),
@@ -62,7 +65,7 @@ export async function DashboardContent({ searchParams }: DashboardContentProps) 
     sosIds = results[1].status === 'fulfilled' ? results[1].value : [];
     marketplaceJobs = results[2].status === 'fulfilled' ? results[2].value : [];
     customerMode = results[3].status === 'fulfilled' ? results[3].value : false;
-    custId = results[4].status === 'fulfilled' ? results[4].value : null;
+    custId = (results[4].status === 'fulfilled' ? results[4].value : null) ?? null;
     dailyStats = results[5].status === 'fulfilled' ? results[5].value : { total: 0, delivered: 0, inProgress: 0, pending: 0, sos: 0 };
     driverStats = results[6].status === 'fulfilled' ? results[6].value : { total: 0, active: 0, onJob: 0 };
     esgResult = results[7].status === 'fulfilled' ? results[7].value : null;

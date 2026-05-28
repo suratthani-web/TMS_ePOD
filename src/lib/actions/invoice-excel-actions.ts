@@ -78,7 +78,7 @@ export async function exportInvoiceExcel(invoiceId: string) {
         // 2. Load Template (Vercel Fix: Embedded Base64)
         const workbook = new ExcelJS.Workbook()
         const templateBuffer = Buffer.from(templateBase64, 'base64')
-        await workbook.xlsx.load(templateBuffer)
+        await workbook.xlsx.load(templateBuffer as any)
         const worksheet = workbook.getWorksheet(1)
         if (!worksheet) throw new Error("Worksheet not found")
 
@@ -249,7 +249,7 @@ export async function exportInvoiceExcel(invoiceId: string) {
 
             // Styling for data rows
             row.eachCell((cell) => {
-                if (cell.col >= 8) cell.numFmt = '#,##0.00'
+                if (Number(cell.col) >= 8) cell.numFmt = '#,##0.00'
             })
         })
 

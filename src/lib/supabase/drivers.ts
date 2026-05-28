@@ -270,10 +270,10 @@ export async function getDriverStats(providedBranchId?: string) {
     }
 
     const { data: activeJobs } = await onJobQuery
-    const uniqueDriversOnJob = new Set(activeJobs?.map(j => j.Driver_ID)).size
+    const uniqueDriversOnJob = new Set(activeJobs?.map((j: any) => j.Driver_ID)).size
 
     const total = data?.length || 0
-    const active = data?.filter(d => d.Active_Status === 'Active').length || 0
+    const active = data?.filter((d: any) => d.Active_Status === 'Active').length || 0
     
     return { 
       total, 
@@ -343,7 +343,7 @@ export async function getDriverComplianceStats(branchId?: string) {
         thirtyDays.setDate(now.getDate() + 30)
 
         const stats = { valid: 0, expiring: 0, expired: 0, missing: 0 }
-        data?.forEach(d => {
+        data?.forEach((d: any) => {
             if (!d.Expire_Date) stats.missing++
             else {
                 const expiry = new Date(d.Expire_Date)
@@ -369,8 +369,8 @@ export async function getDriverEfficiencySummary(branchId?: string) {
         const total = targetDrivers.length
         
         return {
-            avgSuccess: Math.round(scores.reduce((sum, s) => sum + s.acceptanceScore, 0) / total),
-            avgOnTime: Math.round(scores.reduce((sum, s) => sum + s.onTimeScore, 0) / total),
+            avgSuccess: Math.round(scores.reduce((sum: number, s: any) => sum + s.acceptanceScore, 0) / total),
+            avgOnTime: Math.round(scores.reduce((sum: number, s: any) => sum + s.onTimeScore, 0) / total),
             totalDrivers: total
         }
     } catch {

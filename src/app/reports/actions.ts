@@ -234,7 +234,7 @@ export async function getFilteredReportData(filters: ReportFilters): Promise<{
 
         if (!vehicles || vehicles.length === 0) return { data: [], columns: [] }
 
-        const plates = vehicles.map(v => v.Vehicle_Plate)
+        const plates = vehicles.map((v: any) => v.Vehicle_Plate)
 
         // 2. Aggregate Fuel Costs
         let fuelQuery = supabase
@@ -265,7 +265,7 @@ export async function getFilteredReportData(filters: ReportFilters): Promise<{
         const { data: rawJobs } = await jobQuery
 
         // 5. Get Subcontractor details for labeling
-        const subIds = [...new Set(vehicles.map(v => v.Sub_ID).filter(Boolean))]
+        const subIds = [...new Set(vehicles.map((v: any) => v.Sub_ID).filter(Boolean))]
         const { data: subs } = await supabase
           .from('Master_Subcontractors')
           .select('Sub_ID, Sub_Name')

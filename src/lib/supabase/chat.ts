@@ -100,7 +100,7 @@ export async function getChatContacts(): Promise<ChatContact[]> {
     }
 
     // Normalizing results to lowercase keys for internal logic
-    const normalizedMessages = messages?.map(msg => ({
+    const normalizedMessages = messages?.map((msg: any) => ({
         id: msg[columns.id],
         sender_id: msg[columns.sender_id],
         receiver_id: msg[columns.receiver_id],
@@ -116,21 +116,21 @@ export async function getChatContacts(): Promise<ChatContact[]> {
     // STRICT ISOLATION
     if (!isSuper) {
         if (branchId && branchId !== 'All') {
-            allowedDriverIds = new Set(allDrivers?.filter(d => d.Branch_ID === branchId).map(d => d.Driver_ID) || [])
+            allowedDriverIds = new Set(allDrivers?.filter((d: any) => d.Branch_ID === branchId).map((d: any) => d.Driver_ID) || [])
         } else {
             return []
         }
     } else if (branchId && branchId !== 'All') {
-        allowedDriverIds = new Set(allDrivers?.filter(d => d.Branch_ID === branchId).map(d => d.Driver_ID) || [])
+        allowedDriverIds = new Set(allDrivers?.filter((d: any) => d.Branch_ID === branchId).map((d: any) => d.Driver_ID) || [])
     }
 
     // Map to lookup driver info easily
-    const driverInfoMap = new Map(allDrivers?.map(d => [d.Driver_ID, { name: d.Driver_Name, plate: d.Vehicle_Plate }]) || [])
+    const driverInfoMap = new Map<string, { name: string, plate: string | null }>(allDrivers?.map((d: any) => [d.Driver_ID, { name: d.Driver_Name, plate: d.Vehicle_Plate }]) || [])
 
     // 2. Group by driver and find last message
     const contactMap = new Map<string, ChatContact>()
 
-    normalizedMessages.forEach((msg) => {
+    normalizedMessages.forEach((msg: any) => {
       const driverId = msg.sender_id === 'admin' ? msg.receiver_id : msg.sender_id
       
       if (allowedDriverIds && !allowedDriverIds.has(driverId)) return
@@ -204,7 +204,7 @@ export async function getMessages(driverId: string): Promise<ChatMessage[]> {
     }
 
     // Normalize
-    return data?.map(msg => ({
+    return data?.map((msg: any) => ({
         id: msg[columns.id],
         sender_id: msg[columns.sender_id],
         receiver_id: msg[columns.receiver_id],

@@ -21,7 +21,7 @@ export default async function DriverPaymentPrintPage(props: Props) {
     const WITHHOLDING_TAX_RATE = 0.01
 
     // Calculate totals to ensure consistency
-    const subtotal = jobs.reduce((sum, job) => {
+    const subtotal = jobs.reduce((sum: number, job: { Cost_Driver_Total?: number | null; extra_costs_json?: unknown }) => {
         const base = job.Cost_Driver_Total || 0
         let extra = 0
         try {
@@ -157,7 +157,7 @@ export default async function DriverPaymentPrintPage(props: Props) {
                                 <th className="py-2 px-3 text-right font-bold w-32">จำนวนเงิน (Amount)</th>
                             </tr>
                         </thead>
-                        {jobs.map((item, index) => {
+                        {jobs.map((item: { Job_ID?: string; Plan_Date?: string | null; Origin_Location?: string | null; Dest_Location?: string | null; Route_Name?: string | null; Cost_Driver_Total?: number | null; extra_costs_json?: unknown }, index: number) => {
                                 let extraCosts: { type?: string; cost_driver?: number }[] = []
                                 try {
                                     if (item.extra_costs_json) {

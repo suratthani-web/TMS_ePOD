@@ -1,6 +1,6 @@
 "use server"
 
-import { createAdminClient } from '@/utils/supabase/server'
+import { createClient, createAdminClient } from '@/utils/supabase/server'
 import { getUserBranchId, isSuperAdmin } from "@/lib/permissions"
 import { cookies } from 'next/headers'
 
@@ -155,9 +155,9 @@ export async function getRepairTicketStats() {
     const tickets = data || []
     return {
       total: tickets.length,
-      pending: tickets.filter(t => t.Status === 'Pending' || t.Status === 'รอดำเนินการ').length,
-      inProgress: tickets.filter(t => t.Status === 'In Progress' || t.Status === 'กำลังซ่อม').length,
-      completed: tickets.filter(t => t.Status === 'Completed' || t.Status === 'เสร็จสิ้น').length,
+      pending: tickets.filter((t: any) => t.Status === 'Pending' || t.Status === 'รอดำเนินการ').length,
+      inProgress: tickets.filter((t: any) => t.Status === 'In Progress' || t.Status === 'กำลังซ่อม').length,
+      completed: tickets.filter((t: any) => t.Status === 'Completed' || t.Status === 'เสร็จสิ้น').length,
     }
   } catch (e) {
     return { total: 0, pending: 0, inProgress: 0, completed: 0 }

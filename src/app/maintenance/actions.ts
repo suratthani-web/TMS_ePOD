@@ -101,6 +101,7 @@ export type TicketUpdateData = TicketFormData & {
   Cost_Total?: number | null
   Remark?: string | null
   Date_Finish?: string | null
+  Branch_ID?: string | null
 }
 
 export async function updateRepairTicket(ticketId: string, data: TicketUpdateData) {

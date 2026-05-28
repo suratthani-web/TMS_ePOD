@@ -18,7 +18,7 @@ export const aiToolExecutors: Record<string, Function> = {
   // ---- JOBS ----
   search_jobs: async (args: { query?: string, status?: string }) => {
     const results = await getAllJobs(1, 20, args.query || '', args.status)
-    return results.map(j => ({
+    return (results.data || []).map((j: any) => ({
         id: j.Job_ID,
         status: j.Job_Status,
         customer: j.Customer_Name,
@@ -89,15 +89,15 @@ export const aiToolExecutors: Record<string, Function> = {
     const PENDING_STATUS = ['New', 'Pending', 'Requested', 'รอรับบริการ', 'รอดำเนินการ', 'รอคนขับ', 'ยืนยันงาน']
     const CANCELLED_STATUS = ['Cancelled', 'Cancel', 'ยกเลิก']
 
-    const active = allJobs.filter(j => ACTIVE_STATUS.includes(j.Job_Status || '')).length
-    const completed = allJobs.filter(j => COMPLETED_STATUS.includes(j.Job_Status || '')).length
-    const pending = allJobs.filter(j => PENDING_STATUS.includes(j.Job_Status || '')).length
-    const cancelled = allJobs.filter(j => CANCELLED_STATUS.includes(j.Job_Status || '')).length
+    const active = allJobs.filter((j: any) => ACTIVE_STATUS.includes(j.Job_Status || '')).length
+    const completed = allJobs.filter((j: any) => COMPLETED_STATUS.includes(j.Job_Status || '')).length
+    const pending = allJobs.filter((j: any) => PENDING_STATUS.includes(j.Job_Status || '')).length
+    const cancelled = allJobs.filter((j: any) => CANCELLED_STATUS.includes(j.Job_Status || '')).length
     
     // Count "Others" to ensure total matches (14 - known)
     const other = allJobs.length - (active + completed + pending + cancelled)
     
-    const statusBreakdown = allJobs.reduce((acc: Record<string,number>, j) => {
+    const statusBreakdown = allJobs.reduce((acc: Record<string,number>, j: any) => {
         const s = j.Job_Status || 'Unknown'
         acc[s] = (acc[s] || 0) + 1
         return acc
@@ -107,7 +107,7 @@ export const aiToolExecutors: Record<string, Function> = {
         stats: { active, completed, pending, cancelled, other },
         todayJobCount: allJobs.length,
         statusBreakdown,
-        jobs: allJobs.slice(0, 5).map(j => ({ id: j.Job_ID, customer: j.Customer_Name, status: j.Job_Status, driver: j.Driver_Name }))
+        jobs: allJobs.slice(0, 5).map((j: any) => ({ id: j.Job_ID, customer: j.Customer_Name, status: j.Job_Status, driver: j.Driver_Name }))
     }
   },
 
@@ -126,7 +126,7 @@ export const aiToolExecutors: Record<string, Function> = {
 
   get_all_drivers: async () => {
     const drivers = await getAllDriversFromTable()
-    return drivers.map(d => ({
+    return drivers.map((d: any) => ({
         id: d.Driver_ID,
         name: d.Driver_Name,
         phone: d.Mobile_No,
@@ -144,7 +144,7 @@ export const aiToolExecutors: Record<string, Function> = {
 
   get_all_vehicles: async () => {
     const vehicles = await getAllVehiclesFromTable()
-    return vehicles.map(v => ({
+    return vehicles.map((v: any) => ({
         plate: v.Vehicle_Plate,
         brand: v.Brand,
         model: v.Model,
@@ -174,7 +174,7 @@ export const aiToolExecutors: Record<string, Function> = {
   // ---- CUSTOMERS ----
   get_customers: async (args: { query?: string }) => {
     const customers = await getAllCustomers(1, 20, args.query || '')
-    return customers.map((c: any) => ({
+    return (customers.data || []).map((c: any) => ({
         id: c.Customer_ID,
         name: c.Customer_Name,
         contact: c.Contact_Person,
@@ -202,7 +202,7 @@ export const aiToolExecutors: Record<string, Function> = {
 
   get_all_repairs: async (args: { plate?: string, status?: string }) => {
     const tickets = await getAllRepairTickets(1, 30, args.plate, args.status)
-    return tickets.map((t: any) => ({
+    return (tickets.data || []).map((t: any) => ({
         id: t.Ticket_ID,
         vehicle: t.Vehicle_Plate,
         problem: t.Problem_Description,
@@ -214,7 +214,7 @@ export const aiToolExecutors: Record<string, Function> = {
 
   // ---- FUEL ----
   get_fuel_analytics: async () => {
-    const fuel = await getFuelAnalytics()
+    const fuel = (await getFuelAnalytics()) as any
     return {
         totalFuelCost: fuel.totalFuelCost,
         totalLiters: fuel.totalLiters,

@@ -23,7 +23,6 @@ async function DashboardContent() {
   return (
     <DashboardClient 
       session={session}
-      stats={stats}
       currentJob={currentJob}
       activeJobs={activeJobs}
       gamification={gamification}

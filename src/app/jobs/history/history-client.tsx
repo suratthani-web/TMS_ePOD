@@ -21,7 +21,9 @@ import {
   ListFilter,
   ImageIcon,
   Zap,
-  Eye
+  Eye,
+  Loader2,
+  ExternalLink
 } from "lucide-react"
 import { ExcelExport } from "@/components/ui/excel-export"
 import { JobHistoryActions } from "@/components/jobs/job-history-actions"
@@ -47,6 +49,7 @@ interface HistoryClientProps {
   canViewPrice: boolean
   canDelete: boolean
   canExport: boolean
+  dateFrom: string
   dateTo: string
   status: string
   query: string
@@ -328,8 +331,20 @@ export function HistoryClient({
                                 <div className="w-10 h-10 rounded-lg bg-muted/50 border border-border/5 flex items-center justify-center group-hover/row:bg-primary group-hover/row:text-foreground transition-all duration-500 shadow-lg group-hover/row:-rotate-3 shrink-0">
                                     <Package size={16} strokeWidth={2.5} />
                                 </div>
-                                <div className="min-w-0">
-                                    <p className="text-foreground font-black text-sm tracking-tighter group-hover/row:text-primary transition-colors font-display uppercase truncate">{job.Job_ID}</p>
+                                <div className="min-w-0 flex-1">
+                                    <div className="flex items-center gap-1.5">
+                                        <p className="text-foreground font-black text-sm tracking-tighter group-hover/row:text-primary transition-colors font-display uppercase truncate">{job.Job_ID}</p>
+                                        <a 
+                                            href={`/track/${job.Job_ID}`} 
+                                            target="_blank" 
+                                            rel="noreferrer"
+                                            className="p-1 text-muted-foreground hover:text-indigo-400 bg-white/5 hover:bg-indigo-500/10 rounded border border-white/5 transition-all shrink-0"
+                                            title="เปิดหน้าติดตามงาน (Track)"
+                                            onClick={(e) => e.stopPropagation()}
+                                        >
+                                            <ExternalLink size={10} strokeWidth={2.5} />
+                                        </a>
+                                    </div>
                                     <div className="flex items-center gap-1.5 mt-0.5">
                                         <Clock size={10} className="text-muted-foreground" />
                                         <p className="text-[10px] font-black text-muted-foreground uppercase tracking-widest">{job.Plan_Date || t('common.pending')}</p>

@@ -46,7 +46,6 @@ import { PremiumCard } from "@/components/ui/premium-card"
 import { PremiumButton } from "@/components/ui/premium-button"
 import { cn } from "@/lib/utils"
 import { motion, AnimatePresence } from "framer-motion"
-import { createAdminJob } from "@/lib/actions/job-actions"
 import { geocodeAddress } from "@/lib/ai/geocoding"
 
 // Types & Interfaces
@@ -170,7 +169,7 @@ export default function CreateJobPage() {
       ...prev,
       Customer_ID: customer.Customer_ID,
       Customer_Name: customer.Customer_Name,
-      Customer_Phone: customer.Mobile_No || '',
+      Customer_Phone: (customer as any).Mobile_No || '',
       Customer_Address: customer.Address || '',
     }))
   }
@@ -197,7 +196,7 @@ export default function CreateJobPage() {
       setFormData(prev => ({
         ...prev,
         Driver_ID: driver.Driver_ID,
-        Driver_Name: driver.Driver_Name,
+        Driver_Name: driver.Driver_Name || '',
         Vehicle_Plate: driver.Vehicle_Plate || prev.Vehicle_Plate,
       }))
     }
@@ -248,7 +247,7 @@ export default function CreateJobPage() {
             ...formData,
             Job_Status: 'Assigned',
             Branch_ID: 'HQ' // Default branch
-        })
+        } as any)
 
         if (!result.success) throw new Error(result.message)
 
@@ -518,7 +517,7 @@ export default function CreateJobPage() {
                                 </div>
                             </div>
 
-                            {formData.Est_Distance_KM > 0 && (
+                            {Number(formData.Est_Distance_KM) > 0 && (
                                 <div className="p-10 bg-background rounded-[3rem] border border-border/5 flex flex-col md:flex-row items-center justify-between gap-8 relative overflow-hidden group/dist">
                                     <div className="absolute top-0 right-0 w-64 h-full bg-emerald-500/5 blur-3xl pointer-events-none" />
                                     <div className="flex items-center gap-6 relative z-10">
@@ -608,10 +607,10 @@ export default function CreateJobPage() {
                                     </SelectTrigger>
                                     <SelectContent className="bg-background border-border/10 rounded-3xl">
                                         {lists.vehicles.map(v => (
-                                            <SelectItem key={v.vehicle_plate} value={v.vehicle_plate} className="p-4 focus:bg-primary/20 text-muted-foreground">
+                                            <SelectItem key={v.Vehicle_Plate} value={v.Vehicle_Plate} className="p-4 focus:bg-primary/20 text-muted-foreground">
                                                 <div className="flex flex-col font-sans">
-                                                    <span className="font-black italic tracking-widest">{v.vehicle_plate}</span>
-                                                    <span className="text-base font-bold text-muted-foreground">SPEC: {v.vehicle_type} // OPTIMIZED</span>
+                                                    <span className="font-black italic tracking-widest">{v.Vehicle_Plate}</span>
+                                                    <span className="text-base font-bold text-muted-foreground">SPEC: {v.Vehicle_Type} // OPTIMIZED</span>
                                                 </div>
                                             </SelectItem>
                                         ))}

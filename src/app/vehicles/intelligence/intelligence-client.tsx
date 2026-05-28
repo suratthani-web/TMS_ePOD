@@ -142,7 +142,7 @@ export function FleetIntelligenceClient({ initialAlerts }: { initialAlerts: any[
                             <AlertItem 
                                 key={alert.Alert_ID} 
                                 alert={alert} 
-                                onResolve={(status) => handleResolve(alert.Alert_ID, status)}
+                                onResolve={(status: 'RESOLVED' | 'IGNORED') => handleResolve(alert.Alert_ID, status)}
                                 loading={resolvingId === alert.Alert_ID}
                             />
                         ))

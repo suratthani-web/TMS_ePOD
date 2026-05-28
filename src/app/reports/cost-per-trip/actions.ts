@@ -87,7 +87,7 @@ export async function getCostPerTrip(startDate?: string, endDate?: string, custo
     .select('Date, Price')
     .in('Date', uniqueDates)
   
-  const fuelMap = new Map(fuelData?.map(f => [f.Date, f.Price]) || [])
+  const fuelMap = new Map(fuelData?.map((f: any) => [f.Date, f.Price]) || [])
   
   // Get latest price as global fallback
   const { data: latestFuel } = await supabase

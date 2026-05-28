@@ -143,7 +143,7 @@ export default function DriverPaymentHistory() {
             return
         }
 
-        const subtotal = jobs.reduce((sum, j) => sum + (j.Cost_Driver_Total || 0), 0)
+        const subtotal = jobs.reduce((sum: number, j: typeof jobs[0]) => sum + (j.Cost_Driver_Total || 0), 0)
         const vat = subtotal * 0.07
         const total = subtotal + vat
 

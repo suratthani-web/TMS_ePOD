@@ -18,6 +18,7 @@ export type Customer = {
   Default_Origin?: string | null
   Line_User_ID?: string | null
   Price_Per_Unit?: number | null
+  Incentive_Sensor_Check?: boolean | null
 }
 
 // Get all customers
@@ -246,8 +247,8 @@ export async function createBulkCustomers(customers: Record<string, unknown>[]) 
             supabase.from('Master_Customers').select('Customer_ID').in('Customer_ID', idsToCheck)
         ])
 
-        const existingNames = new Set(existingByNames?.map(c => c.Customer_Name) || [])
-        const existingIds = new Set(existingByIds?.map(c => c.Customer_ID) || [])
+        const existingNames = new Set(existingByNames?.map((c: { Customer_Name: string }) => c.Customer_Name) || [])
+        const existingIds = new Set(existingByIds?.map((c: { Customer_ID: string }) => c.Customer_ID) || [])
         
         const validInserts = customersToInsert.filter(c => !existingNames.has(c.Customer_Name) && !existingIds.has(c.Customer_ID))
 

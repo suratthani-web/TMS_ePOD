@@ -3,8 +3,8 @@ import { messagingApi, validateSignature } from '@line/bot-sdk';
 const { MessagingApiClient, MessagingApiBlobClient } = messagingApi;
 
 // Lazy client instantiation helpers to ensure process.env variables are accessed at runtime (vital for serverless cold-start HMR)
-let _lineClient: MessagingApiClient | null = null;
-let _lineBlobClient: MessagingApiBlobClient | null = null;
+let _lineClient: InstanceType<typeof MessagingApiClient> | null = null;
+let _lineBlobClient: InstanceType<typeof MessagingApiBlobClient> | null = null;
 
 export function getLineClient() {
   const token = process.env.LINE_CHANNEL_ACCESS_TOKEN || '';
@@ -47,11 +47,14 @@ export function verifyLineSignature(body: string, signature: string): boolean {
  */
 export async function getMessageContent(messageId: string): Promise<Buffer> {
   const client = getLineBlobClient();
-  const response = await client.getMessageContent(messageId);
-  const reader = response.body;
-  if (!reader) throw new Error('Empty message content body');
+  const stream = await client.getMessageContent(messageId) as any;
   
-  return Buffer.from(await response.arrayBuffer());
+  return new Promise((resolve, reject) => {
+    const chunks: any[] = [];
+    stream.on('data', (chunk: any) => chunks.push(chunk));
+    stream.on('error', (err: any) => reject(err));
+    stream.on('end', () => resolve(Buffer.concat(chunks)));
+  });
 }
 
 /**

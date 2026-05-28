@@ -23,7 +23,7 @@ export default async function AdminJobDetailPage({
   let routeHistory: [number, number][] = []
   if (job.Driver_ID && job.Plan_Date) {
     const logs = await getDriverRouteForDate(job.Driver_ID, job.Plan_Date)
-    routeHistory = logs.map(log => [Number(log.Latitude), Number(log.Longitude)])
+    routeHistory = logs.map((log: { Latitude?: number; Longitude?: number }) => [Number(log.Latitude), Number(log.Longitude)] as [number, number])
   }
 
   return <JobDetailClient job={job} routeHistory={routeHistory} />

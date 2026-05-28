@@ -75,13 +75,13 @@ export async function getInvoices(page = 1, limit = 20, query = '') {
     ])
 
     // 3. Merge and Map
-    const mappedInvoices = (invRes.data || []).map(inv => ({
+    const mappedInvoices = (invRes.data || []).map((inv: any) => ({
         ...inv,
         Customer_Name: inv.Master_Customers?.Customer_Name || 'Unknown Customer',
         Type: 'Invoice'
     }))
 
-    const mappedBN = (bnRes.data || []).map(bn => ({
+    const mappedBN = (bnRes.data || []).map((bn: any) => ({
         Invoice_ID: bn.Billing_Note_ID,
         Customer_Name: bn.Customer_Name,
         Issue_Date: bn.Billing_Date,
@@ -93,8 +93,8 @@ export async function getInvoices(page = 1, limit = 20, query = '') {
     }))
 
     // 4. Deduplicate by Invoice_ID (Prefer Invoice over BillingNote if IDs match)
-    const seenIds = new Set(mappedInvoices.map(i => i.Invoice_ID))
-    const uniqueBN = mappedBN.filter(bn => !seenIds.has(bn.Invoice_ID))
+    const seenIds = new Set(mappedInvoices.map((i: { Invoice_ID: string }) => i.Invoice_ID))
+    const uniqueBN = mappedBN.filter((bn: { Invoice_ID: string }) => !seenIds.has(bn.Invoice_ID))
 
     const todayNum = new Date().setHours(0,0,0,0)
 

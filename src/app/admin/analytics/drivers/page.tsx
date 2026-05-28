@@ -137,7 +137,7 @@ export default async function DriverLeaderboardPage(props: {
                   <div className="grid grid-cols-2 gap-6 w-full pt-8 border-t border-border/5">
                       <div className="space-y-1">
                           <p className="text-base font-bold font-black text-muted-foreground uppercase tracking-widest italic">Missions</p>
-                          <p className="text-3xl font-black text-foreground tracking-tighter italic">{driver.jobsCount}</p>
+                          <p className="text-3xl font-black text-foreground tracking-tighter italic">{(driver as any).jobsCount}</p>
                       </div>
                       <div className="space-y-1">
                           <p className="text-base font-bold font-black text-muted-foreground uppercase tracking-widest italic">Efficiency</p>

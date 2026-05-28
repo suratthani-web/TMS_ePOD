@@ -68,7 +68,7 @@ export default function UserSettingsPage() {
 
             if (rolesResult.success && rolesResult.data) {
                 const perms: Record<string, Record<string, boolean>> = {}
-                rolesResult.data.forEach(r => {
+                rolesResult.data.forEach((r: any) => {
                     perms[r.Role] = r.Permissions
                 })
                 setAllRolePermissions(perms)

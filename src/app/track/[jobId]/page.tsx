@@ -157,8 +157,8 @@ export default async function TrackingPage(props: { params: Promise<{ jobId: str
                         lastLocation={job.lastLocation}
                         driverName={job.driverName}
                         status={job.status}
-                        pickup={{ lat: job.pickupLat, lng: job.pickupLon, name: job.origin }}
-                        dropoff={{ lat: job.dropoffLat, lng: job.dropoffLon, name: job.destination }}
+                        pickup={{ lat: job.pickupLat ?? null, lng: job.pickupLon ?? null, name: job.origin }}
+                        dropoff={{ lat: job.dropoffLat ?? null, lng: job.dropoffLon ?? null, name: job.destination }}
                     />
                 </div>
             </div>
@@ -228,6 +228,59 @@ export default async function TrackingPage(props: { params: Promise<{ jobId: str
                                 </div>
                             </div>
                         )}
+                    </div>
+                </section>
+            )}
+
+            {/* Real-Time Expense & Billing Card for Customer */}
+            {Number(job.priceCustTotal || 0) > 0 && (
+                <section className="bg-white border border-slate-200 rounded-3xl p-6 sm:p-8 shadow-sm space-y-6 flex flex-col justify-between">
+                    <div>
+                        <h3 className="text-lg font-bold text-slate-900 border-l-4 border-amber-500 pl-4 uppercase tracking-tight mb-6">
+                            สรุปค่าบริการแบบเรียลไทม์
+                        </h3>
+                        
+                        <div className="space-y-4">
+                            {/* Base Price */}
+                            <div className="flex justify-between items-center p-4 bg-slate-50 rounded-2xl border border-slate-100">
+                                <div>
+                                    <p className="text-[10px] font-bold uppercase text-slate-400 mb-0.5 tracking-wider">ค่าขนส่งหลัก</p>
+                                    <p className="text-xs text-slate-400">อัตราค่าขนส่งพื้นฐาน</p>
+                                </div>
+                                <p className="text-base font-extrabold text-slate-900">฿{Number(job.priceCustBase || 0).toLocaleString()}</p>
+                            </div>
+
+                            {/* Extra costs list */}
+                            {(() => {
+                                let extras: any[] = [];
+                                if (job.extraCostsJson) {
+                                    try {
+                                        const parsed = typeof job.extraCostsJson === 'string'
+                                            ? JSON.parse(job.extraCostsJson)
+                                            : job.extraCostsJson;
+                                        if (Array.isArray(parsed)) extras = parsed;
+                                    } catch {}
+                                }
+                                return extras.map((c, i) => (
+                                    <div key={i} className="flex justify-between items-center p-4 bg-amber-50/20 rounded-2xl border border-amber-100/50">
+                                        <div>
+                                            <p className="text-[10px] font-bold uppercase text-amber-600 mb-0.5 tracking-wider">ค่าใช้จ่ายเพิ่มเติม</p>
+                                            <p className="text-xs text-slate-500">{c.type || 'ค่าบริการอื่น'}</p>
+                                        </div>
+                                        <p className="text-base font-extrabold text-amber-700">฿{Number(c.charge_cust || 0).toLocaleString()}</p>
+                                    </div>
+                                ));
+                            })()}
+                        </div>
+                    </div>
+
+                    {/* Total Cust Price */}
+                    <div className="mt-8 pt-6 border-t border-slate-100 flex justify-between items-center bg-slate-50/50 p-4 rounded-2xl border border-slate-100">
+                        <div>
+                            <p className="text-[10px] font-bold uppercase text-slate-500 mb-0.5 tracking-wider">ยอดเงินรวมสุทธิ</p>
+                            <p className="text-xs text-slate-400">Total Invoice Value</p>
+                        </div>
+                        <p className="text-2xl font-black text-slate-900">฿{Number(job.priceCustTotal || 0).toLocaleString()}</p>
                     </div>
                 </section>
             )}

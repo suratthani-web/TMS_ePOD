@@ -71,15 +71,15 @@ async function getFinancialDirect(branchId?: string) {
         if (!data) return null
 
         const REVENUE_STATUSES = ['Completed', 'Delivered', 'Complete']
-        const revenueJobs = data.filter(j => REVENUE_STATUSES.includes(j.Job_Status || ''))
+        const revenueJobs = data.filter((j: any) => REVENUE_STATUSES.includes(j.Job_Status || ''))
 
-        const revenue = revenueJobs.reduce((s, j) => s + (Number(j.Price_Cust_Total) || 0) + (Number(j.Price_Cust_Extra) || 0), 0)
-        const cost = revenueJobs.reduce((s, j) => s + (Number(j.Cost_Driver_Total) || 0) + (Number(j.Cost_Driver_Extra) || 0), 0)
+        const revenue = revenueJobs.reduce((s: number, j: { Price_Cust_Total?: number | null; Price_Cust_Extra?: number | null }) => s + (Number(j.Price_Cust_Total) || 0) + (Number(j.Price_Cust_Extra) || 0), 0)
+        const cost = revenueJobs.reduce((s: number, j: { Cost_Driver_Total?: number | null; Cost_Driver_Extra?: number | null }) => s + (Number(j.Cost_Driver_Total) || 0) + (Number(j.Cost_Driver_Extra) || 0), 0)
         const netProfit = revenue - cost
         const margin = revenue > 0 ? (netProfit / revenue) * 100 : 0
 
         // Total jobs pipeline this month (for context)
-        const pipeline = data.reduce((s, j) => s + (Number(j.Price_Cust_Total) || 0), 0)
+        const pipeline = data.reduce((s: number, j: { Price_Cust_Total?: number | null }) => s + (Number(j.Price_Cust_Total) || 0), 0)
 
         return { revenue, cost, netProfit, margin, pipeline, jobCount: data.length, revenueJobCount: revenueJobs.length }
     } catch {
@@ -107,10 +107,10 @@ async function getTodayDirect(branchId?: string) {
         const { data } = await query.order('Created_At', { ascending: false }).limit(30)
         if (!data) return null
 
-        const active = data.filter(j => ['Picked Up', 'In Transit', 'Assigned', 'Confirmed', 'Arrived'].includes(j.Job_Status)).length
-        const completed = data.filter(j => ['Completed', 'Delivered'].includes(j.Job_Status)).length
-        const pending = data.filter(j => ['New', 'Pending', 'Requested'].includes(j.Job_Status)).length
-        const sos = data.filter(j => j.Job_Status === 'SOS').length
+        const active = data.filter((j: any) => ['Picked Up', 'In Transit', 'Assigned', 'Confirmed', 'Arrived'].includes(j.Job_Status)).length
+        const completed = data.filter((j: any) => ['Completed', 'Delivered'].includes(j.Job_Status)).length
+        const pending = data.filter((j: any) => ['New', 'Pending', 'Requested'].includes(j.Job_Status)).length
+        const sos = data.filter((j: any) => j.Job_Status === 'SOS').length
 
         return {
             total: data.length,
@@ -118,7 +118,7 @@ async function getTodayDirect(branchId?: string) {
             completed,
             pending,
             sos,
-            jobs: data.slice(0, 10).map(j => ({
+            jobs: data.slice(0, 10).map((j: { Job_ID: string; Job_Status: string; Customer_Name?: string | null; Driver_Name?: string | null; Vehicle_Plate?: string | null; Route_Name?: string | null; Origin_Location?: string | null; Dest_Location?: string | null }) => ({
                 id: j.Job_ID,
                 status: j.Job_Status,
                 customer: j.Customer_Name,
@@ -186,7 +186,7 @@ async function getRecentJobTrend(branchId?: string) {
             byDate[ds] = { date: ds, total: 0, completed: 0, revenue: 0 }
         }
 
-        data.forEach(j => {
+        data.forEach((j: any) => {
             const ds = String(j.Plan_Date).split('T')[0]
             if (byDate[ds]) {
                 byDate[ds].total++
@@ -217,15 +217,15 @@ async function getBillingSummary(branchId?: string) {
 
         if (!data) return null
 
-        const pending = data.filter(b => ['Draft', 'Pending', 'Sent'].includes(b.Status || ''))
-        const paid = data.filter(b => b.Status === 'Paid')
+        const pending = data.filter((b: any) => ['Draft', 'Pending', 'Sent'].includes(b.Status || ''))
+        const paid = data.filter((b: any) => b.Status === 'Paid')
 
         return {
             total: data.length,
             pending: pending.length,
             paid: paid.length,
-            pendingAmount: pending.reduce((s, b) => s + (Number(b.Total_Amount) || 0), 0),
-            paidAmount: paid.reduce((s, b) => s + (Number(b.Total_Amount) || 0), 0),
+            pendingAmount: pending.reduce((s: number, b: { Total_Amount?: number | null }) => s + (Number(b.Total_Amount) || 0), 0),
+            paidAmount: paid.reduce((s: number, b: { Total_Amount?: number | null }) => s + (Number(b.Total_Amount) || 0), 0),
         }
     } catch {
         return null

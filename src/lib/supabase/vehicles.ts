@@ -207,7 +207,7 @@ export async function getAllVehicles(page?: number, limit?: number, query?: stri
     }
 
     // Manual Driver Mapping (since PGRST relationship may not be defined)
-    const driverIds = Array.from(new Set(data?.map(v => v.Driver_ID).filter(Boolean)))
+    const driverIds = Array.from(new Set(data?.map((v: any) => v.Driver_ID).filter(Boolean)))
     const driverMap = new Map<string, string>()
     
     if (driverIds.length > 0) {
@@ -216,7 +216,7 @@ export async function getAllVehicles(page?: number, limit?: number, query?: stri
             .select('Driver_ID, Driver_Name')
             .in('Driver_ID', driverIds)
         
-        drivers?.forEach(d => {
+        drivers?.forEach((d: any) => {
             if (d.Driver_ID && d.Driver_Name) {
                 driverMap.set(d.Driver_ID, d.Driver_Name)
             }
@@ -262,10 +262,10 @@ export async function getVehicleStats(providedBranchId?: string) {
     if (error) return { total: 0, active: 0, maintenance: 0, dueSoon: 0 }
     
     const total = data?.length || 0
-    const active = data?.filter(v => v.Active_Status === 'Active').length || 0
-    const maintenance = data?.filter(v => v.Active_Status === 'Maintenance').length || 0
+    const active = data?.filter((v: any) => v.Active_Status === 'Active').length || 0
+    const maintenance = data?.filter((v: any) => v.Active_Status === 'Maintenance').length || 0
     
-    const dueSoon = data?.filter(v => {
+    const dueSoon = data?.filter((v: any) => {
       if (v.Current_Mileage && v.Next_Service_Mileage) {
         return (v.Next_Service_Mileage - v.Current_Mileage) <= 1000
       }

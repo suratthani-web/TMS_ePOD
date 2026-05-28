@@ -82,7 +82,7 @@ export function MobileDamageClient({ driverId, driverName, initialReports, recen
           Reason_Category: category,
           Description: desc,
           Image_Base64: image || undefined // Added support for image
-        })
+        } as any)
         
         if (result.success) {
           setSuccess(true)
