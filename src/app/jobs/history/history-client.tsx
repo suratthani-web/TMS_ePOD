@@ -334,14 +334,6 @@ export function HistoryClient({
                                 <div className="min-w-0 flex-1">
                                     <div className="flex items-center gap-1.5">
                                         <p className="text-foreground font-black text-sm tracking-tighter group-hover/row:text-primary transition-colors font-display uppercase truncate">{job.Job_ID}</p>
-                                        <Link 
-                                            href={customerMode ? `/dashboard/tracking?q=${job.Job_ID}` : `/admin/tracking?q=${job.Job_ID}`} 
-                                            className="p-1 text-muted-foreground hover:text-indigo-400 bg-white/5 hover:bg-indigo-500/10 rounded border border-white/5 transition-all shrink-0"
-                                            title="ติดตามงานใน Tracking Hub"
-                                            onClick={(e) => e.stopPropagation()}
-                                        >
-                                            <Activity size={10} strokeWidth={2.5} />
-                                        </Link>
                                     </div>
                                     <div className="flex items-center gap-1.5 mt-0.5">
                                         <Clock size={10} className="text-muted-foreground" />
