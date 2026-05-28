@@ -44,7 +44,7 @@ export function TrackingHubClient({ initialActiveJobs, customerMode = false }: T
   useEffect(() => {
     const q = searchParams.get('q')
     if (q) handleSearch(q)
-  }, [searchParams]) // Fixed dependency to handle navigation changes
+  }, [searchParams]) 
 
   useEffect(() => {
     setActiveJobs(initialActiveJobs)
@@ -101,9 +101,12 @@ export function TrackingHubClient({ initialActiveJobs, customerMode = false }: T
   }
 
   // Financial Helpers
-  const priceCust = Number(selectedJob?.priceCustTotal || 0)
-  const costDriver = Number(selectedJob?.costDriverTotal || 0)
-  const netMargin = priceCust - costDriver
+  // Ensure we fall back to 0 if undefined, or to total if base is missing but total exists.
+  const priceCustTotal = Number(selectedJob?.priceCustTotal || 0)
+  const costDriverTotal = Number(selectedJob?.costDriverTotal || 0)
+  const priceCustBase = Number(selectedJob?.priceCustBase || priceCustTotal) // Fallback to total if base is 0
+  const costDriverBase = Number(selectedJob?.costDriverBase || costDriverTotal) // Fallback to total if base is 0
+  const netMargin = priceCustTotal - costDriverTotal
 
   let extraCostsList: any[] = []
   if (selectedJob?.extraCostsJson) {
@@ -278,6 +281,7 @@ export function TrackingHubClient({ initialActiveJobs, customerMode = false }: T
                             status={selectedJob.status}
                             pickup={{ lat: selectedJob.pickupLat ?? null, lng: selectedJob.pickupLon ?? null, name: selectedJob.origin }}
                             dropoff={{ lat: selectedJob.dropoffLat ?? null, lng: selectedJob.dropoffLon ?? null, name: selectedJob.destination }}
+                            vehiclePlate={selectedJob.vehiclePlate}
                         />
                     </div>
 
@@ -342,8 +346,8 @@ export function TrackingHubClient({ initialActiveJobs, customerMode = false }: T
                                         <div className="grid grid-cols-1 md:grid-cols-2 gap-10">
                                             <div className="space-y-4">
                                                 <div className="flex justify-between text-xs font-black text-muted-foreground uppercase tracking-widest">
-                                                    <span>ผลต่างความสูงสะสม</span>
-                                                    <span className="text-foreground text-sm">{selectedJob.sensorMaxElevationDiff?.toFixed(2) || '0.00'} / 2.8ม.</span>
+                                                    <span>ผลต่างความสูงสะสม (เมตร)</span>
+                                                    <span className="text-foreground text-sm">ปัจจุบัน {selectedJob.sensorMaxElevationDiff?.toFixed(2) || '0.00'} / <span className="text-primary opacity-60">เป้าหมาย 2.8</span></span>
                                                 </div>
                                                 <div className="h-3 bg-muted rounded-full overflow-hidden">
                                                     <div className="h-full bg-primary transition-all duration-1000" style={{ width: `${Math.min(((selectedJob.sensorMaxElevationDiff || 0) / 2.8) * 100, 100)}%` }} />
@@ -351,8 +355,8 @@ export function TrackingHubClient({ initialActiveJobs, customerMode = false }: T
                                             </div>
                                             <div className="space-y-4">
                                                 <div className="flex justify-between text-xs font-black text-muted-foreground uppercase tracking-widest">
-                                                    <span>ก้าวเดินขึ้นบันได</span>
-                                                    <span className="text-foreground text-sm">{selectedJob.sensorTotalStepsUpward || '0'} / 15ก้าว</span>
+                                                    <span>ก้าวเดินขึ้นบันได (ก้าว)</span>
+                                                    <span className="text-foreground text-sm">ปัจจุบัน {selectedJob.sensorTotalStepsUpward || '0'} / <span className="text-primary opacity-60">เป้าหมาย 15</span></span>
                                                 </div>
                                                 <div className="h-3 bg-muted rounded-full overflow-hidden">
                                                     <div className="h-full bg-emerald-500 transition-all duration-1000" style={{ width: `${Math.min(((selectedJob.sensorTotalStepsUpward || 0) / 15) * 100, 100)}%` }} />
@@ -415,22 +419,29 @@ export function TrackingHubClient({ initialActiveJobs, customerMode = false }: T
                                     </h3>
                                 </div>
                                 <div className="p-8 space-y-6">
-                                    <LedgerRow label="ค่าขนส่งหลัก" cust={selectedJob.priceCustBase} driver={selectedJob.costDriverBase} />
-                                    {extraCostsList.map((c, i) => (
-                                        <LedgerRow key={i} label={`└ ${c.type || 'อื่นๆ'}`} cust={c.charge_cust} driver={c.cost_driver} sub />
-                                    ))}
+                                    <LedgerRow label="ค่าขนส่งหลัก" cust={priceCustBase} driver={costDriverBase} />
+                                    {extraCostsList.map((c, i) => {
+                                        // Auto-translate common extra costs if possible
+                                        let displayType = c.type || 'อื่นๆ'
+                                        if (displayType === 'labor') displayType = 'ค่าแรงลงของ'
+                                        if (displayType === 'wait') displayType = 'ค่าเสียเวลา'
+                                        if (displayType === 'return') displayType = 'ค่าตีกลับ'
+                                        if (displayType === 'fuel') displayType = 'ค่าปรับน้ำมัน'
+                                        if (displayType === 'trailer') displayType = 'ค่าพ่วง'
+                                        return <LedgerRow key={i} label={`└ ${displayType}`} cust={c.charge_cust} driver={c.cost_driver} sub />
+                                    })}
                                     <div className="pt-6 border-t-2 border-border/40 space-y-5">
                                         <div className="flex justify-between text-xs font-black uppercase italic tracking-wider">
                                             <span className="text-muted-foreground">TOTAL REVENUE</span>
-                                            <span className="text-emerald-600 font-display text-xl">฿{priceCust.toLocaleString()}</span>
+                                            <span className="text-emerald-600 font-display text-xl">฿{priceCustTotal.toLocaleString()}</span>
                                         </div>
                                         <div className="flex justify-between text-xs font-bold uppercase italic border-b border-border/40 pb-5 tracking-wider">
                                             <span className="text-muted-foreground opacity-60">DRIVER PAYOUT</span>
-                                            <span className="text-rose-500 font-display text-lg">฿{costDriver.toLocaleString()}</span>
+                                            <span className="text-rose-500 font-display text-lg">฿{costDriverTotal.toLocaleString()}</span>
                                         </div>
                                         <div className="flex justify-between items-center bg-muted/20 p-4 rounded-2xl">
                                             <span className="text-xs font-black text-foreground uppercase tracking-[0.2em] italic">NET MARGIN</span>
-                                            <Badge className="bg-emerald-500 text-white border-none text-2xl font-black font-display italic px-6 py-2 rounded-xl shadow-xl">
+                                            <Badge className={cn("text-white border-none text-2xl font-black font-display italic px-6 py-2 rounded-xl shadow-xl", netMargin >= 0 ? "bg-emerald-500" : "bg-rose-500")}>
                                                 ฿{netMargin.toLocaleString()}
                                             </Badge>
                                         </div>
