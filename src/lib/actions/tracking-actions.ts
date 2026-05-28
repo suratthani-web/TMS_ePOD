@@ -38,8 +38,16 @@ export interface PublicJobDetails {
   priceCustBase?: number | null;
   priceCustExtra?: number | null;
   priceCustTotal?: number | null;
+  costDriverBase?: number | null;
+  costDriverExtra?: number | null;
+  costDriverTotal?: number | null;
   extraCostsJson?: string | null;
   branchId?: string | null;
+  incentiveClaimed?: boolean;
+  requiresIncentiveCheck?: boolean;
+  sensorVerified?: string;
+  sensorMaxElevationDiff?: number;
+  sensorTotalStepsUpward?: number;
 }
 
 export async function submitJobFeedback(
@@ -112,41 +120,7 @@ export async function getActiveJobs(
   if (error || !data) return [];
 
   // Map to PublicJobDetails
-  return data.map(job => ({
-    jobId: job.Job_ID,
-    trackingCode: job.Job_ID,
-    status: job.Job_Status || "Pending",
-    customerName: job.Customer_Name || "Unknown",
-    origin: job.Location_Origin_Name || job.Origin_Location || "-",
-    destination: job.Location_Destination_Name || job.Dest_Location || "-",
-    driverName: job.Driver_Name || "-",
-    driverPhone: "-",
-    vehiclePlate: job.Vehicle_Plate || "-",
-    planDate: job.Plan_Date || "-",
-    pickupDate: job.Actual_Pickup_Time || null,
-    deliveryDate: (job.Delivery_Date && job.Actual_Delivery_Time) 
-      ? `${job.Delivery_Date}T${job.Actual_Delivery_Time}`
-      : (job.Actual_Delivery_Time || null),
-    pickupPhotos: job.Pickup_Photo_Url ? job.Pickup_Photo_Url.split(",").filter(Boolean) : [],
-    podPhotos: job.Photo_Proof_Url ? job.Photo_Proof_Url.split(",").filter(Boolean) : [],
-    signature: job.Signature_Proof_Url || job.Signature_Url || null,
-    pickupSignature: job.Signature_Pickup_Url || job.Pickup_Signature_Url || null,
-    notes: job.Notes || null,
-    customerPhone: job.Phone || job.Customer_Phone || null,
-    cargoType: job.Cargo_Type || null,
-    weight: job.Weight_Kg || job.Weight || null,
-    volume: job.Volume_Cbm || job.Volume || null,
-    vehicleType: job.Vehicle_Type || null,
-    pickupLat: job.Pickup_Lat,
-    pickupLon: job.Pickup_Lon,
-    dropoffLat: job.Delivery_Lat || job.Dropoff_Lat,
-    dropoffLon: job.Delivery_Lon || job.Dropoff_Lon,
-    priceCustBase: job.Price_Cust_Base,
-    priceCustExtra: job.Price_Cust_Extra,
-    priceCustTotal: job.Price_Cust_Total,
-    extraCostsJson: job.extra_costs_json || job.extra_costs,
-    branchId: job.Branch_ID,
-  }));
+  return data.map(job => mapJobToPublicDetails(job));
 }
 
 export async function getPublicJobDetails(
@@ -177,16 +151,7 @@ export async function getPublicJobDetails(
 
   const job = jobs[0];
 
-  // Process Photos
-  const pickupPhotos = job.Pickup_Photo_Url
-    ? job.Pickup_Photo_Url.split(",").filter(Boolean)
-    : [];
-  const podPhotos = job.Photo_Proof_Url
-    ? job.Photo_Proof_Url.split(",").filter(Boolean)
-    : [];
-
   let lastLocation = null;
-  // Use Driver_ID to find location - Try harder to find recent location
   if (job.Driver_ID) {
     const adminSupabase = createAdminClient();
     const { data: gpsData } = await adminSupabase
@@ -207,39 +172,53 @@ export async function getPublicJobDetails(
   }
 
   return {
-    jobId: job.Job_ID,
-    trackingCode: jobId,
-    status: job.Job_Status || "Pending",
-    customerName: job.Customer_Name || "Unknown",
-    origin: job.Location_Origin_Name || job.Origin_Location || "-",
-    destination: job.Location_Destination_Name || job.Dest_Location || "-",
-    driverName: job.Driver_Name || "-",
-    driverPhone: "-",
-    vehiclePlate: job.Vehicle_Plate || "-",
-    planDate: job.Plan_Date || "-",
-    pickupDate: job.Actual_Pickup_Time || null,
-    deliveryDate: (job.Delivery_Date && job.Actual_Delivery_Time) 
-      ? `${job.Delivery_Date}T${job.Actual_Delivery_Time}`
-      : (job.Actual_Delivery_Time || null),
-    pickupPhotos,
-    podPhotos,
-    signature: job.Signature_Proof_Url || job.Signature_Url || null,
-    pickupSignature: job.Signature_Pickup_Url || job.Pickup_Signature_Url || null,
-    lastLocation,
-    notes: job.Notes || null,
-    customerPhone: job.Phone || job.Customer_Phone || null,
-    cargoType: job.Cargo_Type || null,
-    weight: job.Weight_Kg || job.Weight || null,
-    volume: job.Volume_Cbm || job.Volume || null,
-    vehicleType: job.Vehicle_Type || null,
-    pickupLat: job.Pickup_Lat,
-    pickupLon: job.Pickup_Lon,
-    dropoffLat: job.Delivery_Lat || job.Dropoff_Lat,
-    dropoffLon: job.Delivery_Lon || job.Dropoff_Lon,
-    priceCustBase: job.Price_Cust_Base,
-    priceCustExtra: job.Price_Cust_Extra,
-    priceCustTotal: job.Price_Cust_Total,
-    extraCostsJson: job.extra_costs_json || job.extra_costs,
-    branchId: job.Branch_ID,
+    ...mapJobToPublicDetails(job),
+    lastLocation
   };
+}
+
+function mapJobToPublicDetails(job: any): PublicJobDetails {
+    return {
+        jobId: job.Job_ID,
+        trackingCode: job.Job_ID,
+        status: job.Job_Status || "Pending",
+        customerName: job.Customer_Name || "Unknown",
+        origin: job.Location_Origin_Name || job.Origin_Location || "-",
+        destination: job.Location_Destination_Name || job.Dest_Location || "-",
+        driverName: job.Driver_Name || "-",
+        driverPhone: job.Phone || "-",
+        vehiclePlate: job.Vehicle_Plate || "-",
+        planDate: job.Plan_Date || "-",
+        pickupDate: job.Actual_Pickup_Time || null,
+        deliveryDate: (job.Delivery_Date && job.Actual_Delivery_Time) 
+          ? `${job.Delivery_Date}T${job.Actual_Delivery_Time}`
+          : (job.Actual_Delivery_Time || null),
+        pickupPhotos: job.Pickup_Photo_Url ? job.Pickup_Photo_Url.split(",").filter(Boolean) : [],
+        podPhotos: job.Photo_Proof_Url ? job.Photo_Proof_Url.split(",").filter(Boolean) : [],
+        signature: job.Signature_Proof_Url || job.Signature_Url || null,
+        pickupSignature: job.Signature_Pickup_Url || job.Pickup_Signature_Url || null,
+        notes: job.Notes || null,
+        customerPhone: job.Phone || job.Customer_Phone || null,
+        cargoType: job.Cargo_Type || null,
+        weight: job.Weight_Kg || job.Weight || null,
+        volume: job.Volume_Cbm || job.Volume || null,
+        vehicleType: job.Vehicle_Type || null,
+        pickupLat: job.Pickup_Lat,
+        pickupLon: job.Pickup_Lon,
+        dropoffLat: job.Delivery_Lat || job.Dropoff_Lat,
+        dropoffLon: job.Delivery_Lon || job.Dropoff_Lon,
+        priceCustBase: job.Price_Cust_Base,
+        priceCustExtra: job.Price_Cust_Extra,
+        priceCustTotal: job.Price_Cust_Total,
+        costDriverBase: job.Cost_Driver_Base,
+        costDriverExtra: job.Cost_Driver_Extra,
+        costDriverTotal: job.Cost_Driver_Total,
+        extraCostsJson: job.extra_costs_json || job.extra_costs,
+        branchId: job.Branch_ID,
+        incentiveClaimed: job.Incentive_Claimed,
+        requiresIncentiveCheck: job.Requires_Incentive_Check,
+        sensorVerified: job.Sensor_Verified,
+        sensorMaxElevationDiff: job.Sensor_Max_Elevation_Diff,
+        sensorTotalStepsUpward: job.Sensor_Total_Steps_Upward,
+    };
 }
