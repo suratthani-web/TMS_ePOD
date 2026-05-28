@@ -21,7 +21,13 @@ import {
   Smartphone,
   Phone,
   ArrowRight,
-  Maximize2
+  Maximize2,
+  RefreshCw,
+  Box,
+  Scale,
+  Layers,
+  Map,
+  Info
 } from "lucide-react"
 import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
@@ -29,7 +35,7 @@ import { PremiumCard } from "@/components/ui/premium-card"
 import { TrackingMap } from "@/components/tracking/tracking-map"
 import { PODDownloadButton } from "@/components/tracking/pod-download"
 import { FeedbackForm } from "@/components/tracking/feedback-form"
-import { getPublicJobDetails, PublicJobDetails } from "@/lib/actions/tracking-actions"
+import { getPublicJobDetails, PublicJobDetails, getActiveJobs } from "@/lib/actions/tracking-actions"
 import { cn } from "@/lib/utils"
 import Image from "next/image"
 import { useRouter, useSearchParams } from "next/navigation"
@@ -46,6 +52,7 @@ export function TrackingHubClient({ initialActiveJobs, customerMode = false }: T
   const [selectedJob, setSelectedJob] = useState<PublicJobDetails | null>(null)
   const [searchQuery, setSearchQuery] = useState(searchParams.get('q') || '')
   const [isSearching, startSearch] = useTransition()
+  const [isLoadingDetails, setIsLoadingDetails] = useState(false)
   const [isLoaded, setIsLoaded] = useState(false)
 
   // Handle Initial Search from URL
@@ -57,6 +64,11 @@ export function TrackingHubClient({ initialActiveJobs, customerMode = false }: T
     setIsLoaded(true)
   }, [])
 
+  // Update activeJobs when initialActiveJobs changes (e.g. after branch switch)
+  useEffect(() => {
+    setActiveJobs(initialActiveJobs)
+  }, [initialActiveJobs])
+
   const handleSearch = async (query: string) => {
     if (!query.trim()) return
     
@@ -64,14 +76,31 @@ export function TrackingHubClient({ initialActiveJobs, customerMode = false }: T
         const result = await getPublicJobDetails(query)
         if (result) {
             setSelectedJob(result)
-            // If it's not in the active list, add it temporarily or highlight it
+            // If it's not in the active list, add it temporarily
             if (!activeJobs.find(j => j.jobId === result.jobId)) {
-                setActiveJobs(prev => [result, ...prev.slice(0, 49)])
+                setActiveJobs(prev => [result, ...prev])
             }
         } else {
             alert("ไม่พบข้อมูลงานที่ระบุ")
         }
     })
+  }
+
+  const selectJobFromRadar = async (job: PublicJobDetails) => {
+    setIsLoadingDetails(true)
+    try {
+        // Fetch full details including latest GPS for the clicked job
+        const fullJob = await getPublicJobDetails(job.jobId)
+        if (fullJob) {
+            setSelectedJob(fullJob)
+        } else {
+            setSelectedJob(job) // Fallback to basic info
+        }
+    } catch (err) {
+        setSelectedJob(job)
+    } finally {
+        setIsLoadingDetails(false)
+    }
   }
 
   const steps = [
@@ -85,7 +114,7 @@ export function TrackingHubClient({ initialActiveJobs, customerMode = false }: T
   const getCurrentStepIndex = (status: string) => {
     const s = status?.toLowerCase()
     if (['delivered', 'completed', 'complete', 'success'].includes(s)) return 4
-    if (s === 'in transit' || s === 'en route' || s === 'en-route') return 3
+    if (s === 'in transit' || s === 'en route' || s === 'en-route' || s === 'arrived') return 3
     if (s === 'picked up') return 2
     if (s === 'assigned') return 1
     return 0
@@ -105,7 +134,7 @@ export function TrackingHubClient({ initialActiveJobs, customerMode = false }: T
               onChange={(e) => setSearchQuery(e.target.value)}
               onKeyDown={(e) => e.key === 'Enter' && handleSearch(searchQuery)}
             />
-            {isSearching && (
+            {(isSearching || isLoadingDetails) && (
                 <div className="absolute right-4 top-1/2 -translate-y-1/2">
                     <Loader2 className="h-5 w-5 animate-spin text-primary" />
                 </div>
@@ -117,9 +146,15 @@ export function TrackingHubClient({ initialActiveJobs, customerMode = false }: T
           <div className="flex items-center justify-between px-3 py-2">
              <div className="flex items-center gap-3">
                 <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse shadow-[0_0_10px_rgba(16,185,129,0.5)]" />
-                <h3 className="text-[11px] font-black text-foreground/80 uppercase tracking-[0.3em] italic">ACTIVE FLEET RADAR</h3>
+                <h3 className="text-[11px] font-black text-foreground/80 uppercase tracking-[0.3em] italic">TODAY&apos;S MISSIONS</h3>
              </div>
-             <div className="px-2 py-0.5 rounded-full bg-white/5 border border-white/5 text-[9px] font-black text-muted-foreground uppercase tracking-widest">{activeJobs.length} UNITS</div>
+             <button 
+                onClick={() => router.refresh()} 
+                className="p-1.5 rounded-lg hover:bg-white/10 text-muted-foreground hover:text-primary transition-colors"
+                title="Sync Branch Data"
+             >
+                <RefreshCw size={14} className={isSearching ? "animate-spin" : ""} />
+             </button>
           </div>
 
           {activeJobs.map((job) => {
@@ -127,7 +162,7 @@ export function TrackingHubClient({ initialActiveJobs, customerMode = false }: T
             return (
                 <div 
                   key={job.jobId}
-                  onClick={() => setSelectedJob(job)}
+                  onClick={() => selectJobFromRadar(job)}
                   className={cn(
                     "group cursor-pointer p-5 rounded-[2rem] border transition-all duration-700 relative overflow-hidden",
                     isSelected 
@@ -184,7 +219,7 @@ export function TrackingHubClient({ initialActiveJobs, customerMode = false }: T
                 <div className="w-16 h-16 rounded-full bg-white/5 border border-dashed border-white/10 flex items-center justify-center mx-auto mb-6">
                     <Package className="text-muted-foreground/20" size={32} />
                 </div>
-                <p className="text-[10px] font-black uppercase tracking-[0.3em] text-muted-foreground/40 italic">ALL SYSTEMS STANDBY</p>
+                <p className="text-[10px] font-black uppercase tracking-[0.3em] text-muted-foreground/40 italic">NO MISSIONS FOUND TODAY</p>
             </div>
           )}
         </div>
@@ -209,7 +244,7 @@ export function TrackingHubClient({ initialActiveJobs, customerMode = false }: T
             <div className="min-h-full flex flex-col">
                 {/* Visual Header */}
                 <div className="p-8 lg:p-12 pb-0 flex flex-col sm:flex-row justify-between items-start gap-8">
-                    <div className="space-y-6">
+                    <div className="space-y-6 w-full max-w-[80%]">
                         <div className="flex items-center gap-4">
                             <div className="px-4 py-1.5 bg-primary/20 rounded-full border border-primary/30 text-[10px] font-black text-primary uppercase tracking-[0.2em] italic flex items-center gap-2">
                                 <span className="w-1.5 h-1.5 rounded-full bg-primary animate-pulse" />
@@ -217,7 +252,7 @@ export function TrackingHubClient({ initialActiveJobs, customerMode = false }: T
                             </div>
                             <span className="text-[10px] font-black text-muted-foreground uppercase tracking-[0.4em] italic opacity-30">TRACKING_UID: {selectedJob.jobId.slice(-8)}</span>
                         </div>
-                        <h1 className="text-5xl lg:text-7xl font-black text-foreground tracking-tighter uppercase italic leading-[0.8] font-display">
+                        <h1 className="text-3xl lg:text-5xl font-black text-foreground tracking-tighter uppercase italic leading-[1.1] font-display break-all">
                             {selectedJob.jobId}
                         </h1>
                         <div className="flex flex-wrap items-center gap-6">
@@ -243,7 +278,7 @@ export function TrackingHubClient({ initialActiveJobs, customerMode = false }: T
                         </div>
                     </div>
                     
-                    <div className="flex flex-col items-end gap-4">
+                    <div className="flex flex-col items-end gap-4 shrink-0">
                         <div className="flex flex-col items-end">
                             <span className="text-[10px] font-black text-muted-foreground uppercase tracking-[0.3em] mb-2 opacity-40">MISSION_STATUS</span>
                             <Badge className="px-8 py-3 rounded-[1.5rem] text-lg font-black uppercase tracking-[0.1em] italic border-2 shadow-2xl bg-primary text-foreground border-white/10 hover:bg-primary/80 transition-all">
@@ -258,7 +293,7 @@ export function TrackingHubClient({ initialActiveJobs, customerMode = false }: T
                 </div>
 
                 {/* Map View */}
-                <div className="mt-12 mx-8 lg:mx-12 aspect-[21/9] rounded-[3rem] border border-white/10 overflow-hidden shadow-2xl relative group">
+                <div className="mt-12 mx-8 lg:mx-12 aspect-[21/9] rounded-[3rem] border border-white/10 overflow-hidden shadow-2xl relative group min-h-[300px]">
                     <TrackingMap 
                         lastLocation={selectedJob.lastLocation || null}
                         driverName={selectedJob.driverName}
@@ -268,17 +303,40 @@ export function TrackingHubClient({ initialActiveJobs, customerMode = false }: T
                     />
                     <div className="absolute top-6 left-6 z-10">
                         <div className="px-4 py-2 bg-black/80 backdrop-blur-xl border border-white/10 rounded-2xl flex items-center gap-3 shadow-2xl">
-                            <div className="w-2 h-2 rounded-full bg-emerald-500 animate-[ping_1.5s_infinite]" />
-                            <span className="text-[10px] font-black text-foreground uppercase tracking-widest italic">GEOSPATIAL SYNC: NOMINAL</span>
+                            <div className={cn("w-2 h-2 rounded-full animate-[ping_1.5s_infinite]", selectedJob.lastLocation ? "bg-emerald-500" : "bg-rose-500")} />
+                            <span className="text-[10px] font-black text-foreground uppercase tracking-widest italic">
+                                GEOSPATIAL SYNC: {selectedJob.lastLocation ? 'NOMINAL' : 'AWAITING UPLINK'}
+                            </span>
                         </div>
                     </div>
-                    <button className="absolute bottom-6 right-6 z-10 p-3 bg-white text-black rounded-2xl shadow-2xl hover:scale-110 transition-transform duration-300">
-                        <Maximize2 size={18} />
-                    </button>
                 </div>
 
                 {/* Main Content Scrollable Area */}
                 <div className="p-8 lg:p-12 space-y-12">
+                    {/* Cargo Specs Matrix */}
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                        <div className="p-5 bg-white/5 rounded-3xl border border-white/5 flex flex-col items-center gap-2">
+                             <Box size={16} className="text-primary/60" />
+                             <span className="text-[9px] font-black text-muted-foreground uppercase tracking-widest opacity-50">CARGO_TYPE</span>
+                             <span className="text-sm font-black uppercase italic">{selectedJob.cargoType || 'GENERAL'}</span>
+                        </div>
+                        <div className="p-5 bg-white/5 rounded-3xl border border-white/5 flex flex-col items-center gap-2">
+                             <Scale size={16} className="text-primary/60" />
+                             <span className="text-[9px] font-black text-muted-foreground uppercase tracking-widest opacity-50">WEIGHT_KG</span>
+                             <span className="text-sm font-black uppercase italic">{selectedJob.weight?.toLocaleString() || '0'} KG</span>
+                        </div>
+                        <div className="p-5 bg-white/5 rounded-3xl border border-white/5 flex flex-col items-center gap-2">
+                             <Layers size={16} className="text-primary/60" />
+                             <span className="text-[9px] font-black text-muted-foreground uppercase tracking-widest opacity-50">VOLUME_CBM</span>
+                             <span className="text-sm font-black uppercase italic">{selectedJob.volume?.toLocaleString() || '0'} CBM</span>
+                        </div>
+                        <div className="p-5 bg-white/5 rounded-3xl border border-white/5 flex flex-col items-center gap-2">
+                             <Info size={16} className="text-primary/60" />
+                             <span className="text-[9px] font-black text-muted-foreground uppercase tracking-widest opacity-50">VEHICLE_TYPE</span>
+                             <span className="text-sm font-black uppercase italic">{selectedJob.vehicleType || '-'}</span>
+                        </div>
+                    </div>
+
                     {/* Tracking Progress */}
                     <div className="grid grid-cols-2 md:grid-cols-5 gap-6 relative">
                         <div className="absolute top-8 left-10 right-10 h-0.5 bg-white/5 -translate-y-1/2 z-0 hidden md:block" />

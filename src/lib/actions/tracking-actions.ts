@@ -80,14 +80,16 @@ export async function getActiveJobs(
   customerMode = false
 ): Promise<PublicJobDetails[]> {
   const supabase = createAdminClient();
+  const today = new Date().toISOString().split('T')[0];
   
   // Define active statuses
-  const activeStatuses = ["Assigned", "Picked Up", "In Transit", "Arrived", "SOS", "En Route", "En-Route", "New", "In Progress", "Pending"];
+  const activeStatuses = ["Assigned", "Picked Up", "In Transit", "Arrived", "SOS", "En Route", "En-Route", "In Progress", "Pending"];
 
   let dbQuery = supabase
     .from("Jobs_Main")
     .select("*")
-    .in("Job_Status", activeStatuses);
+    .in("Job_Status", activeStatuses)
+    .eq("Plan_Date", today); // ONLY TODAY
 
   // Apply Branch Filtering for Admin (Non-Customer Mode)
   if (!customerMode) {
@@ -105,7 +107,7 @@ export async function getActiveJobs(
     }
   }
 
-  const { data, error } = await dbQuery.order('Created_At', { ascending: false }).limit(50);
+  const { data, error } = await dbQuery.order('Created_At', { ascending: false }).limit(100);
 
   if (error || !data) return [];
 
@@ -184,8 +186,8 @@ export async function getPublicJobDetails(
     : [];
 
   let lastLocation = null;
-  // Use Driver_ID to find location
-  if (job.Driver_ID && ["Assigned", "Picked Up", "In Transit", "Arrived", "SOS", "En Route", "En-Route"].includes(job.Job_Status)) {
+  // Use Driver_ID to find location - Try harder to find recent location
+  if (job.Driver_ID) {
     const adminSupabase = createAdminClient();
     const { data: gpsData } = await adminSupabase
       .from("gps_logs")
