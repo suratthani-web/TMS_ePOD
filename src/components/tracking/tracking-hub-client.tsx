@@ -44,7 +44,7 @@ export function TrackingHubClient({ initialActiveJobs, customerMode = false }: T
   useEffect(() => {
     const q = searchParams.get('q')
     if (q) handleSearch(q)
-  }, [])
+  }, [searchParams]) // Fixed dependency to handle navigation changes
 
   useEffect(() => {
     setActiveJobs(initialActiveJobs)
@@ -218,7 +218,7 @@ export function TrackingHubClient({ initialActiveJobs, customerMode = false }: T
       </div>
 
       {/* RIGHT PANEL: Unified Mission Command Center */}
-      <div className="flex-1 overflow-y-auto custom-scrollbar rounded-3xl border border-border/40 bg-card/30 shadow-xl relative overflow-x-hidden">
+      <div className="flex-1 overflow-y-auto custom-scrollbar rounded-3xl border border-border/40 bg-card shadow-xl relative overflow-x-hidden">
         {!selectedJob ? (
             <div className="h-full flex flex-col items-center justify-center text-center p-12">
                 <div className="w-24 h-24 rounded-full bg-primary/5 flex items-center justify-center mb-8 relative">
@@ -327,34 +327,34 @@ export function TrackingHubClient({ initialActiveJobs, customerMode = false }: T
                              {/* Stair Incentive Module (Integrated from Detail Page) */}
                              {(selectedJob.incentiveClaimed || selectedJob.requiresIncentiveCheck) && (
                                 <PremiumCard className={cn(
-                                    "border rounded-3xl overflow-hidden shadow-md bg-muted/10",
+                                    "border-2 rounded-3xl overflow-hidden shadow-xl bg-card",
                                     selectedJob.sensorVerified === 'Verified' ? 'border-emerald-500/20' : 'border-amber-500/20'
                                 )}>
-                                    <div className="p-6 border-b border-border/40 flex items-center justify-between bg-muted/20">
-                                        <h3 className="text-xs font-black uppercase tracking-widest flex items-center gap-2 italic">
-                                            <Layers size={14} className="text-primary" /> ตรวจขึ้นชั้น 2-3 (SENSOR DATA)
+                                    <div className="p-8 border-b border-border/40 flex items-center justify-between bg-muted/10">
+                                        <h3 className="text-sm font-black uppercase tracking-widest flex items-center gap-3 italic">
+                                            <Layers size={18} className="text-primary" /> ตรวจขึ้นชั้น 2-3 (SENSOR DATA)
                                         </h3>
-                                        <Badge className={cn("text-[8px] font-black uppercase", selectedJob.sensorVerified === 'Verified' ? "bg-emerald-500" : "bg-amber-500")}>
+                                        <Badge className={cn("px-4 py-1.5 text-xs font-black uppercase", selectedJob.sensorVerified === 'Verified' ? "bg-emerald-500 text-white" : "bg-amber-500 text-white")}>
                                             {selectedJob.sensorVerified === 'Verified' ? 'VERIFIED' : 'PENDING'}
                                         </Badge>
                                     </div>
-                                    <div className="p-6 space-y-8">
-                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                                            <div className="space-y-3">
-                                                <div className="flex justify-between text-[10px] font-black text-muted-foreground uppercase">
+                                    <div className="p-8 space-y-10">
+                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-10">
+                                            <div className="space-y-4">
+                                                <div className="flex justify-between text-xs font-black text-muted-foreground uppercase tracking-widest">
                                                     <span>ผลต่างความสูงสะสม</span>
-                                                    <span className="text-foreground">{selectedJob.sensorMaxElevationDiff?.toFixed(2) || '0.00'} / 2.8ม.</span>
+                                                    <span className="text-foreground text-sm">{selectedJob.sensorMaxElevationDiff?.toFixed(2) || '0.00'} / 2.8ม.</span>
                                                 </div>
-                                                <div className="h-2 bg-muted rounded-full overflow-hidden">
+                                                <div className="h-3 bg-muted rounded-full overflow-hidden">
                                                     <div className="h-full bg-primary transition-all duration-1000" style={{ width: `${Math.min(((selectedJob.sensorMaxElevationDiff || 0) / 2.8) * 100, 100)}%` }} />
                                                 </div>
                                             </div>
-                                            <div className="space-y-3">
-                                                <div className="flex justify-between text-[10px] font-black text-muted-foreground uppercase">
+                                            <div className="space-y-4">
+                                                <div className="flex justify-between text-xs font-black text-muted-foreground uppercase tracking-widest">
                                                     <span>ก้าวเดินขึ้นบันได</span>
-                                                    <span className="text-foreground">{selectedJob.sensorTotalStepsUpward || '0'} / 15ก้าว</span>
+                                                    <span className="text-foreground text-sm">{selectedJob.sensorTotalStepsUpward || '0'} / 15ก้าว</span>
                                                 </div>
-                                                <div className="h-2 bg-muted rounded-full overflow-hidden">
+                                                <div className="h-3 bg-muted rounded-full overflow-hidden">
                                                     <div className="h-full bg-emerald-500 transition-all duration-1000" style={{ width: `${Math.min(((selectedJob.sensorTotalStepsUpward || 0) / 15) * 100, 100)}%` }} />
                                                 </div>
                                             </div>
@@ -362,12 +362,12 @@ export function TrackingHubClient({ initialActiveJobs, customerMode = false }: T
 
                                         {/* Admin Override Controls */}
                                         {!customerMode && (
-                                            <div className="pt-6 border-t border-border/40 space-y-4">
+                                            <div className="pt-8 border-t border-border/40 space-y-5">
                                                 <div className="flex items-center gap-2">
-                                                    <ShieldCheck size={12} className="text-primary" />
-                                                    <span className="text-[9px] font-black text-muted-foreground uppercase tracking-widest">Command Override Panel</span>
+                                                    <ShieldCheck size={14} className="text-primary" />
+                                                    <span className="text-[10px] font-black text-muted-foreground uppercase tracking-[0.2em]">MISSION OVERRIDE PROTOCOL</span>
                                                 </div>
-                                                <div className="flex gap-3">
+                                                <div className="flex gap-4">
                                                     <button
                                                         onClick={async () => {
                                                             if (confirm('ยืนยันการอนุมัติจ่ายเงินพิเศษ?')) {
@@ -376,7 +376,7 @@ export function TrackingHubClient({ initialActiveJobs, customerMode = false }: T
                                                                 if (res.success) selectJobFromRadar(selectedJob)
                                                             }
                                                         }}
-                                                        className="flex-1 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-[10px] font-black uppercase tracking-wider transition-all"
+                                                        className="flex-1 py-4 bg-emerald-600 hover:bg-emerald-500 text-white rounded-2xl text-xs font-black uppercase tracking-widest transition-all shadow-lg shadow-emerald-500/20"
                                                     >
                                                         อนุมัติจ่ายเงิน
                                                     </button>
@@ -388,7 +388,7 @@ export function TrackingHubClient({ initialActiveJobs, customerMode = false }: T
                                                                 if (res.success) selectJobFromRadar(selectedJob)
                                                             }
                                                         }}
-                                                        className="flex-1 py-2.5 bg-rose-600 hover:bg-rose-500 text-white rounded-xl text-[10px] font-black uppercase tracking-wider transition-all"
+                                                        className="flex-1 py-4 bg-rose-600 hover:bg-rose-500 text-white rounded-2xl text-xs font-black uppercase tracking-widest transition-all shadow-lg shadow-rose-500/20"
                                                     >
                                                         ปฏิเสธการจ่าย
                                                     </button>
@@ -408,48 +408,48 @@ export function TrackingHubClient({ initialActiveJobs, customerMode = false }: T
 
                         {/* Right Matrix: Financial Ledger & Actions */}
                         <div className="xl:col-span-4 space-y-8">
-                             <PremiumCard className="rounded-3xl border-border/40 shadow-lg overflow-hidden flex flex-col">
-                                <div className="p-6 border-b border-border/40 bg-muted/20">
-                                    <h3 className="text-xs font-black uppercase tracking-widest flex items-center gap-2 italic text-emerald-600">
-                                        <DollarSign size={14} /> FINANCIAL LEDGER
+                             <PremiumCard className="rounded-[2.5rem] border-2 border-border/40 shadow-xl overflow-hidden flex flex-col bg-card">
+                                <div className="p-8 border-b border-border/40 bg-muted/10">
+                                    <h3 className="text-sm font-black uppercase tracking-widest flex items-center gap-3 italic text-emerald-600">
+                                        <DollarSign size={18} /> FINANCIAL LEDGER
                                     </h3>
                                 </div>
-                                <div className="p-6 space-y-4">
+                                <div className="p-8 space-y-6">
                                     <LedgerRow label="ค่าขนส่งหลัก" cust={selectedJob.priceCustBase} driver={selectedJob.costDriverBase} />
                                     {extraCostsList.map((c, i) => (
                                         <LedgerRow key={i} label={`└ ${c.type || 'อื่นๆ'}`} cust={c.charge_cust} driver={c.cost_driver} sub />
                                     ))}
-                                    <div className="pt-4 border-t border-border/40 space-y-3">
-                                        <div className="flex justify-between text-xs font-black uppercase italic">
+                                    <div className="pt-6 border-t-2 border-border/40 space-y-5">
+                                        <div className="flex justify-between text-xs font-black uppercase italic tracking-wider">
                                             <span className="text-muted-foreground">TOTAL REVENUE</span>
-                                            <span className="text-emerald-600 font-display text-base">฿{priceCust.toLocaleString()}</span>
+                                            <span className="text-emerald-600 font-display text-xl">฿{priceCust.toLocaleString()}</span>
                                         </div>
-                                        <div className="flex justify-between text-[10px] font-bold uppercase italic border-b border-border/40 pb-3">
+                                        <div className="flex justify-between text-xs font-bold uppercase italic border-b border-border/40 pb-5 tracking-wider">
                                             <span className="text-muted-foreground opacity-60">DRIVER PAYOUT</span>
-                                            <span className="text-rose-500">฿{costDriver.toLocaleString()}</span>
+                                            <span className="text-rose-500 font-display text-lg">฿{costDriver.toLocaleString()}</span>
                                         </div>
-                                        <div className="flex justify-between items-center">
-                                            <span className="text-xs font-black text-foreground uppercase tracking-widest italic">NET MARGIN</span>
-                                            <Badge className="bg-emerald-500/10 text-emerald-600 border-emerald-500/20 text-lg font-black font-display italic">
+                                        <div className="flex justify-between items-center bg-muted/20 p-4 rounded-2xl">
+                                            <span className="text-xs font-black text-foreground uppercase tracking-[0.2em] italic">NET MARGIN</span>
+                                            <Badge className="bg-emerald-500 text-white border-none text-2xl font-black font-display italic px-6 py-2 rounded-xl shadow-xl">
                                                 ฿{netMargin.toLocaleString()}
                                             </Badge>
                                         </div>
                                     </div>
                                 </div>
-                                <div className="p-6 bg-muted/10 border-t border-border/40 space-y-4">
+                                <div className="p-8 bg-muted/10 border-t border-border/40 space-y-4">
                                     <PODDownloadButton job={selectedJob} />
-                                    <button className="w-full h-12 bg-primary hover:bg-primary/90 text-white rounded-2xl text-[10px] font-black uppercase tracking-widest italic flex items-center justify-center gap-3 transition-all shadow-lg shadow-primary/10">
-                                        <Phone size={14} /> CONNECT OPERATOR UPLINK
+                                    <button className="w-full h-16 bg-primary hover:bg-primary/90 text-white rounded-3xl text-xs font-black uppercase tracking-widest italic flex items-center justify-center gap-3 transition-all shadow-2xl shadow-primary/20">
+                                        <Phone size={18} /> CONNECT OPERATOR UPLINK
                                     </button>
                                 </div>
                              </PremiumCard>
 
                              {selectedJob.notes && (
-                                <div className="p-6 bg-amber-500/5 rounded-3xl border border-amber-500/10 space-y-3">
+                                <div className="p-8 bg-amber-500/5 rounded-[2.5rem] border border-amber-500/20 space-y-4">
                                     <div className="flex items-center gap-2 text-[10px] font-black text-amber-600 uppercase tracking-widest italic">
-                                        <Info size={12} /> TACTICAL NOTES
+                                        <Info size={14} /> TACTICAL NOTES
                                     </div>
-                                    <p className="text-xs font-medium text-foreground/70 italic leading-relaxed">{selectedJob.notes}</p>
+                                    <p className="text-sm font-bold text-foreground/80 italic leading-relaxed">{selectedJob.notes}</p>
                                 </div>
                              )}
 
@@ -476,7 +476,7 @@ function StatusBadge({ status }: { status: string }) {
     else if (['failed', 'cancelled'].includes(s)) color = "bg-rose-500 text-white"
 
     return (
-        <Badge className={cn("px-6 py-2 rounded-xl text-xs font-black uppercase tracking-widest italic border-none shadow-lg", color)}>
+        <Badge className={cn("px-8 py-3 rounded-2xl text-sm font-black uppercase tracking-widest italic border-none shadow-xl", color)}>
             {status.toUpperCase()}
         </Badge>
     )
@@ -484,31 +484,31 @@ function StatusBadge({ status }: { status: string }) {
 
 function InfoCard({ label, value, icon, color }: { label: string, value: string, icon: any, color: "primary" | "indigo" }) {
     return (
-        <div className="p-6 bg-card border border-border/40 rounded-[2rem] shadow-sm relative overflow-hidden group">
-            <div className={cn("absolute top-0 right-0 p-6 opacity-5 group-hover:opacity-10 transition-opacity", color === 'primary' ? "text-primary" : "text-indigo-500")}>
+        <div className="p-8 bg-card border-2 border-border/40 rounded-[2.5rem] shadow-sm relative overflow-hidden group">
+            <div className={cn("absolute top-0 right-0 p-8 opacity-5 group-hover:opacity-10 transition-opacity", color === 'primary' ? "text-primary" : "text-indigo-500")}>
                 {icon}
             </div>
-            <p className={cn("text-[9px] font-black uppercase tracking-[0.25em] mb-3 italic", color === 'primary' ? "text-primary" : "text-indigo-500")}>{label}</p>
-            <p className="text-lg font-black text-foreground tracking-tighter uppercase italic leading-tight">{value}</p>
+            <p className={cn("text-[10px] font-black uppercase tracking-[0.3em] mb-4 italic", color === 'primary' ? "text-primary" : "text-indigo-500")}>{label}</p>
+            <p className="text-xl font-black text-foreground tracking-tighter uppercase italic leading-tight">{value}</p>
         </div>
     )
 }
 
 function MetricBox({ icon, label, value }: { icon: any, label: string, value: string }) {
     return (
-        <div className="p-4 bg-muted/20 border border-border/40 rounded-2xl flex flex-col items-center gap-2 text-center">
+        <div className="p-5 bg-muted/20 border-2 border-border/40 rounded-3xl flex flex-col items-center gap-3 text-center transition-all hover:bg-muted/30">
             <div className="text-primary/60">{icon}</div>
-            <span className="text-[8px] font-black text-muted-foreground uppercase tracking-widest">{label}</span>
-            <span className="text-xs font-black uppercase italic text-foreground">{value}</span>
+            <span className="text-[9px] font-black text-muted-foreground uppercase tracking-widest opacity-60">{label}</span>
+            <span className="text-sm font-black uppercase italic text-foreground">{value}</span>
         </div>
     )
 }
 
 function LedgerRow({ label, cust, driver, sub }: { label: string, cust: any, driver: any, sub?: boolean }) {
     return (
-        <div className={cn("flex justify-between items-center text-[11px]", sub ? "pl-2 opacity-70 italic" : "font-bold text-muted-foreground")}>
+        <div className={cn("flex justify-between items-center text-xs", sub ? "pl-4 opacity-70 italic font-bold" : "font-black text-muted-foreground tracking-wide uppercase")}>
             <span>{label}</span>
-            <div className="flex gap-6 font-mono font-black">
+            <div className="flex gap-8 font-mono font-black">
                 <span className="text-emerald-600">฿{(Number(cust) || 0).toLocaleString()}</span>
                 <span className="text-rose-500">฿{(Number(driver) || 0).toLocaleString()}</span>
             </div>
@@ -518,26 +518,26 @@ function LedgerRow({ label, cust, driver, sub }: { label: string, cust: any, dri
 
 function EvidenceBox({ label, photos, signature, phase }: { label: string, photos: string[], signature: string | null, phase: string }) {
     return (
-        <div className="p-6 bg-muted/10 border border-border/40 rounded-[2rem] space-y-5">
+        <div className="p-8 bg-muted/10 border-2 border-border/40 rounded-[2.5rem] space-y-6">
             <div className="flex items-center justify-between">
-                <p className="text-[10px] font-black text-muted-foreground uppercase tracking-widest italic">{label}</p>
-                <Badge variant="outline" className="text-[8px] border-border/40 font-black opacity-40 uppercase tracking-widest">{phase}</Badge>
+                <p className="text-[11px] font-black text-muted-foreground uppercase tracking-[0.2em] italic">{label}</p>
+                <Badge variant="outline" className="px-3 py-1 text-[9px] border-border/60 font-black opacity-60 uppercase tracking-widest">{phase}</Badge>
             </div>
-            <div className="flex flex-wrap gap-3">
+            <div className="flex flex-wrap gap-4">
                 {photos.map((p, i) => (
-                    <div key={i} className="w-14 h-14 rounded-2xl border border-border shadow-sm overflow-hidden bg-black relative group/img cursor-pointer">
-                        <Image src={p} alt="Proof" fill className="object-cover group-hover/img:scale-110 transition-transform" />
-                        <div className="absolute inset-0 bg-primary/20 opacity-0 group-hover/img:opacity-100 transition-opacity flex items-center justify-center"><Eye size={16} className="text-white" /></div>
+                    <div key={i} className="w-20 h-20 rounded-2xl border-2 border-border shadow-md overflow-hidden bg-black relative group/img cursor-pointer transition-transform hover:scale-110">
+                        <Image src={p} alt="Proof" fill className="object-cover group-hover/img:scale-110 transition-transform duration-700" />
+                        <div className="absolute inset-0 bg-primary/20 opacity-0 group-hover/img:opacity-100 transition-opacity flex items-center justify-center"><Eye size={20} className="text-white" /></div>
                     </div>
                 ))}
                 {signature && (
-                    <div className="w-14 h-14 rounded-2xl border border-border shadow-sm overflow-hidden bg-white p-1 relative flex items-center justify-center">
+                    <div className="w-20 h-20 rounded-2xl border-2 border-border shadow-md overflow-hidden bg-white p-2 relative flex items-center justify-center transition-transform hover:scale-110">
                         <Image src={signature} alt="Sig" fill className="object-contain" />
                     </div>
                 )}
                 {photos.length === 0 && !signature && (
-                    <div className="h-14 flex items-center px-4 bg-muted/40 rounded-2xl border border-dashed border-border/60">
-                        <p className="text-[9px] font-black text-muted-foreground uppercase tracking-widest italic opacity-40">WAITING_INTEL</p>
+                    <div className="h-20 flex items-center px-6 bg-muted/40 rounded-2xl border-2 border-dashed border-border/60">
+                        <p className="text-[10px] font-black text-muted-foreground uppercase tracking-widest italic opacity-40">AWAITING_INTEL</p>
                     </div>
                 )}
             </div>

@@ -333,7 +333,12 @@ export function HistoryClient({
                                 </div>
                                 <div className="min-w-0 flex-1">
                                     <div className="flex items-center gap-1.5">
-                                        <p className="text-foreground font-black text-sm tracking-tighter group-hover/row:text-primary transition-colors font-display uppercase truncate">{job.Job_ID}</p>
+                                        <Link 
+                                            href={customerMode ? `/dashboard/tracking?q=${job.Job_ID}` : `/admin/tracking?q=${job.Job_ID}`}
+                                            className="text-foreground font-black text-sm tracking-tighter hover:text-primary transition-colors font-display uppercase truncate hover:underline"
+                                        >
+                                            {job.Job_ID}
+                                        </Link>
                                     </div>
                                     <div className="flex items-center gap-1.5 mt-0.5">
                                         <Clock size={10} className="text-muted-foreground" />

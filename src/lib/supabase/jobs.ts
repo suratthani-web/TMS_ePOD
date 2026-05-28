@@ -110,12 +110,20 @@ export async function getTodayJobs(date?: string, branchId?: string): Promise<Jo
     
     // Use provided date or today in Bangkok time
     const targetDate = date || new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Bangkok' })
-    
+    const today = new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Bangkok' })
+
     let dbQuery = supabase
       .from('Jobs_Main')
       .select('*')
       .eq('Plan_Date', targetDate)
     
+    // UI REFINEMENT: In Planning, if viewing TODAY, hide active jobs that are already in Tracking Hub
+    // UNLESS the job is 'Draft' or 'New' or 'Assigned' but not yet 'Picked Up'
+    if (targetDate === today) {
+        // We only want to show things that NEED planning or haven't started yet.
+        dbQuery = dbQuery.in('Job_Status', ['Draft', 'New', 'Assigned', 'Requested', 'Pending'])
+    }
+
     if (customerId) {
         dbQuery = dbQuery.eq('Customer_ID', customerId)
     } else {
@@ -241,6 +249,7 @@ export async function getAllJobs(
     let dbQuery = supabase
       .from('Jobs_Main')
       .select('*', { count: 'exact' })
+      .neq('Job_Status', 'Draft') // UI REFINEMENT: Hide Drafts from History (They belong in Planning)
     
     if (customerId) {
         dbQuery = dbQuery.eq('Customer_ID', customerId)
@@ -458,6 +467,9 @@ export async function getDriverJobs(
       .from('Jobs_Main')
       .select('Job_ID, Customer_Name, Job_Status, Pickup_Date, Delivery_Date, Plan_Date, Plan_Time, Origin_Location, Dest_Location, Route_Name, Show_Price_To_Driver, Cost_Driver_Total, Total_Drop, Signature_Url, Photo_Proof_Url')
       .eq('Driver_ID', driverId)
+
+    // Filter out drafts - driver shouldn't see them yet
+    query = query.neq('Job_Status', 'Draft')
 
     // Only apply branch filter if it's NOT a driver (Admin/Staff must see their branch)
     // Driver should see jobs assigned to them regardless of their profile branch_id
@@ -1024,7 +1036,7 @@ export async function getDriverDashboardStats(driverId: string) {
   try {
     // Use admin client to bypass RLS as drivers use custom session
     const supabase = createAdminClient()
-    const today = new Date().toISOString().split('T')[0]
+    const today = new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Bangkok' })
     
     const startOfMonth = new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString()
 

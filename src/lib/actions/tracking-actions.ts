@@ -93,10 +93,8 @@ export async function getActiveJobs(
   const now = new Date();
   const today = new Intl.DateTimeFormat('sv-SE', { timeZone: 'Asia/Bangkok' }).format(now);
   
-  console.log(`[Tracking] Fetching active jobs for: ${today} (Branch Filter Active)`);
-  
-  // Define active statuses
-  const activeStatuses = ["Assigned", "Picked Up", "In Transit", "Arrived", "SOS", "En Route", "En-Route", "In Progress", "Pending", "Completed", "Delivered"];
+  // Define active statuses for the Radar
+  const activeStatuses = ["Assigned", "Picked Up", "In Transit", "Arrived", "SOS", "En Route", "En-Route", "In Progress", "Pending", "Completed", "Delivered", "New"];
 
   let dbQuery = supabase
     .from("Jobs_Main")
@@ -123,7 +121,6 @@ export async function getActiveJobs(
   const { data, error } = await dbQuery.order('Created_At', { ascending: false }).limit(100);
 
   if (error || !data) {
-    console.error("[Tracking] Fetch error:", error);
     return [];
   }
 
@@ -194,7 +191,7 @@ function mapJobToPublicDetails(job: any): PublicJobDetails {
         destination: job.Location_Destination_Name || job.Dest_Location || "-",
         driverName: job.Driver_Name || "-",
         driverPhone: job.Phone || "-",
-        vehiclePlate: job.Vehicle_Plate || "-",
+        vehiclePlate: job.Vehicle_Plate || "N/A",
         planDate: job.Plan_Date || "-",
         pickupDate: job.Actual_Pickup_Time || null,
         deliveryDate: (job.Delivery_Date && job.Actual_Delivery_Time) 
