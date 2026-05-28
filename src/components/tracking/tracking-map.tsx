@@ -19,9 +19,10 @@ interface TrackingMapProps {
   status: string
   pickup?: { lat: number | null, lng: number | null, name: string }
   dropoff?: { lat: number | null, lng: number | null, name: string }
+  vehiclePlate?: string
 }
 
-export function TrackingMap({ lastLocation, driverName, status, pickup, dropoff }: TrackingMapProps) {
+export function TrackingMap({ lastLocation, driverName, status, pickup, dropoff, vehiclePlate }: TrackingMapProps) {
   const jobMissions = []
   
   if (pickup?.lat && pickup?.lng) {
@@ -89,7 +90,8 @@ export function TrackingMap({ lastLocation, driverName, status, pickup, dropoff 
             lat: lastLocation.lat,
             lng: lastLocation.lng,
             status: status,
-            lastUpdate: new Date(lastLocation.timestamp).toLocaleTimeString('th-TH')
+            lastUpdate: new Date(lastLocation.timestamp).toLocaleTimeString('th-TH'),
+            vehiclePlate: vehiclePlate || "N/A"
         }]}
     />
   )

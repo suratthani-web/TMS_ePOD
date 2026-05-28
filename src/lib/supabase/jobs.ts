@@ -483,16 +483,20 @@ export async function getDriverJobs(
         query = query.gte('Plan_Date', options.startDate)
     } else {
         const past = new Date()
-        past.setDate(past.getDate() - 15)
-        query = query.gte('Plan_Date', past.toISOString().split('T')[0])
+        const bkkStr = new Intl.DateTimeFormat('sv-SE', { timeZone: 'Asia/Bangkok' }).format(past)
+        const pastDate = new Date(bkkStr)
+        pastDate.setDate(pastDate.getDate() - 15)
+        query = query.gte('Plan_Date', pastDate.toISOString().split('T')[0])
     }
 
     if (options.endDate) {
         query = query.lte('Plan_Date', options.endDate)
     } else {
         const future = new Date()
-        future.setDate(future.getDate() + 15)
-        query = query.lte('Plan_Date', future.toISOString().split('T')[0])
+        const bkkStr = new Intl.DateTimeFormat('sv-SE', { timeZone: 'Asia/Bangkok' }).format(future)
+        const futureDate = new Date(bkkStr)
+        futureDate.setDate(futureDate.getDate() + 15)
+        query = query.lte('Plan_Date', futureDate.toISOString().split('T')[0])
     }
 
     if (options.status && options.status !== 'All') {
