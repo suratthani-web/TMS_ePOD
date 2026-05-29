@@ -59,9 +59,19 @@ export function TrackingHubClient({ initialActiveJobs, customerMode = false }: T
   }, [activeJobs])
 
   const handleSearch = async (query: string) => {
-    if (!query.trim()) return
+    let cleanQuery = query.trim()
+    if (!cleanQuery) return
+
+    // If query is comma-separated (e.g. multi-SO paste), take the first SO
+    if (cleanQuery.includes(',')) {
+      const parts = cleanQuery.split(',')
+      cleanQuery = parts[0].trim()
+    }
+
+    if (!cleanQuery) return
+
     startSearch(async () => {
-        const result = await getPublicJobDetails(query)
+        const result = await getPublicJobDetails(cleanQuery)
         if (result) {
             setSelectedJob(result)
             if (!activeJobs.find(j => j.jobId === result.jobId)) {
