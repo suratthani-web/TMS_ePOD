@@ -131,6 +131,7 @@ export async function getPublicJobDetails(
   jobId: string,
 ): Promise<PublicJobDetails | null> {
   const supabase = createAdminClient();
+  const decodedJobId = decodeURIComponent(jobId).trim();
 
   let jobs = null;
   let error = null;
@@ -139,14 +140,14 @@ export async function getPublicJobDetails(
   const { data: exactJobs, error: exactError } = await supabase
     .from("Jobs_Main")
     .select("*")
-    .eq("Job_ID", jobId.trim())
+    .eq("Job_ID", decodedJobId)
     .order('Created_At', { ascending: false });
 
   if (exactJobs && exactJobs.length > 0) {
     jobs = exactJobs;
   } else {
     // 2. Fall back to split-by-comma logic if no exact match is found
-    const tokens = jobId.split(',').map(t => t.trim()).filter(Boolean);
+    const tokens = decodedJobId.split(',').map(t => t.trim()).filter(Boolean);
     if (tokens.length === 0) return null;
 
     const { data: splitJobs, error: splitError } = await supabase
