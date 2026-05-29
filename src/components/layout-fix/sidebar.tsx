@@ -108,7 +108,7 @@ const customerNavigation: NavGroup[] = [
       titleKey: "nav_groups.client_portal",
       items: [
         { titleKey: "navigation.dashboard", href: "/dashboard", icon: <LayoutDashboard size={20} /> },
-        { titleKey: "navigation.tracking_hub", href: "/dashboard/tracking", icon: <Activity size={20} />, badge: "common.live", badgeColor: "blue" },
+        { titleKey: "navigation.customer_tracking_hub", href: "/dashboard/tracking", icon: <Activity size={20} />, badge: "common.live", badgeColor: "blue" },
         { titleKey: "navigation.monitoring", href: "/monitoring", icon: <Activity size={20} />, badge: "common.live", badgeColor: "green" },
         { titleKey: "navigation.routes", href: "/routes", icon: <Navigation size={20} /> },
         { titleKey: "navigation.history", href: "/jobs/history", icon: <History size={20} /> },
