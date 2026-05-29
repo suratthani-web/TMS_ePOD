@@ -159,13 +159,20 @@ export async function getPublicJobDetails(
     jobs = splitJobs;
     error = splitError || exactError;
 
-    // If no jobs found by exact Job_ID tokens, try searching the Notes for SO numbers
+    // If no jobs found by exact Job_ID tokens, try searching Notes, original_destinations_json, Dest_Location, and Job_ID for SO numbers
     if (!jobs || jobs.length === 0) {
-        const noteConditions = tokens.map(token => `Notes.ilike.%${token}%`).join(',');
+        const conditions: string[] = [];
+        for (const token of tokens) {
+            conditions.push(`Notes.ilike.%${token}%`);
+            conditions.push(`original_destinations_json.ilike.%${token}%`);
+            conditions.push(`Dest_Location.ilike.%${token}%`);
+            conditions.push(`Job_ID.ilike.%${token}%`);
+        }
+
         const { data: noteJobs } = await supabase
           .from("Jobs_Main")
           .select("*")
-          .or(noteConditions)
+          .or(conditions.join(','))
           .order('Created_At', { ascending: false });
           
         if (noteJobs && noteJobs.length > 0) {
