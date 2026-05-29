@@ -429,7 +429,7 @@ export function TrackingHubClient({ initialActiveJobs, customerMode = false }: T
                                     </h3>
                                 </div>
                                 <div className="p-8 space-y-6">
-                                    <LedgerRow label="ค่าขนส่งหลัก" cust={priceCustBase} driver={costDriverBase} />
+                                    <LedgerRow label="ค่าขนส่งหลัก" cust={priceCustBase} driver={costDriverBase} customerMode={customerMode} />
                                     {extraCostsList.map((c, i) => {
                                         // Auto-translate common extra costs if possible
                                         let displayType = c.type || 'อื่นๆ'
@@ -438,23 +438,27 @@ export function TrackingHubClient({ initialActiveJobs, customerMode = false }: T
                                         if (displayType === 'return') displayType = 'ค่าตีกลับ'
                                         if (displayType === 'fuel') displayType = 'ค่าปรับน้ำมัน'
                                         if (displayType === 'trailer') displayType = 'ค่าพ่วง'
-                                        return <LedgerRow key={i} label={`└ ${displayType}`} cust={c.charge_cust} driver={c.cost_driver} sub />
+                                        return <LedgerRow key={i} label={`└ ${displayType}`} cust={c.charge_cust} driver={c.cost_driver} sub customerMode={customerMode} />
                                     })}
                                     <div className="pt-6 border-t-2 border-border/40 space-y-5">
                                         <div className="flex justify-between text-xs font-black uppercase italic tracking-wider">
                                             <span className="text-muted-foreground">TOTAL REVENUE</span>
                                             <span className="text-emerald-600 font-display text-xl">฿{priceCustTotal.toLocaleString()}</span>
                                         </div>
-                                        <div className="flex justify-between text-xs font-bold uppercase italic border-b border-border/40 pb-5 tracking-wider">
-                                            <span className="text-muted-foreground opacity-60">DRIVER PAYOUT</span>
-                                            <span className="text-rose-500 font-display text-lg">฿{costDriverTotal.toLocaleString()}</span>
-                                        </div>
-                                        <div className="flex justify-between items-center bg-muted/20 p-4 rounded-2xl">
-                                            <span className="text-xs font-black text-foreground uppercase tracking-[0.2em] italic">NET MARGIN</span>
-                                            <Badge className={cn("text-white border-none text-2xl font-black font-display italic px-6 py-2 rounded-xl shadow-xl", netMargin >= 0 ? "bg-emerald-500" : "bg-rose-500")}>
-                                                ฿{netMargin.toLocaleString()}
-                                            </Badge>
-                                        </div>
+                                        {!customerMode && (
+                                            <>
+                                                <div className="flex justify-between text-xs font-bold uppercase italic border-b border-border/40 pb-5 tracking-wider">
+                                                    <span className="text-muted-foreground opacity-60">DRIVER PAYOUT</span>
+                                                    <span className="text-rose-500 font-display text-lg">฿{costDriverTotal.toLocaleString()}</span>
+                                                </div>
+                                                <div className="flex justify-between items-center bg-muted/20 p-4 rounded-2xl">
+                                                    <span className="text-xs font-black text-foreground uppercase tracking-[0.2em] italic">NET MARGIN</span>
+                                                    <Badge className={cn("text-white border-none text-2xl font-black font-display italic px-6 py-2 rounded-xl shadow-xl", netMargin >= 0 ? "bg-emerald-500" : "bg-rose-500")}>
+                                                        ฿{netMargin.toLocaleString()}
+                                                    </Badge>
+                                                </div>
+                                            </>
+                                        )}
                                     </div>
                                 </div>
                                 <div className="p-8 bg-muted/10 border-t border-border/40 space-y-4">
@@ -525,13 +529,13 @@ function MetricBox({ icon, label, value }: { icon: any, label: string, value: st
     )
 }
 
-function LedgerRow({ label, cust, driver, sub }: { label: string, cust: any, driver: any, sub?: boolean }) {
+function LedgerRow({ label, cust, driver, sub, customerMode }: { label: string, cust: any, driver: any, sub?: boolean, customerMode?: boolean }) {
     return (
         <div className={cn("flex justify-between items-center text-xs", sub ? "pl-4 opacity-70 italic font-bold" : "font-black text-muted-foreground tracking-wide uppercase")}>
             <span>{label}</span>
             <div className="flex gap-8 font-mono font-black">
                 <span className="text-emerald-600">฿{(Number(cust) || 0).toLocaleString()}</span>
-                <span className="text-rose-500">฿{(Number(driver) || 0).toLocaleString()}</span>
+                {!customerMode && <span className="text-rose-500">฿{(Number(driver) || 0).toLocaleString()}</span>}
             </div>
         </div>
     )
