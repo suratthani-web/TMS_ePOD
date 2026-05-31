@@ -38,16 +38,14 @@ export function GlobalClientComponents() {
     return () => controller.abort()
   }, []) // Fix: Execute only once on mount
 
+  if (!isMounted) return null
+
   return (
     <>
-      {isMounted && (
-        <>
-          <PWAInstallHint />
-          <Toaster />
-          <AdminPushRequester userId={adminUserId} />
-          <AdminGlobalNotifier branchId={adminBranchId} isAdmin={isAdmin} />
-        </>
-      )}
+      <PWAInstallHint />
+      <Toaster />
+      <AdminPushRequester userId={adminUserId} />
+      <AdminGlobalNotifier branchId={adminBranchId} isAdmin={isAdmin} />
     </>
   )
 }
