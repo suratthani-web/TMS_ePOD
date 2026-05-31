@@ -7,7 +7,7 @@ import { LanguageProvider } from "@/components/providers/language-provider"
 import { BranchProvider } from "@/components/providers/branch-provider"
 import { GlobalClientComponents } from "@/components/providers/global-client-components"
 import { UserPresenceFetcher } from "@/components/providers/user-presence-fetcher"
-
+import { NotificationSoundProvider } from "@/components/providers/notification-sound-provider"
 import { IdleProvider } from "@/components/providers/idle-provider"
 
 interface ClientProvidersProps {
@@ -23,6 +23,7 @@ export function ClientProviders({ children }: ClientProvidersProps) {
       disableTransitionOnChange
     >
       <ErrorBoundary>
+        <NotificationSoundProvider />
         <IdleProvider>
           <LanguageProvider>
             <BranchProvider>

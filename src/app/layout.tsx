@@ -2,7 +2,6 @@ import type { Metadata } from "next";
 import { Outfit, Prompt } from "next/font/google";
 import "./globals.css";
 import { ClientProviders } from "@/components/providers/client-providers";
-import { NotificationSoundProvider } from "@/components/providers/notification-sound-provider";
 
 const outfit = Outfit({
   variable: "--font-outfit",
@@ -47,7 +46,6 @@ export default function RootLayout({
         className={`${outfit.variable} ${prompt.variable} font-sans antialiased`}
         suppressHydrationWarning
       >
-        <NotificationSoundProvider />
         <ClientProviders>
           {children}
         </ClientProviders>
