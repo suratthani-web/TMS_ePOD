@@ -183,12 +183,20 @@ export async function loginDriver(formData: FormData) {
     permissions: userPermissions
   }
 
-  const { cookies: cookieStore } = await getCookieStore()
+  const { cookies: cookieStore, headers: headersStore } = await getCookieStore()
   const expires = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000) // Extend to 30 days for better experience
+
+  let isSecure = true
+  try {
+    const proto = headersStore.get('x-forwarded-proto')
+    if (proto) {
+      isSecure = proto.toLowerCase() === 'https'
+    }
+  } catch (err) {}
 
   cookieStore.set("driver_session", JSON.stringify(sessionData), {
     httpOnly: true,
-    secure: true,
+    secure: isSecure,
     expires,
     maxAge: 30 * 24 * 60 * 60,
     sameSite: "lax",
@@ -251,12 +259,20 @@ export async function loginWithQRToken(token: string) {
           role: "driver",
       }
 
-      const { cookies: cookieStore } = await getCookieStore()
+      const { cookies: cookieStore, headers: headersStore } = await getCookieStore()
       const expires = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000)
+
+      let isSecure = true
+      try {
+          const proto = headersStore.get('x-forwarded-proto')
+          if (proto) {
+              isSecure = proto.toLowerCase() === 'https'
+          }
+      } catch (err) {}
 
       cookieStore.set("driver_session", JSON.stringify(sessionData), {
           httpOnly: true,
-          secure: true,
+          secure: isSecure,
           expires,
           maxAge: 30 * 24 * 60 * 60,
           sameSite: "lax",
@@ -293,12 +309,20 @@ export async function recoverDriverSession(driverId: string) {
         role: "driver",
     }
 
-    const { cookies: cookieStore } = await getCookieStore()
+    const { cookies: cookieStore, headers: headersStore } = await getCookieStore()
     const expires = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000)
+
+    let isSecure = true
+    try {
+        const proto = headersStore.get('x-forwarded-proto')
+        if (proto) {
+            isSecure = proto.toLowerCase() === 'https'
+        }
+    } catch (err) {}
 
     cookieStore.set("driver_session", JSON.stringify(sessionData), {
         httpOnly: true,
-        secure: true,
+        secure: isSecure,
         expires,
         maxAge: 30 * 24 * 60 * 60,
         sameSite: "lax",

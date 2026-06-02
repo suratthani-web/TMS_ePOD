@@ -7,7 +7,7 @@ import {
   verifyAuthenticationResponse
 } from '@simplewebauthn/server'
 import { createAdminClient } from "@/utils/supabase/server"
-import { cookies } from "next/headers"
+import { cookies, headers } from "next/headers"
 import { getDriverSession } from "./auth-actions"
 
 // In a real production app, RP_ID should be your domain
@@ -49,7 +49,15 @@ export async function getPasskeyRegistrationOptions() {
 
   // Store challenge in a cookie or session to verify in Phase 2
   const cookieStore = await cookies()
-  cookieStore.set('registration_challenge', options.challenge, { httpOnly: true, secure: true })
+  let isSecure = true
+  try {
+    const headersList = await headers()
+    const proto = headersList.get('x-forwarded-proto')
+    if (proto) {
+      isSecure = proto.toLowerCase() === 'https'
+    }
+  } catch (err) {}
+  cookieStore.set('registration_challenge', options.challenge, { httpOnly: true, secure: isSecure })
 
   return options
 }
@@ -125,8 +133,16 @@ export async function getPasskeyAuthenticationOptions(identifier: string) {
   })
 
   const cookieStore = await cookies()
-  cookieStore.set('auth_challenge', options.challenge, { httpOnly: true, secure: true })
-  cookieStore.set('auth_driver_id', driver.Driver_ID, { httpOnly: true, secure: true })
+  let isSecure = true
+  try {
+    const headersList = await headers()
+    const proto = headersList.get('x-forwarded-proto')
+    if (proto) {
+      isSecure = proto.toLowerCase() === 'https'
+    }
+  } catch (err) {}
+  cookieStore.set('auth_challenge', options.challenge, { httpOnly: true, secure: isSecure })
+  cookieStore.set('auth_driver_id', driver.Driver_ID, { httpOnly: true, secure: isSecure })
 
   return options
 }
@@ -182,9 +198,17 @@ export async function verifyPasskeyLogin(body: any) {
     }
     
     const expires = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000)
+    let isSecure = process.env.NODE_ENV === "production"
+    try {
+      const headersList = await headers()
+      const proto = headersList.get('x-forwarded-proto')
+      if (proto) {
+        isSecure = proto.toLowerCase() === 'https'
+      }
+    } catch (err) {}
     cookieStore.set("driver_session", JSON.stringify(sessionData), { 
       httpOnly: true, 
-      secure: process.env.NODE_ENV === "production",
+      secure: isSecure,
       expires,
       maxAge: 7 * 24 * 60 * 60,
       sameSite: "lax",

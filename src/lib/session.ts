@@ -1,6 +1,6 @@
 import 'server-only'
 import { SignJWT, jwtVerify } from 'jose'
-import { cookies } from 'next/headers'
+import { cookies, headers } from 'next/headers'
 
 // Use exactly the same logic as middleware
 const secretKey = process.env.SESSION_SECRET || 'default_secret_key_change_me_in_production'
@@ -55,9 +55,21 @@ export async function createSession(
   
   const cookieStore = await cookies()
 
+  // Dynamically determine secure status from protocol header
+  let isSecure = process.env.NODE_ENV === 'production'
+  try {
+    const headersList = await headers()
+    const proto = headersList.get('x-forwarded-proto')
+    if (proto) {
+      isSecure = proto.toLowerCase() === 'https'
+    }
+  } catch (err) {
+    // Graceful fallback if headers() is called outside request context
+  }
+
   cookieStore.set('session', session, {
     httpOnly: true,
-    secure: process.env.NODE_ENV === 'production',
+    secure: isSecure,
     sameSite: 'lax',
     path: '/',
   })
