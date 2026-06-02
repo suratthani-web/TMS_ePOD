@@ -60,7 +60,7 @@ const item = {
 }
 
 export function DashboardClient({ session, currentJob, activeJobs = [], gamification, todayIncome }: Omit<DashboardClientProps, 'stats'>) {
-    const supabase = createClient()
+    const supabase = useMemo(() => createClient(), [])
     const [mounted, setMounted] = useState(false)
 
     useEffect(() => {

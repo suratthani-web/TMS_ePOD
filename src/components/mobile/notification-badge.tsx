@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useMemo } from "react"
 import { Bell } from "lucide-react"
 import Link from "next/link"
 import { RealtimeChannel } from "@supabase/supabase-js"
@@ -9,7 +9,7 @@ import { createClient } from "@/utils/supabase/client"
 
 export function MobileNotificationBadge() {
   const [hasUnread, setHasUnread] = useState(false)
-  const supabase = createClient()
+  const supabase = useMemo(() => createClient(), [])
 
   useEffect(() => {
     let channel: RealtimeChannel | null = null
@@ -53,7 +53,7 @@ export function MobileNotificationBadge() {
       isMounted = false
       if (channel) supabase.removeChannel(channel) 
     }
-  }, [supabase])
+  }, [])
 
   return (
     <Link href="/mobile/notifications" className="text-muted-foreground hover:text-foreground relative transition-colors">

@@ -1,7 +1,7 @@
 "use client"
 
 import { useState } from "react"
-import { useRouter, useSearchParams, usePathname } from "next/navigation"
+import { useRouter, usePathname } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -15,35 +15,37 @@ import {
 } from "@/components/ui/sheet"
 import { Filter, Calendar } from "lucide-react"
 
-export function MobileJobFilter() {
+export function MobileJobFilter({ searchParams }: { searchParams: any }) {
   const router = useRouter()
   const pathname = usePathname()
-  const searchParams = useSearchParams()
-
-  const [date, setDate] = useState(searchParams.get("date") || "")
-  const [status, setStatus] = useState(searchParams.get("status") || "All")
+ 
+  const [dateFrom, setDateFrom] = useState((searchParams?.dateFrom as string) || "")
+  const [dateTo, setDateTo] = useState((searchParams?.dateTo as string) || "")
+  const [status, setStatus] = useState((searchParams?.status as string) || "All")
   const [isOpen, setIsOpen] = useState(false)
-
+ 
   // Apply filters
   const handleApply = () => {
     const params = new URLSearchParams()
-    if (date) params.set("date", date)
+    if (dateFrom) params.set("dateFrom", dateFrom)
+    if (dateTo) params.set("dateTo", dateTo)
     if (status && status !== "All") params.set("status", status)
     
     router.replace(`${pathname}?${params.toString()}`)
     setIsOpen(false)
   }
-
+ 
   // Clear filters
   const handleClear = () => {
-    setDate("")
+    setDateFrom("")
+    setDateTo("")
     setStatus("All")
     router.replace(pathname)
     setIsOpen(false)
   }
-
-  const activeFilterCount = (date ? 1 : 0) + (status !== "All" ? 1 : 0)
-
+ 
+  const activeFilterCount = ((dateFrom || dateTo) ? 1 : 0) + (status !== "All" ? 1 : 0)
+ 
   return (
     <Sheet open={isOpen} onOpenChange={setIsOpen}>
       <SheetTrigger asChild>
@@ -79,37 +81,66 @@ export function MobileJobFilter() {
             {/* Date Filter & Presets */}
             <div className="space-y-4">
                 <div className="flex justify-between items-end">
-                    <Label htmlFor="date" className="text-muted-foreground font-black text-xs uppercase tracking-widest">วันที่</Label>
+                    <Label className="text-muted-foreground font-black text-xs uppercase tracking-widest">ช่วงวันที่</Label>
                     <div className="flex gap-2">
                         <button 
                             type="button" 
-                            onClick={() => setDate(new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Bangkok' }))}
+                            onClick={() => {
+                                const todayStr = new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Bangkok' })
+                                setDateFrom(todayStr)
+                                setDateTo(todayStr)
+                            }}
                             className="text-[10px] px-2 py-1 bg-muted hover:bg-muted/80 text-foreground rounded-md font-bold uppercase transition-colors"
                         >วันนี้</button>
                         <button 
                             type="button" 
                             onClick={() => {
                                 const d = new Date(); d.setDate(d.getDate() + 1);
-                                setDate(d.toLocaleDateString('en-CA', { timeZone: 'Asia/Bangkok' }));
+                                const tomStr = d.toLocaleDateString('en-CA', { timeZone: 'Asia/Bangkok' })
+                                setDateFrom(tomStr)
+                                setDateTo(tomStr)
                             }}
                             className="text-[10px] px-2 py-1 bg-muted hover:bg-muted/80 text-foreground rounded-md font-bold uppercase transition-colors"
                         >พรุ่งนี้</button>
                         <button 
                             type="button" 
-                            onClick={() => setDate("")}
+                            onClick={() => {
+                                setDateFrom("")
+                                setDateTo("")
+                            }}
                             className="text-[10px] px-2 py-1 bg-primary/10 text-primary rounded-md font-bold uppercase hover:bg-primary/20 transition-colors"
                         >ทั้งหมด</button>
                     </div>
                 </div>
-                <div className="relative">
-                    <Input 
-                        id="date" 
-                        type="date" 
-                        value={date}
-                        onChange={(e) => setDate(e.target.value)}
-                        className="bg-muted/50 border-border text-foreground pl-10 h-12 rounded-xl focus-visible:ring-primary/20"
-                    />
-                    <Calendar className="absolute left-3 top-3.5 text-muted-foreground" size={18} />
+                
+                <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                        <Label htmlFor="dateFrom" className="text-muted-foreground text-[10px] font-bold uppercase tracking-wider">เริ่มต้น</Label>
+                        <div className="relative">
+                            <Input 
+                                id="dateFrom" 
+                                type="date" 
+                                value={dateFrom}
+                                onChange={(e) => setDateFrom(e.target.value)}
+                                className="bg-muted/50 border-border text-foreground pl-10 h-12 rounded-xl focus-visible:ring-primary/20 text-xs font-bold"
+                            />
+                            <Calendar className="absolute left-3 top-3.5 text-muted-foreground" size={14} />
+                        </div>
+                    </div>
+                    
+                    <div className="space-y-2">
+                        <Label htmlFor="dateTo" className="text-muted-foreground text-[10px] font-bold uppercase tracking-wider">สิ้นสุด</Label>
+                        <div className="relative">
+                            <Input 
+                                id="dateTo" 
+                                type="date" 
+                                value={dateTo}
+                                onChange={(e) => setDateTo(e.target.value)}
+                                className="bg-muted/50 border-border text-foreground pl-10 h-12 rounded-xl focus-visible:ring-primary/20 text-xs font-bold"
+                            />
+                            <Calendar className="absolute left-3 top-3.5 text-muted-foreground" size={14} />
+                        </div>
+                    </div>
                 </div>
             </div>
  

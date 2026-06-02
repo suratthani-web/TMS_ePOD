@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useRef, useEffect } from "react"
+import { useState, useRef, useEffect, useMemo } from "react"
 import { useRouter } from "next/navigation"
 import { toast } from "sonner"
 import { MobileHeader } from "@/components/mobile/mobile-header"
@@ -24,7 +24,7 @@ export default function MobileChatPage() {
   const scrollRef = useRef<HTMLDivElement>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
   const cameraInputRef = useRef<HTMLInputElement>(null)
-  const supabase = createClient()
+  const supabase = useMemo(() => createClient(), [])
 
   // 1. Init Session & Load History
   useEffect(() => {
@@ -128,7 +128,7 @@ export default function MobileChatPage() {
             if (channel) supabase.removeChannel(channel)
         })
     }
-  }, [driverId, supabase])
+  }, [driverId])
 
   // 3. Auto Scroll
   useEffect(() => {

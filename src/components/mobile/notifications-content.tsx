@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useMemo } from "react"
 import { useRouter } from "next/navigation"
 import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -16,7 +16,7 @@ interface NotificationsContentProps {
 export function NotificationsContent({ notifications: initialNotifications, driverId }: NotificationsContentProps) {
   const router = useRouter()
   const [notifications, setNotifications] = useState(initialNotifications)
-  const supabase = createClient()
+  const supabase = useMemo(() => createClient(), [])
 
   useEffect(() => {
     const channel = supabase.channel('mobile-notifications-list')
@@ -34,7 +34,7 @@ export function NotificationsContent({ notifications: initialNotifications, driv
       .subscribe()
 
     return () => { supabase.removeChannel(channel) }
-  }, [driverId, supabase])
+  }, [driverId])
 
   const getIcon = (type: string) => {
     switch (type) {

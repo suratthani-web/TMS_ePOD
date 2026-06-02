@@ -19,16 +19,14 @@ type Props = {
 }
 
 async function JobsContent({ driverId, searchParams }: { driverId: string, searchParams: any }) {
-  const date = (searchParams.date as string) || undefined
+  const dateFrom = (searchParams.dateFrom as string) || undefined
+  const dateTo = (searchParams.dateTo as string) || undefined
   const status = (searchParams.status as string) || undefined
 
   const today = new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Bangkok' })
-  const tomorrow = new Date();
-  tomorrow.setDate(tomorrow.getDate() + 1);
-  const tomorrowStr = tomorrow.toLocaleDateString('en-CA', { timeZone: 'Asia/Bangkok' });
 
   // Fetch jobs for this driver with filters
-  const jobs = await getDriverJobs(driverId, { startDate: date, endDate: date, status })
+  const jobs = await getDriverJobs(driverId, { startDate: dateFrom, endDate: dateTo, status })
 
   // Scalability: Hide old completed/cancelled jobs from default view
   let displayJobs = jobs
@@ -36,8 +34,8 @@ async function JobsContent({ driverId, searchParams }: { driverId: string, searc
       displayJobs = jobs.filter(j => {
           // Keep active jobs regardless of date
           if (j.Job_Status !== 'Completed' && j.Job_Status !== 'Cancelled') return true;
-          // Keep completed jobs ONLY if it is explicitly the date filtered, or it's today/future
-          if (date) return true; 
+          // Keep completed jobs ONLY if a date filter was explicitly selected, or it's today/future
+          if (dateFrom || dateTo) return true; 
           return j.Plan_Date && j.Plan_Date >= today
       })
   }
@@ -76,7 +74,7 @@ export default async function DriverJobsPage(props: Props) {
       <div className="absolute top-0 right-[-10%] w-[600px] h-[600px] bg-primary/5 rounded-full blur-[140px] -translate-y-1/2 pointer-events-none" />
       <div className="absolute bottom-0 left-[-10%] w-[400px] h-[400px] bg-accent/5 rounded-full blur-[120px] pointer-events-none" />
       
-      <MobileHeader title="Management" rightElement={<MobileJobFilter />} />
+      <MobileHeader title="Management" rightElement={<MobileJobFilter searchParams={searchParams} />} />
       
       <Suspense fallback={<JobsLoading />}>
           <JobsContent driverId={session.driverId} searchParams={searchParams} />

@@ -187,7 +187,7 @@ export async function getActiveDrivers() {
         return []
     }
 
-    const { data, error } = await queryBuilder.limit(10)
+    const { data, error } = await queryBuilder.limit(1000)
     
     if (error) return []
     return data || []

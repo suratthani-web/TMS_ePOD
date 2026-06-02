@@ -31,6 +31,11 @@ function StaffLoginContent() {
         setErrorMessage(result.error)
       }
     } catch (e: any) {
+      // If Next.js threw a NEXT_REDIRECT error, we must rethrow it
+      // so Next.js router can perform the server-side redirection successfully.
+      if (e.message === "NEXT_REDIRECT" || e.message?.includes("NEXT_REDIRECT")) {
+        throw e
+      }
       setErrorMessage(e.message || "เกิดข้อผิดพลาด")
     } finally {
       setIsPending(false)

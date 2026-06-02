@@ -7,7 +7,7 @@ export const dynamic = 'force-dynamic'
 
 type Props = {
   params: Promise<{ id: string }>
-  searchParams: Promise<{ success?: string }>
+  searchParams: Promise<{ success?: string; tab?: string }>
 }
 
 export default async function JobDetailPage(props: Props) {
@@ -29,7 +29,9 @@ export default async function JobDetailPage(props: Props) {
     )
   }
 
+  const initialTab = (searchParams.tab as string) || 'mission';
+  
   return (
-    <JobDetailClient job={job} success={success} />
+    <JobDetailClient job={job} success={success} initialTab={initialTab} />
   )
 }

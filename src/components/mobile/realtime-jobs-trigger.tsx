@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useRef } from "react"
+import { useEffect, useRef, useMemo } from "react"
 import { createClient } from "@/utils/supabase/client"
 import { useRouter } from "next/navigation"
 
@@ -8,7 +8,7 @@ const REFRESH_THROTTLE = 10000 // 10 seconds
 
 export function RealtimeJobsTrigger({ driverId }: { driverId: string }) {
     const router = useRouter()
-    const supabase = createClient()
+    const supabase = useMemo(() => createClient(), [])
     const lastRefreshRef = useRef(0)
 
     useEffect(() => {
@@ -52,7 +52,7 @@ export function RealtimeJobsTrigger({ driverId }: { driverId: string }) {
         return () => {
             supabase.removeChannel(channel)
         }
-    }, [driverId, router, supabase])
+    }, [driverId, router])
 
     return null
 }

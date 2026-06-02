@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { useSearchParams, useRouter, usePathname } from "next/navigation"
+import { useRouter, usePathname } from "next/navigation"
 import { motion, AnimatePresence } from "framer-motion"
 import { MobileHeader } from "@/components/mobile/mobile-header"
 import { 
@@ -21,30 +21,32 @@ import { parseISO, isAfter, startOfDay } from "date-fns"
 interface JobDetailClientProps {
     job: Job
     success?: string
+    initialTab?: string
 }
 
-export function JobDetailClient({ job, success }: JobDetailClientProps) {
-    const searchParams = useSearchParams()
+export function JobDetailClient({ job, success, initialTab = 'mission' }: JobDetailClientProps) {
     const router = useRouter()
     const pathname = usePathname()
     
     // Sync tab with URL to prevent "bounce" on refresh
-    const initialTab = (searchParams.get('tab') as 'mission' | 'info') || 'mission'
-    const [activeTab, setActiveTab] = useState<'mission' | 'info'>(initialTab)
+    const [activeTab, setActiveTab] = useState<'mission' | 'info'>(initialTab as 'mission' | 'info')
     const [mounted, setMounted] = useState(false)
 
     useEffect(() => {
         setMounted(true)
-        // Sync state if URL changes externally
-        const tab = searchParams.get('tab') as 'mission' | 'info'
-        if (tab && tab !== activeTab) {
-            setActiveTab(tab)
+        if (typeof window !== "undefined") {
+            const params = new URLSearchParams(window.location.search)
+            const tab = params.get('tab') as 'mission' | 'info'
+            if (tab && tab !== activeTab) {
+                setActiveTab(tab)
+            }
         }
-    }, [searchParams, activeTab])
+    }, [activeTab])
 
     const handleTabChange = (tab: 'mission' | 'info') => {
         setActiveTab(tab)
-        const params = new URLSearchParams(searchParams.toString())
+        const search = typeof window !== "undefined" ? window.location.search : ""
+        const params = new URLSearchParams(search)
         params.set('tab', tab)
         router.replace(`${pathname}?${params.toString()}`, { scroll: false })
     }

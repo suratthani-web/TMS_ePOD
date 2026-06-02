@@ -467,7 +467,7 @@ export async function getDriverJobs(
     
     let query = supabase
       .from('Jobs_Main')
-      .select('Job_ID, Customer_Name, Job_Status, Pickup_Date, Delivery_Date, Plan_Date, Plan_Time, Origin_Location, Dest_Location, Route_Name, Show_Price_To_Driver, Cost_Driver_Total, Total_Drop, Signature_Url, Photo_Proof_Url')
+      .select('Job_ID, Customer_Name, Job_Status, Pickup_Date:Plan_Date, Delivery_Date, Plan_Date, Origin_Location, Dest_Location, Route_Name, Show_Price_To_Driver, Cost_Driver_Total, Total_Drop, Signature_Url, Photo_Proof_Url')
       .eq('Driver_ID', driverId)
 
     // Filter out drafts - driver shouldn't see them yet
@@ -939,11 +939,15 @@ export async function getJobsForBilling(
         const branchId = await getUserBranchId()
         const sessionCustomerId = await getCustomerId()
         const customerId = explicitCustomerId || sessionCustomerId
-        const supabase = (isSuper || isRegularAdmin || customerId) ? await createAdminClient() : await createClient()
+        
+        // Billing, invoicing, and payout registries are highly privileged, administrative actions.
+        // We always utilize createAdminClient() to guarantee 100% data fidelity and bypass RLS column limits,
+        // while strictly enforcing branch-level isolation programmatically below.
+        const supabase = createAdminClient()
 
         let dbQuery = supabase
             .from('Jobs_Main')
-            .select('Job_ID, Job_Status, Plan_Date, Customer_ID, Customer_Name, Route_Name, Vehicle_Plate, Vehicle_Type, Origin_Location, Dest_Location, Price_Cust_Total, Price_Per_Unit, Loaded_Qty, Created_At, Branch_ID')
+            .select('Job_ID, Job_Status, Plan_Date, Customer_ID, Customer_Name, Route_Name, Vehicle_Plate, Vehicle_Type, Origin_Location, Dest_Location, Price_Cust_Total, Price_Per_Unit, Loaded_Qty, Created_At, Branch_ID, Driver_ID, Driver_Name, Cost_Driver_Total, extra_costs_json, Driver_Payment_ID, Billing_Note_ID, Invoice_ID')
             .in('Job_Status', ['Completed', 'Delivered'])
         
         if (mode === 'driver') {

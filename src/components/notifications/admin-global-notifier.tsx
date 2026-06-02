@@ -33,6 +33,8 @@ export function AdminGlobalNotifier({ branchId, isAdmin }: AdminGlobalNotifierPr
   const notifiedIds = useRef<Set<string>>(new Set())
 
   useEffect(() => {
+    if (!isAdmin) return
+
     const supabase = createClient()
 
     // Helper to play sound

@@ -1,7 +1,7 @@
 "use client"
 
-import { useState, useEffect, Suspense } from "react"
-import { useRouter, useSearchParams } from "next/navigation"
+import { useState, useEffect } from "react"
+import { useRouter } from "next/navigation"
 import { Lock, User, Shield, Phone, Headphones } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -18,31 +18,29 @@ import { useLanguage } from "@/components/providers/language-provider"
 import { cn } from "@/lib/utils"
 import Image from "next/image"
 
-function DriverLoginContent() {
+export default function DriverLoginPage() {
   const { t } = useLanguage()
   const router = useRouter()
-  const searchParams = useSearchParams()
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState("")
   const [isForgotOpen, setIsForgotOpen] = useState(false)
   const [identifier, setIdentifier] = useState("")
 
-  const urlError = searchParams.get("error")
-
   useEffect(() => {
-    if (!urlError) return
-
-    const timer = setTimeout(() => {
-      if (urlError === 'session_missing') {
-        setError("กรุณาเข้าสู่ระบบก่อนใช้งาน")
-      } else if (urlError === 'session_invalid') {
-        setError("เซสชันหมดอายุ กรุณาเข้าสู่ระบบใหม่")
-      } else {
-        setError(urlError)
+    if (typeof window !== "undefined") {
+      const params = new URLSearchParams(window.location.search)
+      const urlError = params.get("error")
+      if (urlError) {
+        if (urlError === 'session_missing') {
+          setError("กรุณาเข้าสู่ระบบก่อนใช้งาน")
+        } else if (urlError === 'session_invalid') {
+          setError("เซสชันหมดอายุ กรุณาเข้าสู่ระบบใหม่")
+        } else {
+          setError(urlError)
+        }
       }
-    }, 0)
-    return () => clearTimeout(timer)
-  }, [urlError])
+    }
+  }, [])
 
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault()
@@ -224,15 +222,4 @@ function DriverLoginContent() {
   )
 }
 
-export default function DriverLoginPage() {
-  return (
-    <Suspense fallback={
-      <div className="min-h-screen bg-background flex items-center justify-center p-6">
-        <div className="w-16 h-16 border-4 border-primary/30 border-t-primary rounded-full animate-spin" />
-      </div>
-    }>
-      <DriverLoginContent />
-    </Suspense>
-  )
-}
 

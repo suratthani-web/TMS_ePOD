@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useMemo } from "react"
 import { motion } from "framer-motion"
 import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -31,7 +31,7 @@ export type JobBid = {
 
 export function MarketplaceClient({ initialJobs, driverId, driverName }: MarketplaceClientProps) {
     const router = useRouter()
-    const supabase = createClient()
+    const supabase = useMemo(() => createClient(), [])
     const [jobs] = useState<Job[]>(initialJobs)
     const [biddingJob, setBiddingJob] = useState<string | null>(null)
     const [bidAmount, setBidAmount] = useState("")
@@ -73,7 +73,7 @@ export function MarketplaceClient({ initialJobs, driverId, driverName }: Marketp
             .subscribe()
 
         return () => { supabase.removeChannel(channel) }
-    }, [router, supabase])
+    }, [router])
 
     // Check if missing driver details
     if (!driverId) {
