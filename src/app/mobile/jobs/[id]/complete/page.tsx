@@ -84,11 +84,15 @@ export default function JobCompletePage() {
     const handleSubmit = async () => {
     // Explicit Validation Feedback
     if (photos.length === 0) {
-        toast.error(isContainer ? "กรุณาถ่ายรูปใบ EIR (ขาเข้า/คืนตู้)" : "กรุณาถ่ายรูปสินค้าอย่างน้อย 1 รูป")
+        toast.error(isContainer ? "กรุณาถ่ายรูปใบ EIR" : "กรุณาถ่ายรูปสินค้า", {
+            description: "กรุณาถ่ายรูปหลักฐานอย่างน้อย 1 รูป"
+        })
         return
     }
     if (!signature) {
-        toast.error(isContainer ? "กรุณาลงลายเซ็นเจ้าหน้าที่ลานตู้" : "กรุณาลงลายเซ็นผู้รับสินค้า")
+        toast.error("กรุณาลงลายเซ็น", {
+            description: isContainer ? "กรุณาลงลายเซ็นเจ้าหน้าที่ลานตู้" : "กรุณาลงลายเซ็นผู้รับสินค้า"
+        })
         return
     }
 
@@ -322,11 +326,8 @@ export default function JobCompletePage() {
         <div className="space-y-3">
             <Button 
                 onClick={handleSubmit}
-                className={`w-full h-14 font-black text-lg shadow-xl transition-all duration-500 rounded-2xl ${
-                    photos.length > 0 && signature 
-                        ? "bg-gradient-to-r from-blue-600 via-indigo-600 to-blue-700 shadow-blue-500/30 text-white translate-y-0 active:scale-95" 
-                        : "bg-slate-800 text-muted-foreground opacity-70 grayscale translate-y-1"
-                }`}
+                disabled={loading}
+                className="w-full h-16 bg-gradient-to-r from-blue-600 via-indigo-600 to-blue-700 shadow-blue-500/30 text-white font-black text-lg shadow-xl transition-all duration-300 rounded-2xl active:scale-95"
             >
                 {isContainer ? "ยืนยันการคืนตู้" : "ยืนยันการส่งงาน"}
             </Button>

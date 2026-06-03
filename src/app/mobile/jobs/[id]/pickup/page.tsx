@@ -309,7 +309,7 @@ export default function JobPickupPage() {
             )}
         </div>
 
-        <div className="fixed bottom-0 left-0 right-0 p-5 bg-background/80 backdrop-blur-xl border-t border-border/50 z-50">
+        <div className="p-5 bg-background mt-8">
             <Button 
                 onClick={handleSubmit}
                 disabled={loading}
