@@ -217,6 +217,10 @@ export function JobDialog({
     lfd_demurrage: (job as any)?.container?.lfd_demurrage || '',
     lfd_detention: (job as any)?.container?.lfd_detention || '',
     target_temperature: (job as any)?.container?.target_temperature || '',
+    booking_no: (job as any)?.container?.booking_no || '',
+    container_subtype: (job as any)?.container?.container_subtype || 'import',
+    pickup_empty_date: (job as any)?.container?.pickup_empty_date || '',
+    port_closing_datetime: (job as any)?.container?.port_closing_datetime ? (job as any).container.port_closing_datetime.slice(0, 16) : '',
   })
 
   // Multi-point origins
@@ -1379,7 +1383,50 @@ export function JobDialog({
           {/* Tab: ตู้คอนเทนเนอร์ */}
           {activeTab === 'container' && (
             <div className="space-y-8 animate-in fade-in slide-in-from-right-4 duration-500">
+                {/* Import / Export Selection */}
+                <div className="space-y-2 mb-6">
+                    <Label className="text-xl font-black text-primary/80 uppercase tracking-normal">ประเภทงานตู้ (Sub Type)</Label>
+                    <div className="flex p-1 bg-muted rounded-xl border border-border h-14">
+                        <button
+                            type="button"
+                            onClick={() => setFormData({ ...formData, container_subtype: 'import' })}
+                            className={cn(
+                                "flex-1 rounded-lg text-lg font-black transition-all",
+                                formData.container_subtype === 'import' || !formData.container_subtype
+                                    ? "bg-background text-primary shadow-sm" 
+                                    : "text-muted-foreground hover:bg-background/50"
+                            )}
+                        >
+                            นำเข้า (Import)
+                        </button>
+                        <button
+                            type="button"
+                            onClick={() => setFormData({ ...formData, container_subtype: 'export' })}
+                            className={cn(
+                                "flex-1 rounded-lg text-lg font-black transition-all",
+                                formData.container_subtype === 'export' 
+                                    ? "bg-background text-primary shadow-sm" 
+                                    : "text-muted-foreground hover:bg-background/50"
+                            )}
+                        >
+                            ส่งออก (Export)
+                        </button>
+                    </div>
+                </div>
+
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-10">
+                    <div className="space-y-4">
+                        <Label className="text-primary text-xl font-black uppercase tracking-tight flex items-center gap-2">
+                            <FileText className="w-5 h-5" /> เลข Booking (Booking No.) <span className="text-destructive">*</span>
+                        </Label>
+                        <Input
+                            value={formData.booking_no}
+                            onChange={(e) => setFormData({ ...formData, booking_no: e.target.value.toUpperCase() })}
+                            placeholder="e.g. BKG1234567"
+                            className="bg-background border-input text-xl h-14 font-black"
+                            required={formData.job_type === 'container'}
+                        />
+                    </div>
                     <div className="space-y-4">
                         <Label className="text-primary text-xl font-black uppercase tracking-tight flex items-center gap-2">
                             <Package className="w-5 h-5" /> {t('container.form.container_no')}
@@ -1391,6 +1438,9 @@ export function JobDialog({
                             className="bg-background border-input text-xl h-14 font-black"
                         />
                     </div>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-10">
                     <div className="space-y-4">
                         <Label className="text-indigo-400 text-xl font-black uppercase tracking-tight flex items-center gap-2">
                             <ShieldCheck className="w-5 h-5" /> {t('container.form.seal_no')}
@@ -1402,9 +1452,6 @@ export function JobDialog({
                             className="bg-background border-input text-xl h-14 font-black"
                         />
                     </div>
-                </div>
-
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-10">
                     <div className="space-y-4">
                         <Label className="text-xl font-black uppercase tracking-tight">{t('container.form.container_size')}</Label>
                         <Select 
@@ -1431,15 +1478,16 @@ export function JobDialog({
                             className="bg-background border-input text-xl h-14"
                         />
                     </div>
-                    <div className="space-y-4">
-                        <Label className="text-xl font-black uppercase tracking-tight">{t('container.form.vessel_voyage')}</Label>
-                        <Input
-                            value={formData.vessel_voyage}
-                            onChange={(e) => setFormData({ ...formData, vessel_voyage: e.target.value })}
-                            placeholder="e.g. EVER GIVEN V.001"
-                            className="bg-background border-input text-xl h-14"
-                        />
-                    </div>
+                </div>
+
+                <div className="space-y-4">
+                    <Label className="text-xl font-black uppercase tracking-tight">{t('container.form.vessel_voyage')}</Label>
+                    <Input
+                        value={formData.vessel_voyage}
+                        onChange={(e) => setFormData({ ...formData, vessel_voyage: e.target.value })}
+                        placeholder="e.g. EVER GIVEN V.001"
+                        className="bg-background border-input text-xl h-14"
+                    />
                 </div>
 
                 {formData.container_size === 'REEFER' && (
@@ -1465,30 +1513,59 @@ export function JobDialog({
                     </div>
                 )}
 
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-10 p-6 bg-amber-500/5 border border-amber-500/20 rounded-2xl">
-                    <div className="space-y-4">
-                        <Label className="text-amber-600 text-xl font-black uppercase tracking-tight flex items-center gap-2">
-                            <AlertTriangle className="w-5 h-5" /> {t('container.form.lfd_demurrage')}
-                        </Label>
-                        <Input
-                            type="date"
-                            value={formData.lfd_demurrage}
-                            onChange={(e) => setFormData({ ...formData, lfd_demurrage: e.target.value })}
-                            className="bg-background border-amber-500/30 text-xl h-14"
-                        />
+                {/* Conditional Time Logistics based on Import vs Export */}
+                {(formData.container_subtype === 'import' || !formData.container_subtype) ? (
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-10 p-6 bg-amber-500/5 border border-amber-500/20 rounded-2xl">
+                        <div className="space-y-4">
+                            <Label className="text-amber-600 text-xl font-black uppercase tracking-tight flex items-center gap-2">
+                                <AlertTriangle className="w-5 h-5" /> {t('container.form.lfd_demurrage')} (ลานท่าเรือ)
+                            </Label>
+                            <Input
+                                type="date"
+                                value={formData.lfd_demurrage}
+                                onChange={(e) => setFormData({ ...formData, lfd_demurrage: e.target.value })}
+                                className="bg-background border-amber-500/30 text-xl h-14"
+                            />
+                        </div>
+                        <div className="space-y-4">
+                            <Label className="text-amber-600 text-xl font-black uppercase tracking-tight flex items-center gap-2">
+                                <AlertTriangle className="w-5 h-5" /> {t('container.form.lfd_detention')} (ลานคืนตู้)
+                            </Label>
+                            <Input
+                                type="date"
+                                value={formData.lfd_detention}
+                                onChange={(e) => setFormData({ ...formData, lfd_detention: e.target.value })}
+                                className="bg-background border-amber-500/30 text-xl h-14"
+                            />
+                        </div>
                     </div>
-                    <div className="space-y-4">
-                        <Label className="text-amber-600 text-xl font-black uppercase tracking-tight flex items-center gap-2">
-                            <AlertTriangle className="w-5 h-5" /> {t('container.form.lfd_detention')}
-                        </Label>
-                        <Input
-                            type="date"
-                            value={formData.lfd_detention}
-                            onChange={(e) => setFormData({ ...formData, lfd_detention: e.target.value })}
-                            className="bg-background border-amber-500/30 text-xl h-14"
-                        />
+                ) : (
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-10 p-6 bg-emerald-500/5 border border-emerald-500/20 rounded-2xl">
+                        <div className="space-y-4">
+                            <Label className="text-emerald-600 text-xl font-black uppercase tracking-tight flex items-center gap-2">
+                                <Calendar className="w-5 h-5" /> วันเริ่มรับตู้เปล่า (Pickup Empty)
+                            </Label>
+                            <Input
+                                type="date"
+                                value={formData.pickup_empty_date}
+                                onChange={(e) => setFormData({ ...formData, pickup_empty_date: e.target.value })}
+                                className="bg-background border-emerald-500/30 text-xl h-14"
+                            />
+                        </div>
+                        <div className="space-y-4">
+                            <Label className="text-rose-600 text-xl font-black uppercase tracking-tight flex items-center gap-2">
+                                <AlertTriangle className="w-5 h-5" /> กำหนดปิดรับตู้ (Port Closing) <span className="text-destructive">*</span>
+                            </Label>
+                            <Input
+                                type="datetime-local"
+                                value={formData.port_closing_datetime}
+                                onChange={(e) => setFormData({ ...formData, port_closing_datetime: e.target.value })}
+                                className="bg-background border-rose-500/30 text-rose-600 text-xl h-14"
+                                required={formData.job_type === 'container' && formData.container_subtype === 'export'}
+                            />
+                        </div>
                     </div>
-                </div>
+                )}
 
                 <div className="space-y-4">
                     <Label className="text-primary text-xl font-black uppercase tracking-tight">ทะเบียนหางลาก (Chassis Plate)</Label>

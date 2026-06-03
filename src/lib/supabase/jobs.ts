@@ -98,6 +98,10 @@ export type Job = {
     eir_gate_out_url: string | null
     container_condition_json: any
     target_temperature?: number | null
+    booking_no?: string | null
+    container_subtype?: string | null
+    pickup_empty_date?: string | null
+    port_closing_datetime?: string | null
   } | null
   Billing_Notes?: {
     Status: string

@@ -166,8 +166,16 @@ export function JobDetailClient({ job, success, initialTab = 'mission' }: JobDet
                     <div className="bg-card rounded-3xl p-6 border border-border shadow-sm space-y-6">
                         <h3 className="text-lg font-black text-foreground flex items-center gap-2">
                             <Info size={20} className="text-primary" />
-                            ข้อมูลตู้คอนเทนเนอร์
+                            ข้อมูลตู้คอนเทนเนอร์ {job.container.container_subtype === 'export' ? '(Export)' : '(Import)'}
                         </h3>
+                        
+                        {job.container.booking_no && (
+                            <div className="p-3 bg-primary/10 rounded-xl border border-primary/20">
+                                <p className="text-[10px] font-bold text-primary uppercase">เลข Booking</p>
+                                <p className="text-xl font-black text-primary tracking-wider">{job.container.booking_no}</p>
+                            </div>
+                        )}
+
                         <div className="grid grid-cols-2 gap-4">
                             <div className="space-y-1">
                                 <p className="text-[10px] font-bold text-muted-foreground uppercase">หมายเลขตู้</p>
@@ -186,6 +194,48 @@ export function JobDetailClient({ job, success, initialTab = 'mission' }: JobDet
                                 <p className="text-sm font-bold">{job.container.shipping_line || 'N/A'}</p>
                             </div>
                         </div>
+
+                        {/* Export Deadlines */}
+                        {job.container.container_subtype === 'export' && (
+                            <div className="mt-4 pt-4 border-t border-border/50 grid grid-cols-1 gap-3">
+                                {job.container.pickup_empty_date && (
+                                    <div className="flex justify-between items-center p-2 rounded-lg bg-emerald-500/10 text-emerald-700">
+                                        <span className="text-[10px] font-bold uppercase">เริ่มรับตู้เปล่า</span>
+                                        <span className="text-sm font-black">{new Date(job.container.pickup_empty_date).toLocaleDateString('th-TH')}</span>
+                                    </div>
+                                )}
+                                {job.container.port_closing_datetime && (
+                                    <div className="flex justify-between items-center p-3 rounded-xl bg-rose-500/10 border border-rose-500/20 text-rose-700">
+                                        <span className="text-[11px] font-bold uppercase flex items-center gap-1">
+                                            <Activity size={12} /> Closing (ปิดรับตู้)
+                                        </span>
+                                        <span className="text-base font-black animate-pulse">
+                                            {new Date(job.container.port_closing_datetime).toLocaleString('th-TH', { 
+                                                day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' 
+                                            })} น.
+                                        </span>
+                                    </div>
+                                )}
+                            </div>
+                        )}
+
+                        {/* Import Deadlines */}
+                        {(!job.container.container_subtype || job.container.container_subtype === 'import') && (
+                            <div className="mt-4 pt-4 border-t border-border/50 grid grid-cols-2 gap-4">
+                                {job.container.lfd_demurrage && (
+                                    <div className="space-y-1">
+                                        <p className="text-[10px] font-bold text-amber-600 uppercase">LFD Demurrage</p>
+                                        <p className="text-sm font-bold">{new Date(job.container.lfd_demurrage).toLocaleDateString('th-TH')}</p>
+                                    </div>
+                                )}
+                                {job.container.lfd_detention && (
+                                    <div className="space-y-1">
+                                        <p className="text-[10px] font-bold text-amber-600 uppercase">LFD Detention</p>
+                                        <p className="text-sm font-bold">{new Date(job.container.lfd_detention).toLocaleDateString('th-TH')}</p>
+                                    </div>
+                                )}
+                            </div>
+                        )}
 
                         {/* REEFER SPECIFIC: Temp Update Button */}
                         {job.container.container_size === 'REEFER' && (

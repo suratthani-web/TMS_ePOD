@@ -239,6 +239,10 @@ async function handleContainerData(supabase: any, jobId: string, data: JobFormDa
     lfd_demurrage: data.lfd_demurrage || null,
     lfd_detention: data.lfd_detention || null,
     target_temperature: data.target_temperature ? Number(data.target_temperature) : null,
+    booking_no: data.booking_no || null,
+    container_subtype: data.container_subtype || 'import',
+    pickup_empty_date: data.pickup_empty_date || null,
+    port_closing_datetime: data.port_closing_datetime || null,
     updated_at: new Date().toISOString()
   }
 
