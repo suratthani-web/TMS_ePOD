@@ -50,13 +50,34 @@ export default function JobPickupPage() {
 
   const isContainer = job?.job_type === 'container'
 
-  const canSubmit = isContainer 
-    ? (photos.length > 0 && Object.keys(conditionPhotos).length >= 4)
-    : (photos.length > 0 && signature && (
-        (loadedQty && Number(loadedQty) > 0) ||
-        (!job?.Price_Per_Unit || Number(job.Price_Per_Unit) === 0) ||
-        (job?.Price_Cust_Total && Number(job.Price_Cust_Total) > 0)
-      ))
+  // Refined Validation Logic
+  const getValidationErrors = () => {
+    const errors: string[] = []
+    
+    if (photos.length === 0) {
+        errors.push(isContainer ? "กรุณาถ่ายรูปใบ EIR" : "กรุณาถ่ายรูปสินค้า")
+    }
+
+    if (isContainer) {
+        if (Object.keys(conditionPhotos).length < 4) {
+            errors.push("กรุณาถ่ายรูปสภาพตู้ให้ครบ (อย่างน้อย 4 ด้าน)")
+        }
+        if (!containerNo || containerNo.trim().length < 5) {
+            errors.push("กรุณาระบุหมายเลขตู้คอนเทนเนอร์")
+        }
+    } else {
+        if (!signature) {
+            errors.push("กรุณาลงลายเซ็นผู้ส่งของ")
+        }
+        const needsQty = (job?.Price_Per_Unit && Number(job.Price_Per_Unit) > 0) && 
+                         (!job?.Price_Cust_Total || Number(job.Price_Cust_Total) === 0)
+        if (needsQty && (!loadedQty || Number(loadedQty) <= 0)) {
+            errors.push("กรุณาระบุจำนวนสินค้า")
+        }
+    }
+    
+    return errors
+  }
 
   const handleConditionPhoto = (key: string, file: File | null) => {
     if (file) {
@@ -64,27 +85,13 @@ export default function JobPickupPage() {
     }
   }
 
-    const handleSubmit = async () => {
-    if (photos.length === 0) {
-        toast.error(isContainer ? "กรุณาถ่ายรูปใบ EIR" : "กรุณาถ่ายรูปสินค้าอย่างน้อย 1 รูป")
-        return
-    }
-    
-    if (isContainer && Object.keys(conditionPhotos).length < 4) {
-        toast.error("กรุณาถ่ายรูปสภาพตู้ให้ครบถ้วน (อย่างน้อย 4 ด้าน)")
-        return
-    }
-
-    if (!isContainer && !signature) {
-        toast.error("กรุณาลงลายเซ็นผู้ส่งของ")
-        return
-    }
-    
-    const needsQty = !isContainer && (job?.Price_Per_Unit && Number(job.Price_Per_Unit) > 0) && 
-                     (!job?.Price_Cust_Total || Number(job.Price_Cust_Total) === 0)
-    
-    if (needsQty && (!loadedQty || Number(loadedQty) <= 0)) {
-        toast.error("กรุณาระบุจำนวนสินค้าที่รับจริง (มากกว่า 0)")
+  const handleSubmit = async () => {
+    const errors = getValidationErrors()
+    if (errors.length > 0) {
+        toast.error(errors[0], { 
+            description: "กรุณาตรวจสอบข้อมูลให้ครบถ้วนก่อนดำเนินการต่อ",
+            duration: 4000
+        })
         return
     }
 
@@ -305,7 +312,7 @@ export default function JobPickupPage() {
         <div className="fixed bottom-0 left-0 right-0 p-5 bg-background/80 backdrop-blur-xl border-t border-border/50 z-50">
             <Button 
                 onClick={handleSubmit}
-                disabled={loading || !canSubmit}
+                disabled={loading}
                 className="w-full h-16 rounded-2xl text-lg font-black uppercase tracking-widest gap-3 shadow-2xl transition-all active:scale-95"
             >
                 {loading ? (
