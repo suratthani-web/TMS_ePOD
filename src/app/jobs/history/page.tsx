@@ -7,6 +7,7 @@ import { getJobCreationData } from "@/app/planning/actions"
 import { isCustomer, hasPermission, getUserBranchId, isAdmin } from "@/lib/permissions"
 import { HistoryClient } from "./history-client"
 import { ShieldCheck } from "lucide-react"
+import { cookies } from "next/headers"
 
 type Props = {
   searchParams: Promise<{ [key: string]: string | string[] | undefined }>
@@ -24,7 +25,13 @@ export default async function JobHistoryPage(props: Props) {
   const dateFrom = (searchParams.from as string) || ''
   const dateTo = (searchParams.to as string) || ''
   const status = (searchParams.status as string) || ''
-  const customerId = (searchParams.customer as string) || ''
+
+  // Read customer from URL param first, fallback to cookie (persists across navigation)
+  const cookieStore = await cookies()
+  const cookieCustomerId = cookieStore.get('selectedCustomer')?.value || ''
+  const rawCustomerId = (searchParams.customer as string) ?? cookieCustomerId
+  const customerId = (rawCustomerId === 'All') ? '' : rawCustomerId
+
   const limit = 25
 
   const isAdminUser = await isAdmin()
