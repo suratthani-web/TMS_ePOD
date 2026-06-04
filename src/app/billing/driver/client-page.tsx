@@ -83,13 +83,22 @@ interface DriverPaymentClientProps {
   drivers: Driver[]
   companyProfile: CompanyProfile | null
   subcontractors: Subcontractor[]
+  initialDateFrom?: string
+  initialDateTo?: string
 }
 
-export default function DriverPaymentClient({ initialJobs, drivers, companyProfile, subcontractors }: DriverPaymentClientProps) {
+export default function DriverPaymentClient({ 
+  initialJobs, 
+  drivers, 
+  companyProfile, 
+  subcontractors,
+  initialDateFrom,
+  initialDateTo
+}: DriverPaymentClientProps) {
   const { t } = useLanguage()
   const router = useRouter()
-  const [dateFrom, setDateFrom] = useState("")
-  const [dateTo, setDateTo] = useState("")
+  const [dateFrom, setDateFrom] = useState(initialDateFrom || "")
+  const [dateTo, setDateTo] = useState(initialDateTo || "")
   const [paymentModel, setPaymentModel] = useState<'individual' | 'subcontractor' | 'all'>('individual')
   const [selectedEntityId, setSelectedEntityId] = useState("")
   const [selectedItems, setSelectedItems] = useState<string[]>([])
@@ -469,7 +478,16 @@ export default function DriverPaymentClient({ initialJobs, drivers, companyProfi
                 </div>
             </div>
             <div>
-              <PremiumButton variant="outline" className="border-border/5 w-full h-14 rounded-2xl gap-3">
+              <PremiumButton 
+                variant="outline" 
+                className="border-border/5 w-full h-14 rounded-2xl gap-3"
+                onClick={() => {
+                  const params = new URLSearchParams()
+                  if (dateFrom) params.set('dateFrom', dateFrom)
+                  if (dateTo) params.set('dateTo', dateTo)
+                  router.push(`?${params.toString()}`)
+                }}
+              >
                 <Search className="w-5 h-5" /> 
                 <span className="font-black uppercase tracking-widest text-base font-bold">{t('billing_driver.execute_query')}</span>
               </PremiumButton>

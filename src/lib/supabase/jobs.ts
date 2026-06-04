@@ -1001,7 +1001,7 @@ export async function getJobsForBilling(
 
         let query = dbQuery
             .order('Plan_Date', { ascending: false })
-            .limit(100)
+            .limit(1000)
             
         // Add default date range if not provided (e.g. last 30 days) to keep initial load snappy
         if (startDate) {
