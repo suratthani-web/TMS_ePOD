@@ -569,6 +569,10 @@ export function JobDialog({
         lfd_demurrage: (job as any)?.container?.lfd_demurrage || '',
         lfd_detention: (job as any)?.container?.lfd_detention || '',
         target_temperature: (job as any)?.container?.target_temperature || '',
+        booking_no: (job as any)?.container?.booking_no || '',
+        container_subtype: (job as any)?.container?.container_subtype || 'import',
+        pickup_empty_date: (job as any)?.container?.pickup_empty_date || '',
+        port_closing_datetime: (job as any)?.container?.port_closing_datetime ? (job as any).container.port_closing_datetime.slice(0, 16) : '',
       }
       setFormData(newFormData);
 
@@ -613,6 +617,10 @@ export function JobDialog({
         lfd_demurrage: '',
         lfd_detention: '',
         target_temperature: '',
+        booking_no: '',
+        container_subtype: 'import',
+        pickup_empty_date: '',
+        port_closing_datetime: '',
       })
       setOrigins([{ name: '', lat: '', lng: '' }])
       setDestinations([{ name: '', lat: '', lng: '' }])

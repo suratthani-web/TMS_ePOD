@@ -60,6 +60,10 @@ export type JobFormData = {
   lfd_demurrage?: string | null
   lfd_detention?: string | null
   target_temperature?: number | string | null
+  booking_no?: string | null
+  container_subtype?: string | null
+  pickup_empty_date?: string | null
+  port_closing_datetime?: string | null
 }
 
 const parseIfString = (val: string | undefined | null) => {
@@ -585,9 +589,20 @@ export async function createBulkJobs(
      return { success: false, message: 'ไม่พบข้อมูลที่ถูกต้อง (ต้องระบุชื่อลูกค้า)' }
   }
 
+  // Strip container-only fields before saving to Jobs_Main to prevent DB schema errors
+  const containerFields = [
+    'container_no', 'seal_no', 'container_size', 'shipping_line', 
+    'vessel_voyage', 'lfd_demurrage', 'lfd_detention', 'target_temperature'
+  ]
+  const jobsMainData = finalizedData.map(j => {
+      const cleanJob = { ...j }
+      containerFields.forEach(f => delete (cleanJob as any)[f])
+      return cleanJob
+  })
+
   const { error } = await supabase
     .from('Jobs_Main')
-    .upsert(finalizedData, { onConflict: 'Job_ID' })
+    .upsert(jobsMainData, { onConflict: 'Job_ID' })
 
   if (error) {
     return { success: false, message: `Failed to import: ${error.message}` }
