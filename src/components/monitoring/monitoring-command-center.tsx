@@ -401,7 +401,6 @@ export function MonitoringCommandCenter({
 
                     {(filter === 'all' || filter === 'drivers') && (
                         driversWithGPS
-                            .filter(d => filter === 'drivers' ? d.status === 'Online' : true)
                             .map(driver => (
                                 <div key={driver.Driver_ID} 
                                      onClick={() => handleDriverClick(driver)}
