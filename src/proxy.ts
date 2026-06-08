@@ -16,11 +16,50 @@ async function decrypt(session: string | undefined = '') {
   }
 }
 
-export async function middleware(request: NextRequest) {
+export async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl
   
   if (pathname.includes('analytics')) {
     return NextResponse.next()
+  }
+
+  if (pathname === '/') {
+    const sessionCookie = request.cookies.get('session')
+    const driverSession = request.cookies.get('driver_session')
+    const payload = sessionCookie ? await decrypt(sessionCookie.value) : null
+
+    if (payload) {
+      return NextResponse.redirect(new URL('/dashboard', request.url))
+    }
+
+    const userAgent = request.headers.get('user-agent') || ''
+    const isDeviceMobile = /Android|webOS|iPhone|iPod|BlackBerry|IEMobile|Opera Mini/i.test(userAgent)
+
+    if (isDeviceMobile && request.nextUrl.searchParams.get('type') !== 'staff') {
+      return NextResponse.redirect(new URL(driverSession ? '/mobile/jobs' : '/mobile/login', request.url))
+    }
+
+    const loginUrl = new URL('/login', request.url)
+    const redirectResponse = NextResponse.redirect(loginUrl)
+    if (sessionCookie && !payload) {
+      redirectResponse.cookies.delete('session')
+    }
+    return redirectResponse
+  }
+
+  if (pathname === '/login') {
+    const sessionCookie = request.cookies.get('session')
+    const payload = sessionCookie ? await decrypt(sessionCookie.value) : null
+
+    if (payload) {
+      return NextResponse.redirect(new URL('/dashboard', request.url))
+    }
+
+    if (sessionCookie && !payload) {
+      const response = NextResponse.next()
+      response.cookies.delete('session')
+      return response
+    }
   }
 
   // Protect /mobile/* routes (except /mobile/login) — require driver_session cookie
