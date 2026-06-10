@@ -373,15 +373,36 @@ export async function POST(req: NextRequest) {
     try {
         const bodyText = await req.text()
         const signature = req.headers.get('x-line-signature') || ''
+        const supabase = createAdminClient()
+
+        // Log incoming webhook for analysis
+        await supabase.from('System_Logs').insert({
+            module: 'WebhookDebug',
+            action_type: 'RECEIVE',
+            user_id: 'system',
+            username: 'system',
+            role: 'System',
+            details: {
+                signature: signature ? `${signature.substring(0, 10)}...` : 'none',
+                body: bodyText.length > 1000 ? bodyText.substring(0, 1000) + '...' : bodyText
+            }
+        })
 
         if (!verifyLineSignature(bodyText, signature)) {
             console.warn('[Line] Unauthorized webhook attempt')
+            await supabase.from('System_Logs').insert({
+                module: 'WebhookDebug',
+                action_type: 'ERROR',
+                user_id: 'system',
+                username: 'system',
+                role: 'System',
+                details: { error: 'Invalid signature', signature }
+            })
             return NextResponse.json({ error: 'Invalid signature' }, { status: 401 })
         }
 
         const body = JSON.parse(bodyText)
         const events = body.events || []
-        const supabase = createAdminClient()
 
         for (const event of events) {
             const replyToken = event.replyToken
