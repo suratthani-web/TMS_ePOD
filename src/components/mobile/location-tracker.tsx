@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react"
 import { saveGPSLog } from "@/lib/supabase/gps"
 import { Geolocation } from '@capacitor/geolocation'
+import { BackgroundGeolocation } from '@capacitor-community/background-geolocation'
 import { Capacitor } from '@capacitor/core'
 import { toast } from "sonner"
 
@@ -30,31 +31,34 @@ export function LocationTracker({ driverId }: { driverId?: string, branchId?: st
                     await Geolocation.requestPermissions()
                 }
 
-                const id = await Geolocation.watchPosition(
+                // Start background tracking using background-geolocation plugin
+                const id = await BackgroundGeolocation.addWatcher(
                     {
-                        enableHighAccuracy: true,
-                        timeout: 10000,
-                        maximumAge: 3000
+                        backgroundTitle: "LOGIS Driver - บันทึกพิกัด",
+                        backgroundMessage: "กำลังบันทึกตำแหน่งสำหรับการส่งงานของคุณในเบื้องหลัง",
+                        requestPermissions: true,
+                        stale: false,
+                        distanceFilter: 20 // Update position every 20 meters
                     },
-                    (position, err) => {
+                    (position: any, err: any) => {
                         if (err) {
-                            console.error('[Capacitor] Watch error:', err)
+                            console.error('[Capacitor Background] Watch error:', err)
                             return
                         }
                         if (position) {
                             processLocationUpdate(
-                                position.coords.latitude, 
-                                position.coords.longitude, 
-                                position.coords.speed || 0
+                                position.latitude, 
+                                position.longitude, 
+                                position.speed || 0
                             )
                         }
                     }
                 )
                 watchIdRef.current = id
-                console.log("[Capacitor] Native tracking initiated")
+                console.log("[Capacitor Background] Native tracking initiated")
             } catch (err) {
-                console.error("[Capacitor] Failed to start native tracking:", err)
-                toast.error("Native GPS tracking failed to initialize")
+                console.error("[Capacitor Background] Failed to start native tracking:", err)
+                toast.error("Native Background GPS tracking failed to initialize")
             }
         } else {
             // Web Fallback
@@ -152,7 +156,9 @@ export function LocationTracker({ driverId }: { driverId?: string, branchId?: st
     return () => {
         if (watchIdRef.current) {
             if (Capacitor.isNativePlatform()) {
-                Geolocation.clearWatch({ id: watchIdRef.current })
+                BackgroundGeolocation.removeWatcher({ id: watchIdRef.current }).catch(err => {
+                    console.error('[Capacitor Background] Remove watcher error:', err)
+                })
             } else {
                 navigator.geolocation.clearWatch(Number(watchIdRef.current))
             }
