@@ -5,7 +5,7 @@ import { getUserBranchId, isAdmin } from "@/lib/permissions"
 
 export interface AdminAlert {
   id: string
-  type: 'expiry' | 'inspection_fail' | 'maintenance' | 'sos'
+  type: 'expiry' | 'inspection_fail' | 'maintenance'
   severity: 'critical' | 'warning' | 'info'
   title: string
   description: string
@@ -21,49 +21,6 @@ export async function getAdminAlerts(): Promise<AdminAlert[]> {
   const alerts: AdminAlert[] = []
   const today = new Date()
 
-  // 0. SOS Alerts from System_Logs (Last 24 hours)
-  try {
-    const yesterday = new Date(today.getTime() - 24 * 60 * 60 * 1000).toISOString()
-    const { data: sosLogs } = await supabase
-      .from('System_Logs')
-      .select('*')
-      .eq('module', 'Jobs')
-      .eq('action_type', 'UPDATE')
-      .gte('created_at', yesterday)
-      .order('created_at', { ascending: false })
-
-    sosLogs?.forEach((log: any) => {
-      const details = log.details || {}
-      if (details.alert_type === 'SOS' || details.alert_type === 'SILENT_SOS') {
-        // Filter by branch
-        if (isAdminUser && branchId && branchId !== 'All') {
-            if (String(log.branch_id) !== String(branchId)) return
-        }
-
-        alerts.push({
-          id: `sos-${log.id}`,
-          type: 'sos',
-          severity: 'critical',
-          title: `🆘 SOS: ${details.driver_name || 'คนขับ'}`,
-          description: details.alert_type === 'SILENT_SOS' 
-            ? `แจ้งเหตุฉุกเฉิน (ไม่สะดวกคุย): ${details.address || 'ไม่ทราบตำแหน่ง'}`
-            : `พนักงานกดโทรฉุกเฉินหาแอดมิน`,
-          date: log.created_at,
-          href: '/sos',
-          meta: { 
-            driverId: log.target_id || '', 
-            driverName: details.driver_name || '',
-            lat: String(details.lat || ''),
-            lng: String(details.lng || ''),
-            address: details.address || ''
-          }
-        })
-      }
-    })
-  } catch (err) {
-    console.error("Admin SOS alerts error:", err)
-  }
-
   // 1. Vehicle document expiry alerts (tax, insurance, ACT)
   try {
     let vQuery = supabase
@@ -76,7 +33,7 @@ export async function getAdminAlerts(): Promise<AdminAlert[]> {
     }
 
     const { data: vehicles } = await vQuery
-    vehicles?.forEach((v: any) => {
+    vehicles?.forEach((v: { Tax_Expiry: string, Insurance_Expiry: string, Act_Expiry: string, Vehicle_Plate: string }) => {
       const checks = [
         { field: v.Tax_Expiry, label: 'ภาษีรถ (Tax)', type: 'tax' },
         { field: v.Insurance_Expiry, label: 'ประกันภัย (Insurance)', type: 'insurance' },
@@ -96,7 +53,7 @@ export async function getAdminAlerts(): Promise<AdminAlert[]> {
             description: diffDays <= 0 
               ? `หมดอายุแล้ว ${Math.abs(diffDays)} วัน` 
               : `เหลืออีก ${diffDays} วัน (หมดอายุ ${expDate.toLocaleDateString('th-TH')})`,
-            date: c.field,
+            date: c.field || '',
             href: `/fleet?search=${v.Vehicle_Plate}`,
             meta: { plate: v.Vehicle_Plate, expiryType: c.type }
           })
@@ -117,7 +74,7 @@ export async function getAdminAlerts(): Promise<AdminAlert[]> {
 
     const CHECKLIST = ["น้ำมันเครื่อง", "น้ำในหม้อน้ำ", "ลมยาง", "ไฟเบรค/ไฟเลี้ยว", "สภาพยางรถยนต์", "อุปกรณ์ฉุกเฉิน", "เอกสารประจำรถ"]
 
-    checks?.forEach((check: any) => {
+    checks?.forEach((check: { id: string, Passed_Items?: Record<string, boolean>, Vehicle_Plate: string, Check_Date: string, Driver_Name: string }) => {
       const items = (check.Passed_Items || {}) as Record<string, boolean>
       const failedItems = CHECKLIST.filter(item => !items[item])
       if (failedItems.length > 0) {
@@ -127,10 +84,10 @@ export async function getAdminAlerts(): Promise<AdminAlert[]> {
           severity: failedItems.length >= 3 ? 'critical' : 'warning',
           title: `ตรวจรถไม่ผ่าน — ${check.Vehicle_Plate}`,
           description: `ไม่ผ่าน ${failedItems.length} รายการ: ${failedItems.join(', ')}`,
-          date: check.Check_Date,
+          date: check.Check_Date || '',
           href: `/admin/vehicle-checks?id=${check.id}`,
           meta: { 
-            plate: check.Vehicle_Plate, 
+            plate: check.Vehicle_Plate || '', 
             driver: check.Driver_Name || '-',
             failCount: String(failedItems.length) 
           }
@@ -149,7 +106,7 @@ export async function getAdminAlerts(): Promise<AdminAlert[]> {
       .limit(20)
 
     const { data: tickets } = await mQuery
-    tickets?.forEach((ticket: any) => {
+    tickets?.forEach((ticket: { Ticket_ID: string, Date_Report: string, Vehicle_Plate: string, Priority: string, Issue_Desc: string, Status: string }) => {
       const reported = new Date(ticket.Date_Report)
       const daysOpen = Math.ceil((today.getTime() - reported.getTime()) / (1000 * 60 * 60 * 24))
       
@@ -157,11 +114,11 @@ export async function getAdminAlerts(): Promise<AdminAlert[]> {
         id: `repair-${ticket.Ticket_ID}`,
         type: 'maintenance',
         severity: ticket.Priority === 'High' || daysOpen > 7 ? 'critical' : daysOpen > 3 ? 'warning' : 'info',
-        title: `แจ้งซ่อม — ${ticket.Vehicle_Plate}`,
+        title: `แจ้งซ่อม — ${ticket.Vehicle_Plate || ''}`,
         description: `${ticket.Issue_Desc || 'ไม่ระบุ'} (เปิดมา ${daysOpen} วัน)`,
-        date: ticket.Date_Report,
+        date: ticket.Date_Report || '',
         href: `/maintenance?ticket=${ticket.Ticket_ID}`,
-        meta: { plate: ticket.Vehicle_Plate, status: ticket.Status, ticketId: ticket.Ticket_ID }
+        meta: { plate: String(ticket.Vehicle_Plate || ''), status: String(ticket.Status || ''), ticketId: String(ticket.Ticket_ID || '') }
       })
     })
   } catch { /* ignore */ }

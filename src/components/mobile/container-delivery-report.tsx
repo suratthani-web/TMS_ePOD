@@ -3,8 +3,12 @@
 import { Job, JobContainer } from "@/types/database"
 import { forwardRef } from "react"
 
+type ContainerJob = Job & {
+  container?: Partial<JobContainer> | null
+}
+
 type Props = {
-  job: any
+  job: ContainerJob
   photos: string[] // EIR Gate-in photos
   signature: string | null // Receiver/Gate Officer signature
 }

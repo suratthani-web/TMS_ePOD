@@ -86,7 +86,7 @@ export async function getBillingAnalytics(
   }
 
   const receivables = unpaidNotes || []
-  const totalAr = receivables.reduce((sum: number, n: any) => sum + (n.Total_Amount || 0), 0)
+  const totalAr = receivables.reduce((sum: number, n: { Total_Amount?: number }) => sum + (n.Total_Amount || 0), 0)
   
   // Calculate Aging
   const aging = { '0-30': 0, '31-60': 0, '61-90': 0, '90+': 0 }
@@ -128,7 +128,7 @@ export async function getBillingAnalytics(
   recentUnpaid.sort((a, b) => b.daysOverdue - a.daysOverdue)
 
   // 2. Fetch Accounts Payable (Driver Payments)
-  let apQuery = supabase
+  const apQuery = supabase
     .from('Driver_Payments')
     .select('Total_Amount, Status, Branch_ID') // Assuming Branch_ID exists or linked via jobs? 
     // Driver_Payments might not have Branch_ID directly in some schemas. 
@@ -152,7 +152,7 @@ export async function getBillingAnalytics(
   
   // Filter by branch manually if necessary/possible (complex without join). 
   // For MVP, we'll calculate total.
-  const totalAp = payables.reduce((sum: number, p: any) => sum + (p.Total_Amount || 0), 0)
+  const totalAp = payables.reduce((sum: number, p: { Total_Amount?: number }) => sum + (p.Total_Amount || 0), 0)
 
   // 3. Collection Rate (Paid / (Paid + Unpaid)) for the selected period
   // If no date selected, default to last 30 days
@@ -171,8 +171,8 @@ export async function getBillingAnalytics(
   }
   
   const { data: periodNotes } = await collectionQuery
-  const totalPeriod = (periodNotes || []).reduce((s: number, n: any) => s + (n.Total_Amount || 0), 0)
-  const paidPeriod = (periodNotes || []).filter((n: any) => n.Status === 'Paid').reduce((s: number, n: any) => s + (n.Total_Amount || 0), 0)
+  const totalPeriod = (periodNotes || []).reduce((s: number, n: { Total_Amount?: number, Status?: string }) => s + (n.Total_Amount || 0), 0)
+  const paidPeriod = (periodNotes || []).filter((n: { Status?: string }) => n.Status === 'Paid').reduce((s: number, n: { Total_Amount?: number, Status?: string }) => s + (n.Total_Amount || 0), 0)
   
   const collectionRate = totalPeriod > 0 ? (paidPeriod / totalPeriod) * 100 : 0
 
@@ -209,7 +209,7 @@ export async function getBillingAnalytics(
     trendMap.set(key, { revenue: 0, payout: 0 })
   }
   
-  trendRev?.forEach((n: any) => {
+  trendRev?.forEach((n: { Billing_Date?: string, Total_Amount?: number }) => {
     const key = (n.Billing_Date || '').slice(0, 7)
     if (trendMap.has(key)) {
       const entry = trendMap.get(key)!
@@ -218,7 +218,7 @@ export async function getBillingAnalytics(
     }
   })
   
-  trendPay?.forEach((p: any) => {
+  trendPay?.forEach((p: { Payment_Date?: string, Total_Amount?: number }) => {
     const key = (p.Payment_Date || '').slice(0, 7)
     if (trendMap.has(key)) {
       const entry = trendMap.get(key)!

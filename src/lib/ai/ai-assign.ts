@@ -3,6 +3,7 @@
 import { createClient } from '@/utils/supabase/server'
 import { getLatestDriverLocations } from '@/lib/supabase/gps'
 import { getAllDriversFromTable } from '@/lib/supabase/drivers'
+import { transitionJobStatus } from "@/services/job-status-machine"
 
 // ============================================================
 // AI Auto-Assign Engine — TMS 2026
@@ -48,8 +49,18 @@ export async function getSuggestedDrivers(jobData: {
 
     // 1. Get all active drivers
     const allDrivers = await getAllDriversFromTable()
+    
+    // 1.5 Get vehicles in maintenance
+    const { data: maintenanceTickets } = await supabase
+      .from('Repair_Tickets')
+      .select('Vehicle_Plate')
+      .in('Status', ['Pending', 'In Progress'])
+      
+    const maintenancePlates = new Set(maintenanceTickets?.map(t => t.Vehicle_Plate) || [])
+
     const activeDrivers = allDrivers.filter(d =>
-      d.Active_Status === 'Active' || !d.Active_Status
+      (d.Active_Status === 'Active' || !d.Active_Status) && 
+      !maintenancePlates.has(d.Vehicle_Plate || '')
     )
 
     // 2. Get latest GPS locations
@@ -342,21 +353,30 @@ export async function autoBatchAssign(branchId?: string): Promise<{ successCount
                     return loadA - loadB || b.match_score - a.match_score
                 })[0]
 
-                // 3. Update job with Driver_ID and change status to 'Confirmed'
-                const { error: updateError } = await supabase
-                    .from('Jobs_Main')
-                    .update({ 
-                        Driver_ID: bestCandidate.Driver_ID,
-                        Job_Status: 'Confirmed',
-                        Updated_At: new Date().toISOString()
-                    })
-                    .eq('Job_ID', job.Job_ID)
+                // 3. Update job with Driver_ID and change status to 'Confirmed' using Machine
+                const transition = await transitionJobStatus(job.Job_ID, 'Confirmed', {
+                    userId: 'AI_ASSIGNER',
+                    reason: 'AI Auto-Assignment',
+                    notes: `Match Score: ${bestCandidate.match_score}, Estimated Distance: ${bestCandidate.distance_km} km`
+                })
 
-                if (!updateError) {
-                    successCount++
-                    tempJobCountMap.set(bestCandidate.Driver_ID, (tempJobCountMap.get(bestCandidate.Driver_ID) || 0) + 1)
+                if (transition.success) {
+                    const { error: updateError } = await supabase
+                        .from('Jobs_Main')
+                        .update({ 
+                            Driver_ID: bestCandidate.Driver_ID,
+                            Updated_At: new Date().toISOString()
+                        })
+                        .eq('Job_ID', job.Job_ID)
+
+                    if (!updateError) {
+                        successCount++
+                        tempJobCountMap.set(bestCandidate.Driver_ID, (tempJobCountMap.get(bestCandidate.Driver_ID) || 0) + 1)
+                    } else {
+                        errors.push(`Job ${job.Job_ID}: ${updateError.message}`)
+                    }
                 } else {
-                    errors.push(`Job ${job.Job_ID}: ${updateError.message}`)
+                    errors.push(`Job ${job.Job_ID}: Status Machine Error - ${transition.message}`)
                 }
             }
         }

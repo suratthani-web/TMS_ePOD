@@ -12,11 +12,16 @@ import { toast } from "sonner"
 import { submitJobPickup } from "@/lib/actions/pod-actions"
 import { getJobDetails } from "@/app/mobile/jobs/actions"
 import { Job } from "@/lib/supabase/jobs"
+import type { JobContainer } from "@/types/database"
 import { Loader2, Box, Info, Camera, ShieldCheck, ChevronRight } from "lucide-react"
 import html2canvas from "html2canvas"
 import { QuantityStepper } from "@/components/mobile/quantity-stepper"
 import { Label } from "@/components/ui/label"
 import { cn } from "@/lib/utils"
+
+type ContainerReportJob = Job & {
+  container?: JobContainer | null
+}
 
 export default function JobPickupPage() {
   const router = useRouter()
@@ -44,6 +49,10 @@ export default function JobPickupPage() {
                 setContainerNo(j.container.container_no || "")
                 setSealNo(j.container.seal_no || "")
             }
+            // User requested to remove the default suggested number to prevent accidental submission
+            // if (j?.Loaded_Qty) {
+            //     setLoadedQty(j.Loaded_Qty.toString())
+            // }
         })
     }
   }, [params.id])
@@ -150,8 +159,8 @@ export default function JobPickupPage() {
         } else {
             toast.error(result.error || "เกิดข้อผิดพลาด", { id: "pickup-upload" })
         }
-    } catch (err: any) {
-        toast.error(err.message || "เกิดข้อผิดพลาดในการเชื่อมต่อ", { id: "pickup-upload" })
+    } catch (err: unknown) {
+        toast.error(err instanceof Error ? err.message : "เกิดข้อผิดพลาดในการเชื่อมต่อ", { id: "pickup-upload" })
     } finally {
         setLoading(false)
     }
@@ -291,7 +300,7 @@ export default function JobPickupPage() {
                                 container_no: containerNo,
                                 seal_no: sealNo
                             }
-                        } as any}
+                        } as ContainerReportJob}
                         photos={photos.map(p => URL.createObjectURL(p))}
                         conditionPhotos={Object.fromEntries(
                             Object.entries(conditionPhotos).map(([k, v]) => [k, URL.createObjectURL(v)])

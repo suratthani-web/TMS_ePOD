@@ -2,12 +2,14 @@
 
 import { createClient, createAdminClient } from '@/utils/supabase/server'
 import { revalidatePath } from 'next/cache'
+import { requireAdmin } from '@/services/permission-guards'
 
 /**
  * Legacy compatibility: Get role permissions in { success, data } format
  */
 export async function getRolePermissions() {
     try {
+        await requireAdmin()
         const supabase = createAdminClient()
         const { data, error } = await supabase
             .from('role_permissions')
@@ -16,24 +18,25 @@ export async function getRolePermissions() {
         if (error) throw error
         
         // Map fields for legacy compatibility if needed
-        const legacyData = data?.map((item: any) => ({
+        const legacyData = data?.map((item: { id: string; role_name: string; allowed_menus: unknown }) => ({
             id: item.id,
             Role: item.role_name,
             Permissions: item.allowed_menus
         }))
 
         return { success: true, data: legacyData || [] }
-    } catch (error: any) {
+    } catch (error: unknown) {
         console.error("Error fetching role permissions:", error)
-        return { success: false, error: error.message }
+        return { success: false, error: error instanceof Error ? error.message : 'Unknown error' }
     }
 }
 
 /**
  * Legacy compatibility: Update role permissions
  */
-export async function updateRolePermissions(role: string, permissions: any) {
+export async function updateRolePermissions(role: string, permissions: Record<string, boolean> | string[]) {
     try {
+        await requireAdmin()
         const supabase = createAdminClient()
         
         // Standardize to Allowed_Menus (Array of strings)
@@ -53,9 +56,9 @@ export async function updateRolePermissions(role: string, permissions: any) {
         
         revalidatePath('/')
         return { success: true }
-    } catch (error: any) {
+    } catch (error: unknown) {
         console.error("Error updating role permissions:", error)
-        return { success: false, error: error.message }
+        return { success: false, error: error instanceof Error ? error.message : 'Unknown error' }
     }
 }
 
@@ -63,6 +66,7 @@ export async function updateRolePermissions(role: string, permissions: any) {
  * Modern Module-Based: Get all permissions
  */
 export async function getAllRolePermissions() {
+    await requireAdmin()
     const supabase = createAdminClient()
     const { data, error } = await supabase
         .from('role_permissions')
@@ -81,6 +85,7 @@ export async function getAllRolePermissions() {
  */
 export async function saveRolePermissions(roleName: string, allowedMenus: string[]) {
     try {
+        await requireAdmin()
         const supabase = createAdminClient()
         
         // Log for debugging (will show in server console)
@@ -110,11 +115,11 @@ export async function saveRolePermissions(roleName: string, allowedMenus: string
         console.log("Save successful:", data)
         revalidatePath('/')
         return { success: true }
-    } catch (err: any) {
+    } catch (err: unknown) {
         console.error("Critical Exception saving permissions:", err)
         return { 
             success: false, 
-            message: `Exception: ${err.message || 'Unknown error'}` 
+            message: `Exception: ${err instanceof Error ? err.message : 'Unknown error'}` 
         }
     }
 }

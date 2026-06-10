@@ -6,8 +6,19 @@ import Script from 'next/script'
 
 // Declare global liff property on window
 declare global {
+    interface Liff {
+        init: (config: { liffId: string }) => Promise<void>;
+        isLoggedIn: () => boolean;
+        getProfile: () => Promise<{ displayName: string; userId: string; [key: string]: unknown }>;
+        login: (config?: { redirectUri?: string }) => void;
+        getContext: () => { userId: string; [key: string]: unknown } | null;
+        isInClient: () => boolean;
+        closeWindow: () => void;
+        isApiAvailable: (api: string) => boolean;
+        shareTargetPicker: (messages: unknown[]) => Promise<unknown>;
+    }
     interface Window {
-        liff: any
+        liff: Liff
     }
 }
 
@@ -114,15 +125,15 @@ function SignatureContent() {
                 setIsLiffInit(true)
                 if (window.liff.isLoggedIn()) {
                     window.liff.getProfile()
-                        .then((profile: any) => {
+                        .then((profile: { displayName: string }) => {
                             setDriverName(profile.displayName || '')
                         })
-                        .catch((err: any) => console.error('[LIFF Profile Error]', err))
+                        .catch((err: unknown) => console.error('[LIFF Profile Error]', err))
                 } else {
                     window.liff.login()
                 }
             })
-            .catch((err: any) => {
+            .catch((err: unknown) => {
                 console.warn('[LIFF Init failed - Fallback to standard web]', err)
                 setIsLiffInit(false)
             })
@@ -173,9 +184,9 @@ function SignatureContent() {
             } else {
                 setErrorMsg(resData.error || 'บันทึกลายเซ็นล้มเหลว กรุณาลองอีกครั้ง')
             }
-        } catch (e: any) {
+        } catch (e: unknown) {
             console.error(e)
-            setErrorMsg(e.message || 'เกิดข้อผิดพลาดในการเชื่อมต่อเซิร์ฟเวอร์')
+            setErrorMsg(e instanceof Error ? e.message : 'เกิดข้อผิดพลาดในการเชื่อมต่อเซิร์ฟเวอร์')
         } finally {
             setSubmitting(false)
         }

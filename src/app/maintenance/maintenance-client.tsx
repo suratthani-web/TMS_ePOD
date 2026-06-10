@@ -26,7 +26,6 @@ import Image from "next/image"
 import { useLanguage } from "@/components/providers/language-provider"
 import type { RepairTicket } from "@/lib/supabase/maintenance"
 import type { Driver } from "@/lib/supabase/drivers"
-import type { Vehicle } from "@/lib/supabase/vehicles"
 import type { MaintenanceScheduleData } from "@/lib/supabase/maintenance-schedule"
 
 interface MaintenanceClientProps {
@@ -39,7 +38,7 @@ interface MaintenanceClientProps {
     completed: number
   }
   drivers: Driver[]
-  vehicles: Vehicle[]
+  vehicles: { Vehicle_Plate?: string | null; Vehicle_Type?: string | null }[]
   schedule: MaintenanceScheduleData
   limit: number
   startDate: string
@@ -60,11 +59,17 @@ export function MaintenanceClient({
   status
 }: MaintenanceClientProps) {
   const { t } = useLanguage()
+  const vehicleOptions = vehicles
+    .filter((vehicle): vehicle is { Vehicle_Plate: string; Vehicle_Type?: string | null } => Boolean(vehicle.Vehicle_Plate))
+    .map((vehicle) => ({
+      Vehicle_Plate: vehicle.Vehicle_Plate,
+      Vehicle_Type: vehicle.Vehicle_Type ?? null,
+    }))
 
   return (
     <div className="space-y-10 pb-20">
       {/* Tactical Maintenance Header */}
-      <div className="bg-background p-8 rounded-3xl border border-border/5 shadow-xl relative overflow-hidden group">
+      <div className="bg-background p-8 rounded-3xl border border-border shadow-xl relative overflow-hidden group">
         <div className="absolute top-0 right-0 w-80 h-80 bg-amber-500/10 blur-[120px] rounded-full -mr-40 -mt-40 pointer-events-none" />
         <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-8 relative z-10">
           <div>
@@ -83,7 +88,7 @@ export function MaintenanceClient({
           <div className="flex items-center gap-4">
             <MaintenanceDialog 
                 drivers={drivers}
-                vehicles={vehicles}
+                vehicles={vehicleOptions}
                 trigger={
                     <PremiumButton className="h-12 px-8 rounded-xl shadow-lg gap-2 bg-amber-600 hover:bg-amber-500 text-foreground font-black italic tracking-widest text-sm">
                         <Plus size={20} strokeWidth={3} />
@@ -103,7 +108,7 @@ export function MaintenanceClient({
           { label: t('maintenance.stats.active'), value: stats.inProgress, icon: Clock, color: "blue" },
           { label: t('maintenance.stats.complete'), value: stats.completed, icon: CheckCircle2, color: "emerald" },
         ].map((stat, idx) => (
-          <PremiumCard key={idx} className="bg-background border-2 border-border/5 p-6 relative overflow-hidden group hover:border-border/20 transition-all">
+          <PremiumCard key={idx} className="bg-background border-2 border-border p-6 relative overflow-hidden group hover:border-border/20 transition-all">
             <div className="flex items-center justify-between mb-6">
                 <div className={cn(
                     "p-3 rounded-xl shadow-lg transition-all duration-500 group-hover:scale-110 group-hover:rotate-3",
@@ -131,7 +136,7 @@ export function MaintenanceClient({
       </div>
 
       {/* Signal Filtering Matrix */}
-      <div className="space-y-6 bg-background p-8 rounded-3xl border border-border/5 shadow-xl">
+      <div className="space-y-6 bg-background p-8 rounded-3xl border border-border shadow-xl">
         <div className="flex items-center gap-4 mb-1">
             <div className="p-2 bg-muted/50 rounded-xl text-muted-foreground">
                 <Filter size={16} />
@@ -143,11 +148,11 @@ export function MaintenanceClient({
           <div className="flex-1">
               <SearchInput 
                 placeholder={t('common.search')} 
-                className="h-12 bg-black/60 border-border/5 rounded-xl text-foreground font-black text-sm"
+                className="h-12 bg-black/60 border-border rounded-xl text-foreground font-black text-sm"
               />
           </div>
           <form className="flex flex-wrap lg:flex-nowrap gap-3 items-center">
-              <div className="flex items-center gap-3 bg-black/60 border border-border/5 p-1.5 rounded-xl">
+              <div className="flex items-center gap-3 bg-black/60 border border-border p-1.5 rounded-xl">
                 <input 
                     type="date" 
                     name="startDate"
@@ -165,14 +170,14 @@ export function MaintenanceClient({
               <select 
                   name="status" 
                   defaultValue={status}
-                  className="h-12 min-w-[150px] rounded-xl border border-border/5 bg-black/60 px-4 text-xs font-bold font-black text-foreground uppercase tracking-widest focus:outline-none focus:ring-2 focus:ring-amber-500 shadow-xl outline-none"
+                  className="h-12 min-w-[150px] rounded-xl border border-border bg-black/60 px-4 text-xs font-bold font-black text-foreground uppercase tracking-widest focus:outline-none focus:ring-2 focus:ring-amber-500 shadow-xl outline-none"
               >
                   <option value="">{t('common.all')}</option>
                   <option value="Pending">{t('maintenance.stats.pending')}</option>
                   <option value="In Progress">{t('maintenance.stats.active')}</option>
                   <option value="Completed">{t('maintenance.stats.complete')}</option>
               </select>
-              <PremiumButton type="submit" variant="secondary" className="h-12 px-6 rounded-xl border-border/5 bg-muted/80 hover:bg-white/20 text-foreground font-black uppercase tracking-widest italic outline-none text-xs">
+              <PremiumButton type="submit" variant="secondary" className="h-12 px-6 rounded-xl border-border bg-muted/80 hover:bg-white/20 text-foreground font-black uppercase tracking-widest italic outline-none text-xs">
                   {t('maintenance.refresh')}
               </PremiumButton>
           </form>
@@ -182,7 +187,7 @@ export function MaintenanceClient({
       {/* Ticket Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         {tickets.length === 0 ? (
-          <div className="col-span-full text-center py-24 bg-background/50 rounded-3xl border-2 border-dashed border-border/5">
+          <div className="col-span-full text-center py-24 bg-background/50 rounded-3xl border-2 border-dashed border-border">
              <ShieldAlert className="w-16 h-16 text-foreground/5 mx-auto mb-4 animate-pulse" />
              <p className="text-muted-foreground font-black uppercase tracking-[0.4em] text-sm font-bold">{t('common.no_data')}</p>
           </div>
@@ -192,12 +197,12 @@ export function MaintenanceClient({
           const effectivePriority = priorityMatch ? priorityMatch[1] : 'Medium'
 
           return (
-            <PremiumCard key={ticket.Ticket_ID} className="bg-background p-0 overflow-hidden group border-2 border-border/5 rounded-2xl shadow-xl relative hover:border-amber-500/30 transition-all duration-500">
+            <PremiumCard key={ticket.Ticket_ID} className="bg-background p-0 overflow-hidden group border-2 border-border rounded-2xl shadow-xl relative hover:border-amber-500/30 transition-all duration-500">
               <div className="absolute top-4 right-4 z-20">
                   <MaintenanceActions 
-                      ticket={{ ...ticket, Priority: effectivePriority } as any} 
+                      ticket={{ ...ticket, Priority: effectivePriority } as RepairTicket} 
                       drivers={drivers} 
-                      vehicles={vehicles} 
+                      vehicles={vehicleOptions} 
                   />
               </div>
               
@@ -213,7 +218,7 @@ export function MaintenanceClient({
                     <h3 className="text-xl font-black text-foreground italic tracking-widest uppercase leading-none">{ticket.Driver_Name || "UNASSIGNED"}</h3>
                     <div className="flex flex-wrap items-center gap-2">
                         <span className="text-[9px] font-black text-primary font-mono tracking-widest uppercase italic bg-primary/10 px-1.5 py-0.5 rounded-md border border-primary/10">{ticket.Vehicle_Plate || "VOID_PLATE"}</span>
-                        <span className="text-[9px] font-black text-muted-foreground font-mono tracking-widest uppercase italic bg-muted/50 px-1.5 py-0.5 rounded-md border border-border/5">ID: {ticket.Ticket_ID}</span>
+                        <span className="text-[9px] font-black text-muted-foreground font-mono tracking-widest uppercase italic bg-muted/50 px-1.5 py-0.5 rounded-md border border-border">ID: {ticket.Ticket_ID}</span>
                         <span className="text-[9px] font-black text-amber-500/80 uppercase tracking-widest bg-amber-500/10 px-1.5 py-0.5 rounded-md border border-amber-500/10">{ticket.Issue_Type}</span>
                     </div>
                   </div>
@@ -239,7 +244,7 @@ export function MaintenanceClient({
 
                 <div className="space-y-4">
                   {ticket.Photo_Url && (
-                      <div className="relative w-full h-40 rounded-2xl overflow-hidden border-2 border-border/10 bg-black/40 shadow-inner group-hover:border-primary/40 transition-all duration-700">
+                      <div className="relative w-full h-40 rounded-2xl overflow-hidden border-2 border-border/10 bg-muted/30 shadow-inner group-hover:border-primary/40 transition-all duration-700">
                           <Image 
                               src={(() => {
                                   try {
@@ -260,13 +265,13 @@ export function MaintenanceClient({
                       </div>
                   )}
                   <div className="relative">
-                      <p className="text-sm text-muted-foreground font-black italic uppercase leading-relaxed bg-muted/50 p-4 rounded-xl border-2 border-border/5 relative overflow-hidden group-hover:bg-muted/80 transition-all duration-500 min-h-[80px]">
+                      <p className="text-sm text-muted-foreground font-black italic uppercase leading-relaxed bg-muted/50 p-4 rounded-xl border-2 border-border relative overflow-hidden group-hover:bg-muted/80 transition-all duration-500 min-h-[80px]">
                           <span className="absolute -top-2 -left-1 text-4xl text-foreground/5 font-black leading-none select-none tracking-tighter italic">ISSUE</span>
                           <span className="relative z-10">{ticket.Description || t('common.no_data')}</span>
                       </p>
                   </div>
 
-                  <div className="flex items-center justify-between text-xs font-bold pt-4 border-t border-border/5">
+                  <div className="flex items-center justify-between text-xs font-bold pt-4 border-t border-border">
                       <div className="flex items-center gap-2">
                         <div className="p-1.5 bg-muted/50 rounded-lg border border-border/10">
                           <Clock size={12} className="text-muted-foreground" />
@@ -311,7 +316,7 @@ export function MaintenanceClient({
       </section>
 
       {/* Tactical Footer */}
-      <div className="p-10 bg-background rounded-3xl border-2 border-border/5 flex flex-col items-center text-center space-y-4 mt-16 relative overflow-hidden group">
+      <div className="p-10 bg-background rounded-3xl border-2 border-border flex flex-col items-center text-center space-y-4 mt-16 relative overflow-hidden group">
           <div className="absolute inset-0 bg-gradient-to-b from-amber-500/5 to-transparent pointer-events-none" />
           <div className="p-3 bg-amber-500/20 rounded-2xl shadow-[0_0_20px_rgba(245,158,11,0.2)] border-2 border-amber-500/30 group-hover:scale-110 transition-all duration-700">
               <Wrench size={24} className="text-amber-500" />

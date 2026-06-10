@@ -165,8 +165,8 @@ export function JobActionButton({ job }: JobActionButtonProps) {
       case 'Completed':
           renderStatus = (
               <div className="p-4 bg-emerald-500/10 rounded-2xl border border-emerald-500/20 text-center">
-                  <p className="text-emerald-600 font-bold flex items-center justify-center gap-2">
-                      <CheckCircle size={20} /> ภารกิจเสร็จสิ้นแล้ว
+                  <p className="text-emerald-600 font-semibold flex items-center justify-center gap-2">
+                      <CheckCircle size={20} /> งานเสร็จสิ้นแล้ว
                   </p>
               </div>
           )
@@ -174,8 +174,8 @@ export function JobActionButton({ job }: JobActionButtonProps) {
 
       default:
           renderStatus = (
-              <div className="p-4 bg-slate-100 rounded-2xl text-center">
-                  <p className="text-slate-500 text-xs italic">ไม่ทราบสถานะ ({currentStatus})</p>
+              <div className="p-4 bg-muted rounded-2xl text-center">
+                  <p className="text-muted-foreground text-xs">ไม่ทราบสถานะ ({currentStatus})</p>
               </div>
           )
           break
@@ -194,20 +194,20 @@ export function JobActionButton({ job }: JobActionButtonProps) {
   const phone_totalDrop = Array.isArray(job.original_destinations_json) ? job.original_destinations_json.length : 1
   const phone_currentDropIndex = Math.min(phone_completedDrops, phone_totalDrop - 1)
   const phone_currentDest = Array.isArray(job.original_destinations_json) ? job.original_destinations_json[phone_currentDropIndex] : null
-  const phone = phone_currentDest?.phone || (job as any).Customer_Phone
+  const phone = phone_currentDest?.phone || (job as { Customer_Phone?: string | null }).Customer_Phone
 
   return (
     <div className="space-y-3">
         <div className="flex flex-col">
             {/* Step Guidance Header */}
-            <div className="p-5 border-b border-white/5 bg-primary/5 rounded-t-2xl">
+            <div className="p-5 border-b border-border bg-primary/5 rounded-t-2xl">
                 <div className="flex items-start gap-4">
                     <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
                         <Info className="text-primary" size={20} />
                     </div>
                     <div className="flex-1 min-w-0">
                         <div className="flex items-center justify-between">
-                            <p className="text-[10px] font-black text-primary uppercase tracking-[0.2em] mb-1">สิ่งที่คุณต้องทำตอนนี้</p>
+                            <p className="text-xs font-semibold text-primary mb-1">สิ่งที่ต้องทำตอนนี้</p>
                             
                             {/* Integrated Call Button */}
                             <button 
@@ -227,16 +227,16 @@ export function JobActionButton({ job }: JobActionButtonProps) {
                                 )}
                             >
                                 <Phone size={10} strokeWidth={3} />
-                                <span className="text-[10px] font-black uppercase tracking-wider">{phone ? "โทร" : "ไม่มีเบอร์"}</span>
+                                <span className="text-[10px] font-semibold">{phone ? "โทร" : "ไม่มีเบอร์"}</span>
                             </button>
                         </div>
-                        <h4 className="text-sm font-bold text-foreground leading-tight mt-1">
-                            {currentStatus === 'Assigned' || currentStatus === 'New' ? 'กรุณากด "เริ่มงาน" เพื่อเริ่มต้นภารกิจ' : 
+                        <h4 className="text-sm font-semibold text-foreground leading-tight mt-1">
+                            {currentStatus === 'Assigned' || currentStatus === 'New' ? 'กรุณากด "เริ่มงาน" เพื่อเริ่มงาน' : 
                                 currentStatus === 'Accepted' ? 'เดินทางไปยังจุดรับสินค้า' :
                                 currentStatus === 'Arrived Pickup' ? (job.job_type === 'container' ? 'ถึงลานตู้แล้ว กรุณาถ่ายรูป EIR และสภาพตู้' : 'ถึงจุดรับแล้ว กรุณาถ่ายรูปรับสินค้า') :
                                 currentStatus === 'Picked Up' || currentStatus === 'In Transit' ? (isMultiDrop ? `กำลังเดินทางไปจุดที่ ${currentDropIndex}` : 'กำลังเดินทางไปยังจุดหมาย') :
                                 currentStatus === 'Arrived Dropoff' ? (isMultiDrop ? `ถึงจุดส่งที่ ${currentDropIndex} แล้ว บันทึกส่งงาน` : 'ถึงที่หมายแล้ว บันทึกส่งงาน') :
-                                'อยู่ระหว่างดำเนินการ'}
+                                'อยู่ระหว่างดำเนินงาน'}
                         </h4>
                         
                         {/* Multi-drop Specific Detail */}
@@ -257,7 +257,7 @@ export function JobActionButton({ job }: JobActionButtonProps) {
                         {/* Destination Name for current stop */}
                         {(currentStatus === 'In Transit' || currentStatus === 'Arrived Dropoff' || currentStatus === 'Picked Up') && (
                             <div className="mt-2 space-y-1">
-                                <p className="text-xs font-medium text-muted-foreground line-clamp-1 italic">
+                                <p className="text-xs font-medium text-muted-foreground line-clamp-1">
                                     จุดหมาย: {
                                         isMultiDrop 
                                             ? (Array.isArray(job.original_destinations_json) ? job.original_destinations_json[currentDropIndex - 1]?.name : 'ไม่ระบุ')
@@ -289,7 +289,7 @@ export function JobActionButton({ job }: JobActionButtonProps) {
                     disabled={loading || currentStatus === 'Completed'}
                     size="lg"
                     className={cn(
-                        "w-full h-14 rounded-2xl text-base font-black uppercase tracking-widest gap-2 shadow-2xl transition-all active:scale-95",
+                        "w-full h-14 rounded-xl text-base font-semibold gap-2 shadow-sm transition-all active:scale-95",
                         variant === 'primary' ? "bg-emerald-600 hover:bg-emerald-700 text-white" : "bg-primary hover:bg-primary/90 text-white"
                     )}
                 >

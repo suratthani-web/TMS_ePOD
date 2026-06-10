@@ -77,7 +77,7 @@ export async function getWorkforceAnalytics(
   const { data: activeJobs } = await activeJobsQueryBuilder
   
   if (activeJobs) {
-      const uniqueDrivers = new Set(activeJobs.map((j: any) => j.Driver_ID))
+      const uniqueDrivers = new Set(activeJobs.map((j: { Driver_ID: string }) => j.Driver_ID))
       activeDriversCount = uniqueDrivers.size
   }
   
@@ -138,7 +138,7 @@ export async function getWorkforceAnalytics(
   // We specifically want Revenue and Job Count
   const leaderboard = await getDriverLeaderboard(startDate, endDate, effectiveBranchId)
   
-  const topPerformers = leaderboard.map((d: any) => ({
+  const topPerformers = leaderboard.map((d: { name: string, revenue: number, completedJobs: number, successRate: number }) => ({
       name: d.name,
       revenue: d.revenue,
       jobCount: d.completedJobs, // Using completed jobs as primary metric

@@ -14,7 +14,7 @@ export function LocationTracker({ driverId }: { driverId?: string, branchId?: st
   
   const lastUpdateRef = useRef<number>(0)
   const lastPosRef = useRef<{ lat: number; lng: number } | null>(null)
-  const wakeLockRef = useRef<any>(null)
+  const wakeLockRef = useRef<WakeLockSentinel | null>(null)
   const audioRef = useRef<HTMLAudioElement | null>(null)
   const watchIdRef = useRef<string | null>(null)
   
@@ -92,7 +92,7 @@ export function LocationTracker({ driverId }: { driverId?: string, branchId?: st
         // Screen Wake Lock
         if ('wakeLock' in navigator) {
             try {
-                wakeLockRef.current = await (navigator as any).wakeLock.request('screen')
+                wakeLockRef.current = await (navigator as Navigator & { wakeLock?: { request: (type: 'screen') => Promise<WakeLockSentinel> } }).wakeLock?.request('screen')
                 console.log("[PWA] Screen Wake Lock acquired")
             } catch (err) {
                 console.warn("[PWA] Wake Lock failed:", err)

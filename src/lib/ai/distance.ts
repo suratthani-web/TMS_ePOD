@@ -1,5 +1,16 @@
 "use server"
 
+type OsrmWaypoint = {
+  trips_index: number;
+  waypoint_index: number;
+}
+
+type OsrmTripResponse = {
+  code?: string;
+  waypoints?: OsrmWaypoint[];
+  routes?: { distance?: number }[];
+}
+
 /**
  * Distance Utility — TMS 2026
  * Using OSRM (Open Source Routing Machine) to get driving distances between points.
@@ -25,11 +36,11 @@ export async function getDrivingDistance(
 
     if (!response.ok) return null;
     
-    const data = await response.json();
+    const data = await response.json() as OsrmTripResponse;
     
     if (data.code === 'Ok' && data.routes && data.routes.length > 0) {
       // OSRM returns distance in meters, convert to kilometers
-      const distanceMeters = data.routes[0].distance;
+      const distanceMeters = data.routes[0].distance ?? 0;
       return parseFloat((distanceMeters / 1000).toFixed(2));
     }
     
@@ -65,14 +76,14 @@ export async function optimizeRouteSequence(
 
     if (!response.ok) return null;
     
-    const data = await response.json();
+    const data = await response.json() as OsrmTripResponse;
     
     if (data.code === 'Ok' && data.waypoints) {
       // waypoints[i].trips_index is the visit order for the i-th input point
       // We want to return a list of input indices in the order they should be visited
       const optimizedIndices = data.waypoints
-        .sort((a: any, b: any) => a.trips_index - b.trips_index)
-        .map((w: any) => w.waypoint_index);
+        .sort((a: OsrmWaypoint, b: OsrmWaypoint) => a.trips_index - b.trips_index)
+        .map((w: OsrmWaypoint) => w.waypoint_index);
       
       return optimizedIndices;
     }

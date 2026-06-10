@@ -10,104 +10,103 @@ export function ESGSection({ data }: { data: ESGStats }) {
   const { t } = useLanguage()
 
   return (
-    <div className="space-y-10">
+    <div className="space-y-6">
       {/* Sub-Section Header */}
       <div className="flex items-center gap-3">
-        <div className="p-2 bg-muted/60 rounded-xl text-emerald-500 shadow-lg border border-border/10">
-          <Leaf size={18} />
+        <div className="p-2 bg-muted rounded-xl text-success border border-border/80 shadow-sm">
+          <Leaf size={16} />
         </div>
-        <h3 className="text-xl font-black text-foreground tracking-tight uppercase premium-text-gradient">{t('dashboard.esg_intel')}</h3>
+        <h3 className="text-lg font-black text-foreground uppercase tracking-tight">{t('dashboard.esg_intel')}</h3>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-4 gap-8">
+      <div className="grid grid-cols-1 lg:grid-cols-4 gap-5">
         {/* Main ESG KPI */}
-        <PremiumCard className="lg:col-span-2 bg-muted/50 border border-border/10 shadow-2xl relative overflow-hidden group p-10 rounded-br-[5rem] rounded-tl-[3rem]">
-            <div className="absolute inset-0 bg-gradient-to-br from-emerald-500/20 via-emerald-500/5 to-transparent pointer-events-none" />
-            <div className="flex items-center justify-between mb-8 relative z-10">
-                <div className="space-y-2">
-                    <span className="text-emerald-400 text-[12px] font-black uppercase italic">{t('dashboard.env_impact_realized')}</span>
-                    <h4 className="text-4xl font-black text-foreground tracking-tighter">{t('dashboard.co2_offset')}</h4>
+        <PremiumCard className="lg:col-span-2 bg-card border border-border p-6 rounded-2xl shadow-sm relative overflow-hidden">
+            <div className="flex items-center justify-between mb-6 relative z-10">
+                <div className="space-y-1">
+                    <span className="text-success text-[10px] font-bold uppercase tracking-wider">{t('dashboard.env_impact_realized')}</span>
+                    <h4 className="text-base font-black text-foreground">{t('dashboard.co2_offset')}</h4>
                 </div>
-                <div className="p-4 bg-emerald-500/10 rounded-2xl text-emerald-500 shadow-2xl shadow-emerald-500/20">
-                    <Wind size={32} className="animate-pulse" />
+                <div className="p-2 bg-success/10 rounded-xl text-success border border-success/20">
+                    <Wind size={20} />
                 </div>
             </div>
             
-            <div className="grid grid-cols-2 gap-10 relative z-10">
+            <div className="grid grid-cols-2 gap-6 relative z-10">
                 <div>
-                     <div className="text-5xl font-black text-foreground tracking-tighter italic">
-                        {data.co2SavedKg.toLocaleString()}<span className="text-xl ml-2 text-muted-foreground">kg</span>
+                     <div className="text-3xl font-black text-foreground tracking-tight">
+                        {data.co2SavedKg.toLocaleString()}<span className="text-xs ml-1 text-muted-foreground">kg</span>
                      </div>
-                     <p className="text-base font-bold text-muted-foreground font-bold uppercase tracking-widest mt-3 flex items-center gap-2">
-                        <TrendingDown size={14} className="text-emerald-500" /> {t('dashboard.emission_reduction_aggregate')}
+                     <p className="text-[10px] text-muted-foreground font-bold uppercase tracking-wider mt-2 flex items-center gap-1.5">
+                        <TrendingDown size={12} className="text-success" /> {t('dashboard.emission_reduction_aggregate')}
                      </p>
                 </div>
-                <div className="border-l border-border/5 pl-10">
-                     <div className="text-5xl font-black text-emerald-500 tracking-tighter italic">
+                <div className="border-l border-border pl-6">
+                     <div className="text-3xl font-black text-success tracking-tight">
                         {data.treesSaved.toLocaleString()}
                      </div>
-                     <p className="text-base font-bold text-muted-foreground font-bold uppercase tracking-widest mt-3 flex items-center gap-2">
-                        <TreePine size={14} className="text-emerald-500" /> {t('dashboard.tree_equivalence_index')}
+                     <p className="text-[10px] text-muted-foreground font-bold uppercase tracking-wider mt-2 flex items-center gap-1.5">
+                        <TreePine size={12} className="text-success" /> {t('dashboard.tree_equivalence_index')}
                      </p>
                 </div>
             </div>
 
-            <div className="mt-10 pt-8 border-t border-border/5 relative z-10">
-                <div className="flex items-center justify-between mb-4">
-                    <span className="text-base font-bold text-muted-foreground font-black uppercase italic">{t('dashboard.optimization_efficiency')}</span>
-                    <span className="text-emerald-400 text-xl font-black italic">+{data.efficiencyRate}% {t('dashboard.target_sync')}</span>
+            <div className="mt-6 pt-4 border-t border-border relative z-10">
+                <div className="flex items-center justify-between mb-3">
+                    <span className="text-xs text-muted-foreground font-medium">{t('dashboard.optimization_efficiency')}</span>
+                    <span className="text-success text-sm font-black">+{data.efficiencyRate}% {t('dashboard.target_sync')}</span>
                 </div>
-                <div className="h-2 w-full bg-card rounded-full overflow-hidden border border-border/5 p-0.5">
-                    <div className="h-full bg-gradient-to-r from-emerald-600 to-emerald-400 rounded-full" style={{ width: `${data.efficiencyRate}%` }} />
+                <div className="h-2 w-full bg-muted rounded-full overflow-hidden">
+                    <div className="h-full bg-success rounded-full" style={{ width: `${data.efficiencyRate}%` }} />
                 </div>
             </div>
         </PremiumCard>
 
         {/* Small Detail Cards */}
-        <div className="lg:col-span-2 grid grid-cols-1 md:grid-cols-2 gap-8">
-             <PremiumCard className="bg-muted/50 border border-border/10 shadow-2xl p-8 rounded-br-[3rem] rounded-tl-[1.5rem] group hover:scale-[1.02] transition-transform duration-500">
-                <div className="flex items-center gap-4 mb-6">
-                    <div className="p-2 bg-background rounded-xl text-blue-400 shadow-lg border border-border/5">
-                        <Activity size={18} />
+        <div className="lg:col-span-2 grid grid-cols-1 md:grid-cols-2 gap-5">
+             <PremiumCard className="bg-card border border-border p-5 rounded-2xl shadow-sm hover:border-primary/30 transition-all duration-300">
+                <div className="flex items-center gap-3 mb-4">
+                    <div className="p-2 bg-muted rounded-xl text-primary border border-border/80 shadow-sm">
+                        <Activity size={16} />
                     </div>
                     <div>
-                        <h4 className="text-xl font-black text-foreground uppercase italic">{t('dashboard.saved_distance')}</h4>
-                        <p className="text-base font-bold text-muted-foreground font-bold uppercase">{t('dashboard.fleet_optimization')}</p>
+                        <h4 className="text-sm font-black text-foreground">{t('dashboard.saved_distance')}</h4>
+                        <p className="text-[10px] text-muted-foreground uppercase font-bold tracking-wider">{t('dashboard.fleet_optimization')}</p>
                     </div>
                 </div>
-                <div className="text-3xl font-black text-foreground tracking-tighter italic">
-                    {data.totalSavedKm.toLocaleString()}<span className="text-xl ml-1 text-muted-foreground">km</span>
+                <div className="text-2xl font-black text-foreground tracking-tight">
+                    {data.totalSavedKm.toLocaleString()}<span className="text-xs ml-1 text-muted-foreground">km</span>
                 </div>
              </PremiumCard>
 
-             <PremiumCard className="bg-muted/50 border border-border/10 shadow-2xl p-8 rounded-br-[3rem] rounded-tl-[1.5rem] group hover:scale-[1.02] transition-transform duration-500">
-                <div className="flex items-center gap-4 mb-6">
-                    <div className="p-2 bg-emerald-500 rounded-xl text-white shadow-lg shadow-emerald-500/20">
-                        <Leaf size={18} />
+             <PremiumCard className="bg-card border border-border p-5 rounded-2xl shadow-sm hover:border-success/30 transition-all duration-300">
+                <div className="flex items-center gap-3 mb-4">
+                    <div className="p-2 bg-success/10 rounded-xl text-success border border-success/20">
+                        <Leaf size={16} />
                     </div>
                     <div>
-                        <h4 className="text-xl font-black text-foreground uppercase italic">{t('dashboard.green_protocol')}</h4>
-                        <p className="text-base font-bold text-emerald-500 font-bold uppercase">{t('dashboard.esg_compliance_registry')}</p>
+                        <h4 className="text-sm font-black text-foreground">{t('dashboard.green_protocol')}</h4>
+                        <p className="text-[10px] text-success uppercase font-bold tracking-wider">{t('dashboard.esg_compliance_registry')}</p>
                     </div>
                 </div>
-                <div className="text-3xl font-black text-foreground tracking-tighter italic">
+                <div className="text-2xl font-black text-foreground tracking-tight">
                     {t('dashboard.active_label')}
                 </div>
              </PremiumCard>
 
-             <PremiumCard className="md:col-span-2 bg-muted/50 border border-border/10 shadow-2xl p-8 rounded-br-[4rem] rounded-tl-[2rem] flex items-center justify-between">
-                <div className="space-y-1">
-                    <h4 className="text-lg font-bold font-black text-foreground uppercase italic">{t('dashboard.industrial_esg_rating')}</h4>
-                    <p className="text-base font-bold text-muted-foreground font-bold uppercase">{t('dashboard.structural_sustainability_index')}</p>
+             <PremiumCard className="md:col-span-2 bg-card border border-border p-5 rounded-2xl shadow-sm flex items-center justify-between">
+                <div className="space-y-0.5">
+                    <h4 className="text-sm font-black text-foreground">{t('dashboard.industrial_esg_rating')}</h4>
+                    <p className="text-[10px] text-muted-foreground uppercase font-bold tracking-wider">{t('dashboard.structural_sustainability_index')}</p>
                 </div>
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-1.5">
                     {[1,2,3,4,5].map(i => (
                         <div key={i} className={cn(
-                            "w-4 h-6 rounded-sm bg-muted/50",
-                            i <= 4 ? "bg-emerald-500 shadow-sm shadow-emerald-500/50" : ""
+                            "w-2 h-4 rounded-sm bg-muted",
+                            i <= 4 ? "bg-success" : ""
                         )} />
                     ))}
-                    <span className="ml-3 text-2xl font-black text-foreground italic">A+</span>
+                    <span className="ml-2 text-xl font-black text-foreground">A+</span>
                 </div>
              </PremiumCard>
         </div>

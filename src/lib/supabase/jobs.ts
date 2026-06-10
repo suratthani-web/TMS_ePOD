@@ -96,7 +96,7 @@ export type Job = {
     lfd_detention: string | null
     eir_gate_in_url: string | null
     eir_gate_out_url: string | null
-    container_condition_json: any
+    container_condition_json: unknown
     target_temperature?: number | null
     booking_no?: string | null
     container_subtype?: string | null
@@ -111,7 +111,7 @@ export type Job = {
   Sensor_Verified?: 'Verified' | 'Suspect' | null
   Sensor_Max_Elevation_Diff?: number | null
   Sensor_Total_Steps_Upward?: number | null
-  Sensor_Logs_Json?: any
+  Sensor_Logs_Json?: unknown
 }
 
 // Removed duplicate definition
@@ -162,7 +162,7 @@ export async function getTodayJobs(date?: string, branchId?: string): Promise<Jo
     const { data } = await dbQuery
       .order('Created_At', { ascending: false })
     
-    return data || []
+    return (data || []) as Job[]
   } catch {
     return []
   }
@@ -239,7 +239,7 @@ export async function getJobsByStatus(status: string): Promise<Job[]> {
       return []
     }
     
-    return data || []
+    return (data || []) as Job[]
   } catch {
     return []
   }
@@ -369,11 +369,11 @@ export async function getTodayJobStats(branchId?: string, startDate?: string, en
     const jobs = data || []
     return {
       total: jobs.length,
-      delivered: jobs.filter((j: any) => j.Job_Status === 'Delivered' || j.Job_Status === 'Completed').length,
-      inProgress: jobs.filter((j: any) => j.Job_Status === 'In Transit' || j.Job_Status === 'In Progress' || j.Job_Status === 'Arrived Pickup' || j.Job_Status === 'Arrived Dropoff').length,
-      pending: jobs.filter((j: any) => j.Job_Status === 'New' || j.Job_Status === 'Assigned' || j.Job_Status === 'Requested' || j.Job_Status === 'Pending').length,
-      sos: jobs.filter((j: any) => j.Job_Status === 'SOS').length,
-      totalQty: jobs.reduce((sum: number, j: any) => sum + (Number(j.Loaded_Qty) || 0), 0)
+      delivered: jobs.filter((j: Partial<Job>) => j.Job_Status === 'Delivered' || j.Job_Status === 'Completed').length,
+      inProgress: jobs.filter((j: Partial<Job>) => j.Job_Status === 'In Transit' || j.Job_Status === 'In Progress' || j.Job_Status === 'Arrived Pickup' || j.Job_Status === 'Arrived Dropoff').length,
+      pending: jobs.filter((j: Partial<Job>) => j.Job_Status === 'New' || j.Job_Status === 'Assigned' || j.Job_Status === 'Requested' || j.Job_Status === 'Pending').length,
+      sos: jobs.filter((j: Partial<Job>) => j.Job_Status === 'SOS').length,
+      totalQty: jobs.reduce((sum: number, j: Partial<Job>) => sum + (Number(j.Loaded_Qty) || 0), 0)
     }
   } catch {
     return { total: 0, delivered: 0, inProgress: 0, pending: 0, totalQty: 0 }
@@ -423,11 +423,11 @@ export async function getJobStatsSummary(query = '', startDate = '', endDate = '
     
     return {
       total: data.length,
-      success: data.filter((j: any) => ['Delivered', 'Complete', 'Completed'].includes(j.Job_Status || '')).length,
-      failed: data.filter((j: any) => j.Job_Status === 'Failed').length,
-      cancelled: data.filter((j: any) => j.Job_Status === 'Cancelled').length,
-      withPhoto: data.filter((j: any) => j.Photo_Proof_Url || j.Pickup_Photo_Url).length,
-      withSignature: data.filter((j: any) => j.Signature_Url || j.Pickup_Signature_Url).length
+      success: data.filter((j: Partial<Job>) => ['Delivered', 'Complete', 'Completed'].includes(j.Job_Status || '')).length,
+      failed: data.filter((j: Partial<Job>) => j.Job_Status === 'Failed').length,
+      cancelled: data.filter((j: Partial<Job>) => j.Job_Status === 'Cancelled').length,
+      withPhoto: data.filter((j: Partial<Job>) => j.Photo_Proof_Url || j.Pickup_Photo_Url).length,
+      withSignature: data.filter((j: Partial<Job>) => j.Signature_Url || j.Pickup_Signature_Url).length
     }
   } catch {
     return { success: 0, failed: 0, cancelled: 0, total: 0, withPhoto: 0, withSignature: 0 }
@@ -470,7 +470,7 @@ export async function getTodayFinancials(branchId?: string) {
     
     if (!data) return { revenue: 0 }
 
-    const revenue = data.reduce((sum: number, job: any) => sum + (job.Price_Cust_Total || 0), 0) || 0
+    const revenue = data.reduce((sum: number, job: Partial<Job>) => sum + (job.Price_Cust_Total || 0), 0) || 0
     return { revenue }
   } catch {
     return { revenue: 0 }
@@ -538,7 +538,7 @@ export async function getDriverJobs(
       return []
     }
     
-    return data || []
+    return (data || []) as Job[]
   } catch {
     return []
   }
@@ -714,11 +714,11 @@ export async function getWeeklyJobStats(branchId?: string) {
         dailyStats[dateStr] = { date: dayName, total: 0, completed: 0 }
     }
 
-    data?.forEach((job: any) => {
+    data?.forEach((job: Partial<Job>) => {
         const dateStr = job.Plan_Date as string // Assuming Plan_Date is string YYYY-MM-DD
         if (dailyStats[dateStr]) {
             dailyStats[dateStr].total += 1
-            if (['Delivered', 'Completed'].includes(job.Job_Status)) {
+            if (job.Job_Status && ['Delivered', 'Completed'].includes(job.Job_Status)) {
                 dailyStats[dateStr].completed += 1
             }
         }
@@ -759,7 +759,7 @@ export async function getJobStatusDistribution(branchId?: string) {
         if (!data) return []
 
         const statusCounts: Record<string, number> = {}
-        data?.forEach((job: any) => {
+        data?.forEach((job: Partial<Job>) => {
             const status = job.Job_Status || 'Unknown'
             statusCounts[status] = (statusCounts[status] || 0) + 1
         })
@@ -900,7 +900,7 @@ export async function getAllDrivers() {
 
         // De-duplicate by Driver_ID
         const uniqueDrivers = new Map()
-        data?.forEach((item: any) => {
+        data?.forEach((item: Partial<Job>) => {
             if (item.Driver_ID && !uniqueDrivers.has(item.Driver_ID)) {
                 uniqueDrivers.set(item.Driver_ID, item)
             }
@@ -940,7 +940,7 @@ export async function getAllVehicles() {
         if (!data) return []
 
         const uniqueVehicles = new Map()
-        data?.forEach((item: any) => {
+        data?.forEach((item: Partial<Job>) => {
             if (item.Vehicle_Plate && !uniqueVehicles.has(item.Vehicle_Plate)) {
                 uniqueVehicles.set(item.Vehicle_Plate, item)
             }
@@ -961,7 +961,7 @@ export async function getJobsForBilling(
 ): Promise<Job[]> {
     try {
         const isSuper = await isSuperAdmin()
-        const isRegularAdmin = await isAdmin()
+        const _isRegularAdmin = await isAdmin()
         const branchId = await getUserBranchId()
         const sessionCustomerId = await getCustomerId()
         const customerId = explicitCustomerId || sessionCustomerId
@@ -1026,22 +1026,22 @@ export async function getJobsForBilling(
             return []
         }
 
-        const uniqueCustomerIds = Array.from(new Set(data.filter((j: any) => j.Customer_ID).map((j: any) => j.Customer_ID)))
+        const uniqueCustomerIds = Array.from(new Set(data.filter((j: Partial<Job>) => j.Customer_ID).map((j: Partial<Job>) => j.Customer_ID)))
         const { data: customerPrices } = await supabase
             .from('Master_Customers')
             .select('Customer_ID, Price_Per_Unit')
             .in('Customer_ID', uniqueCustomerIds)
 
-        const priceMap = new Map(customerPrices?.map((c: any) => [c.Customer_ID, c.Price_Per_Unit]) || [])
+        const priceMap = new Map(customerPrices?.map((c: { Customer_ID: string, Price_Per_Unit: number }) => [c.Customer_ID, c.Price_Per_Unit]) || [])
 
         // Process each job to find the best matching price for its specific date
-        const enhancedJobs = await Promise.all(data.map(async (job: any) => {
+        const enhancedJobs = await Promise.all(data.map(async (job: Partial<Job>) => {
             const dateStr = String(job.Plan_Date || "")
             const jobDate = job.Plan_Date ? new Date(job.Plan_Date) : null
             const isApril21_23 = (jobDate && jobDate.getFullYear() === 2026 && jobDate.getMonth() === 3 && [21, 22, 23].includes(jobDate.getDate())) ||
                                  dateStr.includes("-04-21") || dateStr.includes("-04-22") || dateStr.includes("-04-23")
             
-            let finalPrice = priceMap.get(job.Customer_ID) || job.Price_Per_Unit || 0
+            let finalPrice = priceMap.get(job.Customer_ID || '') || job.Price_Per_Unit || 0
             
             // If the job has a route and customer, strictly try to find a date-specific rate from fuel matrix
             // This ensures historical rates are applied correctly
@@ -1132,13 +1132,13 @@ export async function getDriverDashboardStats(driverId: string) {
     const isIncomeVisible = driverProfile?.Show_Price_Default !== false
 
     // Calculate today's income
-    const todayIncome = isIncomeVisible ? (jobs?.filter((j: any) => 
+    const todayIncome = isIncomeVisible ? (jobs?.filter((j: Partial<Job>) => 
         j.Plan_Date === today && 
         j.Job_Status !== 'Cancelled' &&
         j.Show_Price_To_Driver !== false
-    ).reduce((sum: number, j: any) => sum + (j.Cost_Driver_Total || 0), 0) || 0) : 0
+    ).reduce((sum: number, j: Partial<Job>) => sum + (j.Cost_Driver_Total || 0), 0) || 0) : 0
 
-    const activeJobs = jobs?.filter((j: any) => !['Completed', 'Delivered', 'Cancelled', 'Draft'].includes(j.Job_Status || '')) || []
+    const activeJobs = jobs?.filter((j: Partial<Job>) => !['Completed', 'Delivered', 'Cancelled', 'Draft'].includes(j.Job_Status || '')) || []
     const currentJob = activeJobs.length > 0 ? activeJobs[0] : null
     const totalRemaining = activeJobs.length
 
@@ -1218,18 +1218,18 @@ export async function getBillableJobs(customerId?: string, startDate?: string, e
 
     // Map unit prices from Master_Customers + Dynamic Fuel Matrix
     try {
-        const uniqueCustomerIds = Array.from(new Set(data.filter((j: any) => j.Customer_ID).map((j: any) => j.Customer_ID)))
+        const uniqueCustomerIds = Array.from(new Set(data.filter((j: Partial<Job>) => j.Customer_ID).map((j: Partial<Job>) => j.Customer_ID)))
         
         const { data: customerPrices } = await supabase
             .from('Master_Customers')
             .select('Customer_ID, Price_Per_Unit')
             .in('Customer_ID', uniqueCustomerIds)
 
-        const priceMap = new Map(customerPrices?.map((c: any) => [c.Customer_ID, c.Price_Per_Unit]) || [])
+        const _priceMap = new Map(customerPrices?.map((c: { Customer_ID: string, Price_Per_Unit: number }) => [c.Customer_ID, c.Price_Per_Unit]) || [])
 
         /* 
         // Process each job to find the best matching price for its specific date
-        const enhancedJobs = await Promise.all(data.map(async (job: any) => {
+        const enhancedJobs = await Promise.all(data.map(async (job: Partial<Job>) => {
             const dateStr = String(job.Plan_Date || "")
             const jobDate = job.Plan_Date ? new Date(job.Plan_Date) : null
             const isApril21_23 = (jobDate && jobDate.getFullYear() === 2026 && jobDate.getMonth() === 3 && [21, 22, 23].includes(jobDate.getDate())) ||
@@ -1353,7 +1353,7 @@ export async function getRequestedJobs(providedBranchId?: string): Promise<Job[]
         }
 
         // Map column name Branch_ID to type field branch_id for frontend consistency
-        const mappedData = data.map((job: any) => ({
+        const mappedData = data.map((job: Partial<Job> & { branch_id?: string }) => ({
             ...job,
             branch_id: job.Branch_ID || job.branch_id
         }))
@@ -1377,11 +1377,13 @@ export async function getAllVehiclePlates() {
             .not('Vehicle_Plate', 'is', null)
             .order('Vehicle_Plate', { ascending: true });
         
-        return Array.from(new Set((data || []).map((v: any) => v.Vehicle_Plate)));
+        return Array.from(new Set((data || []).map((v: { Vehicle_Plate: string }) => v.Vehicle_Plate)));
     } catch {
         return [];
     }
 }
+
+import { transitionBulkJobStatus } from "@/services/job-status-machine"
 
 /**
  * ปรับปรุงสถานะงานจาก Draft เป็น New (เพื่อส่งงานให้คนขับ)
@@ -1389,23 +1391,35 @@ export async function getAllVehiclePlates() {
 export async function publishDraftJobs(date: string, branchId?: string) {
     try {
         const supabase = await createAdminClient()
-        let query = supabase
+        
+        // 1. Identify which jobs to update first (to get their IDs and for notifications)
+        let findQuery = supabase
             .from('Jobs_Main')
-            .update({ Job_Status: 'New' })
+            .select('Job_ID, Driver_ID, Customer_Name')
             .eq('Job_Status', 'Draft')
             .eq('Plan_Date', date)
-            .select('Job_ID, Driver_ID, Customer_Name')
         
         if (branchId && branchId !== 'All') {
-            query = query.eq('Branch_ID', branchId)
+            findQuery = findQuery.eq('Branch_ID', branchId)
         }
         
-        const { data: updatedJobs, error } = await query
+        const { data: jobsToUpdate, error: fetchError } = await findQuery
         
+        if (fetchError || !jobsToUpdate || jobsToUpdate.length === 0) {
+            return { success: true, jobs: [] }
+        }
+
+        const jobIds = jobsToUpdate.map(j => j.Job_ID)
+
+        // 2. Perform bulk transition using machine
+        const result = await transitionBulkJobStatus(jobIds, 'New', {
+            reason: 'Publishing draft jobs from planning'
+        })
+
         return { 
-            success: !error, 
-            error: error ? { message: error.message, details: error.details } : null, 
-            jobs: updatedJobs || [] 
+            success: result.success, 
+            error: result.error ? { message: result.error } : null, 
+            jobs: jobsToUpdate
         }
     } catch (e) {
         console.error('[Jobs] publishDraftJobs error:', e)

@@ -180,7 +180,7 @@ export default function ContainerDashboard() {
                                         const detentionStatus = getLFDStatus(job.container?.lfd_detention)
                                         const demurrageStatus = getLFDStatus(job.container?.lfd_demurrage)
                                         const targetTemp = job.container?.target_temperature
-                                        const latestTemp = (job as any).latest_temp
+                                        const latestTemp = Number((job as { latest_temp?: number | string | null }).latest_temp ?? 0)
                                         const isTempWarning = targetTemp !== null && targetTemp !== undefined && latestTemp !== null && latestTemp > (targetTemp + 2)
 
                                         return (

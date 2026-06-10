@@ -228,7 +228,7 @@ export default function InvoicesClient({ initialInvoices, billableJobs, customer
                 </button>
               </div>
               <InvoiceForm 
-                customers={customers as any} 
+                customers={customers} 
                 initialData={{ 
                     customerId: selectedCustomerId === 'all' ? "" : selectedCustomerId, 
                     jobIds: selectedJobIds 

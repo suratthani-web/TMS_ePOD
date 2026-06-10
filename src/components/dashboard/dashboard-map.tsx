@@ -27,6 +27,44 @@ function LoadingMap() {
   )
 }
 
+type RoutePoint = {
+    lat?: number | string | null
+    lng?: number | string | null
+    name?: string | null
+}
+
+type DashboardMapJob = {
+    Job_ID: string
+    Job_Status?: string | null
+    Pickup_Lat?: number | string | null
+    Pickup_Lon?: number | string | null
+    Delivery_Lat?: number | string | null
+    Delivery_Lon?: number | string | null
+    Origin_Location?: string | null
+    Dest_Location?: string | null
+    original_origins_json?: string | RoutePoint[] | null
+    original_destinations_json?: string | RoutePoint[] | null
+    Price_Cust_Total?: number | string | null
+    Cost_Driver_Total?: number | string | null
+}
+
+type MissionMarker = {
+    id: string
+    jobId: string
+    name: string
+    lat: number
+    lng: number
+    type: 'origin' | 'destination'
+    status: string
+    originName: string
+    destName: string
+}
+
+type RouteHistoryPoint = {
+    lat: number
+    lng: number
+}
+
 interface DashboardMapProps {
     drivers: {
         Driver_ID: string
@@ -36,8 +74,8 @@ interface DashboardMapProps {
         Latitude: number | null
         Longitude: number | null
     }[]
-    allJobs?: any[]
-    activeJobs?: any[]
+    allJobs?: DashboardMapJob[]
+    activeJobs?: DashboardMapJob[]
     focusPosition?: [number, number]
     plannedRoute?: { lat: number; lng: number; name: string; type: 'start' | 'stop' | 'end' }[]
     routeSummary?: {
@@ -95,7 +133,7 @@ export function DashboardMap({ drivers, allJobs = [], activeJobs = [], focusPosi
 
     // Generate Mission Locations (Origins & Destinations) for each job
     const jobMissions = useMemo(() => {
-        const missions: any[] = []
+        const missions: MissionMarker[] = []
         // Only render interactive mission markers for active (live) jobs
         const jobsToUse = activeJobs
         
@@ -145,7 +183,7 @@ export function DashboardMap({ drivers, allJobs = [], activeJobs = [], focusPosi
                     lat: finalOLat,
                     lng: finalOLng,
                     type: 'origin',
-                    status: j.Job_Status,
+                    status: j.Job_Status || 'Unknown',
                     originName: oName || 'Pickup',
                     destName: dName || 'Delivery'
                 })
@@ -160,7 +198,7 @@ export function DashboardMap({ drivers, allJobs = [], activeJobs = [], focusPosi
                     lat: finalDLat,
                     lng: finalDLng,
                     type: 'destination',
-                    status: j.Job_Status,
+                    status: j.Job_Status || 'Unknown',
                     originName: oName || 'Pickup',
                     destName: dName || 'Delivery'
                 })
@@ -212,7 +250,7 @@ export function DashboardMap({ drivers, allJobs = [], activeJobs = [], focusPosi
                 toast.info("No route data found for this period")
                 setRouteHistory([])
             } else {
-                setRouteHistory(data.map((d: any) => [d.lat, d.lng] as [number, number]))
+                setRouteHistory((data as RouteHistoryPoint[]).map((d) => [d.lat, d.lng] as [number, number]))
                 toast.success(`Loaded ${data.length} GPS points`)
             }
         } catch {

@@ -19,7 +19,6 @@ import {
   Activity,
   Navigation,
   Users,
-  Building,
   Calendar,
   CalendarDays,
   Receipt,
@@ -27,18 +26,20 @@ import {
   History,
   CheckCircle2,
   Zap,
-  Bot,
   Settings,
   ShieldCheck,
   ShieldAlert,
   Key,
   Compass,
   MapPin,
+  HeartPulse,
+  Siren,
 } from "lucide-react"
 
 import { SidebarProfile } from "./sidebar-profile"
 import { useLanguage } from "@/components/providers/language-provider"
-import { getPermissionsByRole } from "@/lib/actions/permission-actions"
+
+type Translate = (path: string, data?: Record<string, string | number>) => string
 
 interface NavItem {
   titleKey: string
@@ -50,39 +51,46 @@ interface NavItem {
 
 interface NavGroup {
   titleKey: string
+  titleFallback?: {
+    th: string
+    en: string
+  }
   items: NavItem[]
 }
 
 const navigation: NavGroup[] = [
   {
     titleKey: "nav_groups.ops_command",
+    titleFallback: { th: "ภาพรวม", en: "Overview" },
     items: [
       { titleKey: "navigation.dashboard", href: "/dashboard", icon: <LayoutDashboard size={20} /> },
+      { titleKey: "navigation.exception_center", href: "/admin/exceptions", icon: <Siren size={20} />, badgeColor: "red" },
+      { titleKey: "navigation.operations_health", href: "/admin/health", icon: <HeartPulse size={20} /> },
       { titleKey: "navigation.user_monitor", href: "/admin/monitoring/users", icon: <Users size={20} /> },
     ],
   },
   {
     titleKey: "nav_groups.operations",
+    titleFallback: { th: "งานขนส่ง", en: "Transport Operations" },
     items: [
       { titleKey: "navigation.planning", href: "/planning", icon: <CalendarDays size={20} /> },
       { titleKey: "navigation.tracking_hub", href: "/admin/tracking", icon: <Compass size={20} /> },
       { titleKey: "navigation.calendar", href: "/calendar", icon: <Calendar size={20} /> },
       { titleKey: "navigation.history", href: "/jobs/history", icon: <History size={20} /> },
       { titleKey: "navigation.monitoring", href: "/monitoring", icon: <MapPin size={20} /> },
-      { titleKey: "navigation.notifications", href: "/notifications", icon: <AlertTriangle size={20} />, badgeColor: "red" },
       { titleKey: "navigation.chat", href: "/chat", icon: <MessageSquare size={20} />, badgeColor: "blue" },    
     ],
   },
   {
     titleKey: "nav_groups.asset_control",
+    titleFallback: { th: "รถและทรัพยากร", en: "Fleet & Resources" },
     items: [
       { titleKey: "navigation.routes", href: "/routes", icon: <Navigation size={20} /> },
       { titleKey: "navigation.danger_zones", href: "/routes/danger-zones", icon: <ShieldAlert size={20} />, badgeColor: "red" },
       { titleKey: "navigation.drivers", href: "/drivers", icon: <Users size={20} /> },
       { titleKey: "navigation.driver_leaves", href: "/admin/driver-leaves", icon: <CalendarDays size={20} /> }, 
-      { titleKey: "navigation.customers", href: "/settings/customers", icon: <Building size={20} /> },
       { titleKey: "navigation.fleet", href: "/vehicles", icon: <Truck size={20} /> },
-      { titleKey: "navigation.fleet_intelligence", href: "/vehicles/intelligence", icon: <Zap size={20} /> },   
+      { titleKey: "navigation.notifications", href: "/notifications", icon: <ShieldCheck size={20} />, badgeColor: "blue" },
       { titleKey: "navigation.checks", href: "/admin/vehicle-checks", icon: <CheckCircle2 size={20} /> },       
       { titleKey: "navigation.maintenance", href: "/maintenance", icon: <Wrench size={20} /> },
       { titleKey: "navigation.fuel", href: "/fuel", icon: <Fuel size={20} /> },
@@ -90,14 +98,15 @@ const navigation: NavGroup[] = [
   },
   {
     titleKey: "nav_groups.intelligence",
+    titleFallback: { th: "รายงานและวิเคราะห์", en: "Reports & Analytics" },
     items: [
       { titleKey: "navigation.analytics", href: "/admin/analytics", icon: <BarChart3 size={20} />, badgeColor: "blue" },
-      { titleKey: "navigation.ai", href: "/intelligence", icon: <Bot size={20} />, badgeColor: "green" },       
       { titleKey: "navigation.reports", href: "/reports", icon: <BarChart3 size={20} /> },
     ],
   },
   {
     titleKey: "nav_groups.financial",
+    titleFallback: { th: "การเงินและวางบิล", en: "Finance & Billing" },
     items: [
       { titleKey: "navigation.billing_customer", href: "/billing/customer", icon: <Receipt size={20} /> },      
       { titleKey: "navigation.billing_automation", href: "/billing/automation", icon: <Zap size={20} />, badge: "common.new", badgeColor: "yellow" },
@@ -107,6 +116,7 @@ const navigation: NavGroup[] = [
   },
   {
     titleKey: "nav_groups.settings",
+    titleFallback: { th: "ตั้งค่าระบบ", en: "System Settings" },
     items: [
       { titleKey: "navigation.settings", href: "/settings", icon: <Settings size={20} /> },
       { titleKey: "navigation.fleet_standards", href: "/settings/fleet-standards", icon: <ShieldCheck size={20} /> },
@@ -118,6 +128,7 @@ const navigation: NavGroup[] = [
 const customerNavigation: NavGroup[] = [
   {
     titleKey: "nav_groups.client_portal",
+    titleFallback: { th: "งานของลูกค้า", en: "Client Portal" },
     items: [
       { titleKey: "navigation.dashboard", href: "/dashboard", icon: <LayoutDashboard size={20} /> },
       { titleKey: "navigation.customer_tracking_hub", href: "/dashboard/tracking", icon: <Compass size={20} /> },
@@ -135,7 +146,7 @@ interface SidebarProps {
 
 export function Sidebar({ collapsed = false, onToggle }: SidebarProps) {
   const pathname = usePathname()
-  const { t } = useLanguage()
+  const { t, language } = useLanguage()
   const [sidebarState, setSidebarState] = React.useState<{
     allowedMenus: string[] | null
     isCustomerUser: boolean
@@ -166,7 +177,7 @@ export function Sidebar({ collapsed = false, onToggle }: SidebarProps) {
         // 2. Background Fetch & Sync
         try {
             const { getEffectivePermissions } = await import("@/lib/actions/permission-actions")
-            let perms = await getEffectivePermissions()
+            const perms = await getEffectivePermissions()
 
             const { getUserRole, isCustomer } = await import("@/lib/permissions")
             const { getUserProfile } = await import("@/lib/supabase/users")
@@ -194,6 +205,11 @@ export function Sidebar({ collapsed = false, onToggle }: SidebarProps) {
 
   const { allowedMenus, isCustomerUser, isLoaded } = sidebarState
   const activeNavigation = isCustomerUser ? customerNavigation : navigation
+  const getGroupTitle = (group: NavGroup) => {
+    if (group.titleFallback) return group.titleFallback[language]
+
+    return t(group.titleKey)
+  }
 
   const filteredNavigation = activeNavigation.map(group => ({
     ...group,
@@ -235,58 +251,63 @@ export function Sidebar({ collapsed = false, onToggle }: SidebarProps) {
       transition={{ duration: 0.5, ease: [0.4, 0, 0.2, 1] }}
       className={cn(
         "h-screen z-[1000] flex flex-col font-sans",
-        "glass-elite" // Premium utility class from globals.css
+        "glass-elite"
       )}
     >
-      {/* Header Container - Elite Version */}
+      {/* Header Container - Balanced brand lockup */}
       <div className={cn(
-        "relative flex flex-col items-center justify-center border-b border-border bg-background/40 backdrop-blur-md overflow-hidden transition-all duration-500",
-        collapsed ? "h-16" : "h-32"
+        "relative flex items-center justify-center border-b border-border bg-background/55 backdrop-blur-md overflow-hidden transition-all duration-300",
+        collapsed ? "h-16 px-3" : "h-24 px-5"
       )}>
-        {/* Elite Ambient Glow behind Logo */}
-        <div className="absolute inset-0 opacity-20 bg-[radial-gradient(circle_at_center,_var(--color-primary)_0%,_transparent_70%)] animate-pulse" />
-        
         <button
           onClick={onToggle}
+          aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
+          title={collapsed ? "Expand sidebar" : "Collapse sidebar"}
           className={cn(
-            "absolute z-[1001] p-1.5 rounded-full bg-primary text-white shadow-xl transition-all duration-500 hover:scale-110 active:scale-95",
+            "absolute z-[1001] p-1.5 rounded-full bg-primary text-white shadow-md transition-all duration-300 hover:scale-105 active:scale-95",
             collapsed ? "right-2 top-2" : "-right-3 top-6"
           )}
         >
           <ChevronLeft
             size={16}
-            className={cn("transition-transform duration-500", collapsed && "rotate-180")}
+            className={cn("transition-transform duration-300", collapsed && "rotate-180")}
           />
         </button>
 
-        <motion.div 
-            initial={{ scale: 0.8, opacity: 0 }}
-            animate={{ scale: 1, opacity: 1 }}
-            transition={{ type: "spring", stiffness: 100 }}
-            className={cn(
-                "relative flex items-center justify-center logo-container-pure transition-all duration-700",        
-                "bg-muted/30 rounded-full shadow-lg border border-border/10 overflow-hidden",
-                collapsed ? "w-10 h-10 p-1.5" : "w-24 h-24 p-3"
-            )}
+        <div
+          className={cn(
+            "relative z-10 flex items-center transition-all duration-300",
+            collapsed ? "justify-center" : "w-full justify-start gap-3"
+          )}
         >
-          {/* Scanning line effect */}
-          {!collapsed && <div className="absolute inset-0 w-full bg-gradient-to-b from-transparent via-primary/20 to-transparent h-1/2 animate-scan-line pointer-events-none" />}
-          
-          <div className="relative w-full h-full rounded-full overflow-hidden bg-background/10 flex items-center justify-center z-10">
+          <div className={cn(
+            "relative shrink-0 overflow-hidden rounded-2xl bg-white ring-1 ring-border/50",
+            "shadow-[0_12px_28px_rgba(0,30,76,0.14)] dark:shadow-[0_12px_28px_rgba(0,0,0,0.35)]",
+            collapsed ? "h-10 w-10 rounded-xl" : "h-14 w-14"
+          )}>
             <Image
-              src="/logo2.png"
+              src="/logo-mark.png"
               alt="LogisPro"
               fill
               priority
               loading="eager"
-              sizes="(max-width: 768px) 40px, 96px"
+              sizes="56px"
               className={cn(
-                "object-contain logo-pure transition-all duration-700 hover:scale-110",
-                "mix-blend-multiply dark:mix-blend-normal dark:brightness-125"
+                "object-cover transition-transform duration-300 hover:scale-105"
               )}
             />
           </div>
-        </motion.div>
+          {!collapsed && (
+            <div className="min-w-0 leading-none">
+              <div className="text-[1.35rem] font-black italic uppercase tracking-tight text-accent">
+                LOGIS<span className="text-primary">PRO</span>
+              </div>
+              <div className="mt-1 truncate text-[0.68rem] font-bold text-muted-foreground">
+                {t('header.command_centre')}
+              </div>
+            </div>
+          )}
+        </div>
       </div>
 
       <nav className="flex-1 overflow-y-auto pt-6 pb-4 px-3 custom-scrollbar">
@@ -296,37 +317,18 @@ export function Sidebar({ collapsed = false, onToggle }: SidebarProps) {
                 <SidebarSkeleton collapsed={collapsed} />
               </motion.div>
             ) : (
-              <motion.div
-                variants={containerVariants}
-                initial="hidden"
-                animate="show"
-                className="space-y-6"
-              >
-                {filteredNavigation.map((group, groupIdx) => (
-                  <motion.div 
+              <div className="space-y-4">
+                {filteredNavigation.map((group) => (
+                  <div 
                     key={group.titleKey} 
-                    variants={{
-                        hidden: { opacity: 0, y: 30, scale: 0.95 },
-                        show: { opacity: 1, y: 0, scale: 1 }
-                    }}
-                    whileHover={{ 
-                        scale: 1.02,
-                        transition: { type: "spring", stiffness: 400, damping: 10 }
-                    }}
-                    className="glass-category-card glass-shine p-2 group/card"
-                    transition={{ 
-                        delay: 0.1 * groupIdx,
-                        type: "spring",
-                        stiffness: 100,
-                        damping: 15
-                    }}
+                    className="glass-category-card p-2 group/card"
                   >
                     {!collapsed && (
-                        <h3 className="category-title transition-colors duration-500 group-hover/card:text-primary/60">
-                            {t(group.titleKey)}
+                        <h3 className="category-title transition-colors duration-300">
+                            {getGroupTitle(group)}
                         </h3>
                     )}
-                    <div className="space-y-1.5">
+                    <div className="space-y-1">
                       {group.items.map((item) => (
                          <SidebarItem 
                             key={item.href} 
@@ -337,9 +339,9 @@ export function Sidebar({ collapsed = false, onToggle }: SidebarProps) {
                          />
                       ))}
                     </div>
-                  </motion.div>
+                  </div>
                 ))}
-              </motion.div>
+              </div>
             )}
         </AnimatePresence>
       </nav>
@@ -351,71 +353,88 @@ export function Sidebar({ collapsed = false, onToggle }: SidebarProps) {
   )
 }
 
-function SidebarItem({ item, collapsed, pathname, t }: { item: NavItem, collapsed: boolean, pathname: string | null, t: any }) {
+function SidebarItem({ item, collapsed, pathname, t }: { item: NavItem, collapsed: boolean, pathname: string | null, t: Translate }) {
     const isActive = pathname === item.href
+    const [tooltipTop, setTooltipTop] = React.useState<number | null>(null)
+    const label = t(item.titleKey)
+
+    const showTooltip = (event: React.MouseEvent<HTMLAnchorElement> | React.FocusEvent<HTMLAnchorElement>) => {
+        if (!collapsed) return
+
+        const rect = event.currentTarget.getBoundingClientRect()
+        setTooltipTop(rect.top + rect.height / 2)
+    }
     
     return (
-        <Link href={item.href} prefetch={true} className="block group">
-            <motion.div 
-                whileHover={{ x: 4 }}
-                whileTap={{ scale: 0.98 }}
+        <Link
+            href={item.href}
+            prefetch={true}
+            className="block group relative"
+            title={collapsed ? label : undefined}
+            aria-label={label}
+            onMouseEnter={showTooltip}
+            onMouseLeave={() => setTooltipTop(null)}
+            onFocus={showTooltip}
+            onBlur={() => setTooltipTop(null)}
+        >
+            <div 
                 className={cn(
-                    "relative flex items-center gap-3 px-3 h-11 rounded-xl transition-all duration-300 overflow-hidden",
+                    "relative flex items-center gap-3 px-3 h-10 rounded-xl transition-all duration-200 overflow-hidden",
                     isActive
-                        ? "nav-item-active glow-active"
+                        ? "nav-item-active"
                         : "text-secondary-foreground/70 hover:bg-muted/50 hover:text-foreground"
                 )}
             >
                 {/* Active Indicator Layer */}
                 {isActive && (
                 <>
-                    <motion.div
-                        layoutId="active-nav-glow"
-                        className="absolute inset-0 bg-primary/5 dark:bg-primary/10 pointer-events-none"
-                    />
-                    <motion.div
-                        layoutId="active-indicator"
-                        className="absolute left-0 top-2 bottom-2 w-1 bg-primary rounded-r-full shadow-[0_0_15px_rgba(var(--primary),0.8)]"
-                    />
+                    <div className="absolute inset-0 bg-primary/5 dark:bg-primary/10 pointer-events-none" />
+                    <div className="absolute left-0 top-2 bottom-2 w-1 bg-primary rounded-r-full" />
                 </>
                 )}
 
                 <div className={cn(
-                    "flex-shrink-0 transition-all duration-300 z-10 text-accent",
-                    isActive ? "scale-110" : "group-hover:scale-110 group-hover:text-accent/80"   
+                    "flex-shrink-0 transition-all duration-200 z-10 text-accent",
+                    isActive ? "scale-105" : "group-hover:scale-105"   
                 )}>
                     {item.icon}
                 </div>
 
                 {!collapsed && (
                 <span className={cn(
-                    "text-sm font-bold tracking-wide z-10 transition-colors duration-300 whitespace-nowrap",
+                    "text-sm font-bold tracking-wide z-10 transition-colors duration-200 whitespace-nowrap",
                     isActive ? "text-accent dark:text-foreground font-black" : "text-secondary-foreground/80 group-hover:text-foreground"
                 )}>
-                    {t(item.titleKey)}
+                    {label}
                 </span>
                 )}
 
                 {item.badge && !collapsed && (
-                <motion.span 
-                    initial={{ scale: 0.8 }}
-                    animate={{ scale: [1, 1.1, 1] }}
-                    transition={{ repeat: Infinity, duration: 2 }}
+                <span 
                     className={cn(
                         "ml-auto px-1.5 py-0.5 text-[9px] font-black rounded-md border z-10",
-                        item.badgeColor === "red" && "bg-destructive/20 text-destructive border-destructive/30 shadow-[0_0_10px_rgba(182,9,0,0.2)]",    
+                        item.badgeColor === "red" && "bg-destructive/20 text-destructive border-destructive/30",    
                         item.badgeColor === "blue" && "bg-blue-500/20 text-blue-500 border-blue-500/30",
                         item.badgeColor === "green" && "bg-primary/20 text-primary border-primary/30",
                         item.badgeColor === "yellow" && "bg-yellow-500/20 text-yellow-500 border-yellow-500/30"     
                     )}
                 >
                     {typeof item.badge === 'string' ? t(item.badge).toUpperCase() : item.badge}
-                </motion.span>
+                </span>
                 )}
-                
-                {/* Glass shine hover effect */}
-                <div className="absolute inset-0 opacity-0 group-hover:opacity-10 pointer-events-none bg-gradient-to-r from-transparent via-white to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-700" />
-            </motion.div>
+            </div>
+            {collapsed && tooltipTop !== null && (
+                <span className={cn(
+                    "pointer-events-none fixed left-[88px] z-[1200] -translate-y-1/2",
+                    "max-w-64 whitespace-nowrap rounded-lg border border-border bg-popover px-3 py-2",
+                    "text-xs font-bold text-popover-foreground shadow-[0_16px_40px_rgba(0,0,0,0.22)]",
+                    "opacity-100 transition-all duration-150"
+                )}
+                    style={{ top: tooltipTop }}
+                >
+                    {label}
+                </span>
+            )}
         </Link>
     )
 }

@@ -3,7 +3,6 @@
 import { useState, useEffect, useCallback } from "react"
 import { Bell, X } from "lucide-react"
 import { Button } from "@/components/ui/button"
-import { Card, CardContent } from "@/components/ui/card"
 import { toast } from "sonner"
 
 import { Capacitor } from '@capacitor/core'
@@ -44,7 +43,7 @@ export function PermissionRequester({ driverId }: Props) {
       const apiUrl = `${baseUrl}/api/push/subscribe`
       
       try {
-        const res = await fetch(apiUrl, {
+        await fetch(apiUrl, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ driverId, subscription: { endpoint: token.value, isFCM: true } })
@@ -152,7 +151,7 @@ export function PermissionRequester({ driverId }: Props) {
              const apiUrl = `${baseUrl}/api/push/subscribe`
              
              try {
-               const res = await fetch(apiUrl, {
+               await fetch(apiUrl, {
                  method: 'POST',
                  headers: { 'Content-Type': 'application/json' },
                  body: JSON.stringify({
@@ -163,10 +162,6 @@ export function PermissionRequester({ driverId }: Props) {
                    }
                  })
                })
-               
-               if (!res.ok) {
-                   // Error handling ignored
-               }
              } catch {
                // Error handling ignored
              }
@@ -237,45 +232,39 @@ export function PermissionRequester({ driverId }: Props) {
 
         setShowPrompt(false)
       }
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error("Push subscription error:", err)
-      toast.error(`ข้อผิดพลาด: ${err.message || 'ไม่สามารถเปิดแจ้งเตือนได้'}`)
+      toast.error(`ข้อผิดพลาด: ${err instanceof Error ? err.message : 'ไม่สามารถเปิดแจ้งเตือนได้'}`)
       setShowPrompt(false)
     }
   }
 
   if (showDeniedPrompt) {
     return (
-      <div className="fixed inset-x-4 bottom-32 z-[200] animate-in slide-in-from-bottom-20 duration-700 ease-out">
-        <div className="glass-panel rounded-[2.5rem] p-8 space-y-8 shadow-2xl shadow-rose-500/20 border-rose-500/20 bg-gradient-to-br from-card to-rose-500/5">
-          <div className="absolute top-0 right-0 p-8 text-rose-500/10 pointer-events-none">
-              <Bell size={120} strokeWidth={1} className="rotate-12" />
-          </div>
-          
-          <div className="relative z-10 flex flex-col items-center text-center space-y-4">
-              <div className="w-20 h-20 rounded-3xl bg-rose-500 flex items-center justify-center shadow-xl shadow-rose-500/30">
-                  <X size={40} className="text-white" strokeWidth={2.5} />
+      <div className="fixed inset-x-4 bottom-28 z-[200] animate-in slide-in-from-bottom-8 duration-300">
+        <div className="bg-card border border-border rounded-xl p-6 space-y-6 shadow-lg">
+          <div className="flex flex-col items-center text-center space-y-4">
+              <div className="w-16 h-16 rounded-xl bg-red-500/10 text-red-600 flex items-center justify-center border border-red-500/20">
+                  <X size={32} />
               </div>
               
-              <div className="space-y-2">
-                  <h3 className="text-2xl font-black text-foreground uppercase tracking-tight italic">การแจ้งเตือนถูกปิดกั้น</h3>
-                  <p className="text-muted-foreground text-base font-bold leading-relaxed max-w-[240px]">
-                      คุณได้ปฏิเสธการรับแจ้งเตือนไปก่อนหน้านี้ กรุณาไปที่ <span className="text-rose-500">การตั้งค่าของเครื่อง</span> เพื่อเปิดรับแจ้งเตือนงานใหม่
+              <div className="space-y-1">
+                  <h3 className="text-lg font-bold text-foreground">การแจ้งเตือนถูกปิดกั้น</h3>
+                  <p className="text-muted-foreground text-xs leading-relaxed max-w-[240px]">
+                      คุณได้ปฏิเสธการรับแจ้งเตือนไปก่อนหน้านี้ กรุณาเปิดรับแจ้งเตือนในระบบตั้งค่าของอุปกรณ์ เพื่อไม่ให้พลาดงานใหม่
                   </p>
               </div>
           </div>
 
-          <div className="relative z-10 grid grid-cols-1 gap-4">
-              <Button 
-                  className="h-16 rounded-2xl bg-rose-500 hover:bg-rose-600 text-white font-black uppercase tracking-[0.1em] shadow-xl shadow-rose-500/20 active:scale-95 transition-all"
-                  onClick={() => {
-                      localStorage.setItem('tms_reminded_denied_push', 'true')
-                      setShowDeniedPrompt(false)
-                  }}
-              >
-                  รับทราบ
-              </Button>
-          </div>
+          <Button 
+              className="w-full h-11 rounded-lg bg-red-600 hover:bg-red-700 text-white font-semibold active:scale-95 transition-all"
+              onClick={() => {
+                  localStorage.setItem('tms_reminded_denied_push', 'true')
+                  setShowDeniedPrompt(false)
+              }}
+          >
+              รับทราบ
+          </Button>
         </div>
       </div>
     )
@@ -284,38 +273,34 @@ export function PermissionRequester({ driverId }: Props) {
   if (!showPrompt) return null
 
   return (
-    <div className="fixed inset-x-4 bottom-32 z-[200] animate-in slide-in-from-bottom-20 duration-700 ease-out">
-      <div className="glass-panel rounded-[2.5rem] p-8 space-y-8 shadow-2xl shadow-primary/20 border-primary/20 bg-gradient-to-br from-card to-primary/5">
-        <div className="absolute top-0 right-0 p-8 text-primary/10 pointer-events-none">
-            <Bell size={120} strokeWidth={1} className="rotate-12" />
-        </div>
-        
-        <div className="relative z-10 flex flex-col items-center text-center space-y-4">
-            <div className="w-20 h-20 rounded-3xl bg-primary flex items-center justify-center shadow-xl shadow-primary/30 relative">
-                <Bell size={40} className="text-white animate-pulse" strokeWidth={2.5} />
-                <div className="absolute -top-1 -right-1 w-6 h-6 bg-accent rounded-full border-4 border-background flex items-center justify-center">
-                    <span className="text-[10px] font-black text-white">!</span>
+    <div className="fixed inset-x-4 bottom-28 z-[200] animate-in slide-in-from-bottom-8 duration-300">
+      <div className="bg-card border border-border rounded-xl p-6 space-y-6 shadow-lg">
+        <div className="flex flex-col items-center text-center space-y-4">
+            <div className="w-16 h-16 rounded-xl bg-primary/10 text-primary flex items-center justify-center border border-primary/20 relative">
+                <Bell size={32} />
+                <div className="absolute -top-1 -right-1 w-4.5 h-4.5 bg-red-500 rounded-full flex items-center justify-center text-[8px] text-white font-bold border border-card">
+                    !
                 </div>
             </div>
             
-            <div className="space-y-2">
-                <h3 className="text-2xl font-black text-foreground uppercase tracking-tight italic">แจ้งเตือนงานใหม่</h3>
-                <p className="text-muted-foreground text-base font-bold leading-relaxed max-w-[240px]">
+            <div className="space-y-1">
+                <h3 className="text-lg font-bold text-foreground">แจ้งเตือนงานใหม่</h3>
+                <p className="text-muted-foreground text-xs leading-relaxed max-w-[240px]">
                     เปิดแจ้งเตือนเพื่อให้คุณรับรู้งานใหม่ และสถานะงานได้ทันทีผ่านมือถือ
                 </p>
             </div>
         </div>
 
-        <div className="relative z-10 grid grid-cols-2 gap-4">
+        <div className="grid grid-cols-2 gap-4">
             <Button 
                 variant="ghost" 
-                className="h-16 rounded-2xl text-muted-foreground font-black uppercase tracking-widest hover:bg-muted/50 transition-all"
+                className="h-11 rounded-lg text-muted-foreground font-semibold hover:bg-muted/50 transition-all text-xs"
                 onClick={() => setShowPrompt(false)}
             >
                 ไว้ก่อน
             </Button>
             <Button 
-                className="h-16 rounded-2xl bg-primary hover:bg-primary/90 text-white font-black uppercase tracking-[0.15em] shadow-xl shadow-primary/20 active:scale-95 transition-all"
+                className="h-11 rounded-lg bg-primary hover:bg-primary/90 text-primary-foreground font-semibold active:scale-95 transition-all text-xs"
                 onClick={subscribeToPush}
             >
                 เปิดเลย
@@ -325,5 +310,3 @@ export function PermissionRequester({ driverId }: Props) {
     </div>
   )
 }
-
-

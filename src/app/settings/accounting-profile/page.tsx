@@ -93,8 +93,8 @@ export default function AccountingProfilePage() {
             const errorMsg = typeof result.error === 'string' ? result.error : "Unknown Error"
             toast.error(`บันทึกไม่สำเร็จ: ${errorMsg}`)
         }
-    } catch (err: any) {
-        toast.error(`เกิดข้อผิดพลาด: ${err.message || 'Internal Server Error'}`)
+    } catch (err: unknown) {
+        toast.error(`เกิดข้อผิดพลาด: ${err instanceof Error ? err.message : 'Internal Server Error'}`)
     } finally {
         setSaving(false)
     }
@@ -114,7 +114,7 @@ export default function AccountingProfilePage() {
     <DashboardLayout>
       <div className="space-y-12 pb-20 p-4 lg:p-10 max-w-6xl mx-auto">
         {/* Tactical Header */}
-        <div className="bg-background/60 backdrop-blur-3xl p-10 rounded-br-[6rem] rounded-tl-[3rem] border border-border/5 shadow-2xl relative overflow-hidden group">
+        <div className="bg-background/60 backdrop-blur-3xl p-10 rounded-br-[6rem] rounded-tl-[3rem] border border-border shadow-2xl relative overflow-hidden group">
             <div className="absolute top-0 right-0 w-80 h-80 bg-blue-500/10 blur-[120px] rounded-full -mr-40 -mt-40 pointer-events-none" />
             
             <div className="relative z-10 space-y-8">
@@ -138,8 +138,8 @@ export default function AccountingProfilePage() {
 
         <div className="grid grid-cols-1 gap-10">
             {/* Entity Details Card */}
-            <PremiumCard className="p-10 rounded-[3.5rem] bg-card/40 border-2 border-border/5">
-                <div className="flex items-center gap-4 mb-10 border-b border-border/10 pb-6">
+            <PremiumCard className="p-10 rounded-[3.5rem] bg-card/40 border-2 border-border">
+                <div className="flex items-center gap-4 mb-10 border-b border-border pb-6">
                     <div className="p-3 bg-blue-500/10 rounded-2xl text-blue-500">
                         <FileText size={24} />
                     </div>
@@ -154,7 +154,7 @@ export default function AccountingProfilePage() {
                             <input 
                                 value={profile.logo_url}
                                 onChange={e => setProfile({...profile, logo_url: e.target.value})}
-                                className="w-full h-16 pl-14 pr-6 rounded-2xl bg-black/20 border-2 border-transparent focus:border-blue-500/50 outline-none font-bold text-lg transition-all"
+                                className="w-full h-16 pl-14 pr-6 rounded-2xl bg-muted/20 border-2 border-transparent focus:border-blue-500/50 outline-none font-bold text-lg transition-all"
                                 placeholder="https://your-domain.com/logo.png"
                             />
                         </div>
@@ -166,7 +166,7 @@ export default function AccountingProfilePage() {
                             <input 
                                 value={profile.stamp_url || ''}
                                 onChange={e => setProfile({...profile, stamp_url: e.target.value})}
-                                className="w-full h-16 pl-14 pr-6 rounded-2xl bg-black/20 border-2 border-transparent focus:border-blue-500/50 outline-none font-bold text-lg transition-all"
+                                className="w-full h-16 pl-14 pr-6 rounded-2xl bg-muted/20 border-2 border-transparent focus:border-blue-500/50 outline-none font-bold text-lg transition-all"
                                 placeholder="https://your-domain.com/stamp.png"
                             />
                         </div>
@@ -178,7 +178,7 @@ export default function AccountingProfilePage() {
                             <input 
                                 value={profile.company_name_th}
                                 onChange={e => setProfile({...profile, company_name_th: e.target.value})}
-                                className="w-full h-16 pl-14 pr-6 rounded-2xl bg-black/20 border-2 border-transparent focus:border-blue-500/50 outline-none font-bold text-lg transition-all"
+                                className="w-full h-16 pl-14 pr-6 rounded-2xl bg-muted/20 border-2 border-transparent focus:border-blue-500/50 outline-none font-bold text-lg transition-all"
                                 placeholder="บริษัท ทีเอ็มเอส จำกัด..."
                             />
                         </div>
@@ -190,7 +190,7 @@ export default function AccountingProfilePage() {
                             <input 
                                 value={profile.company_name_en}
                                 onChange={e => setProfile({...profile, company_name_en: e.target.value})}
-                                className="w-full h-16 pl-14 pr-6 rounded-2xl bg-black/20 border-2 border-transparent focus:border-blue-500/50 outline-none font-bold text-lg transition-all"
+                                className="w-full h-16 pl-14 pr-6 rounded-2xl bg-muted/20 border-2 border-transparent focus:border-blue-500/50 outline-none font-bold text-lg transition-all"
                                 placeholder="TMS CO., LTD..."
                             />
                         </div>
@@ -203,7 +203,7 @@ export default function AccountingProfilePage() {
                                 value={profile.address}
                                 onChange={e => setProfile({...profile, address: e.target.value})}
                                 rows={3}
-                                className="w-full pl-14 pr-6 py-5 rounded-2xl bg-black/20 border-2 border-transparent focus:border-blue-500/50 outline-none font-bold text-lg transition-all resize-none"
+                                className="w-full pl-14 pr-6 py-5 rounded-2xl bg-muted/20 border-2 border-transparent focus:border-blue-500/50 outline-none font-bold text-lg transition-all resize-none"
                                 placeholder="ระบุที่ตั้งบริษัทตามทะเบียนภาษี..."
                             />
                         </div>
@@ -215,7 +215,7 @@ export default function AccountingProfilePage() {
                             <input 
                                 value={profile.tax_id}
                                 onChange={e => setProfile({...profile, tax_id: e.target.value})}
-                                className="w-full h-16 pl-14 pr-6 rounded-2xl bg-black/20 border-2 border-transparent focus:border-blue-500/50 outline-none font-bold text-lg transition-all"
+                                className="w-full h-16 pl-14 pr-6 rounded-2xl bg-muted/20 border-2 border-transparent focus:border-blue-500/50 outline-none font-bold text-lg transition-all"
                                 placeholder="0123456789012"
                             />
                         </div>
@@ -227,7 +227,7 @@ export default function AccountingProfilePage() {
                             <input 
                                 value={profile.phone}
                                 onChange={e => setProfile({...profile, phone: e.target.value})}
-                                className="w-full h-16 pl-14 pr-6 rounded-2xl bg-black/20 border-2 border-transparent focus:border-blue-500/50 outline-none font-bold text-lg transition-all"
+                                className="w-full h-16 pl-14 pr-6 rounded-2xl bg-muted/20 border-2 border-transparent focus:border-blue-500/50 outline-none font-bold text-lg transition-all"
                                 placeholder="02-XXX-XXXX"
                             />
                         </div>
@@ -239,7 +239,7 @@ export default function AccountingProfilePage() {
                             <input 
                                 value={profile.email}
                                 onChange={e => setProfile({...profile, email: e.target.value})}
-                                className="w-full h-16 pl-14 pr-6 rounded-2xl bg-black/20 border-2 border-transparent focus:border-blue-500/50 outline-none font-bold text-lg transition-all"
+                                className="w-full h-16 pl-14 pr-6 rounded-2xl bg-muted/20 border-2 border-transparent focus:border-blue-500/50 outline-none font-bold text-lg transition-all"
                                 placeholder="accounting@company.com"
                             />
                         </div>
@@ -248,8 +248,8 @@ export default function AccountingProfilePage() {
             </PremiumCard>
 
             {/* Settlement Details Card */}
-            <PremiumCard className="p-10 rounded-[3.5rem] bg-card/40 border-2 border-border/5">
-                <div className="flex items-center gap-4 mb-10 border-b border-border/10 pb-6">
+            <PremiumCard className="p-10 rounded-[3.5rem] bg-card/40 border-2 border-border">
+                <div className="flex items-center gap-4 mb-10 border-b border-border pb-6">
                     <div className="p-3 bg-emerald-500/10 rounded-2xl text-emerald-500">
                         <CreditCard size={24} />
                     </div>
@@ -262,7 +262,7 @@ export default function AccountingProfilePage() {
                         <input 
                             value={profile.bank_name}
                             onChange={e => setProfile({...profile, bank_name: e.target.value})}
-                            className="w-full h-16 px-6 rounded-2xl bg-black/20 border-2 border-transparent focus:border-emerald-500/50 outline-none font-bold text-lg transition-all"
+                            className="w-full h-16 px-6 rounded-2xl bg-muted/20 border-2 border-transparent focus:border-emerald-500/50 outline-none font-bold text-lg transition-all"
                             placeholder="ธนาคารไทยพาณิชย์ (SCB)..."
                         />
                     </div>
@@ -271,7 +271,7 @@ export default function AccountingProfilePage() {
                         <input 
                             value={profile.bank_account_no}
                             onChange={e => setProfile({...profile, bank_account_no: e.target.value})}
-                            className="w-full h-16 px-6 rounded-2xl bg-black/20 border-2 border-transparent focus:border-emerald-500/50 outline-none font-bold text-lg transition-all"
+                            className="w-full h-16 px-6 rounded-2xl bg-muted/20 border-2 border-transparent focus:border-emerald-500/50 outline-none font-bold text-lg transition-all"
                             placeholder="000-0-00000-0"
                         />
                     </div>
@@ -280,7 +280,7 @@ export default function AccountingProfilePage() {
                         <input 
                             value={profile.bank_account_name}
                             onChange={e => setProfile({...profile, bank_account_name: e.target.value})}
-                            className="w-full h-16 px-6 rounded-2xl bg-black/20 border-2 border-transparent focus:border-emerald-500/50 outline-none font-bold text-lg transition-all"
+                            className="w-full h-16 px-6 rounded-2xl bg-muted/20 border-2 border-transparent focus:border-emerald-500/50 outline-none font-bold text-lg transition-all"
                             placeholder="บริษัท ทีเอ็มเอส จำกัด"
                         />
                     </div>
@@ -291,7 +291,7 @@ export default function AccountingProfilePage() {
                             <input 
                                 value={profile.contact_name}
                                 onChange={e => setProfile({...profile, contact_name: e.target.value})}
-                                className="w-full h-16 pl-14 pr-6 rounded-2xl bg-black/20 border-2 border-transparent focus:border-emerald-500/50 outline-none font-bold text-lg transition-all"
+                                className="w-full h-16 pl-14 pr-6 rounded-2xl bg-muted/20 border-2 border-transparent focus:border-emerald-500/50 outline-none font-bold text-lg transition-all"
                                 placeholder="ระบุชื่อเจ้าหน้าที่..."
                             />
                         </div>
@@ -300,8 +300,8 @@ export default function AccountingProfilePage() {
             </PremiumCard>
 
             {/* Additional Notes Card */}
-            <PremiumCard className="p-10 rounded-[3.5rem] bg-card/40 border-2 border-border/5">
-                <div className="flex items-center justify-between mb-10 border-b border-border/10 pb-6">
+            <PremiumCard className="p-10 rounded-[3.5rem] bg-card/40 border-2 border-border">
+                <div className="flex items-center justify-between mb-10 border-b border-border pb-6">
                     <div className="flex items-center gap-4">
                         <div className="p-3 bg-amber-500/10 rounded-2xl text-amber-500">
                             <ShieldCheck size={24} />
@@ -315,7 +315,7 @@ export default function AccountingProfilePage() {
                         value={profile.invoice_notes}
                         onChange={e => setProfile({...profile, invoice_notes: e.target.value})}
                         rows={4}
-                        className="w-full p-6 rounded-3xl bg-black/20 border-2 border-transparent focus:border-amber-500/50 outline-none font-bold text-lg transition-all resize-none"
+                        className="w-full p-6 rounded-3xl bg-muted/20 border-2 border-transparent focus:border-amber-500/50 outline-none font-bold text-lg transition-all resize-none"
                         placeholder="ข้อความที่ต้องการให้แสดงท้ายใบแจ้งหนี้ทุกใบ..."
                     />
                 </div>

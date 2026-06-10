@@ -16,7 +16,7 @@ export async function getFilteredReportData(filters: ReportFilters): Promise<{
   data: Record<string, unknown>[], 
   columns: string[], 
   error?: string,
-  debug?: any
+  debug?: unknown
 }> {
   const admin = await isAdmin()
   const supabase = admin ? await createAdminClient() : await createClient()
@@ -58,12 +58,12 @@ export async function getFilteredReportData(filters: ReportFilters): Promise<{
 
         // Extract all unique extra cost types to create columns
         const extraCostTypes = new Set<string>()
-        rawData.forEach((job: any) => {
+        rawData.forEach((job: Record<string, unknown>) => {
           if (job.extra_costs_json) {
             try {
               const costs = typeof job.extra_costs_json === 'string' ? JSON.parse(job.extra_costs_json) : job.extra_costs_json
               if (Array.isArray(costs)) {
-                costs.forEach((c: any) => {
+                costs.forEach((c: Record<string, unknown>) => {
                   if (c.type) extraCostTypes.add(`Extra_${c.type}`)
                 })
               }
@@ -73,7 +73,7 @@ export async function getFilteredReportData(filters: ReportFilters): Promise<{
 
         const sortedExtraTypes = Array.from(extraCostTypes).sort()
 
-        const processedData = rawData.map((job: any) => {
+        const processedData = rawData.map((job: Record<string, unknown>) => {
           const row: Record<string, unknown> = { ...job }
           // Initialize all extra columns with 0
           sortedExtraTypes.forEach(type => {
@@ -85,7 +85,7 @@ export async function getFilteredReportData(filters: ReportFilters): Promise<{
             try {
               const costs = typeof job.extra_costs_json === 'string' ? JSON.parse(job.extra_costs_json) : job.extra_costs_json
               if (Array.isArray(costs)) {
-                costs.forEach((c: any) => {
+                costs.forEach((c: Record<string, unknown>) => {
                   if (c.type) {
                     const colName = `Extra_${c.type}`
                     row[colName] = (Number(row[colName]) || 0) + (Number(c.charge_base) || Number(c.amount) || 0)
@@ -144,7 +144,7 @@ export async function getFilteredReportData(filters: ReportFilters): Promise<{
         if (error) throw error
 
         return { 
-          data: (data || []).map((v: any) => ({
+          data: (data || []).map((v: Record<string, unknown>) => ({
             ...v,
             vehicle_plate: v.Vehicle_Plate,
             vehicle_type: v.Vehicle_Type,
@@ -178,7 +178,7 @@ export async function getFilteredReportData(filters: ReportFilters): Promise<{
         if (error) throw error
 
         return { 
-          data: (data || []).map((f: any) => ({
+          data: (data || []).map((f: Record<string, unknown>) => ({
             ...f,
             fuel_date: f.Date_Time,
             vehicle_plate: f.Vehicle_Plate,
@@ -207,7 +207,7 @@ export async function getFilteredReportData(filters: ReportFilters): Promise<{
         if (error) throw error
 
         return { 
-          data: (data || []).map((m: any) => ({
+          data: (data || []).map((m: Record<string, unknown>) => ({
             ...m,
             created_at: m.Date_Report,
             vehicle_plate: m.Vehicle_Plate,
@@ -234,7 +234,7 @@ export async function getFilteredReportData(filters: ReportFilters): Promise<{
 
         if (!vehicles || vehicles.length === 0) return { data: [], columns: [] }
 
-        const plates = vehicles.map((v: any) => v.Vehicle_Plate)
+        const plates = vehicles.map((v: Record<string, unknown>) => v.Vehicle_Plate)
 
         // 2. Aggregate Fuel Costs
         let fuelQuery = supabase
@@ -265,7 +265,7 @@ export async function getFilteredReportData(filters: ReportFilters): Promise<{
         const { data: rawJobs } = await jobQuery
 
         // 5. Get Subcontractor details for labeling
-        const subIds = [...new Set(vehicles.map((v: any) => v.Sub_ID).filter(Boolean))]
+        const subIds = [...new Set(vehicles.map((v: Record<string, unknown>) => v.Sub_ID).filter(Boolean))]
         const { data: subs } = await supabase
           .from('Master_Subcontractors')
           .select('Sub_ID, Sub_Name')
@@ -278,25 +278,25 @@ export async function getFilteredReportData(filters: ReportFilters): Promise<{
 
         // Aggregate by Plate
         /* eslint-disable @typescript-eslint/no-explicit-any */
-        const reportData = (vehicles as any[]).map((v: any) => {
+        const reportData = (vehicles as Record<string, unknown>[]).map((v: Record<string, unknown>) => {
           const vPlate = v.Vehicle_Plate
           const fuelTotal = (fuelLogs || [])
-            .filter((f: any) => f.Vehicle_Plate === vPlate)
-            .reduce((sum: number, f: any) => sum + (Number(f.Price_Total) || 0), 0)
+            .filter((f: Record<string, unknown>) => f.Vehicle_Plate === vPlate)
+            .reduce((sum: number, f: Record<string, unknown>) => sum + (Number(f.Price_Total) || 0), 0)
           
           const maintTotal = (maintLogs || [])
-            .filter((m: any) => m.Vehicle_Plate === vPlate)
-            .reduce((sum: number, m: any) => sum + (Number(m.Cost_Total) || 0), 0)
+            .filter((m: Record<string, unknown>) => m.Vehicle_Plate === vPlate)
+            .reduce((sum: number, m: Record<string, unknown>) => sum + (Number(m.Cost_Total) || 0), 0)
 
           const extraCosts = (rawJobs || [])
-            .filter((j: any) => j.Vehicle_Plate === vPlate)
-            .reduce((sum: number, j: any) => {
+            .filter((j: Record<string, unknown>) => j.Vehicle_Plate === vPlate)
+            .reduce((sum: number, j: Record<string, unknown>) => {
               let extra = 0
               if (j.extra_costs_json) {
                 try {
                   const costs = typeof j.extra_costs_json === 'string' ? JSON.parse(j.extra_costs_json) : j.extra_costs_json
                   if (Array.isArray(costs)) {
-                    extra = costs.reduce((s: number, c: any) => s + (Number(c.charge_base) || Number(c.amount) || 0), 0)
+                    extra = costs.reduce((s: number, c: Record<string, unknown>) => s + (Number(c.charge_base) || Number(c.amount) || 0), 0)
                   }
                 } catch {}
               }
@@ -306,7 +306,7 @@ export async function getFilteredReportData(filters: ReportFilters): Promise<{
           return {
             vehicle_plate: vPlate,
             vehicle_type: v.Vehicle_Type,
-            owner: v.Sub_ID ? (subMap[v.Sub_ID] || 'รถร่วม') : 'รถบริษัท',
+            owner: v.Sub_ID ? (subMap[v.Sub_ID as string] || 'รถร่วม') : 'รถบริษัท',
             fuel_cost: fuelTotal,
             maintenance_cost: maintTotal,
             extra_cost: extraCosts,
@@ -316,8 +316,8 @@ export async function getFilteredReportData(filters: ReportFilters): Promise<{
 
         // Filter by Owner Type if status filter is used (re-using status as owner type filter for this report)
         let finalData = reportData
-        if (filters.status === 'Company') finalData = reportData.filter((d: any) => d.owner === 'รถบริษัท')
-        if (filters.status === 'Subcontractor') finalData = reportData.filter((d: any) => d.owner !== 'รถบริษัท')
+        if (filters.status === 'Company') finalData = reportData.filter((d: Record<string, unknown>) => d.owner === 'รถบริษัท')
+        if (filters.status === 'Subcontractor') finalData = reportData.filter((d: Record<string, unknown>) => d.owner !== 'รถบริษัท')
         /* eslint-enable @typescript-eslint/no-explicit-any */
 
         return {
@@ -330,9 +330,9 @@ export async function getFilteredReportData(filters: ReportFilters): Promise<{
       default:
         return { data: [], columns: [], debug: { admin, effectiveBranch } }
     }
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('[Report Action Error]', error)
-    return { data: [], columns: [], error: error.message || 'Unknown error occurred' }
+    return { data: [], columns: [], error: error instanceof Error ? error.message : String(error) }
   }
 }
 

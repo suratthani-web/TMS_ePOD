@@ -1,5 +1,5 @@
 export const sanitizeJobData = (data: Record<string, unknown>) => {
-    const clean: Record<string, any> = {}
+    const clean: Record<string, unknown> = {}
     const allowedKeys = [
         'Job_ID', 'Job_Status', 'Plan_Date', 'Pickup_Date', 'Delivery_Date',
         'Customer_ID', 'Customer_Name', 'Route_Name', 'Driver_ID', 'Driver_Name', 

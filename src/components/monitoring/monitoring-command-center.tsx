@@ -45,7 +45,7 @@ interface MonitoringCommandCenterProps {
     initialJobs: Job[]
     initialDrivers: DriverWithGPS[]
     initialContacts?: any[]
-    allDrivers?: Driver[]
+    allDrivers?: any[]
     initialHealthAlerts?: any[]
     heatmapJobs?: any[]
 }
@@ -124,17 +124,17 @@ export function MonitoringCommandCenter({
     // Real-time: gps_logs
     useRealtime('gps_logs', (payload) => {
         if (payload.eventType === 'INSERT') {
-            const newLog = payload.new
+            const newLog = payload.new as any
             const driverId = newLog.driver_id || newLog.Driver_ID
             setDrivers(prev => prev.map(d => {
                 if (d.Driver_ID === driverId) {
                     return {
                         ...d,
-                        Latitude: newLog.latitude || newLog.Latitude,
-                        Longitude: newLog.longitude || newLog.Longitude,
-                        Speed: newLog.speed || newLog.Speed || 0,
-                        Heading: newLog.heading || newLog.Heading,
-                        Last_Update: newLog.timestamp || newLog.Timestamp || new Date().toISOString()
+                        Latitude: (newLog.latitude || newLog.Latitude) as number | null,
+                        Longitude: (newLog.longitude || newLog.Longitude) as number | null,
+                        Speed: (newLog.speed || newLog.Speed || 0) as number,
+                        Heading: (newLog.heading || newLog.Heading) as number | undefined,
+                        Last_Update: (newLog.timestamp || newLog.Timestamp || new Date().toISOString()) as string | null
                     }
                 }
                 return d
@@ -162,19 +162,19 @@ export function MonitoringCommandCenter({
     // Real-time: Notifications
     useRealtime('Notifications', (payload) => {
         if (payload.eventType === 'INSERT') {
-            const notification = payload.new
-            const isSOS = notification.Title?.includes('SOS')
+            const notification = payload.new as any
+            const isSOS = String(notification.Title || '').includes('SOS')
             
             if (isSOS) {
-                toast.error(notification.Title, {
-                    description: notification.Message,
+                toast.error(String(notification.Title || ''), {
+                    description: String(notification.Message || ''),
                     duration: 20000, // 20 seconds for SOS
                     action: {
                         label: '📍 ดูตำแหน่ง',
                         onClick: () => {
                             if (notification.Driver_ID) {
-                                setSelectedId(notification.Driver_ID)
-                                const drv = drivers.find(d => d.Driver_ID === notification.Driver_ID)
+                                setSelectedId(String(notification.Driver_ID))
+                                const drv = drivers.find(d => d.Driver_ID === String(notification.Driver_ID))
                                 if (drv?.Latitude && drv?.Longitude) {
                                     setFocusPosition([drv.Latitude, drv.Longitude])
                                 }
@@ -183,8 +183,8 @@ export function MonitoringCommandCenter({
                     }
                 })
             } else {
-                toast(notification.Title || t('monitoring.alerts'), {
-                    description: notification.Message
+                toast(String(notification.Title || t('monitoring.alerts')), {
+                    description: String(notification.Message || '')
                 })
             }
         }
@@ -256,13 +256,13 @@ export function MonitoringCommandCenter({
     const alertCount = filteredJobs.filter(j => j.Job_Status === 'SOS' || j.Job_Status === 'Failed').length
 
     return (
-        <div className="flex h-[calc(100vh-64px)] bg-background text-muted-foreground overflow-hidden font-sans rounded-3xl border border-border/5 shadow-2xl relative z-10">
-            {/* 1. Tactical Sidebar */}
-            <div className="w-[320px] border-r border-border/5 flex flex-col bg-background/50 backdrop-blur-2xl">
-                <div className="p-6 border-b border-border/5">
+        <div className="flex h-[calc(100vh-64px)] bg-background text-muted-foreground overflow-hidden font-sans rounded-xl border border-border shadow-sm relative z-10">
+            {/* 1. Sidebar */}
+            <div className="w-[360px] shrink-0 z-20 border-r border-border flex flex-col bg-card shadow-xl relative">
+                <div className="p-6 border-b border-border">
                     <div className="flex items-center justify-between mb-6">
-                        <h2 className="text-xl font-black text-foreground tracking-tight flex items-center gap-2 italic">
-                            <div className="p-2 bg-primary/20 rounded-xl border border-primary/30 shadow-[0_0_20px_rgba(255,30,133,0.2)]">
+                        <h2 className="text-xl font-bold text-foreground tracking-tight flex items-center gap-2">
+                            <div className="p-2 bg-primary/10 rounded-lg text-primary">
                                 <Activity className="text-primary" size={18} />
                             </div>
                             {t('monitoring.title')}
@@ -272,12 +272,12 @@ export function MonitoringCommandCenter({
                                 data={driversWithGPS}
                                 filename="logispro_live_tracking_export"
                                 trigger={
-                                    <button className="p-1.5 rounded-lg bg-emerald-500/10 text-emerald-500 hover:bg-emerald-500 hover:text-white transition-all flex items-center justify-center">
+                                    <button className="p-1.5 rounded-lg bg-emerald-500/10 text-emerald-500 hover:bg-emerald-500 hover:text-white transition-all flex items-center justify-center border border-emerald-500/20">
                                         <FileSpreadsheet size={14} />
                                     </button>
                                 }
                             />
-                            <RealtimeIndicator isLive={true} className="bg-muted/50 border-border/10 text-primary scale-75 origin-right" />
+                            <RealtimeIndicator isLive={true} className="bg-muted/30 border border-border text-primary scale-75 origin-right" />
                         </div>
                     </div>
 
@@ -287,7 +287,7 @@ export function MonitoringCommandCenter({
                             <input 
                                 type="text" 
                                 placeholder={t('common.search')}
-                                className="w-full h-10 bg-muted/50 border border-border/10 rounded-xl pl-10 pr-3 text-xs font-black uppercase tracking-widest focus:outline-none focus:border-primary/50 focus:bg-muted/80 transition-all placeholder:text-muted-foreground outline-none"
+                                className="w-full h-10 bg-muted/30 border border-border rounded-lg pl-10 pr-3 text-xs focus:outline-none focus:border-primary/50 transition-all placeholder:text-muted-foreground outline-none"
                                 value={searchQuery}
                                 onChange={(e) => setSearchQuery(e.target.value)}
                             />
@@ -296,15 +296,15 @@ export function MonitoringCommandCenter({
                             <button 
                                 onClick={() => setIsFilterMenuOpen(!isFilterMenuOpen)}
                                 className={cn(
-                                    "p-2.5 rounded-xl border transition-all flex items-center justify-center relative",
+                                    "p-2.5 rounded-lg border transition-all flex items-center justify-center relative",
                                     pinnedCustomerNames.length > 0 
-                                        ? "bg-primary/20 border-primary/30 text-primary shadow-lg shadow-primary/20" 
-                                        : "bg-muted/50 border-border/10 text-muted-foreground hover:bg-muted/80"
+                                        ? "bg-primary/10 border-primary/20 text-primary shadow-sm" 
+                                        : "bg-muted/30 border-border text-muted-foreground hover:bg-muted/50"
                                 )}
                             >
                                 <Users size={18} />
                                 {pinnedCustomerNames.length > 0 && (
-                                    <div className="absolute -top-1 -right-1 w-4 h-4 bg-primary text-white text-[8px] flex items-center justify-center rounded-full font-black">
+                                    <div className="absolute -top-1 -right-1 w-4 h-4 bg-primary text-primary-foreground text-[8px] flex items-center justify-center rounded-full font-bold">
                                         {pinnedCustomerNames.length}
                                     </div>
                                 )}
@@ -314,8 +314,8 @@ export function MonitoringCommandCenter({
                             {isFilterMenuOpen && (
                                 <>
                                     <div className="fixed inset-0 z-40" onClick={() => setIsFilterMenuOpen(false)} />
-                                    <div className="absolute right-0 mt-2 w-64 bg-background border border-border/10 rounded-2xl shadow-2xl z-50 p-4 animate-in fade-in zoom-in duration-200">
-                                        <p className="text-[10px] font-black uppercase tracking-widest mb-3 flex items-center gap-2">
+                                    <div className="absolute right-0 mt-2 w-64 bg-card border border-border rounded-xl shadow-lg z-50 p-4 animate-in fade-in zoom-in duration-200">
+                                        <p className="text-[10px] font-bold uppercase tracking-wider mb-3 flex items-center gap-2">
                                             <Star size={12} className="text-yellow-500 fill-yellow-500" />
                                             Pinned Customers
                                         </p>
@@ -352,10 +352,10 @@ export function MonitoringCommandCenter({
                         <button 
                             onClick={() => setShowPinnedOnly(!showPinnedOnly)}
                             className={cn(
-                                "px-3 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-widest whitespace-nowrap transition-all border flex items-center gap-1.5 ml-2",
+                                "px-3 py-1.5 rounded-lg text-[10px] font-bold uppercase tracking-wider whitespace-nowrap transition-all border flex items-center gap-1.5 ml-2",
                                 showPinnedOnly
-                                    ? "bg-yellow-500 text-black border-yellow-500 shadow-lg shadow-yellow-500/20"
-                                    : "bg-muted/50 border-border/10 text-muted-foreground hover:text-foreground"
+                                    ? "bg-amber-500 text-black border-amber-500 shadow-sm"
+                                    : "bg-muted/30 border-border text-muted-foreground hover:text-foreground"
                             )}
                         >
                             <Star size={12} className={showPinnedOnly ? "fill-black" : ""} />

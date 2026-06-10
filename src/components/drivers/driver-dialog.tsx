@@ -245,7 +245,7 @@ export function DriverDialog({
             <div className="space-y-2">
                 <Label className="text-base font-bold font-black text-muted-foreground uppercase tracking-tight">{t('drivers.dialog.institution')}</Label>
                 <Select value={formData.Bank_Name || "__none__"} onValueChange={(val) => setFormData({ ...formData, Bank_Name: val === "__none__" ? "" : val })}>
-                    <SelectTrigger className="h-12 border-border/10 bg-black/20 text-white">
+                    <SelectTrigger className="h-12 border-border/10 bg-background text-foreground border-border">
                         <SelectValue placeholder={t('common.search')} />
                     </SelectTrigger>
                     <SelectContent className="bg-card border-border/10 text-foreground">
@@ -264,7 +264,7 @@ export function DriverDialog({
                         value={formData.Bank_Account_No}
                         onChange={(e) => setFormData({ ...formData, Bank_Account_No: e.target.value })}
                         placeholder="000-0-00000-0"
-                        className="h-12 bg-black/20 border-border/10 text-white placeholder:text-muted-foreground"
+                        className="h-12 bg-background border-border text-foreground placeholder:text-muted-foreground"
                     />
                 </div>
                 <div className="space-y-2">
@@ -273,7 +273,7 @@ export function DriverDialog({
                         value={formData.Bank_Account_Name}
                         onChange={(e) => setFormData({ ...formData, Bank_Account_Name: e.target.value })}
                         placeholder="Verified Full Name"
-                        className="h-12 bg-black/20 border-border/10 text-white placeholder:text-muted-foreground"
+                        className="h-12 bg-background border-border text-foreground placeholder:text-muted-foreground"
                     />
                 </div>
             </div>

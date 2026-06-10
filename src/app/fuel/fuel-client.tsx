@@ -23,6 +23,20 @@ import { Input } from "@/components/ui/input"
 import { cn } from "@/lib/utils"
 import { useLanguage } from "@/components/providers/language-provider"
 import NextImage from "next/image"
+import type { FuelLog } from "@/lib/supabase/fuel"
+import type { FuelAnalytics } from "@/lib/supabase/fuel-analytics"
+import type { Driver } from "@/lib/supabase/drivers"
+
+type FuelClientProps = {
+  logs: (FuelLog & { Km_Per_Liter?: number })[]
+  count: number
+  drivers: Driver[]
+  vehicles: { Vehicle_Plate?: string | null; Vehicle_Type?: string | null }[]
+  analytics: FuelAnalytics
+  limit: number
+  startDate?: string
+  endDate?: string
+}
 
 export function FuelClient({ 
   logs, 
@@ -33,12 +47,19 @@ export function FuelClient({
   limit,
   startDate,
   endDate
-}: any) {
+}: FuelClientProps) {
   const { t } = useLanguage()
+  const vehicleOptions = vehicles
+    .filter((vehicle): vehicle is { Vehicle_Plate: string; Vehicle_Type?: string | null } => Boolean(vehicle.Vehicle_Plate))
+    .map((vehicle) => ({
+      Vehicle_Plate: vehicle.Vehicle_Plate,
+      Vehicle_Type: vehicle.Vehicle_Type ?? null,
+    }))
+
   return (
     <div className="space-y-8 pb-20">
       {/* Tactical Energy Header */}
-      <div className="bg-background p-8 rounded-3xl border border-border/5 shadow-xl relative overflow-hidden group">
+      <div className="bg-background p-8 rounded-3xl border border-border shadow-xl relative overflow-hidden group">
         <div className="absolute top-0 right-0 w-80 h-80 bg-primary/10 blur-[120px] rounded-full -mr-40 -mt-40 pointer-events-none" />
         <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-8 relative z-10">
           <div>
@@ -57,7 +78,7 @@ export function FuelClient({
           <div className="flex items-center gap-4">
             <FuelDialog 
                 drivers={drivers}
-                vehicles={vehicles}
+                vehicles={vehicleOptions}
                 trigger={
                     <PremiumButton className="h-11 px-8 rounded-xl shadow-lg gap-2 bg-primary hover:bg-primary/90 text-foreground font-black text-xs uppercase tracking-widest italic">
                         <Plus size={18} strokeWidth={3} />
@@ -84,7 +105,7 @@ export function FuelClient({
       </section>
 
       {/* Signal Filtering Matrix */}
-      <div className="space-y-6 bg-background p-8 rounded-3xl border border-border/5 shadow-xl">
+      <div className="space-y-6 bg-background p-8 rounded-3xl border border-border shadow-xl">
         <div className="flex items-center gap-4 mb-1">
             <div className="p-2 bg-blue-500/20 rounded-xl text-blue-500 border border-blue-500/30">
                 <Activity size={16} />
@@ -96,11 +117,11 @@ export function FuelClient({
           <div className="flex-1">
               <SearchInput 
                 placeholder={t('common.search')}
-                className="h-12 bg-black/60 border border-border/5 rounded-xl text-foreground placeholder:text-muted-foreground focus:border-primary/50 transition-all font-black text-sm"
+                className="h-12 bg-black/60 border border-border rounded-xl text-foreground placeholder:text-muted-foreground focus:border-primary/50 transition-all font-black text-sm"
               />
           </div>
           <form className="flex flex-wrap lg:flex-nowrap gap-3 items-center">
-              <div className="flex items-center gap-3 bg-black/60 border border-border/5 p-1.5 rounded-xl">
+              <div className="flex items-center gap-3 bg-black/60 border border-border p-1.5 rounded-xl">
                 <input 
                     type="date" 
                     name="startDate"
@@ -115,7 +136,7 @@ export function FuelClient({
                     className="h-10 bg-transparent border-none text-foreground focus:ring-0 uppercase font-black text-xs font-bold outline-none"
                 />
               </div>
-              <PremiumButton type="submit" variant="secondary" className="h-12 px-6 rounded-xl border-border/5 bg-muted/80 hover:bg-white/20 text-foreground font-black uppercase tracking-widest italic outline-none text-xs">
+              <PremiumButton type="submit" variant="secondary" className="h-12 px-6 rounded-xl border-border bg-muted/80 hover:bg-white/20 text-foreground font-black uppercase tracking-widest italic outline-none text-xs">
                   {t('common.filter')}
               </PremiumButton>
           </form>
@@ -123,8 +144,8 @@ export function FuelClient({
       </div>
 
       {/* Fuel Log Ledger */}
-      <PremiumCard className="bg-background border-2 border-border/5 p-0 overflow-hidden shadow-xl rounded-2xl">
-          <div className="p-6 border-b border-border/5 bg-black/40 flex items-center justify-between relative overflow-hidden">
+      <PremiumCard className="bg-background border-2 border-border p-0 overflow-hidden shadow-xl rounded-2xl">
+          <div className="p-6 border-b border-border bg-muted/30 flex items-center justify-between relative overflow-hidden">
             <div className="absolute inset-x-0 top-0 h-0.5 bg-gradient-to-r from-primary to-transparent" />
             <div className="flex items-center gap-4 relative z-10">
                 <div className="p-3 bg-primary/20 rounded-xl text-primary border border-primary/30">
@@ -149,7 +170,7 @@ export function FuelClient({
                 </div>
             ) : (
                 <table className="w-full border-collapse">
-                  <thead className="text-[10px] font-black uppercase bg-black/60 text-muted-foreground border-b border-border/5 tracking-[0.3em] italic">
+                  <thead className="text-[10px] font-black uppercase bg-black/60 text-muted-foreground border-b border-border tracking-[0.3em] italic">
                     <tr>
                       <th className="text-left px-6 py-4">{t('common.date')}</th>
                       <th className="text-left px-4 py-4">{t('navigation.drivers')}</th>
@@ -164,7 +185,7 @@ export function FuelClient({
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-white/5">
-                    {logs.map((log: any) => (
+                    {logs.map((log) => (
                   <tr 
                     key={log.Log_ID} 
                     className="hover:bg-muted/40 transition-all group/row"
@@ -273,7 +294,7 @@ export function FuelClient({
                       <FuelActions 
                           log={log} 
                           drivers={drivers}
-                          vehicles={vehicles}
+                          vehicles={vehicleOptions}
                       />
                     </td>
                   </tr>
@@ -283,7 +304,7 @@ export function FuelClient({
             )}
           </div>
 
-          <div className="p-6 border-t border-border/5 bg-black/40 flex justify-center">
+          <div className="p-6 border-t border-border bg-muted/30 flex justify-center">
              <Pagination totalItems={count || 0} limit={limit} />
           </div>
       </PremiumCard>

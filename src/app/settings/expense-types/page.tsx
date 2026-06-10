@@ -1,4 +1,4 @@
-"use client"
+﻿"use client"
 
 import { useState, useEffect, useCallback } from "react"
 import { DashboardLayout } from "@/components/layout/dashboard-layout"
@@ -85,79 +85,75 @@ export default function ExpenseTypesPage() {
   return (
     <DashboardLayout>
       <div className="space-y-12 pb-20 p-4 lg:p-10">
-        {/* Tactical Elite Header */}
-        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-10 bg-background/60 backdrop-blur-3xl p-10 rounded-br-[6rem] rounded-tl-[3rem] border border-border/5 shadow-2xl relative overflow-hidden group">
-            <div className="absolute top-0 right-0 w-80 h-80 bg-primary/10 blur-[120px] rounded-full -mr-40 -mt-40 pointer-events-none" />
+        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-8 bg-card p-8 md:p-10 rounded-2xl border border-border shadow-sm relative overflow-hidden group">
             
             <div className="relative z-10 space-y-8">
-                <button onClick={() => router.back()} className="inline-flex items-center gap-2 text-muted-foreground hover:text-primary transition-all font-black uppercase tracking-[0.1em] text-base font-bold group/back italic">
+                <button onClick={() => router.back()} className="inline-flex items-center gap-2 text-muted-foreground hover:text-primary transition-all text-sm font-semibold group/back">
                     <ArrowLeft className="w-4 h-4 group-hover/back:-translate-x-1 transition-transform" /> 
-                    {t('settings_pages.expense_types.title') === 'รายการค่าใช้จ่าย (Resource Matrix)' ? 'Command Control' : 'Command Control'}
-                    {/* Wait, I should probably use a generic key or just keep it premium. I'll use common 'command_control' if it exists or just localize manually */}
                     {t('settings_pages.company.command_control')}
                 </button>
                 <div className="flex items-center gap-6">
-                    <div className="p-4 bg-primary/20 rounded-[2.5rem] border-2 border-primary/30 shadow-[0_0_40px_rgba(255,30,133,0.2)] text-primary group-hover:scale-110 transition-all duration-500">
+                    <div className="p-4 bg-primary/10 rounded-2xl border border-primary/20 text-primary">
                         <Coins size={42} strokeWidth={2.5} />
                     </div>
                     <div>
-                        <h1 className="text-5xl font-black text-foreground tracking-widest uppercase leading-none italic premium-text-gradient">
+                        <h1 className="text-4xl font-black text-foreground leading-tight">
                             {t('settings_pages.expense_types.title')}
                         </h1>
-                        <p className="text-base font-bold font-black text-primary uppercase tracking-[0.2em] mt-2 opacity-80 italic">{t('settings_pages.expense_types.subtitle')}</p>
+                        <p className="text-base font-semibold text-muted-foreground mt-2">{t('settings_pages.expense_types.subtitle')}</p>
                     </div>
                 </div>
             </div>
 
-            <div className="flex flex-col items-end gap-6 relative z-10">
-                <div className="bg-muted/50 border border-border/10 px-6 py-3 rounded-2xl flex items-center gap-3 backdrop-blur-md">
-                    <div className="w-2 h-2 rounded-full bg-primary animate-pulse shadow-[0_0_10px_rgba(255,30,133,1)]" />
-                    <span className="text-base font-bold font-black text-muted-foreground uppercase tracking-widest italic">{t('settings_pages.expense_types.matrix_scan')}</span>
+            <div className="flex flex-col items-start lg:items-end gap-4 relative z-10">
+                <div className="bg-muted/50 border border-border px-4 py-2 rounded-xl flex items-center gap-3">
+                    <div className="w-2 h-2 rounded-full bg-primary" />
+                    <span className="text-sm font-semibold text-muted-foreground">{t('settings_pages.expense_types.matrix_scan')}</span>
                 </div>
-                <PremiumButton onClick={() => setShowAddForm(true)} className="h-16 px-12 rounded-2xl bg-primary text-foreground border-0 shadow-[0_20px_50px_rgba(255,30,133,0.3)] gap-4 text-xl tracking-widest">
+                <PremiumButton onClick={() => setShowAddForm(true)} className="h-12 px-6 rounded-xl bg-primary text-primary-foreground border-0 shadow-sm gap-3 text-sm font-bold">
                     <Plus size={24} strokeWidth={3} />
                     {t('settings_pages.expense_types.enlist_new')}
                 </PremiumButton>
             </div>
         </div>
 
-        {/* Add Form Matrix */}
+        {/* Add expense type form */}
         {showAddForm && (
-            <PremiumCard className="bg-background/60 border-2 border-primary/20 shadow-3xl rounded-[3rem] overflow-hidden group/add animate-in fade-in slide-in-from-top-10 duration-500">
-                <div className="p-10 border-b border-border/5 bg-primary/5 flex items-center justify-between">
-                    <h3 className="text-xl font-black text-foreground tracking-widest uppercase italic flex items-center gap-3">
+            <PremiumCard className="bg-card border border-primary/20 shadow-sm rounded-2xl overflow-hidden group/add animate-in fade-in slide-in-from-top-10 duration-500">
+                <div className="p-10 border-b border-border bg-primary/5 flex items-center justify-between">
+                    <h3 className="text-lg font-black text-foreground flex items-center gap-3">
                         <Plus size={20} className="text-primary" />
                         {t('settings_pages.expense_types.config_new')}
                     </h3>
-                    <PremiumButton variant="outline" size="sm" onClick={() => setShowAddForm(false)} className="rounded-xl border-border/10 text-muted-foreground hover:text-foreground">
+                    <PremiumButton variant="outline" size="sm" onClick={() => setShowAddForm(false)} className="rounded-xl border-border text-muted-foreground hover:text-foreground">
                         <X size={20} />
                     </PremiumButton>
                 </div>
                 <div className="p-12">
                     <div className="grid grid-cols-12 gap-10 items-end">
                         <div className="col-span-12 md:col-span-6 space-y-4">
-                            <Label className="text-base font-bold font-black uppercase text-primary/60 tracking-[0.1em] ml-6">{t('settings_pages.expense_types.res_designation')}</Label>
+                            <Label className="text-sm font-semibold text-muted-foreground ml-4">{t('settings_pages.expense_types.res_designation')}</Label>
                             <Input
                                 value={newType.name}
                                 onChange={(e) => setNewType({ ...newType, name: e.target.value })}
                                 placeholder={t('settings_pages.expense_types.placeholder_name')}
-                                className="h-16 bg-black/40 border-border/5 rounded-[1.5rem] focus:border-primary/50 transition-all text-foreground font-black italic tracking-widest pl-8 shadow-inner"
+                                className="h-14 bg-muted/25 border-border rounded-xl focus:border-primary/50 transition-all text-foreground font-semibold pl-5 shadow-inner"
                             />
                         </div>
                         <div className="col-span-12 md:col-span-4 space-y-4">
-                            <Label className="text-base font-bold font-black uppercase text-primary/60 tracking-[0.1em] ml-6">{t('settings_pages.expense_types.default_yield')}</Label>
+                            <Label className="text-sm font-semibold text-muted-foreground ml-4">{t('settings_pages.expense_types.default_yield')}</Label>
                             <div className="relative">
-                                <span className="absolute left-6 top-1/2 -translate-y-1/2 text-primary font-black italic">฿</span>
+                                <span className="absolute left-6 top-1/2 -translate-y-1/2 text-primary font-black italic">à¸¿</span>
                                 <Input
                                     type="number"
                                     value={newType.default_amount}
                                     onChange={(e) => setNewType({ ...newType, default_amount: Number(e.target.value) })}
-                                    className="h-16 pl-12 bg-black/40 border-border/5 rounded-[1.5rem] focus:border-primary/50 transition-all text-foreground font-black italic tracking-widest shadow-inner text-xl"
+                                    className="h-14 pl-12 bg-muted/25 border-border rounded-xl focus:border-primary/50 transition-all text-foreground font-semibold shadow-inner text-lg"
                                 />
                             </div>
                         </div>
                         <div className="col-span-12 md:col-span-2">
-                            <PremiumButton onClick={handleAdd} className="w-full h-16 rounded-[1.5rem] bg-primary text-foreground font-black italic tracking-widest shadow-xl border-0 gap-3">
+                            <PremiumButton onClick={handleAdd} className="w-full h-14 rounded-xl bg-primary text-primary-foreground font-bold shadow-sm border-0 gap-3">
                                 <Save size={20} /> {t('settings_pages.expense_types.deploy')}
                             </PremiumButton>
                         </div>
@@ -166,15 +162,15 @@ export default function ExpenseTypesPage() {
             </PremiumCard>
         )}
 
-        {/* Global Resource Feed */}
+        {/* Expense type list */}
         <div className="grid grid-cols-1 gap-8">
-            <PremiumCard className="bg-background/40 border-2 border-border/5 shadow-3xl rounded-[4rem] overflow-hidden group/matrix">
-                <div className="p-10 border-b border-border/5 bg-black/40 flex items-center justify-between">
-                    <h3 className="text-xl font-black text-foreground tracking-widest uppercase italic flex items-center gap-3">
+            <PremiumCard className="bg-card border border-border shadow-sm rounded-2xl overflow-hidden">
+                <div className="p-10 border-b border-border bg-muted/25 flex items-center justify-between">
+                    <h3 className="text-lg font-black text-foreground flex items-center gap-3">
                         <Activity size={20} className="text-primary" />
                         {t('settings_pages.expense_types.registry')}
                     </h3>
-                    <div className="px-5 py-1.5 rounded-xl bg-primary/10 text-base font-bold font-black text-primary uppercase tracking-[0.1em] border border-primary/20 italic">
+                    <div className="px-4 py-1.5 rounded-xl bg-primary/10 text-sm font-semibold text-primary border border-primary/20">
                         {t('settings_pages.expense_types.scan_results').replace('{count}', expenseTypes.length.toString())}
                     </div>
                 </div>
@@ -183,15 +179,15 @@ export default function ExpenseTypesPage() {
                         {loading ? (
                             <div className="py-40 flex flex-col items-center justify-center opacity-30">
                                 <Loader2 size={60} className="animate-spin text-primary mb-6" />
-                                <span className="text-base font-bold font-black text-foreground uppercase tracking-[0.6em]">{t('settings_pages.expense_types.syncing')}</span>
+                                <span className="text-sm font-semibold text-foreground">{t('settings_pages.expense_types.syncing')}</span>
                             </div>
                         ) : (
                             expenseTypes.map((et) => (
                                 <div 
                                     key={et.id} 
                                     className={cn(
-                                        "p-8 rounded-[2.5rem] border-2 transition-all duration-500 group/pref flex flex-col md:flex-row md:items-center gap-8 relative overflow-hidden",
-                                        et.is_active ? "bg-muted/30 border-border/5 hover:border-primary/30" : "bg-transparent border-border/5 opacity-40 grayscale"
+                                        "p-6 rounded-2xl border transition-all duration-300 group/pref flex flex-col md:flex-row md:items-center gap-6 relative overflow-hidden",
+                                        et.is_active ? "bg-muted/30 border-border hover:border-primary/30" : "bg-transparent border-border opacity-40 grayscale"
                                     )}
                                 >
                                     <div className="flex items-center gap-6 shrink-0">
@@ -199,8 +195,8 @@ export default function ExpenseTypesPage() {
                                             <GripVertical size={24} />
                                         </div>
                                         <div className={cn(
-                                            "w-16 h-16 rounded-2xl flex items-center justify-center transition-all duration-700 shadow-2xl border border-border/10",
-                                            et.is_active ? "bg-black/40" : "bg-muted/50"
+                                            "w-14 h-14 rounded-2xl flex items-center justify-center transition-all duration-300 shadow-sm border border-border",
+                                            et.is_active ? "bg-muted/25" : "bg-muted/50"
                                         )}>
                                             <TrendingUp size={28} className={cn(et.is_active ? "text-primary" : "text-muted-foreground")} />
                                         </div>
@@ -210,22 +206,22 @@ export default function ExpenseTypesPage() {
                                         {editingId === et.id ? (
                                             <>
                                                 <div className="flex-[2] space-y-2">
-                                                    <Label className="text-base font-bold font-black text-primary uppercase ml-4">{t('settings_pages.expense_types.edit_name')}</Label>
+                                                    <Label className="text-sm font-semibold text-muted-foreground ml-4">{t('settings_pages.expense_types.edit_name')}</Label>
                                                     <Input
                                                         value={et.name}
                                                         onChange={(e) => handleUpdate(et.id, { name: e.target.value })}
-                                                        className="h-14 bg-black/60 border-primary/30 rounded-xl text-foreground font-black italic pl-6"
+                                                        className="h-14 bg-muted/30 border-primary/30 rounded-xl text-foreground font-black italic pl-6"
                                                     />
                                                 </div>
                                                 <div className="flex-1 space-y-2">
-                                                    <Label className="text-base font-bold font-black text-primary uppercase ml-4">{t('settings_pages.expense_types.edit_yield')}</Label>
+                                                    <Label className="text-sm font-semibold text-muted-foreground ml-4">{t('settings_pages.expense_types.edit_yield')}</Label>
                                                     <div className="relative">
-                                                        <span className="absolute left-6 top-1/2 -translate-y-1/2 text-primary font-black italic">฿</span>
+                                                        <span className="absolute left-6 top-1/2 -translate-y-1/2 text-primary font-black italic">à¸¿</span>
                                                         <Input
                                                             type="number"
                                                             value={et.default_amount || 0}
                                                             onChange={(e) => handleUpdate(et.id, { default_amount: Number(e.target.value) })}
-                                                            className="h-14 pl-12 bg-black/60 border-primary/30 rounded-xl text-foreground font-black italic"
+                                                            className="h-14 pl-12 bg-muted/30 border-primary/30 rounded-xl text-foreground font-black italic"
                                                         />
                                                     </div>
                                                 </div>
@@ -237,27 +233,27 @@ export default function ExpenseTypesPage() {
                                             <>
                                                 <div className="flex-[2]">
                                                     <h3 className={cn(
-                                                        "text-2xl font-black uppercase tracking-widest italic group-hover/matrix:text-primary transition-colors",
+                                                        "text-xl font-black group-hover/pref:text-primary transition-colors",
                                                         et.is_active ? "text-foreground" : "text-muted-foreground"
                                                     )}>
                                                         {et.name}
                                                     </h3>
-                                                    <p className="text-base font-bold font-black text-muted-foreground uppercase tracking-widest mt-1 opacity-60">{t('settings_pages.expense_types.id_vector')}: {et.id.substring(0, 8)}...</p>
+                                                    <p className="text-sm font-medium text-muted-foreground mt-1 opacity-70">ID: {et.id.substring(0, 8)}...</p>
                                                 </div>
                                                 <div className="flex-1">
-                                                    <p className="text-base font-bold font-black text-primary uppercase tracking-[0.1em] mb-1 italic opacity-60">{t('settings_pages.expense_types.base_yield')}</p>
-                                                    <p className="text-3xl font-black text-foreground italic tracking-tighter">
-                                                        {et.default_amount ? `฿${et.default_amount.toLocaleString()}` : '฿0.00'}
+                                                    <p className="text-sm font-semibold text-muted-foreground mb-1">{t('settings_pages.expense_types.base_yield')}</p>
+                                                    <p className="text-2xl font-black text-foreground tracking-tight">
+                                                        {et.default_amount ? `à¸¿${et.default_amount.toLocaleString()}` : 'à¸¿0.00'}
                                                     </p>
                                                 </div>
                                                 <div className="flex items-center gap-4">
                                                     <button
                                                         onClick={() => handleToggleActive(et.id, et.is_active)}
                                                         className={cn(
-                                                            "px-5 py-2 rounded-xl text-base font-bold font-black uppercase tracking-widest transition-all italic border-2 shadow-2xl",
+                                                            "px-4 py-2 rounded-xl text-sm font-semibold transition-all border shadow-sm",
                                                             et.is_active 
                                                               ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20 shadow-emerald-500/5' 
-                                                              : 'bg-muted/50 text-muted-foreground border-border/5'
+                                                              : 'bg-muted/50 text-muted-foreground border-border'
                                                         )}
                                                     >
                                                         {et.is_active ? t('settings_pages.expense_types.enabled_node') : t('settings_pages.expense_types.offline_node')}
@@ -266,7 +262,7 @@ export default function ExpenseTypesPage() {
                                                         size="sm" 
                                                         variant="ghost" 
                                                         onClick={() => setEditingId(et.id)}
-                                                        className="w-12 h-12 rounded-xl bg-muted/50 border border-border/5 text-muted-foreground hover:text-foreground hover:bg-primary/20 hover:border-primary/30 transition-all"
+                                                        className="w-12 h-12 rounded-xl bg-muted/50 border border-border text-muted-foreground hover:text-foreground hover:bg-primary/20 hover:border-primary/30 transition-all"
                                                     >
                                                         <Edit size={18} />
                                                     </PremiumButton>
@@ -292,8 +288,8 @@ export default function ExpenseTypesPage() {
                         {!loading && expenseTypes.length === 0 && (
                             <div className="py-40 text-center opacity-20">
                                 <ShieldAlert size={80} className="mx-auto text-muted-foreground mb-8" />
-                                <p className="text-xl font-black uppercase tracking-[0.6em] text-foreground italic">{t('settings_pages.expense_types.registry_depleted')}</p>
-                                <p className="text-base font-bold font-bold text-muted-foreground uppercase tracking-widest mt-4">{t('settings_pages.expense_types.init_protocols')}</p>
+                                <p className="text-xl font-black text-foreground">{t('settings_pages.expense_types.registry_depleted')}</p>
+                                <p className="text-sm font-medium text-muted-foreground mt-4">{t('settings_pages.expense_types.init_protocols')}</p>
                             </div>
                         )}
                     </div>
@@ -301,19 +297,19 @@ export default function ExpenseTypesPage() {
             </PremiumCard>
         </div>
 
-        {/* Global Advisory */}
-        <div className="mt-20 p-12 rounded-[3.5rem] bg-primary/5 border-2 border-primary/10 flex flex-col md:flex-row gap-10 items-center relative overflow-hidden">
+        {/* Advisory */}
+        <div className="mt-12 p-8 rounded-2xl bg-primary/5 border border-primary/10 flex flex-col md:flex-row gap-8 items-center relative overflow-hidden">
             <div className="absolute top-0 right-0 w-80 h-full bg-gradient-to-l from-primary/5 to-transparent pointer-events-none" />
-            <div className="p-6 rounded-[2rem] bg-primary/20 text-primary border-2 border-primary/30 shadow-2xl animate-pulse">
+            <div className="p-4 rounded-2xl bg-primary/10 text-primary border border-primary/20">
                 <Target size={32} />
             </div>
             <div className="space-y-4 text-center md:text-left flex-1">
-                <p className="text-xl font-black text-primary italic uppercase tracking-widest">{t('settings_pages.expense_types.advisory')}</p>
-                <p className="text-xl font-bold text-muted-foreground leading-relaxed uppercase tracking-wider italic">
+                <p className="text-lg font-black text-primary">{t('settings_pages.expense_types.advisory')}</p>
+                <p className="text-base font-medium text-muted-foreground leading-relaxed">
                     {t('settings_pages.expense_types.advisory_desc')}
                 </p>
             </div>
-            <PremiumButton variant="outline" className="h-14 px-10 rounded-2xl border-border/10 text-foreground gap-3 uppercase font-black text-base font-bold tracking-[0.3em] ml-auto italic">
+            <PremiumButton variant="outline" className="h-12 px-6 rounded-xl border-border text-foreground gap-3 font-bold text-sm ml-auto">
                 <Activity size={18} /> {t('settings_pages.expense_types.view_trends')}
             </PremiumButton>
         </div>

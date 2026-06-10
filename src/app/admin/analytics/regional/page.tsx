@@ -43,16 +43,17 @@ export default async function RegionalAnalyticsPage(props: { searchParams: Promi
 
   const branches = await getRegionalDeepDive(startDate, endDate)
   
+  type BranchData = { branchId: string; branchName: string; jobsCount: number; revenue: number; profit: number; revenueGrowth: number; previousRevenue: number; }
   // Calculate Branch Efficiency (Completed / Total Jobs)
-  const branchesWithEfficiency = branches.map((b: any) => {
+  const branchesWithEfficiency = branches.map((b: BranchData) => {
       const efficiency = b.jobsCount > 0 ? (b.jobsCount / (b.jobsCount + 2)) * 100 : 0 // Simplified but real-ish
       return { ...b, efficiency }
   })
 
-  const maxRevenue = Math.max(...branches.map((b: any) => b.revenue), 1)
-  const totalRevenue = branches.reduce((sum: number, b: any) => sum + b.revenue, 0)
-  const totalJobs = branches.reduce((sum: number, b: any) => sum + b.jobsCount, 0)
-  const totalProfit = branches.reduce((sum: number, b: any) => sum + b.profit, 0)
+  const maxRevenue = Math.max(...branches.map((b: BranchData) => b.revenue), 1)
+  const totalRevenue = branches.reduce((sum: number, b: BranchData) => sum + b.revenue, 0)
+  const totalJobs = branches.reduce((sum: number, b: BranchData) => sum + b.jobsCount, 0)
+  const totalProfit = branches.reduce((sum: number, b: BranchData) => sum + b.profit, 0)
 
   return (
     <div className="space-y-12 pb-32 p-4 lg:p-10 bg-background">
@@ -132,7 +133,7 @@ export default async function RegionalAnalyticsPage(props: { searchParams: Promi
               </div>
             ) : (
                 <div className="grid grid-cols-1 gap-8">
-                    {branchesWithEfficiency.map((branch: any, index: number) => {
+                    {branchesWithEfficiency.map((branch: BranchData & { efficiency: number }, index: number) => {
                         const revenuePercent = (branch.revenue / maxRevenue) * 100
                         const profitMargin = branch.revenue > 0 ? ((branch.profit / branch.revenue) * 100) : 0
                         const isGrowthPositive = branch.revenueGrowth >= 0

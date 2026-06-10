@@ -33,7 +33,7 @@ export function FuelAnalyticsDashboard({ analytics }: { analytics: FuelAnalytics
           { label: "Anomalies", value: analytics.anomalies.length, sub: "DIVERGENT", icon: AlertTriangle, color: "text-rose-500", isAnomaly: true }
         ].map((stat, i) => (
           <PremiumCard key={i} className={cn(
-            "bg-background border border-border/5 p-5 relative overflow-hidden group rounded-xl",
+            "bg-background border border-border p-5 relative overflow-hidden group rounded-xl",
             stat.isAnomaly && analytics.anomalies.length > 0 && "border-rose-500/20 bg-rose-500/5 shadow-[0_0_20px_rgba(244,63,94,0.05)]"
           )}>
             <div className="flex items-center justify-between mb-3">
@@ -52,8 +52,8 @@ export function FuelAnalyticsDashboard({ analytics }: { analytics: FuelAnalytics
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Temporal Trends */}
-        <PremiumCard className="bg-background border border-border/5 p-0 overflow-hidden rounded-2xl shadow-xl">
-          <div className="p-5 border-b border-border/5 bg-black/40 flex items-center justify-between">
+        <PremiumCard className="bg-background border border-border p-0 overflow-hidden rounded-2xl shadow-xl">
+          <div className="p-5 border-b border-border bg-muted/30 flex items-center justify-between">
              <h3 className="text-sm font-black text-accent uppercase tracking-[0.4em] flex items-center gap-3 italic">
                 <BarChart3 className="text-accent" size={16} />
                 Temporal Drift
@@ -86,7 +86,7 @@ export function FuelAnalyticsDashboard({ analytics }: { analytics: FuelAnalytics
                           )}
                         </div>
                       </div>
-                      <div className="h-1.5 bg-muted/50 rounded-full overflow-hidden border border-border/5 p-0.5">
+                      <div className="h-1.5 bg-muted/50 rounded-full overflow-hidden border border-border p-0.5">
                         <motion.div
                           initial={{ width: 0 }}
                           animate={{ width: `${(month.totalCost / maxMonthCost) * 100}%` }}
@@ -102,8 +102,8 @@ export function FuelAnalyticsDashboard({ analytics }: { analytics: FuelAnalytics
         </PremiumCard>
 
         {/* Asset Yield Ranking */}
-        <PremiumCard className="bg-background border border-border/5 p-0 overflow-hidden rounded-2xl shadow-xl">
-          <div className="p-5 border-b border-border/5 bg-black/40 flex items-center justify-between">
+        <PremiumCard className="bg-background border border-border p-0 overflow-hidden rounded-2xl shadow-xl">
+          <div className="p-5 border-b border-border bg-muted/30 flex items-center justify-between">
              <h3 className="text-sm font-black text-accent uppercase tracking-[0.4em] flex items-center gap-3 italic">
                 <Fuel className="text-accent" size={16} />
                 Asset Hierarchy

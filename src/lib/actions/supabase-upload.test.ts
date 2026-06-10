@@ -19,7 +19,7 @@ describe('uploadFileToSupabase', () => {
 
   beforeEach(() => {
     vi.clearAllMocks()
-    ;(createAdminClient as unknown as { mockReturnValue: (val: any) => void }).mockReturnValue(mockSupabase)
+    ;(createAdminClient as unknown as { mockReturnValue: (val: unknown) => void }).mockReturnValue(mockSupabase)
   })
 
   it('should upload a file and return the public URL', async () => {

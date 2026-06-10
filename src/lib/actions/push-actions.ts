@@ -100,6 +100,14 @@ export type PushPayload = {
 // ─────────────────────────────────────────────
 // Core: Send one Web Push subscription
 // ─────────────────────────────────────────────
+interface PushSubscriptionRow {
+    Endpoint: string;
+    Keys_P256dh: string;
+    Keys_Auth: string;
+    User_ID?: string | null;
+    Driver_ID?: string | null;
+}
+
 async function sendWebPush(sub: { Endpoint: string; Keys_P256dh: string; Keys_Auth: string }, payload: PushPayload) {
     if (!ensureWebPushConfig()) {
         return { success: false, statusCode: 500, error: 'VAPID not configured' }
@@ -117,10 +125,11 @@ async function sendWebPush(sub: { Endpoint: string; Keys_P256dh: string; Keys_Au
             }
         )
         return { success: true }
-    } catch (err: any) {
-        console.error(`[PUSH] Web Push Error [${sub.Endpoint.slice(0, 30)}...]:`, err.message || err)
+    } catch (err: unknown) {
+        const errMsg = err instanceof Error ? err.message : String(err);
+        console.error(`[PUSH] Web Push Error [${sub.Endpoint.slice(0, 30)}...]:`, errMsg)
         if (err && typeof err === 'object' && 'statusCode' in err) {
-            return { success: false, statusCode: (err as { statusCode: number }).statusCode, error: err.message }
+            return { success: false, statusCode: (err as { statusCode: number }).statusCode, error: errMsg }
         }
         return { success: false, statusCode: 0, error: String(err) }
     }
@@ -198,7 +207,7 @@ export async function sendPushToDriver(driverId: string, payload: PushPayload) {
     console.log(`[PUSH] Sending to ${subs.length} device(s) for driver: ${driverId}`)
 
     const results = await Promise.allSettled(
-        subs.map(async (sub: any) => {
+        subs.map(async (sub: PushSubscriptionRow) => {
             // FCM Native Push
             if (sub.Keys_Auth === 'FCM') {
                 try {
@@ -220,14 +229,15 @@ export async function sendPushToDriver(driverId: string, payload: PushPayload) {
                         token: sub.Endpoint
                     })
                     return { success: true }
-                } catch (err: any) {
-                    const errMsg = err.message || String(err)
+                } catch (err: unknown) {
+                    const errMsg = err instanceof Error ? err.message : String(err)
+                    const errCode = err && typeof err === 'object' && 'code' in err ? (err as {code: string}).code : undefined
                     console.error(`[PUSH] FCM Send Error:`, errMsg)
                     // Cleanup expired FCM tokens
-                    if (err?.code === 'messaging/registration-token-not-registered') {
+                    if (errCode === 'messaging/registration-token-not-registered') {
                         await supabase.from('Push_Subscriptions').delete().eq('Endpoint', sub.Endpoint)
                     }
-                    return { success: false, error: errMsg, code: err?.code }
+                    return { success: false, error: errMsg, code: errCode }
                 }
             }
 
@@ -240,7 +250,7 @@ export async function sendPushToDriver(driverId: string, payload: PushPayload) {
         })
     )
 
-    const successCount = results.filter(r => r.status === 'fulfilled' && (r.value as any).success).length
+    const successCount = results.filter(r => r.status === 'fulfilled' && (r.value as {success?: boolean}).success).length
     const detailResults = results.map(r => r.status === 'fulfilled' ? r.value : { success: false, error: 'Internal error' })
     
     return { success: successCount > 0, results: detailResults }
@@ -275,9 +285,9 @@ export async function sendPushToAdmins(payload: PushPayload, branchId?: string |
     }
 
     // 3. Manual Join & Filter in memory
-    const recipients = subs.filter((sub: any) => {
+    const recipients = subs.filter((sub: PushSubscriptionRow) => {
         // Match subscription's User_ID with Master_Users.Username OR User_ID (UUID)
-        const profile = profiles.find((p: any) => 
+        const profile = profiles.find((p: { Username: string, User_ID: string, Branch_ID: string | number, Role: string }) => 
             p.Username === sub.User_ID || (p.User_ID && p.User_ID === sub.User_ID)
         )
         
@@ -301,7 +311,7 @@ export async function sendPushToAdmins(payload: PushPayload, branchId?: string |
     console.log(`[PUSH] Broadcasting to ${recipients.length} admin(s) [Filter: ${branchId || 'All'}]`)
 
     const results = await Promise.allSettled(
-        recipients.map(async (sub: any) => {
+        recipients.map(async (sub: PushSubscriptionRow) => {
             const result = await sendWebPush(sub, { ...payload, url: payload.url || '/chat' })
             // Clean up expired subscriptions
             if (!result.success && (result.statusCode === 404 || result.statusCode === 410)) {
@@ -425,7 +435,7 @@ export async function broadcastPushToDrivers(payload: PushPayload) {
     console.log(`[PUSH] Broadcasting to ${subs.length} driver(s)`)
 
     const results = await Promise.allSettled(
-        subs.map(async (sub: any) => {
+        subs.map(async (sub: PushSubscriptionRow) => {
             // FCM
             if (sub.Keys_Auth === 'FCM') {
                 try {
@@ -489,6 +499,8 @@ export async function notifyDriverNewChat(driverId: string, message: string) {
     })
 }
 
+import { transitionJobStatus } from "@/services/job-status-machine"
+
 // ─────────────────────────────────────────────
 // Notify: Driver SOS → Push to All Admins
 // ─────────────────────────────────────────────
@@ -506,14 +518,21 @@ export async function notifyAdminSOS(driverId: string, driverName: string, drive
             .limit(1)
         
         if (currentJobs && currentJobs.length > 0) {
+            const jobId = currentJobs[0].Job_ID
+            await transitionJobStatus(jobId, 'SOS', {
+                userId: driverId,
+                username: driverName,
+                reason: 'Driver SOS Call',
+                notes: 'Operator triggered SOS Call (Voice Contact Needed)'
+            })
+
             await adminSupabase
                 .from('Jobs_Main')
                 .update({ 
-                    Job_Status: 'SOS',
                     Failed_Reason: 'Operator triggered SOS Call (Voice Contact Needed)',
                     Failed_Time: new Date().toISOString()
                 })
-                .eq('Job_ID', currentJobs[0].Job_ID)
+                .eq('Job_ID', jobId)
         } else {
             // No active job found - Create a Global SOS Emergency Record
             const { data: driverInfo } = await adminSupabase
@@ -627,16 +646,23 @@ export async function notifySilentSOS(
             .limit(1)
         
         if (currentJobs && currentJobs.length > 0) {
+            const jobId = currentJobs[0].Job_ID
+            await transitionJobStatus(jobId, 'SOS', {
+                userId: driverId,
+                username: driverName,
+                reason: 'Silent SOS Triggered',
+                notes: `Address: ${address || 'N/A'}`
+            })
+
             await adminSupabase
                 .from('Jobs_Main')
                 .update({ 
-                    Job_Status: 'SOS',
                     Failed_Reason: `Silent SOS: ${address || 'No address provided'}`,
                     Failed_Time: new Date().toISOString(),
                     Delivery_Lat: lat,
                     Delivery_Lon: lng
                 })
-                .eq('Job_ID', currentJobs[0].Job_ID)
+                .eq('Job_ID', jobId)
         } else {
             // No active job found - Create a Global SOS Emergency Record
             const { data: driverInfo } = await adminSupabase
@@ -754,7 +780,7 @@ export async function testPushNotification(target: { driverId?: string; userId?:
             ? (subs[0].Keys_Auth === 'FCM' ? 'APK' : 'PWA')
             : 'Unknown'
             
-        const firstError = result.results?.find((r: any) => !r.success)?.error
+        const firstError = result.results?.find((r: {success?: boolean; error?: string}) => !r.success)?.error
 
         return { 
             success: result.success, 
@@ -775,7 +801,7 @@ export async function testPushNotification(target: { driverId?: string; userId?:
         console.log(`[PUSH-TEST] Sending to ${subs.length} device(s) for user: ${target.userId}`)
         
         const results = await Promise.allSettled(
-            subs.map(async (sub: any) => {
+            subs.map(async (sub: PushSubscriptionRow) => {
                 const result = await sendWebPush(sub, payload)
                 if (!result.success && (result.statusCode === 404 || result.statusCode === 410)) {
                     await supabase.from('Push_Subscriptions').delete().eq('Endpoint', sub.Endpoint)
@@ -784,7 +810,7 @@ export async function testPushNotification(target: { driverId?: string; userId?:
             })
         )
         
-        const successCount = results.filter(r => r.status === 'fulfilled' && (r.value as any).success).length
+        const successCount = results.filter(r => r.status === 'fulfilled' && (r.value as {success?: boolean}).success).length
         return { success: successCount > 0, debug: debugInfo }
     }
 
@@ -855,37 +881,55 @@ export async function notifyAdminIPPending(username: string, ip: string) {
 
     if (!subs || subs.length === 0) return { success: false }
 
-    // 2. Fetch Super Admin profiles
+    // 2. Fetch Super Admin profiles (selecting Line_User_ID)
     const { data: profiles } = await supabase
         .from('Master_Users')
-        .select('Username, User_ID, Role')
+        .select('Username, User_ID, Role, Line_User_ID')
         .eq('Role', 'Super Admin')
 
     if (!profiles || profiles.length === 0) return { success: false }
 
-    // 3. Filter subscriptions for Super Admins
-    const recipients = subs.filter((sub: any) => {
-        return profiles.some((p: any) => p.Username === sub.User_ID || (p.User_ID && p.User_ID === sub.User_ID))
+    // 3. Filter subscriptions for Super Admins (Web Push)
+    const recipients = subs.filter((sub: PushSubscriptionRow) => {
+        return profiles.some((p: {Username: string, User_ID: string, Role: string}) => p.Username === sub.User_ID || (p.User_ID && p.User_ID === sub.User_ID))
     })
 
-    if (recipients.length === 0) return { success: true }
-
-    console.log(`[PUSH] Sending IP pending alert to ${recipients.length} Super Admin(s)`)
-
-    await Promise.allSettled(
-        recipients.map(async (sub: any) => {
-            const result = await sendWebPush(sub, {
-                title: '🛡️ มีรายการรออนุมัติ IP ใหม่',
-                body: `ผู้ใช้: ${username} | IP: ${ip}`,
-                url: '/settings/security',
-                type: 'system',
-                tag: `ip_pending_${username}`
+    if (recipients.length > 0) {
+        console.log(`[PUSH] Sending IP pending alert to ${recipients.length} Super Admin(s)`)
+        await Promise.allSettled(
+            recipients.map(async (sub: PushSubscriptionRow) => {
+                const result = await sendWebPush(sub, {
+                    title: '🛡️ มีรายการรออนุมัติ IP ใหม่',
+                    body: `ผู้ใช้: ${username} | IP: ${ip}`,
+                    url: '/settings/security',
+                    type: 'system',
+                    tag: `ip_pending_${username}`
+                })
+                // Clean up expired subscriptions
+                if (!result.success && (result.statusCode === 404 || result.statusCode === 410)) {
+                    await supabase.from('Push_Subscriptions').delete().eq('Endpoint', sub.Endpoint)
+                }
             })
-            // Clean up expired subscriptions
-            if (!result.success && (result.statusCode === 404 || result.statusCode === 410)) {
-                await supabase.from('Push_Subscriptions').delete().eq('Endpoint', sub.Endpoint)
-            }
-        })
-    )
+        )
+    }
+
+    // 4. Send LINE notifications to Super Admins with bound Line_User_ID
+    try {
+        const lineAdmins = profiles.filter(p => p.Line_User_ID)
+        if (lineAdmins.length > 0) {
+            const { pushIPApprovalToUser } = await import('@/lib/integrations/line')
+            await Promise.all(
+                lineAdmins.map(admin => {
+                    if (admin.Line_User_ID) {
+                        return pushIPApprovalToUser(admin.Line_User_ID, username, ip)
+                    }
+                    return Promise.resolve()
+                })
+            )
+        }
+    } catch (lineErr) {
+        console.error('[LINE Push IP Approval Error]', lineErr)
+    }
+
     return { success: true }
 }

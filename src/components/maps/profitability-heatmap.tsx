@@ -34,7 +34,7 @@ export function ProfitabilityHeatmap({ data, intensity = 0.8 }: ProfitabilityHea
             return [p.lat, p.lng, normalizedIntensity] as [number, number, number];
         });
 
-        const heatLayer = (L as any).heatLayer(heatPoints, {
+        const heatLayer = L.heatLayer(heatPoints, {
             radius: 45,
             blur: 25,
             maxZoom: 13,

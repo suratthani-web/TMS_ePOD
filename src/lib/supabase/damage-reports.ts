@@ -60,6 +60,7 @@ export async function createDamageReport(data: {
   Reason_Category: string
   Description?: string
   Image_Path?: string
+  Image_Base64?: string
 }) {
   const supabase = await createClient()
   try {

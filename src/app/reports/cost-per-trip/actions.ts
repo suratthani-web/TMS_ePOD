@@ -40,6 +40,32 @@ export interface CostSummary {
   avgCostPerKm: number
 }
 
+type CostTripSourceRow = {
+  Plan_Date?: string | null
+  Est_Distance_KM?: number | string | null
+  Price_Cust_Total?: number | string | null
+  Cost_Driver_Total?: number | string | null
+  Cost_Driver_Extra?: number | string | null
+  Price_Cust_Extra?: number | string | null
+  Fuel_Cost?: number | string | null
+  Maintenance_Cost?: number | string | null
+  Toll_Cost?: number | string | null
+  Job_ID?: string | null
+  Customer_Name?: string | null
+  Route_Name?: string | null
+  Origin_Location?: string | null
+  Dest_Location?: string | null
+  Driver_Name?: string | null
+  Vehicle_Plate?: string | null
+  Job_Status?: string | null
+  Loaded_Qty?: number | string | null
+}
+
+type FuelPriceRow = {
+  Date: string
+  Price: number
+}
+
 export async function getCostPerTrip(startDate?: string, endDate?: string, customerNames?: string[]): Promise<{ trips: TripCost[], summary: CostSummary }> {
   const isUserAdmin = await isAdmin()
   const branchId = await getUserBranchId()
@@ -81,13 +107,14 @@ export async function getCostPerTrip(startDate?: string, endDate?: string, custo
   if (!data) return { trips: [], summary: emptySummary() }
 
   // Fetch all unique fuel prices for the relevant dates in one go
-  const uniqueDates = Array.from(new Set(data.map((d: any) => d.Plan_Date).filter(Boolean))) as string[]
+  const rows = data as CostTripSourceRow[]
+  const uniqueDates = Array.from(new Set(rows.map((d) => d.Plan_Date).filter(Boolean))) as string[]
   const { data: fuelData } = await supabase
     .from('daily_fuel_prices')
     .select('Date, Price')
     .in('Date', uniqueDates)
   
-  const fuelMap = new Map(fuelData?.map((f: any) => [f.Date, f.Price]) || [])
+  const fuelMap = new Map((fuelData as FuelPriceRow[] | null)?.map((f) => [f.Date, f.Price]) || [])
   
   // Get latest price as global fallback
   const { data: latestFuel } = await supabase
@@ -98,11 +125,13 @@ export async function getCostPerTrip(startDate?: string, endDate?: string, custo
     .maybeSingle()
   const globalFallbackPrice = latestFuel?.Price || 35.0 // Baht/Litre
 
-  const trips: TripCost[] = data.map((d: any) => {
+  const trips: TripCost[] = rows.map((d) => {
     const dist = Number(d.Est_Distance_KM) || 0
+    const planDate = d.Plan_Date || null
+    const loadedQty = Number(d.Loaded_Qty) || 0
     
     // Estimates (For reference only)
-    const dailyPrice = fuelMap.get(d.Plan_Date) || 0
+    const dailyPrice = planDate ? fuelMap.get(planDate) || 0 : 0
     // If we have daily price, we can use it. But for now, 3.5 seems to be a fixed 'rate per KM' in the existing logic.
     // If the user wants the calculation to be dynamic based on fuel price, we'd need a consumption rate.
     // However, the user specifically asked for the "Fuel Price column" to be added/fixed.
@@ -125,15 +154,15 @@ export async function getCostPerTrip(startDate?: string, endDate?: string, custo
     const profitPct = revenue > 0 ? (profit / revenue) * 100 : 0
 
     return {
-      Job_ID: d.Job_ID,
-      Plan_Date: d.Plan_Date,
-      Customer_Name: d.Customer_Name,
-      Route_Name: d.Route_Name,
-      Origin_Location: d.Origin_Location,
-      Dest_Location: d.Dest_Location,
-      Driver_Name: d.Driver_Name,
-      Vehicle_Plate: d.Vehicle_Plate,
-      Job_Status: d.Job_Status,
+      Job_ID: d.Job_ID || "",
+      Plan_Date: planDate,
+      Customer_Name: d.Customer_Name ?? null,
+      Route_Name: d.Route_Name ?? null,
+      Origin_Location: d.Origin_Location ?? null,
+      Dest_Location: d.Dest_Location ?? null,
+      Driver_Name: d.Driver_Name ?? null,
+      Vehicle_Plate: d.Vehicle_Plate ?? null,
+      Job_Status: d.Job_Status || "",
       Cost_Customer_Total: revenue,
       Cost_Driver_Total: driverCost,
       fuel_real: fuelReal,
@@ -146,8 +175,8 @@ export async function getCostPerTrip(startDate?: string, endDate?: string, custo
       profit,
       profit_pct: Math.round(profitPct * 10) / 10,
       distance_km: dist,
-      loaded_qty: d.Loaded_Qty || 0,
-      fuel_price: fuelMap.get(d.Plan_Date) || (d.Loaded_Qty > 0 ? (revenue / d.Loaded_Qty) : globalFallbackPrice)
+      loaded_qty: loadedQty,
+      fuel_price: (planDate ? fuelMap.get(planDate) : 0) || (loadedQty > 0 ? (revenue / loadedQty) : globalFallbackPrice)
     }
   })
 

@@ -1,6 +1,6 @@
 import { createServerClient, type CookieOptions } from '@supabase/ssr'
 import { cookies } from 'next/headers'
-import { createClient as createJsClient } from '@supabase/supabase-js'
+import { createClient as createJsClient, type SupabaseClient } from '@supabase/supabase-js'
 
 export async function createClient() {
   const cookieStore = await cookies()
@@ -30,7 +30,7 @@ export async function createClient() {
   )
 }
 
-let adminClient: any = null
+let adminClient: SupabaseClient | null = null
 
 export function createAdminClient() {
   if (adminClient) return adminClient

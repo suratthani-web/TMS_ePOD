@@ -5,7 +5,9 @@ import { revalidatePath } from "next/cache"
 import { uploadFileToSupabase } from "@/lib/actions/supabase-upload"
 import { Job } from "@/lib/supabase/jobs"
 import { calculateJobCO2 } from "@/app/mobile/jobs/actions"
-import { getFuelPriceNumber, getSuggestedRate } from "./fuel-actions"
+import { transitionJobStatus } from "@/services/job-status-machine"
+import { calculateJobPrice } from "@/services/pricing-engine"
+import type { SupabaseClient } from "@supabase/supabase-js"
 
 /**
  * Helper to update or append quantity remark to notes
@@ -18,35 +20,6 @@ function updateNotesWithQty(currentNotes: string, qty: number): string {
     
     if (!cleanNotes) return qtyRemark
     return `${cleanNotes} ${qtyRemark}`
-}
-
-/**
- * Helper to get the most appropriate unit price based on fuel rates or master data
- */
-async function getSmartUnitPrice(supabase: any, customerId: string, planDate?: string, vehicleType: string = '4-Wheel'): Promise<number> {
-    if (!customerId) return 0
-    
-    try {
-        const fuelPrice = await getFuelPriceNumber(planDate)
-        if (fuelPrice) {
-            const suggestedRate = await getSuggestedRate(customerId, 'SYSTEM_PER_PIECE', fuelPrice, vehicleType)
-            if (suggestedRate && suggestedRate > 0) {
-                console.log(`[PRICE_LOG] Using dynamic fuel-based unit price: ${suggestedRate} for customer ${customerId}`)
-                return suggestedRate
-            }
-        }
-
-        const { data: cust } = await supabase
-            .from("Master_Customers")
-            .select("Price_Per_Unit")
-            .eq("Customer_ID", customerId)
-            .single()
-        
-        return Number(cust?.Price_Per_Unit || 0)
-    } catch (err) {
-        console.error("[PRICE_ERROR] Failed to fetch smart unit price:", err)
-        return 0
-    }
 }
 
 export async function submitJobPOD(jobId: string, formData: FormData) {
@@ -120,33 +93,37 @@ export async function submitJobPOD(jobId: string, formData: FormData) {
 
     const { data: jobData } = await supabase
         .from("Jobs_Main")
-        .select("Price_Cust_Total, Notes, Customer_ID, Plan_Date, Vehicle_Type")
+        .select("*")
         .eq("Job_ID", jobId)
         .single()
 
-    let unitPrice = 0
-    if (jobData?.Customer_ID) {
-        unitPrice = await getSmartUnitPrice(supabase, jobData.Customer_ID, jobData.Plan_Date, jobData.Vehicle_Type || '4-Wheel')
-    }
+    const loadedQty = Number(formData.get("loaded_qty") || 0)
+    
+    // Use Centralized Pricing Engine
+    const pricing = await calculateJobPrice({
+        ...jobData,
+        Loaded_Qty: loadedQty
+    })
 
     const adminPrice = Number(jobData?.Price_Cust_Total || 0)
     const currentNotes = jobData?.Notes || ""
-    const loadedQty = Number(formData.get("loaded_qty") || 0)
 
     const clientTimestamp = formData.get("actualCompletionTime") as string
     const now = clientTimestamp ? new Date(clientTimestamp) : new Date()
     const timeString = now.toTimeString().split(' ')[0] 
 
     const updatePayload: Record<string, unknown> = {
-      Job_Status: 'Completed',
       Photo_Proof_Url: photoUrls.join(','),
       Signature_Url: signatureUrl,
       Delivery_Date: new Date().toISOString(),
-      Actual_Delivery_Time: timeString
+      Actual_Delivery_Time: timeString,
+      Loaded_Qty: loadedQty
     }
 
-    if (Number(adminPrice) === 0 && unitPrice > 0 && loadedQty > 0) {
-        updatePayload.Price_Cust_Total = Number((loadedQty * unitPrice).toFixed(2))
+    // Only update price if it wasn't already set by admin
+    if (adminPrice === 0 && pricing.totalPrice > 0) {
+        updatePayload.Price_Cust_Total = pricing.totalPrice
+        updatePayload.Price_Per_Unit = pricing.unitPrice
     }
 
     if (loadedQty > 0) {
@@ -167,7 +144,9 @@ export async function submitJobPOD(jobId: string, formData: FormData) {
         ]
 
         const sensorNote = `[ระบบเซนเซอร์: Verified] ผ่านการตรวจสอบการขึ้นชั้น 2-3 อัตโนมัติ: ความสูงต่าง ${updatePayload.Sensor_Max_Elevation_Diff}ม. ก้าวขึ้น ${updatePayload.Sensor_Total_Steps_Upward} ก้าว`
-        updatePayload.Notes = currentNotes ? `${currentNotes}\n${sensorNote}` : sensorNote
+        updatePayload.Notes = updatePayload.Notes 
+            ? `${updatePayload.Notes}\n${sensorNote}` 
+            : (currentNotes ? `${currentNotes}\n${sensorNote}` : sensorNote)
     }
 
     const isContainer = formData.get("job_type") === "container"
@@ -193,6 +172,15 @@ export async function submitJobPOD(jobId: string, formData: FormData) {
       .eq("Job_ID", jobId)
 
     if (updateError) throw updateError
+
+    // Transition after proof fields are saved so status guards can validate current DB state.
+    const transition = await transitionJobStatus(jobId, 'Completed', { 
+        reason: 'POD Submission', 
+        notes: `Photos: ${photoUrls.length}, Signature: Yes` 
+    })
+    if (!transition.success) {
+        throw new Error(transition.message || 'ไม่สามารถเปลี่ยนสถานะงานเป็นเสร็จสิ้นได้')
+    }
 
     try {
         const co2Data = await calculateJobCO2(supabase, jobId)
@@ -256,7 +244,6 @@ export async function submitJobPickup(jobId: string, formData: FormData) {
     }
 
     const updateData: any = {
-        Job_Status: 'Picked Up',
         Pickup_Photo_Url: photoUrls.join(','),
         Pickup_Date: new Date().toISOString()
     }
@@ -301,6 +288,14 @@ export async function submitJobPickup(jobId: string, formData: FormData) {
         }
     }
 
+    // Transition Status using Machine
+    const transition = await transitionJobStatus(jobId, 'Picked Up', { 
+        reason: 'Pickup Submission'
+    })
+    if (!transition.success) {
+        throw new Error(transition.message || 'ไม่สามารถเปลี่ยนสถานะงานเป็นรับสินค้าแล้วได้')
+    }
+
     const { error } = await supabase
         .from('Jobs_Main')
         .update(updateData)
@@ -310,9 +305,9 @@ export async function submitJobPickup(jobId: string, formData: FormData) {
 
     revalidatePath(`/mobile/jobs/${jobId}`)
     return { success: true }
-  } catch (e: any) {
+  } catch (e: unknown) {
     console.error('[PICKUP_SUBMIT_ERROR]', e)
-    return { success: false, error: e.message || String(e) }
+    return { success: false, error: e instanceof Error ? e.message : String(e) }
   }
 }
 
@@ -323,7 +318,7 @@ export async function bulkSyncJobPrices(jobIds: string[]) {
     try {
         const { data: jobs, error: fetchError } = await supabase
             .from("Jobs_Main")
-            .select("Job_ID, Price_Cust_Total, Notes, Loaded_Qty, Plan_Date, Vehicle_Type, Customer_ID")
+            .select("*")
             .in("Job_ID", jobIds)
 
         if (fetchError) throw fetchError
@@ -332,25 +327,26 @@ export async function bulkSyncJobPrices(jobIds: string[]) {
         let updateCount = 0
         
         for (const job of jobs) {
-            const typedJob = job as any
-            const adminPrice = Number(typedJob.Price_Cust_Total || 0)
-            const loadedQty = Number(typedJob.Loaded_Qty || 0)
+            const adminPrice = Number(job.Price_Cust_Total || 0)
+            const loadedQty = Number(job.Loaded_Qty || 0)
 
             if (loadedQty > 0) {
-                const unitPrice = await getSmartUnitPrice(supabase, typedJob.Customer_ID, typedJob.Plan_Date, typedJob.Vehicle_Type || '4-Wheel')
+                // Use Centralized Pricing Engine
+                const pricing = await calculateJobPrice(job)
 
-                const updateData: Record<string, string | number | boolean | null> = {
-                    Notes: updateNotesWithQty(typedJob.Notes || "", loadedQty)
+                const updateData: any = {
+                    Notes: updateNotesWithQty(job.Notes || "", loadedQty)
                 }
 
-                if (adminPrice === 0 && unitPrice > 0) {
-                    updateData.Price_Cust_Total = Number((loadedQty * unitPrice).toFixed(2))
+                if (adminPrice === 0 && pricing.totalPrice > 0) {
+                    updateData.Price_Cust_Total = pricing.totalPrice
+                    updateData.Price_Per_Unit = pricing.unitPrice
                 }
 
                 const { error: updateError } = await supabase
                     .from("Jobs_Main")
                     .update(updateData)
-                    .eq("Job_ID", typedJob.Job_ID)
+                    .eq("Job_ID", job.Job_ID)
                 
                 if (!updateError) updateCount++
             }

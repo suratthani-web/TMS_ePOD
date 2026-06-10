@@ -48,11 +48,36 @@ export function AdminGlobalNotifier({ branchId, isAdmin }: AdminGlobalNotifierPr
     }
 
     // Generic handler for operational alerts (Fuel, Repair, Inspect, Damage, Leave, Shipment)
+    type PayloadData = {
+      Job_ID?: string;
+      Log_ID?: string;
+      Ticket_ID?: string;
+      id?: string;
+      Branch_ID?: string | number;
+      Vehicle_Plate?: string;
+      Driver_Name?: string;
+      Liters?: number;
+      Price_Total?: number;
+      Issue_Type?: string;
+      Priority?: string;
+      Passed_Items?: Record<string, unknown>;
+      Description?: string;
+      Leave_Type?: string;
+      Start_Date?: string;
+      End_Date?: string;
+      Pickup_Location?: string;
+      Customer_Name?: string;
+      Customer_ID?: string;
+      sender_id?: string;
+      receiver_id?: string;
+      message?: string;
+    }
+
     const handleOperationalAlert = (
       id: string, 
       type: 'fuel' | 'repair' | 'inspect' | 'damage' | 'leave' | 'shipment',
-      data: any,
-      options: { title: string, message: string, color: string, icon: any, href: string }
+      data: PayloadData,
+      options: { title: string, message: string, color: string, icon: React.ElementType, href: string }
     ) => {
       // 1. Uniqueness check
       if (notifiedIds.current.has(`${type}-${id}`)) return
@@ -105,7 +130,7 @@ export function AdminGlobalNotifier({ branchId, isAdmin }: AdminGlobalNotifierPr
     const sosChannel = supabase
       .channel('global-sos-listener')
       .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'Jobs_Main', filter: "Job_Status=eq.SOS" }, (payload) => {
-        const data = payload.new as any
+        const data = payload.new as PayloadData
         if (!data || notifiedIds.current.has(`sos-${data.Job_ID}`)) return
         
         // Branch Check (Enforce for all, including Super Admin)
@@ -147,8 +172,8 @@ export function AdminGlobalNotifier({ branchId, isAdmin }: AdminGlobalNotifierPr
       .channel('admin-ops-listener')
       // Fuel Reports
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'Fuel_Logs' }, (payload) => {
-        const data = payload.new as any
-        handleOperationalAlert(data.Log_ID, 'fuel', data, {
+        const data = payload.new as PayloadData
+        handleOperationalAlert(data.Log_ID || 'unknown', 'fuel', data, {
             title: "แจ้งเติมน้ำมัน",
             message: `พนักงานเติมน้ำมัน ${data.Liters} ลิตร (${data.Price_Total} บ.)`,
             color: 'text-emerald-500',
@@ -158,8 +183,8 @@ export function AdminGlobalNotifier({ branchId, isAdmin }: AdminGlobalNotifierPr
       })
       // Repair Tickets
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'Repair_Tickets' }, (payload) => {
-        const data = payload.new as any
-        handleOperationalAlert(data.Ticket_ID, 'repair', data, {
+        const data = payload.new as PayloadData
+        handleOperationalAlert(data.Ticket_ID || 'unknown', 'repair', data, {
             title: "แจ้งซ่อมใหม่",
             message: `พบปัญหา: ${data.Issue_Type || 'ไม่ระบุ'} - ${data.Priority} Priority`,
             color: 'text-amber-500',
@@ -169,13 +194,13 @@ export function AdminGlobalNotifier({ branchId, isAdmin }: AdminGlobalNotifierPr
       })
       // Vehicle Screenings (Checks) - Handle only failures if logic resides here
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'Vehicle_Checks' }, (payload) => {
-        const data = payload.new as any
+        const data = payload.new as PayloadData
         // Check for common failure indicators in data structure
         const passedTotal = typeof data.Passed_Items === 'object' ? Object.values(data.Passed_Items).filter(v => v === true).length : 0
         const totalItems = typeof data.Passed_Items === 'object' ? Object.keys(data.Passed_Items).length : 0
         
         if (passedTotal < totalItems && totalItems > 0) {
-            handleOperationalAlert(data.id, 'inspect', data, {
+            handleOperationalAlert(data.id || 'unknown', 'inspect', data, {
                 title: "ตรวจรถไม่ผ่าน",
                 message: `รถทะเบียน ${data.Vehicle_Plate} ตรวจสภาพไม่ผ่านบางรายการ`,
                 color: 'text-rose-500',
@@ -186,8 +211,8 @@ export function AdminGlobalNotifier({ branchId, isAdmin }: AdminGlobalNotifierPr
       })
       // Damage Reports
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'Damage_Reports' }, (payload) => {
-        const data = payload.new as any
-        handleOperationalAlert(data.id, 'damage', data, {
+        const data = payload.new as PayloadData
+        handleOperationalAlert(data.id || 'unknown', 'damage', data, {
             title: "แจ้งสินค้าเสียหาย",
             message: `แจ้งพบความเสียหาย: ${data.Description || 'รอยืนยัน'}`,
             color: 'text-orange-600',
@@ -197,8 +222,8 @@ export function AdminGlobalNotifier({ branchId, isAdmin }: AdminGlobalNotifierPr
       })
       // Leave Requests
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'Driver_Leaves' }, (payload) => {
-        const data = payload.new as any
-        handleOperationalAlert(data.id, 'leave', data, {
+        const data = payload.new as PayloadData
+        handleOperationalAlert(data.id || 'unknown', 'leave', data, {
             title: "แจ้งลางาน",
             message: `พนักงานขอลางาน: ${data.Leave_Type} (${data.Start_Date} ถึง ${data.End_Date})`,
             color: 'text-violet-500',
@@ -208,8 +233,8 @@ export function AdminGlobalNotifier({ branchId, isAdmin }: AdminGlobalNotifierPr
       })
       // Shipment Requests (Booking Table)
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'Shipment_Requests' }, (payload) => {
-        const data = payload.new as any
-        handleOperationalAlert(data.id, 'shipment', data, {
+        const data = payload.new as PayloadData
+        handleOperationalAlert(data.id || 'unknown', 'shipment', data, {
             title: "จองงานใหม่",
             message: `ลูกค้าแจ้งจองงานใหม่จาก: ${data.Pickup_Location || 'ไม่ระบุ'}`,
             color: 'text-blue-500',
@@ -219,8 +244,8 @@ export function AdminGlobalNotifier({ branchId, isAdmin }: AdminGlobalNotifierPr
       })
       // Shipment Requests (Direct Jobs_Main Table) - Covers Enterprise API & Manual Customer Portal
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'Jobs_Main', filter: "Job_Status=eq.New" }, (payload) => {
-        const data = payload.new as any
-        handleOperationalAlert(data.Job_ID, 'shipment', data, {
+        const data = payload.new as PayloadData
+        handleOperationalAlert(data.Job_ID || 'unknown', 'shipment', data, {
             title: "จองงานใหม่ (System)",
             message: `จองงานใหม่: ${data.Customer_Name || data.Customer_ID || 'ไม่ระบุ'}`,
             color: 'text-blue-500',
@@ -234,7 +259,7 @@ export function AdminGlobalNotifier({ branchId, isAdmin }: AdminGlobalNotifierPr
     const chatChannel = supabase
       .channel('global-chat-listener')
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'Chat_Messages' }, async (payload) => {
-        const data = payload.new as any
+        const data = payload.new as PayloadData
         if (!data || data.receiver_id !== 'admin' || notifiedIds.current.has(`chat-${data.id}`)) return
 
         // Branch Filter for Chat (Messages don't have Branch_ID, need to check sender/driver)

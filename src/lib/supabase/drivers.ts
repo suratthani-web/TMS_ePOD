@@ -279,10 +279,10 @@ export async function getDriverStats(providedBranchId?: string, customerId?: str
     }
 
     const { data: activeJobs } = await onJobQuery
-    const uniqueDriversOnJob = new Set(activeJobs?.map((j: any) => j.Driver_ID)).size
+    const uniqueDriversOnJob = new Set(activeJobs?.map((j: { Driver_ID?: string }) => j.Driver_ID)).size
 
     const total = data?.length || 0
-    const active = data?.filter((d: any) => d.Active_Status === 'Active').length || 0
+    const active = data?.filter((d: { Active_Status?: string, Expire_Date?: string }) => d.Active_Status === 'Active').length || 0
     
     return { 
       total, 
@@ -352,7 +352,7 @@ export async function getDriverComplianceStats(branchId?: string) {
         thirtyDays.setDate(now.getDate() + 30)
 
         const stats = { valid: 0, expiring: 0, expired: 0, missing: 0 }
-        data?.forEach((d: any) => {
+        data?.forEach((d: { Active_Status?: string, Expire_Date?: string }) => {
             if (!d.Expire_Date) stats.missing++
             else {
                 const expiry = new Date(d.Expire_Date)
@@ -378,8 +378,8 @@ export async function getDriverEfficiencySummary(branchId?: string) {
         const total = targetDrivers.length
         
         return {
-            avgSuccess: Math.round(scores.reduce((sum: number, s: any) => sum + s.acceptanceScore, 0) / total),
-            avgOnTime: Math.round(scores.reduce((sum: number, s: any) => sum + s.onTimeScore, 0) / total),
+            avgSuccess: Math.round(scores.reduce((sum: number, s: { acceptanceScore: number, onTimeScore: number }) => sum + s.acceptanceScore, 0) / total),
+            avgOnTime: Math.round(scores.reduce((sum: number, s: { acceptanceScore: number, onTimeScore: number }) => sum + s.onTimeScore, 0) / total),
             totalDrivers: total
         }
     } catch {
@@ -398,8 +398,8 @@ export async function createBulkDrivers(drivers: Partial<Driver>[]) {
   const branchId = await getUserBranchId()
   const effectiveBranchId = (branchId && branchId !== 'All') ? branchId : null
 
-  const normalizeData = (row: any) => {
-    const normalized: Record<string, any> = {}
+  const normalizeData = (row: Record<string, unknown>) => {
+    const normalized: Record<string, unknown> = {}
     const getValue = (keys: string[]) => {
       const rowKeys = Object.keys(row)
       for (const key of keys) {

@@ -147,7 +147,7 @@ export function InvoiceRowActions({ id, type, status, language = 'th' }: Invoice
             size="sm"
             disabled={exporting}
             onClick={handleExportExcel}
-            className="h-10 px-3 bg-emerald-500/10 text-emerald-500 hover:bg-emerald-500 hover:text-white border border-emerald-500/20 rounded-xl transition-all active:scale-90"
+            className="h-10 px-3 bg-emerald-500/10 text-emerald-600 hover:bg-emerald-500 hover:text-white border border-emerald-500/20 rounded-xl transition-all active:scale-90"
         >
             {exporting ? <Loader2 className="h-4 w-4 animate-spin" /> : <FileSpreadsheet className="h-5 w-5" />}
         </Button>
@@ -158,8 +158,8 @@ export function InvoiceRowActions({ id, type, status, language = 'th' }: Invoice
                     {loading ? <Loader2 className="h-5 w-5 animate-spin" /> : <MoreHorizontal className="h-5 w-5" />}
                 </Button>
             </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="bg-card border-border/10 min-w-[220px] p-2 rounded-2xl shadow-2xl">
-                <DropdownMenuLabel className="text-xs font-black text-muted-foreground uppercase tracking-widest px-4 py-2">
+            <DropdownMenuContent align="end" className="bg-card border-border min-w-[220px] p-2 rounded-2xl shadow-lg">
+                <DropdownMenuLabel className="text-xs font-medium text-muted-foreground px-4 py-2">
                     {language === 'th' ? 'การจัดการ' : 'Management'}
                 </DropdownMenuLabel>
                 
@@ -169,8 +169,8 @@ export function InvoiceRowActions({ id, type, status, language = 'th' }: Invoice
                         onSelect={(e) => { e.preventDefault(); handleConfirmVerification(); }}
                     >
                         <ClipboardCheck className="h-4 w-4 text-purple-400" />
-                        <span className="font-bold uppercase tracking-widest">
-                            {language === 'th' ? 'ยืนยันความถูกต้อง' : 'VERIFY'}
+                        <span className="font-medium">
+                            {language === 'th' ? 'ยืนยันความถูกต้อง' : 'Verify'}
                         </span>
                     </DropdownMenuItem>
                 )}
@@ -181,8 +181,8 @@ export function InvoiceRowActions({ id, type, status, language = 'th' }: Invoice
                         onSelect={(e) => { e.preventDefault(); handleConfirmPayment(); }}
                     >
                         <CheckCircle className="h-4 w-4 text-emerald-500" />
-                        <span className="font-bold uppercase tracking-widest">
-                            {language === 'th' ? 'รับชำระเงิน' : 'CONFIRM PAYMENT'}
+                        <span className="font-medium">
+                            {language === 'th' ? 'รับชำระเงิน' : 'Confirm payment'}
                         </span>
                     </DropdownMenuItem>
                 )}
@@ -192,7 +192,7 @@ export function InvoiceRowActions({ id, type, status, language = 'th' }: Invoice
                     onClick={handleExportExcel}
                 >
                     <FileSpreadsheet className="h-4 w-4 text-emerald-500" />
-                    <span className="font-bold uppercase tracking-widest">EXCEL</span>
+                    <span className="font-medium">Excel</span>
                 </DropdownMenuItem>
 
                 {status !== 'Draft' && (
@@ -203,7 +203,7 @@ export function InvoiceRowActions({ id, type, status, language = 'th' }: Invoice
                             className="flex items-center w-full"
                         >
                             <FileText className="h-4 w-4 text-primary" />
-                            <span className="font-bold uppercase tracking-widest">PDF</span>
+                            <span className="font-medium">PDF</span>
                         </Link>
                     </DropdownMenuItem>
                 )}
@@ -216,8 +216,8 @@ export function InvoiceRowActions({ id, type, status, language = 'th' }: Invoice
                         onSelect={(e) => { e.preventDefault(); handleRejectInvoice(); }}
                     >
                         <Zap className="h-4 w-4 text-rose-500" />
-                        <span className="font-bold uppercase tracking-widest text-rose-500">
-                            {language === 'th' ? 'ยกเลิกรายการ' : 'VOID INVOICE'}
+                        <span className="font-medium text-rose-500">
+                            {language === 'th' ? 'ยกเลิกรายการ' : 'Void invoice'}
                         </span>
                     </DropdownMenuItem>
                 )}

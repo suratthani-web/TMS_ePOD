@@ -37,7 +37,7 @@ export function StatsGrid({ stats, columns = 4 }: StatsGridProps) {
     }[columns] || "md:grid-cols-4"
 
     return (
-        <div className={cn("grid grid-cols-2 gap-8 mb-12", gridCols)}>
+        <div className={cn("grid grid-cols-2 gap-4 mb-8", gridCols)}>
             {stats.map((stat, idx) => {
                 const colors = colorMap[stat.color] || colorMap.indigo
                 return (
@@ -47,17 +47,17 @@ export function StatsGrid({ stats, columns = 4 }: StatsGridProps) {
                         animate={{ opacity: 1, y: 0 }}
                         transition={{ duration: 0.5, delay: idx * 0.1 }}
                         className={cn(
-                            "p-8 rounded-[3rem] border backdrop-blur-3xl shadow-2xl relative overflow-hidden group transition-all hover:scale-[1.03] bg-card/40",
+                            "p-6 rounded-2xl border shadow-sm relative overflow-hidden group transition-colors bg-card hover:bg-muted/30",
                             colors.border,
                             colors.shadow
                         )}
                     >
-                        <div className="absolute -right-4 -bottom-4 opacity-5 group-hover:opacity-10 transition-opacity duration-700 pointer-events-none transform group-hover:scale-110">
+                        <div className="absolute -right-4 -bottom-4 opacity-[0.04] transition-opacity duration-300 pointer-events-none">
                             <div className="w-24 h-24">{stat.icon}</div>
                         </div>
                         
-                        <div className="flex items-center justify-between mb-8">
-                            <div className={cn("p-4 rounded-2xl shadow-xl transition-all duration-700 group-hover:scale-110 group-hover:rotate-6", colors.bg, colors.text)}>
+                        <div className="flex items-center justify-between mb-6">
+                            <div className={cn("p-3 rounded-2xl transition-colors", colors.bg, colors.text)}>
                                 <div className="w-6 h-6 flex items-center justify-center">
                                     {stat.icon}
                                 </div>
@@ -65,13 +65,13 @@ export function StatsGrid({ stats, columns = 4 }: StatsGridProps) {
                         </div>
 
                         <div className="relative z-10">
-                            <p className="text-muted-foreground font-black text-base font-bold uppercase tracking-[0.3em] mb-2">{stat.label}</p>
-                            <p className={cn("text-4xl font-black tracking-tighter leading-none", colors.text)}>
+                            <p className="text-muted-foreground font-medium text-sm mb-2">{stat.label}</p>
+                            <p className={cn("text-3xl font-semibold tracking-tight leading-none", colors.text)}>
                                 {typeof stat.value === 'number' ? stat.value.toLocaleString() : stat.value}
                             </p>
                         </div>
 
-                        <div className="absolute -bottom-4 -right-4 text-7xl font-black text-foreground/[0.02] pointer-events-none italic">
+                        <div className="absolute -bottom-3 -right-2 text-6xl font-semibold text-foreground/[0.03] pointer-events-none">
                             0{idx + 1}
                         </div>
                     </motion.div>

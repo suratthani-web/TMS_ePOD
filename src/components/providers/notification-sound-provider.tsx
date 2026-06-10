@@ -41,10 +41,10 @@ export function NotificationSoundProvider() {
     document.addEventListener("touchstart", handleFirstInteraction);
     document.addEventListener("keydown", handleFirstInteraction);
 
-    const handleMessage = (data: any, source: string) => {
+    const handleMessage = (data: { type?: string; notification?: { type?: string; title?: string } }, source: string) => {
       // Check if message is of type PUSH_RECEIVED
       if (data && data.type === "PUSH_RECEIVED") {
-        const { type, title } = data.notification
+        const { type, title } = data.notification ?? {}
 
         console.log(`[SoundProvider] [Source: ${source}] Push Received: "${title}" (Type: ${type})`)
 

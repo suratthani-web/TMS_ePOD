@@ -14,7 +14,7 @@ import {
   ArrowRight,
   Zap
 } from "lucide-react"
-import { getAllSOSAlerts, getSOSCount } from "@/lib/supabase/sos"
+import { getAllSOSAlerts, getSOSCount, SOSAlert } from "@/lib/supabase/sos"
 import { PremiumButton } from "@/components/ui/premium-button"
 import { PremiumCard } from "@/components/ui/premium-card"
 import { cn } from "@/lib/utils"
@@ -23,9 +23,14 @@ import Link from "next/link"
 import { useState, useEffect } from "react"
 import { createClient } from "@/utils/supabase/client"
 
-export default function SOSPage({ alerts: initialAlerts, activeCount: initialCount }: any) {
+interface SOSPageProps {
+  alerts: SOSAlert[]
+  activeCount: number
+}
+
+export default function SOSPage({ alerts: initialAlerts, activeCount: initialCount }: SOSPageProps) {
   const { t } = useLanguage()
-  const [alerts, setAlerts] = useState(initialAlerts)
+  const [alerts, setAlerts] = useState<SOSAlert[]>(initialAlerts)
   const [activeCount, setActiveCount] = useState(initialCount)
 
   useEffect(() => {
@@ -38,7 +43,9 @@ export default function SOSPage({ alerts: initialAlerts, activeCount: initialCou
         table: 'Jobs_Main'
       }, async (payload) => {
         // If status changed to SOS or an SOS alert was updated/deleted
-        const isSOS = (payload.new as any)?.Job_Status === 'SOS' || (payload.old as any)?.Job_Status === 'SOS'
+        const newRecord = payload.new as Record<string, unknown> | undefined
+        const oldRecord = payload.old as Record<string, unknown> | undefined
+        const isSOS = newRecord?.Job_Status === 'SOS' || oldRecord?.Job_Status === 'SOS'
         
         if (isSOS) {
           const [freshAlerts, freshCount] = await Promise.all([
@@ -90,7 +97,7 @@ export default function SOSPage({ alerts: initialAlerts, activeCount: initialCou
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
          {[
            { label: t('monitoring.alerts'), value: activeCount, icon: Activity, color: "text-rose-400", bg: "bg-rose-500/5", border: "border-rose-500/20" },
-           { label: t('planning.stats_pending'), value: alerts.filter((a: any) => a.Job_Status === 'Failed').length, icon: AlertTriangle, color: "text-amber-400", bg: "bg-amber-500/5", border: "border-amber-500/20" },
+           { label: t('planning.stats_pending'), value: alerts.filter((a: SOSAlert) => a.Job_Status === 'Failed').length, icon: AlertTriangle, color: "text-amber-400", bg: "bg-amber-500/5", border: "border-amber-500/20" },
            { label: t('planning.stats_delivered'), value: alerts.length, icon: CheckCircle2, color: "text-emerald-500", bg: "bg-muted/5", border: "border-border/5" }
          ].map((stat, i) => (
            <PremiumCard key={i} className={cn("p-5 transition-all shadow-lg rounded-xl border", stat.bg, stat.border)}>
@@ -112,7 +119,7 @@ export default function SOSPage({ alerts: initialAlerts, activeCount: initialCou
             <h3 className="text-sm font-black text-foreground uppercase tracking-[0.8em]">{t('dashboard.system_integrity')}</h3>
             <p className="text-[10px] font-black text-emerald-400 uppercase tracking-[0.4em] mt-2">{t('common.success')}</p>
           </div>
-        ) : alerts.map((alert: any) => (
+        ) : alerts.map((alert: SOSAlert) => (
           <motion.div 
             key={alert.Job_ID}
             initial={{ opacity: 0, scale: 0.95 }}

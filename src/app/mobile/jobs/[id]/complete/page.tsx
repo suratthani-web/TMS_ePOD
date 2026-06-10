@@ -40,9 +40,10 @@ export default function JobCompletePage() {
     if (params.id) {
         getJobDetails(params.id).then(j => {
             setJob(j)
-            if (j?.Loaded_Qty) {
-                setLoadedQty(j.Loaded_Qty.toString())
-            }
+            // User requested to remove the default suggested number to prevent accidental submission
+            // if (j?.Loaded_Qty) {
+            //     setLoadedQty(j.Loaded_Qty.toString())
+            // }
         })
     }
   }, [params.id])

@@ -34,7 +34,7 @@ interface DailySummaryProps {
 }
 
 export function DailySummary({ stats, driverStats, biddingCount, sosCount, fleetAlertsCount, customerMode = false }: DailySummaryProps) {
-    const { t } = useLanguage()
+    const { t, language } = useLanguage()
     
     const deliveryRate = stats.total > 0 ? Math.round((stats.delivered / stats.total) * 100) : 0
     const readyDrivers = Math.max(0, driverStats.active - driverStats.onJob)
@@ -63,8 +63,7 @@ export function DailySummary({ stats, driverStats, biddingCount, sosCount, fleet
         >
             {/* Main Delivery Progress - Big Card (2x2) or (4x2 for customers) */}
             <motion.div variants={item} className={customerMode ? "md:col-span-4 md:row-span-2" : "md:col-span-2 md:row-span-2"}>
-                <Card variant="glass" className="h-full relative overflow-hidden group">
-                    <div className="absolute -right-10 -bottom-10 w-40 h-40 bg-primary/5 rounded-full blur-3xl group-hover:bg-primary/10 transition-colors duration-700" />
+                <Card variant="default" className="h-full relative overflow-hidden group shadow-sm">
                     
                     <CardContent className="h-full flex flex-col justify-between p-8">
                         <div>
@@ -83,7 +82,7 @@ export function DailySummary({ stats, driverStats, biddingCount, sosCount, fleet
                             </div>
 
                             <div className="flex items-end gap-6 mb-8">
-                                <span className="text-7xl font-black premium-text-gradient leading-none">
+                                <span className="text-7xl font-black text-primary leading-none">
                                     {deliveryRate}%
                                 </span>
                                 <div className="pb-2">
@@ -102,24 +101,24 @@ export function DailySummary({ stats, driverStats, biddingCount, sosCount, fleet
                                     initial={{ width: 0 }}
                                     animate={{ width: `${deliveryRate}%` }}
                                     transition={{ duration: 1, ease: "easeOut", delay: 0.5 }}
-                                    className="h-full bg-gradient-to-r from-primary to-indigo-400 rounded-full shadow-[0_0_15px_rgba(255,30,133,0.3)]"
+                                    className="h-full bg-primary rounded-full"
                                 />
                             </div>
                             
                             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                                <div className="p-4 bg-muted/30 rounded-2xl border border-border/5">
+                                <div className="p-4 bg-muted/30 rounded-2xl border border-border">
                                     <p className="text-xs font-bold text-muted-foreground uppercase mb-1">{t('common.all')}</p>
                                     <p className="text-2xl font-black">{stats.total}</p>
                                 </div>
-                                <div className="p-4 bg-emerald-50/50 dark:bg-emerald-500/5 rounded-2xl border border-emerald-500/10">
+                                <div className="p-4 bg-emerald-50/50 dark:bg-emerald-500/5 rounded-2xl border border-emerald-500/20">
                                     <p className="text-xs font-bold text-emerald-600 dark:text-emerald-400 uppercase mb-1">{t('jobs.status_delivered')}</p>
                                     <p className="text-2xl font-black text-emerald-600 dark:text-emerald-400">{stats.delivered}</p>
                                 </div>
-                                <div className="p-4 bg-blue-50/50 dark:bg-blue-500/5 rounded-2xl border border-blue-500/10">
+                                <div className="p-4 bg-blue-50/50 dark:bg-blue-500/5 rounded-2xl border border-blue-500/20">
                                     <p className="text-xs font-bold text-blue-600 dark:text-blue-400 uppercase mb-1">{t('dashboard.activity.active')}</p>
                                     <p className="text-2xl font-black text-blue-600 dark:text-blue-400">{stats.inProgress}</p>
                                 </div>
-                                <div className="p-4 bg-primary/5 rounded-2xl border border-primary/10">
+                                <div className="p-4 bg-primary/5 rounded-2xl border border-primary/20">
                                     <p className="text-xs font-bold text-primary uppercase mb-1">ยอดสินค้า</p>
                                     <p className="text-2xl font-black text-primary">{(stats.totalQty || 0).toLocaleString()}</p>
                                 </div>
@@ -209,13 +208,15 @@ export function DailySummary({ stats, driverStats, biddingCount, sosCount, fleet
             {/* Critical Alerts Card (1x1) - REPOSITIONED */}
             {!customerMode && (
                 <motion.div variants={item} className="md:col-span-1 md:row-span-1">
-                    <Card variant="glass" className={`h-full border-l-4 ${sosCount > 0 ? 'border-l-rose-500 bg-rose-500/5' : 'border-l-indigo-500'}`}>
+                    <Card variant="default" className={`h-full border-l-4 ${sosCount > 0 ? 'border-l-rose-500 bg-rose-500/5' : 'border-l-primary'} shadow-sm`}>
                         <CardContent className="h-full flex flex-col justify-between p-8">
                             <div className="flex items-center justify-between">
-                                <div className={`p-2 rounded-xl ${sosCount > 0 ? 'bg-rose-500/20 text-rose-500 animate-pulse' : 'bg-indigo-500/20 text-indigo-500'}`}>
+                                <div className={`p-2 rounded-xl ${sosCount > 0 ? 'bg-rose-500/20 text-rose-500 animate-pulse' : 'bg-primary/10 text-primary'}`}>
                                     <AlertCircle size={20} />
                                 </div>
-                                <span className="text-xs font-black text-muted-foreground uppercase tracking-widest opacity-60">SOS Signal</span>
+                                <span className="text-xs font-black text-muted-foreground uppercase tracking-widest opacity-60">
+                                    {language === 'th' ? "สัญญาณ SOS" : "SOS Signals"}
+                                </span>
                             </div>
                             <div>
                                 <p className={cn("text-4xl font-black mb-1", sosCount > 0 ? "text-rose-500" : "text-foreground")}>{sosCount}</p>

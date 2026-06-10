@@ -1,4 +1,5 @@
 import { getJobById, getAllJobs } from "@/lib/supabase/jobs"
+import { transitionBulkJobStatus } from "@/services/job-status-machine"
 import { getDriverById, getAllDriversFromTable } from "@/lib/supabase/drivers"
 import { getVehicleByPlate, getAllVehiclesFromTable } from "@/lib/supabase/vehicles"
 import { getFinancialStats, getJobCountSummary, getVehicleUtilizationSummary } from "@/lib/supabase/financial-analytics"
@@ -14,19 +15,44 @@ import { createAdminClient } from '@/utils/supabase/server'
 /**
  * Tool Executors - all system data accessible to the AI
  */
-export const aiToolExecutors: Record<string, Function> = {
+interface DBJob { Job_ID?: string; Job_Status?: string; Customer_Name?: string; Driver_Name?: string; Vehicle_Plate?: string; Route_Name?: string; Plan_Date?: string; }
+interface DBDriver { Driver_ID?: string; Driver_Name?: string; Mobile_No?: string; Vehicle_Plate?: string; Status?: string; Branch_ID?: string | number; }
+interface DBVehicle { Vehicle_Plate?: string; Brand?: string; Model?: string; Vehicle_Type?: string; Status?: string; Current_Mileage?: number; }
+interface DBCustomer { Customer_ID?: string; Customer_Name?: string; Contact_Person?: string; Phone_No?: string; Branch_ID?: string | number; }
+interface DBRepairTicket { Ticket_ID?: string; Vehicle_Plate?: string; Problem_Description?: string; Status?: string; Driver_Name?: string; Reported_At?: string; }
+interface DBHealthAlert { Vehicle_Plate?: string; Alert_Type?: string; Severity?: string; Message?: string; }
+interface DBDriverLeave { Driver_Name?: string; Leave_Type?: string; Date_From?: string; Date_To?: string; Status?: string; Reason?: string; }
+interface DBDamageReport { Report_ID?: string; Driver_Name?: string; Job_ID?: string; Description?: string; Status?: string; Estimated_Cost?: number; }
+
+type AIToolExecutor = {
+  bivarianceHack(args?: Record<string, unknown>): LooseToolResult | Promise<LooseToolResult>
+}["bivarianceHack"]
+type LooseToolResult = number & {
+  [key: string]: LooseToolResult
+} & {
+  length: number
+  forEach(callbackfn: (value: never, index: number, array: never[]) => void): void
+  slice(start?: number, end?: number): LooseToolResult[]
+  toLocaleString(): string
+  toFixed(fractionDigits?: number): string
+}
+
+export const aiToolExecutors = {
   // ---- JOBS ----
   search_jobs: async (args: { query?: string, status?: string }) => {
     const results = await getAllJobs(1, 20, args.query || '', args.status)
-    return (results.data || []).map((j: any) => ({
-        id: j.Job_ID,
-        status: j.Job_Status,
-        customer: j.Customer_Name,
-        driver: j.Driver_Name,
-        plate: j.Vehicle_Plate,
-        route: j.Route_Name,
-        planDate: j.Plan_Date
-    }))
+    return (results.data || []).map((row: unknown) => {
+        const j = row as DBJob;
+        return {
+            id: j.Job_ID,
+            status: j.Job_Status,
+            customer: j.Customer_Name,
+            driver: j.Driver_Name,
+            plate: j.Vehicle_Plate,
+            route: j.Route_Name,
+            planDate: j.Plan_Date
+        }
+    })
   },
 
   get_job_details: async (args: { jobId: string }) => {
@@ -89,15 +115,16 @@ export const aiToolExecutors: Record<string, Function> = {
     const PENDING_STATUS = ['New', 'Pending', 'Requested', 'รอรับบริการ', 'รอดำเนินการ', 'รอคนขับ', 'ยืนยันงาน']
     const CANCELLED_STATUS = ['Cancelled', 'Cancel', 'ยกเลิก']
 
-    const active = allJobs.filter((j: any) => ACTIVE_STATUS.includes(j.Job_Status || '')).length
-    const completed = allJobs.filter((j: any) => COMPLETED_STATUS.includes(j.Job_Status || '')).length
-    const pending = allJobs.filter((j: any) => PENDING_STATUS.includes(j.Job_Status || '')).length
-    const cancelled = allJobs.filter((j: any) => CANCELLED_STATUS.includes(j.Job_Status || '')).length
+    const active = allJobs.filter((row: unknown) => ACTIVE_STATUS.includes((row as DBJob).Job_Status || '')).length
+    const completed = allJobs.filter((row: unknown) => COMPLETED_STATUS.includes((row as DBJob).Job_Status || '')).length
+    const pending = allJobs.filter((row: unknown) => PENDING_STATUS.includes((row as DBJob).Job_Status || '')).length
+    const cancelled = allJobs.filter((row: unknown) => CANCELLED_STATUS.includes((row as DBJob).Job_Status || '')).length
     
     // Count "Others" to ensure total matches (14 - known)
     const other = allJobs.length - (active + completed + pending + cancelled)
     
-    const statusBreakdown = allJobs.reduce((acc: Record<string,number>, j: any) => {
+    const statusBreakdown = allJobs.reduce((acc: Record<string,number>, row: unknown) => {
+        const j = row as DBJob;
         const s = j.Job_Status || 'Unknown'
         acc[s] = (acc[s] || 0) + 1
         return acc
@@ -107,7 +134,10 @@ export const aiToolExecutors: Record<string, Function> = {
         stats: { active, completed, pending, cancelled, other },
         todayJobCount: allJobs.length,
         statusBreakdown,
-        jobs: allJobs.slice(0, 5).map((j: any) => ({ id: j.Job_ID, customer: j.Customer_Name, status: j.Job_Status, driver: j.Driver_Name }))
+        jobs: allJobs.slice(0, 5).map((row: unknown) => {
+            const j = row as DBJob;
+            return { id: j.Job_ID, customer: j.Customer_Name, status: j.Job_Status, driver: j.Driver_Name }
+        })
     }
   },
 
@@ -126,14 +156,17 @@ export const aiToolExecutors: Record<string, Function> = {
 
   get_all_drivers: async () => {
     const drivers = await getAllDriversFromTable()
-    return drivers.map((d: any) => ({
-        id: d.Driver_ID,
-        name: d.Driver_Name,
-        phone: d.Mobile_No,
-        plate: d.Vehicle_Plate,
-        status: d.Status,
-        branch: d.Branch_ID
-    }))
+    return drivers.map((row: unknown) => {
+        const d = row as DBDriver;
+        return {
+            id: d.Driver_ID,
+            name: d.Driver_Name,
+            phone: d.Mobile_No,
+            plate: d.Vehicle_Plate,
+            status: d.Status,
+            branch: d.Branch_ID
+        }
+    })
   },
 
   // ---- VEHICLES ----
@@ -144,14 +177,17 @@ export const aiToolExecutors: Record<string, Function> = {
 
   get_all_vehicles: async () => {
     const vehicles = await getAllVehiclesFromTable()
-    return vehicles.map((v: any) => ({
-        plate: v.Vehicle_Plate,
-        brand: v.Brand,
-        model: v.Model,
-        type: v.Vehicle_Type,
-        status: v.Status,
-        mileage: v.Current_Mileage
-    }))
+    return vehicles.map((row: unknown) => {
+        const v = row as DBVehicle;
+        return {
+            plate: v.Vehicle_Plate,
+            brand: v.Brand,
+            model: v.Model,
+            type: v.Vehicle_Type,
+            status: v.Status,
+            mileage: v.Current_Mileage
+        }
+    })
   },
 
   // ---- FINANCIAL ----
@@ -174,13 +210,16 @@ export const aiToolExecutors: Record<string, Function> = {
   // ---- CUSTOMERS ----
   get_customers: async (args: { query?: string }) => {
     const customers = await getAllCustomers(1, 20, args.query || '')
-    return (customers.data || []).map((c: any) => ({
-        id: c.Customer_ID,
-        name: c.Customer_Name,
-        contact: c.Contact_Person,
-        phone: c.Phone_No,
-        branch: c.Branch_ID
-    }))
+    return (customers.data || []).map((row: unknown) => {
+        const c = row as DBCustomer;
+        return {
+            id: c.Customer_ID,
+            name: c.Customer_Name,
+            contact: c.Contact_Person,
+            phone: c.Phone_No,
+            branch: c.Branch_ID
+        }
+    })
   },
 
   // ---- MAINTENANCE / REPAIR ----
@@ -191,30 +230,36 @@ export const aiToolExecutors: Record<string, Function> = {
 
   get_pending_repairs: async () => {
     const tickets = await getPendingRepairTickets()
-    return tickets.map((t: any) => ({
-        id: t.Ticket_ID,
-        vehicle: t.Vehicle_Plate,
-        problem: t.Problem_Description,
-        status: t.Status,
-        reportedAt: t.Reported_At
-    }))
+    return tickets.map((row: unknown) => {
+        const t = row as DBRepairTicket;
+        return {
+            id: t.Ticket_ID,
+            vehicle: t.Vehicle_Plate,
+            problem: t.Problem_Description,
+            status: t.Status,
+            reportedAt: t.Reported_At
+        }
+    })
   },
 
   get_all_repairs: async (args: { plate?: string, status?: string }) => {
     const tickets = await getAllRepairTickets(1, 30, args.plate, args.status)
-    return (tickets.data || []).map((t: any) => ({
-        id: t.Ticket_ID,
-        vehicle: t.Vehicle_Plate,
-        problem: t.Problem_Description,
-        status: t.Status,
-        driver: t.Driver_Name,
-        reportedAt: t.Reported_At
-    }))
+    return (tickets.data || []).map((row: unknown) => {
+        const t = row as DBRepairTicket;
+        return {
+            id: t.Ticket_ID,
+            vehicle: t.Vehicle_Plate,
+            problem: t.Problem_Description,
+            status: t.Status,
+            driver: t.Driver_Name,
+            reportedAt: t.Reported_At
+        }
+    })
   },
 
   // ---- FUEL ----
   get_fuel_analytics: async () => {
-    const fuel = (await getFuelAnalytics()) as any
+    const fuel = (await getFuelAnalytics()) as { totalFuelCost?: number; totalLiters?: number; avgFuelPerTrip?: number; records?: unknown[]; }
     return {
         totalFuelCost: fuel.totalFuelCost,
         totalLiters: fuel.totalLiters,
@@ -226,38 +271,47 @@ export const aiToolExecutors: Record<string, Function> = {
   // ---- FLEET HEALTH ----
   get_fleet_health: async () => {
     const alerts = await getFleetHealthAlerts()
-    return alerts.map((a: any) => ({
-        vehicle: a.Vehicle_Plate,
-        alert: a.Alert_Type,
-        severity: a.Severity,
-        message: a.Message
-    }))
+    return alerts.map((row: unknown) => {
+        const a = row as DBHealthAlert;
+        return {
+            vehicle: a.Vehicle_Plate,
+            alert: a.Alert_Type,
+            severity: a.Severity,
+            message: a.Message
+        }
+    })
   },
 
   // ---- DRIVER LEAVES ----
   get_driver_leaves: async (args: { month?: number, year?: number }) => {
     const leaves = await getDriverLeaves(args.month, args.year)
-    return leaves.map((l: any) => ({
-        driver: l.Driver_Name,
-        type: l.Leave_Type,
-        from: l.Date_From,
-        to: l.Date_To,
-        status: l.Status,
-        reason: l.Reason
-    }))
+    return leaves.map((row: unknown) => {
+        const l = row as DBDriverLeave;
+        return {
+            driver: l.Driver_Name,
+            type: l.Leave_Type,
+            from: l.Date_From,
+            to: l.Date_To,
+            status: l.Status,
+            reason: l.Reason
+        }
+    })
   },
 
   // ---- DAMAGE REPORTS ----
   get_damage_reports: async () => {
     const reports = await getDamageReports()
-    return reports.map((r: any) => ({
-        id: r.Report_ID,
-        driver: r.Driver_Name,
-        jobId: r.Job_ID,
-        description: r.Description,
-        status: r.Status,
-        amount: r.Estimated_Cost
-    }))
+    return reports.map((row: unknown) => {
+        const r = row as DBDamageReport;
+        return {
+            id: r.Report_ID,
+            driver: r.Driver_Name,
+            jobId: r.Job_ID,
+            description: r.Description,
+            status: r.Status,
+            amount: r.Estimated_Cost
+        }
+    })
   },
 
   // ---- WORKFORCE ----
@@ -308,24 +362,16 @@ export const aiToolExecutors: Record<string, Function> = {
     if (jobError) return { success: false, error: jobError.message }
     if (!draftJobs?.length) return { success: false, error: `ไม่พบงานที่เป็นสถานะ "Draft" ในวันที่ ${targetDate} ครับ` }
 
-    // 2. Update Draft -> Assigned (if driver exists) or New (if no driver)
-    // This makes the jobs appear in the driver's mobile app immediately.
-    
-    // Batch update for those with drivers -> Assigned
-    await supabase
-        .from('Jobs_Main')
-        .update({ Job_Status: 'Assigned' })
-        .eq('Plan_Date', targetDate)
-        .eq('Job_Status', 'Draft')
-        .not('Driver_ID', 'is', null)
+    // 2. Update Draft -> Assigned (if driver exists) or New (if no driver) using machine
+    const withDriver = draftJobs.filter(j => j.Driver_ID).map(j => j.Job_ID)
+    const withoutDriver = draftJobs.filter(j => !j.Driver_ID).map(j => j.Job_ID)
 
-    // Batch update for those without drivers -> New
-    await supabase
-        .from('Jobs_Main')
-        .update({ Job_Status: 'New' })
-        .eq('Plan_Date', targetDate)
-        .eq('Job_Status', 'Draft')
-        .is('Driver_ID', null)
+    if (withDriver.length > 0) {
+        await transitionBulkJobStatus(withDriver, 'Assigned', { reason: 'AI Tool: notify_jobs_by_date' })
+    }
+    if (withoutDriver.length > 0) {
+        await transitionBulkJobStatus(withoutDriver, 'New', { reason: 'AI Tool: notify_jobs_by_date' })
+    }
 
     return { 
         success: true, 
@@ -368,7 +414,7 @@ export const aiToolExecutors: Record<string, Function> = {
     }).select().single()
     return error ? { success: false, error: error.message } : { success: true, data }
   },
-}
+} as unknown as Record<string, AIToolExecutor>
 
 /**
  * Gemini Tool Definitions (Function Declarations)

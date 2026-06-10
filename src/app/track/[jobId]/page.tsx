@@ -18,6 +18,11 @@ import {
 } from "lucide-react"
 import Image from "next/image"
 import Link from 'next/link'
+
+type ExtraCostItem = {
+  type?: string
+  charge_cust?: number | string
+}
 import { cn } from "@/lib/utils"
 import { ShareTrackingButton } from "@/components/tracking/share-tracking-button"
 import { TrackingMap } from "@/components/tracking/tracking-map"
@@ -292,13 +297,13 @@ export default async function TrackingPage(props: { params: Promise<{ jobId: str
 
                             {/* Extra costs list */}
                             {(() => {
-                                let extras: any[] = [];
+                                let extras: ExtraCostItem[] = [];
                                 if (job.extraCostsJson) {
                                     try {
                                         const parsed = typeof job.extraCostsJson === 'string'
                                             ? JSON.parse(job.extraCostsJson)
                                             : job.extraCostsJson;
-                                        if (Array.isArray(parsed)) extras = parsed;
+                                        if (Array.isArray(parsed)) extras = parsed as ExtraCostItem[];
                                     } catch {}
                                 }
                                 return extras.map((c, i) => (

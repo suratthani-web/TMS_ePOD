@@ -28,8 +28,8 @@ export default function AutomationDashboard() {
             } else {
                 throw new Error(result.error)
             }
-        } catch (e: any) {
-            toast.error(e.message || t('common.failed'), { id: toastId })
+        } catch (e: unknown) {
+            toast.error(e instanceof Error ? e.message : t('common.failed'), { id: toastId })
         } finally {
             setGenerating(false)
         }
@@ -46,8 +46,8 @@ export default function AutomationDashboard() {
             } else {
                 throw new Error(result.error)
             }
-        } catch (e: any) {
-            toast.error(e.message || t('common.failed'), { id: toastId })
+        } catch (e: unknown) {
+            toast.error(e instanceof Error ? e.message : t('common.failed'), { id: toastId })
         } finally {
             setSending(false)
         }
@@ -73,7 +73,7 @@ export default function AutomationDashboard() {
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                     {/* Generation Control */}
-                    <Card className="border-2 border-primary/5 hover:border-primary/20 transition-all group overflow-hidden relative rounded-[2.5rem] bg-card/50 backdrop-blur-xl shadow-2xl">
+                    <Card className="border border-border transition-all group overflow-hidden relative rounded-[2.5rem] bg-card shadow-sm">
                         <div className="absolute top-0 right-0 p-4 opacity-5 group-hover:opacity-10 transition-opacity">
                             <Zap className="w-24 h-24 text-yellow-500" />
                         </div>
@@ -90,10 +90,10 @@ export default function AutomationDashboard() {
                         </CardHeader>
                         <CardContent className="p-8 pt-0 space-y-4">
                             <Button 
-                                className="w-full h-16 text-lg font-black uppercase tracking-widest bg-yellow-600 hover:bg-yellow-700 rounded-2xl shadow-lg shadow-yellow-600/20"
+                                className="w-full h-16 text-lg font-black uppercase tracking-widest bg-amber-500 hover:bg-amber-600 text-white rounded-2xl"
                                 onClick={handleGenerate}
                                 disabled={generating}
-                            >
+                             >
                                 {generating ? <Loader2 className="w-6 h-6 mr-3 animate-spin" /> : <Zap className="w-6 h-6 mr-3" />}
                                 {t('automation.gen_btn')}
                             </Button>
@@ -107,7 +107,7 @@ export default function AutomationDashboard() {
                     </Card>
 
                     {/* Dispatch Control */}
-                    <Card className="border-2 border-primary/5 hover:border-primary/20 transition-all group overflow-hidden relative rounded-[2.5rem] bg-card/50 backdrop-blur-xl shadow-2xl">
+                    <Card className="border border-border transition-all group overflow-hidden relative rounded-[2.5rem] bg-card shadow-sm">
                         <div className="absolute top-0 right-0 p-4 opacity-5 group-hover:opacity-10 transition-opacity">
                             <Send className="w-24 h-24 text-blue-500" />
                         </div>
@@ -124,7 +124,7 @@ export default function AutomationDashboard() {
                         </CardHeader>
                         <CardContent className="p-8 pt-0 space-y-4">
                             <Button 
-                                className="w-full h-16 text-lg font-black uppercase tracking-widest bg-blue-600 hover:bg-blue-700 rounded-2xl shadow-lg shadow-blue-600/20"
+                                className="w-full h-16 text-lg font-black uppercase tracking-widest bg-primary hover:bg-primary/90 text-white rounded-2xl"
                                 onClick={handleSend}
                                 disabled={sending}
                             >
@@ -141,7 +141,7 @@ export default function AutomationDashboard() {
                     </Card>
                 </div>
                 
-                <Card className="bg-muted/20 border-border/5 shadow-inner rounded-[3rem] mt-12 overflow-hidden">
+                <Card className="bg-muted border border-border shadow-sm rounded-[3rem] mt-12 overflow-hidden">
                     <CardContent className="p-10">
                         <div className="flex items-start gap-6 mb-8">
                             <div className="p-3 bg-primary/10 rounded-2xl text-primary">
@@ -156,9 +156,9 @@ export default function AutomationDashboard() {
                         </div>
                         
                         <div className="space-y-4">
-                            <div className="p-6 bg-background/40 rounded-[2rem] border border-border/10 backdrop-blur-md">
+                            <div className="p-6 bg-background rounded-[2rem] border border-border">
                                 <p className="text-xs font-black uppercase tracking-[0.3em] text-primary mb-3 italic">{t('automation.cron_example')}</p>
-                                <code className="text-sm font-mono text-foreground block bg-black/40 p-4 rounded-xl border border-white/5 overflow-x-auto">
+                                <code className="text-sm font-mono text-foreground block bg-muted p-4 rounded-xl border border-border overflow-x-auto">
                                     0 0 1 * * curl -X POST https://your-domain.com/api/cron/billing
                                 </code>
                             </div>

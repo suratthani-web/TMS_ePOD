@@ -1,13 +1,13 @@
 export const dynamic = 'force-dynamic'
 
 import { getDamageReports } from "@/lib/supabase/damage-reports"
-import { AlertOctagon, ArrowLeft, User, CheckCircle2, XCircle, Clock, Truck, FileText, Search, ShieldAlert, Target, ShieldCheck, Zap } from "lucide-react"
+import { AlertOctagon, ArrowLeft, User, CheckCircle2, XCircle, Clock, Truck, FileText, Search, ShieldAlert, Target, ShieldCheck, Zap, type LucideIcon } from "lucide-react"
 import Link from "next/link"
 import { PremiumCard } from "@/components/ui/premium-card"
 import { PremiumButton } from "@/components/ui/premium-button"
 import { cn } from "@/lib/utils"
 
-const STATUS_STYLES: Record<string, { bg: string; text: string; label: string; icon: any; glow: string }> = {
+const STATUS_STYLES: Record<string, { bg: string; text: string; label: string; icon: LucideIcon; glow: string }> = {
   Pending: { 
     bg: 'bg-amber-500/10', 
     text: 'text-amber-500', 

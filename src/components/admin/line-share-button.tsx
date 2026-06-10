@@ -9,8 +9,15 @@ import { cn } from "@/lib/utils"
 import { adminUpdateJobStatus } from "@/app/admin/jobs/actions"
 import { useRouter } from "next/navigation"
 
+interface ShareableJob {
+  Job_ID: string;
+  Customer_Name?: string | null;
+  Dest_Location?: string | null;
+  Job_Status?: string | null;
+}
+
 interface LineShareButtonProps {
-  job: any
+  job: ShareableJob
   variant?: "default" | "icon"
 }
 
@@ -50,8 +57,8 @@ export function LineShareButton({ job, variant = "default" }: LineShareButtonPro
         setIsLiffInit(true)
         setInitError(null)
       })
-      .catch((err: any) => {
-        setInitError(`Init failed: ${err.message || 'Unknown error'}`)
+      .catch((err: unknown) => {
+        setInitError(`Init failed: ${err instanceof Error ? err.message : 'Unknown error'}`)
         console.error("LIFF Init failed", err)
       })
   }, [isLiffInit])

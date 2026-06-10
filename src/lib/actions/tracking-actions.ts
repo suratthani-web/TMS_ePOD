@@ -50,6 +50,59 @@ export interface PublicJobDetails {
   sensorTotalStepsUpward?: number;
 }
 
+type PublicJobRow = {
+  Job_ID: string
+  Job_Status?: string | null
+  Customer_Name?: string | null
+  Route_Name?: string | null
+  Origin_Location?: string | null
+  Location_Origin_Name?: string | null
+  Dest_Location?: string | null
+  Location_Destination_Name?: string | null
+  Driver_Name?: string | null
+  Phone?: string | null
+  Customer_Phone?: string | null
+  Vehicle_Plate?: string | null
+  Plan_Date?: string | null
+  Actual_Pickup_Time?: string | null
+  Delivery_Date?: string | null
+  Actual_Delivery_Time?: string | null
+  Pickup_Photo_Url?: string | null
+  Photo_Proof_Url?: string | null
+  Signature_Proof_Url?: string | null
+  Signature_Url?: string | null
+  Signature_Pickup_Url?: string | null
+  Pickup_Signature_Url?: string | null
+  Notes?: string | null
+  Cargo_Type?: string | null
+  Weight_Kg?: number | null
+  Weight?: number | null
+  Volume_Cbm?: number | null
+  Volume?: number | null
+  Vehicle_Type?: string | null
+  Pickup_Lat?: number | null
+  Pickup_Lon?: number | null
+  Delivery_Lat?: number | null
+  Delivery_Lon?: number | null
+  Dropoff_Lat?: number | null
+  Dropoff_Lon?: number | null
+  Price_Cust_Base?: number | null
+  Price_Cust_Extra?: number | null
+  Price_Cust_Total?: number | null
+  Cost_Driver_Base?: number | null
+  Cost_Driver_Extra?: number | null
+  Cost_Driver_Total?: number | null
+  extra_costs_json?: string | null
+  extra_costs?: string | null
+  Branch_ID?: string | null
+  Incentive_Claimed?: boolean
+  Requires_Incentive_Check?: boolean
+  Sensor_Verified?: string
+  Sensor_Max_Elevation_Diff?: number
+  Sensor_TotalStepsUpward?: number
+  Sensor_Total_Steps_Upward?: number
+}
+
 export async function submitJobFeedback(
   jobId: string,
   rating: number,
@@ -124,7 +177,7 @@ export async function getActiveJobs(
     return [];
   }
 
-  return data.map((job: any) => mapJobToPublicDetails(job));
+  return (data as PublicJobRow[]).map((job) => mapJobToPublicDetails(job));
 }
 
 export async function getPublicJobDetails(
@@ -187,7 +240,7 @@ export async function getPublicJobDetails(
           ...jsonQueries
         ]);
 
-        let mergedJobs: any[] = [];
+        let mergedJobs: PublicJobRow[] = [];
         if (textResult.data) {
           mergedJobs = [...mergedJobs, ...textResult.data];
         }
@@ -243,7 +296,7 @@ export async function getPublicJobDetails(
   };
 }
 
-function mapJobToPublicDetails(job: any): PublicJobDetails {
+function mapJobToPublicDetails(job: PublicJobRow): PublicJobDetails {
     return {
         jobId: job.Job_ID,
         trackingCode: job.Job_ID,

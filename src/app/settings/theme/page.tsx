@@ -44,7 +44,7 @@ export default function ThemeSettingsPage() {
     <DashboardLayout>
       <div className="space-y-12 pb-20 p-4 lg:p-10">
         {/* Tactical Elite Header */}
-        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-10 bg-background/60 backdrop-blur-3xl p-10 rounded-br-[6rem] rounded-tl-[3rem] border border-border/5 shadow-2xl relative overflow-hidden group">
+        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-10 bg-background/60 backdrop-blur-3xl p-10 rounded-br-[6rem] rounded-tl-[3rem] border border-border shadow-2xl relative overflow-hidden group">
             <div className="absolute top-0 right-0 w-80 h-80 bg-primary/10 blur-[120px] rounded-full -mr-40 -mt-40 pointer-events-none" />
             
             <div className="relative z-10 space-y-8">
@@ -66,7 +66,7 @@ export default function ThemeSettingsPage() {
             </div>
 
             <div className="flex flex-col items-end gap-6 relative z-10">
-                <div className="bg-muted/50 border border-border/10 px-6 py-3 rounded-2xl flex items-center gap-3 backdrop-blur-md">
+                <div className="bg-muted/50 border border-border px-6 py-3 rounded-2xl flex items-center gap-3 backdrop-blur-md">
                     <div className="w-2 h-2 rounded-full bg-primary animate-pulse shadow-[0_0_10px_rgba(255,30,133,1)]" />
                     <span className="text-base font-bold font-black text-muted-foreground uppercase tracking-widest italic">สถานะ: ปกติ</span>
                 </div>
@@ -82,14 +82,14 @@ export default function ThemeSettingsPage() {
           <PremiumCard 
             className={cn(
                 "group/theme cursor-pointer transition-all duration-700 bg-background/40 border-2 rounded-[3.5rem] overflow-hidden relative",
-                theme === 'light' ? 'border-primary ring-4 ring-primary/20 scale-105' : 'border-border/5 hover:border-border/20'
+                theme === 'light' ? 'border-primary ring-4 ring-primary/20 scale-105' : 'border-border hover:border-border/20'
             )}
             onClick={() => handleThemeChange('light')}
           >
              <div className="p-10 flex flex-col items-center text-center space-y-8 relative z-10">
                 <div className={cn(
                     "w-24 h-24 rounded-[2rem] flex items-center justify-center transition-all duration-700 shadow-2xl border-2",
-                    theme === 'light' ? "bg-primary text-foreground border-border/20 rotate-12" : "bg-muted/50 text-muted-foreground border-border/5"
+                    theme === 'light' ? "bg-primary text-foreground border-border/20 rotate-12" : "bg-muted/50 text-muted-foreground border-border"
                 )}>
                     <Sun size={42} strokeWidth={2.5} />
                 </div>
@@ -119,14 +119,14 @@ export default function ThemeSettingsPage() {
           <PremiumCard 
             className={cn(
                 "group/theme cursor-pointer transition-all duration-700 bg-background/40 border-2 rounded-[3.5rem] overflow-hidden relative",
-                theme === 'dark' ? 'border-primary ring-4 ring-primary/20 scale-105' : 'border-border/5 hover:border-border/20'
+                theme === 'dark' ? 'border-primary ring-4 ring-primary/20 scale-105' : 'border-border hover:border-border/20'
             )}
             onClick={() => handleThemeChange('dark')}
           >
              <div className="p-10 flex flex-col items-center text-center space-y-8 relative z-10">
                 <div className={cn(
                     "w-24 h-24 rounded-[2rem] flex items-center justify-center transition-all duration-700 shadow-2xl border-2",
-                    theme === 'dark' ? "bg-primary text-foreground border-border/20 rotate-12" : "bg-muted/50 text-muted-foreground border-border/5"
+                    theme === 'dark' ? "bg-primary text-foreground border-border/20 rotate-12" : "bg-muted/50 text-muted-foreground border-border"
                 )}>
                     <Moon size={42} strokeWidth={2.5} />
                 </div>
@@ -156,14 +156,14 @@ export default function ThemeSettingsPage() {
           <PremiumCard 
             className={cn(
                 "group/theme cursor-pointer transition-all duration-700 bg-background/40 border-2 rounded-[3.5rem] overflow-hidden relative",
-                theme === 'system' ? 'border-primary ring-4 ring-primary/20 scale-105' : 'border-border/5 hover:border-border/20'
+                theme === 'system' ? 'border-primary ring-4 ring-primary/20 scale-105' : 'border-border hover:border-border/20'
             )}
             onClick={() => handleThemeChange('system')}
           >
              <div className="p-10 flex flex-col items-center text-center space-y-8 relative z-10">
                 <div className={cn(
                     "w-24 h-24 rounded-[2rem] flex items-center justify-center transition-all duration-700 shadow-2xl border-2",
-                    theme === 'system' ? "bg-primary text-foreground border-border/20 rotate-12" : "bg-muted/50 text-muted-foreground border-border/5"
+                    theme === 'system' ? "bg-primary text-foreground border-border/20 rotate-12" : "bg-muted/50 text-muted-foreground border-border"
                 )}>
                     <Monitor size={42} strokeWidth={2.5} />
                 </div>
@@ -203,7 +203,7 @@ export default function ThemeSettingsPage() {
                     การเปลี่ยนรูปแบบจะทำการคำนวณการแสดงผลใหม่ทั้งหมดเพื่อให้ได้ประสิทธิภาพสูงสุด
                 </p>
             </div>
-            <PremiumButton variant="outline" className="h-14 px-10 rounded-2xl border-border/10 text-foreground gap-3 uppercase font-black text-base font-bold tracking-[0.3em] ml-auto italic">
+            <PremiumButton variant="outline" className="h-14 px-10 rounded-2xl border-border text-foreground gap-3 uppercase font-black text-base font-bold tracking-[0.3em] ml-auto italic">
                 <Activity size={18} /> ปรับจูนการแสดงผล
             </PremiumButton>
         </div>

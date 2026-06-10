@@ -36,15 +36,20 @@ import { useLanguage } from "@/components/providers/language-provider"
 import { getAllJobs } from "@/lib/supabase/jobs"
 import * as XLSX from "xlsx"
 import { useState } from "react"
+import { Job } from "@/lib/supabase/jobs"
+import { Driver } from "@/lib/supabase/drivers"
+import { Vehicle } from "@/lib/supabase/vehicles"
+import { Customer } from "@/lib/supabase/customers"
+import { Route } from "@/lib/supabase/routes"
 
 interface HistoryClientProps {
-  jobs: any[]
+  jobs: Job[]
   count: number
   stats: { success: number, failed: number, cancelled: number, total: number, withPhoto: number, withSignature: number }
-  drivers: any[]
-  vehicles: any[]
-  customers: any[]
-  routes: any[]
+  drivers: Driver[]
+  vehicles: Vehicle[]
+  customers: Customer[]
+  routes: Route[]
   customerMode: boolean
   canViewPrice: boolean
   canDelete: boolean
@@ -319,7 +324,7 @@ export function HistoryClient({
 
               {/* Cards List */}
               <div className="flex flex-col gap-3">
-                {(jobs || []).map((job: any) => (
+                {(jobs || []).map((job: Job) => (
                     <div 
                         key={job.Job_ID} 
                         className="group/row transition-all duration-500 bg-background/40 hover:bg-primary/[0.03] border border-white/5 hover:border-primary/20 rounded-2xl p-4 lg:p-0 relative overflow-hidden shadow-sm"
@@ -497,10 +502,10 @@ export function HistoryClient({
                             <div className="flex justify-center shrink-0">
                                 <span className={cn(
                                     "inline-flex items-center gap-1.5 px-3 py-1 rounded-xl text-[9px] font-black uppercase tracking-widest border shadow-lg transition-all duration-500 group-hover/row:scale-105",
-                                    statusConfig[job.Job_Status]?.color || 'bg-muted/50 text-muted-foreground border-border/10'
+                                    statusConfig[job.Job_Status || '']?.color || 'bg-muted/50 text-muted-foreground border-border/10'
                                 )}>
                                     <span className="w-1 h-1 rounded-full bg-current animate-pulse" />
-                                    {statusConfig[job.Job_Status]?.label || job.Job_Status}
+                                    {statusConfig[job.Job_Status || '']?.label || job.Job_Status}
                                 </span>
                             </div>
 

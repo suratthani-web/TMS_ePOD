@@ -10,7 +10,7 @@ interface Route {
   Route_Name: string
   Origin: string
   Destination: string
-  [key: string]: any
+  [key: string]: unknown
 }
 
 interface RouteAutocompleteProps {

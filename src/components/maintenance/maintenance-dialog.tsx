@@ -157,9 +157,9 @@ export function MaintenanceDialog({
         console.error("[MAINTENANCE] Submit failed:", result?.message)
         toast.error(result?.message || 'เกิดข้อผิดพลาดในการบันทึกข้อมูล')
       }
-    } catch (err: any) {
+    } catch (err: unknown) {
       Logger.error("Maintenance submit error:", err)
-      toast.error('เกิดข้อผิดพลาด: ' + (err.message || 'การเชื่อมต่อขัดข้อง'))
+      toast.error('เกิดข้อผิดพลาด: ' + (err instanceof Error ? err.message : 'การเชื่อมต่อขัดข้อง'))
     } finally {
       setLoading(false)
     }
@@ -168,8 +168,8 @@ export function MaintenanceDialog({
   return (
     <Dialog open={show} onOpenChange={setShow}>
       {trigger && <DialogTrigger asChild>{trigger}</DialogTrigger>}
-      <DialogContent className="max-w-[95vw] sm:max-w-xl max-h-[95vh] flex flex-col bg-card/95 backdrop-blur-2xl border-border/5 text-foreground p-0 rounded-[2.5rem] overflow-hidden shadow-[0_0_80px_rgba(0,0,0,0.5)]">
-        <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-amber-500 via-orange-500 to-red-500" />
+      <DialogContent className="max-w-[95vw] sm:max-w-xl max-h-[95vh] flex flex-col bg-card text-foreground p-0 rounded-2xl overflow-hidden border border-border shadow-xl">
+        <div className="absolute top-0 left-0 w-full h-1 bg-amber-500/80" />
         
         <DialogHeader className="p-8 pb-4 flex-shrink-0">
           <div className="flex items-center gap-4">
@@ -177,10 +177,10 @@ export function MaintenanceDialog({
                   <span className="text-amber-500 text-2xl">🛠️</span>
               </div>
               <div>
-                  <DialogTitle className="text-3xl font-black tracking-tighter uppercase whitespace-nowrap">
+                  <DialogTitle className="text-2xl font-semibold whitespace-nowrap">
                       {initialData ? t('maintenance.title_edit') : t('maintenance.title_add')}
                   </DialogTitle>
-                  <p className="text-muted-foreground text-base font-bold font-black uppercase tracking-[0.3em]">Operational Service Log</p>
+                  <p className="text-muted-foreground text-sm font-medium">บันทึกงานซ่อมและค่าใช้จ่าย</p>
               </div>
           </div>
         </DialogHeader>
@@ -194,7 +194,7 @@ export function MaintenanceDialog({
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="Date_Report" className="text-muted-foreground font-black uppercase tracking-widest ml-1">{t('maintenance.date_report')}</Label>
+            <Label htmlFor="Date_Report" className="text-muted-foreground font-medium ml-1">{t('maintenance.date_report')}</Label>
             <Input
               id="Date_Report"
               type="datetime-local"
@@ -207,7 +207,7 @@ export function MaintenanceDialog({
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div className="space-y-2">
-                <Label className="text-muted-foreground font-black uppercase tracking-widest ml-1">{t('maintenance.reporter')}</Label>
+                <Label className="text-muted-foreground font-medium ml-1">{t('maintenance.reporter')}</Label>
                 <Select value={formData.Driver_ID || ""} onValueChange={(val) => setFormData({ ...formData, Driver_ID: val })}>
                     <SelectTrigger className="h-12 border-border/10 bg-muted/50 text-foreground rounded-xl">
                         <SelectValue placeholder={t('maintenance.placeholder_driver')} />
@@ -224,7 +224,7 @@ export function MaintenanceDialog({
                 </Select>
             </div>
             <div className="space-y-2">
-                <Label className="text-muted-foreground font-black uppercase tracking-widest ml-1">{t('maintenance.vehicle')}</Label>
+                <Label className="text-muted-foreground font-medium ml-1">{t('maintenance.vehicle')}</Label>
                 <Select value={formData.Vehicle_Plate || ""} onValueChange={(val) => setFormData({ ...formData, Vehicle_Plate: val })}>
                     <SelectTrigger className="h-12 border-border/10 bg-muted/50 text-foreground rounded-xl">
                         <SelectValue placeholder={t('maintenance.placeholder_vehicle')} />
@@ -244,7 +244,7 @@ export function MaintenanceDialog({
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div className="space-y-2">
-                <Label className="text-muted-foreground font-black uppercase tracking-widest ml-1">{t('maintenance.issue_type')}</Label>
+                <Label className="text-muted-foreground font-medium ml-1">{t('maintenance.issue_type')}</Label>
                 <Select value={formData.Issue_Type} onValueChange={(val) => setFormData({ ...formData, Issue_Type: val })}>
                     <SelectTrigger className="h-12 border-border/10 bg-muted/50 text-foreground rounded-xl">
                         <SelectValue placeholder={t('maintenance.placeholder_issue')} />
@@ -259,7 +259,7 @@ export function MaintenanceDialog({
                 </Select>
             </div>
              <div className="space-y-2">
-                <Label className="text-muted-foreground font-black uppercase tracking-widest ml-1">{t('maintenance.priority')}</Label>
+                <Label className="text-muted-foreground font-medium ml-1">{t('maintenance.priority')}</Label>
                 <Select value={formData.Priority} onValueChange={(val) => setFormData({ ...formData, Priority: val })}>
                     <SelectTrigger className="h-12 border-border/10 bg-muted/50 text-foreground rounded-xl">
                         <SelectValue placeholder={t('maintenance.placeholder_priority')} />
@@ -274,7 +274,7 @@ export function MaintenanceDialog({
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="Description" className="text-muted-foreground font-black uppercase tracking-widest ml-1">{t('maintenance.description')}</Label>
+            <Label htmlFor="Description" className="text-muted-foreground font-medium ml-1">{t('maintenance.description')}</Label>
             <Textarea
               id="Description"
               value={formData.Description}
@@ -289,7 +289,7 @@ export function MaintenanceDialog({
              <div className="pt-6 border-t border-border/10 space-y-6">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                     <div className="space-y-2">
-                        <Label className="text-muted-foreground font-black uppercase tracking-widest ml-1">{t('maintenance.status')}</Label>
+                        <Label className="text-muted-foreground font-medium ml-1">{t('maintenance.status')}</Label>
                         <Select value={formData.Status} onValueChange={(val) => setFormData({ ...formData, Status: val })}>
                             <SelectTrigger className="h-12 border-border/10 bg-muted/50 text-foreground rounded-xl">
                                 <SelectValue placeholder={t('maintenance.placeholder_status')} />
@@ -303,7 +303,7 @@ export function MaintenanceDialog({
                         </Select>
                     </div>
                     <div className="space-y-2">
-                        <Label htmlFor="Cost_Total" className="text-muted-foreground font-black uppercase tracking-widest ml-1">{t('maintenance.cost')}</Label>
+                        <Label htmlFor="Cost_Total" className="text-muted-foreground font-medium ml-1">{t('maintenance.cost')}</Label>
                          <Input
                             id="Cost_Total"
                             type="number"
@@ -317,7 +317,7 @@ export function MaintenanceDialog({
                     </div>
                 </div>
                  <div className="space-y-2">
-                    <Label htmlFor="Remark" className="text-muted-foreground font-black uppercase tracking-widest ml-1">{t('maintenance.remark')}</Label>
+                    <Label htmlFor="Remark" className="text-muted-foreground font-medium ml-1">{t('maintenance.remark')}</Label>
                     <Textarea
                         id="Remark"
                         value={formData.Remark}
@@ -334,14 +334,14 @@ export function MaintenanceDialog({
                 type="button" 
                 variant="ghost" 
                 onClick={() => setShow(false)}
-                className="h-14 px-8 rounded-2xl text-muted-foreground font-black uppercase tracking-widest hover:text-white"
+                className="h-12 px-6 rounded-xl text-muted-foreground font-semibold hover:text-foreground hover:bg-muted"
             >
               {t('jobs.dialog.abort')}
             </Button>
             <Button 
                 type="submit" 
                 disabled={loading} 
-                className="h-14 px-12 rounded-2xl bg-gradient-to-r from-amber-500 to-orange-600 text-white font-black uppercase tracking-widest shadow-xl shadow-amber-500/20"
+                className="h-12 px-8 rounded-xl bg-primary text-primary-foreground font-semibold shadow-sm"
             >
               {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
               {initialData ? t('common.save') : t('maintenance.title_report_btn') || 'SUBMIT_REPORT'}

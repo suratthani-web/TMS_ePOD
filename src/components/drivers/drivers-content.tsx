@@ -2,11 +2,9 @@
 
 import { useState } from "react"
 import { Driver } from "@/lib/supabase/drivers"
-import { PremiumCard } from "@/components/ui/premium-card"
-import { PremiumButton } from "@/components/ui/premium-button"
 import { 
-    Search, Plus, Filter, Download, Edit, Trash2, FileSpreadsheet,
-    Users, Zap, ShieldCheck, Award, Truck, Phone
+    Search, Plus, Filter, Edit, Trash2, FileSpreadsheet,
+    Users, Truck, Phone, Award
 } from "lucide-react"
 import { deleteDriver } from "@/app/drivers/actions"
 import { toast } from "sonner"
@@ -15,8 +13,6 @@ import { DriverDialog } from "./driver-dialog"
 import { Pagination } from "@/components/ui/pagination"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { useLanguage } from "@/components/providers/language-provider"
-import { cn } from "@/lib/utils"
-import { ExcelImport } from "../ui/excel-import"
 
 type DriversContentProps = {
   drivers: Driver[]
@@ -45,112 +41,105 @@ export function DriversContent({
   const [deletingId, setDeletingId] = useState<string | null>(null)
 
   const handleDelete = async (id: string, name: string) => {
-    if (!confirm(t('common.error'))) return
+    if (!confirm(`${t('common.delete') || 'ต้องการลบ'} ${name}?`)) return
     
     setDeletingId(id)
     try {
       const result = await deleteDriver(id)
       if (result.success) {
-        toast.success(t('common.success'))
+        toast.success(t('common.success') || 'ดำเนินการสำเร็จ')
       } else {
         toast.error(result.message)
       }
     } catch (err: unknown) {
-      toast.error(err instanceof Error ? err.message : t('common.error'))
+      toast.error(err instanceof Error ? err.message : (t('common.error') || 'เกิดข้อผิดพลาด'))
     } finally {
       setDeletingId(null)
     }
   }
   
   return (
-    <div className="space-y-8 pb-20">
+    <div className="space-y-6 pb-20">
       {/* Brand Header */}
-      <div className="relative group p-8 rounded-3xl bg-background border border-border/5 overflow-hidden shadow-xl">
-        <div className="absolute inset-0 bg-gradient-to-r from-primary/10 to-transparent pointer-events-none" />
-        <div className="absolute top-0 right-0 p-8 text-primary/5 pointer-events-none">
-            <Users size={120} />
-        </div>
-        
-        <div className="relative z-10 space-y-1">
-          <div className="flex items-center gap-3 mb-2">
-              <div className="p-2 bg-primary rounded-xl shadow-lg">
-                  <Users className="text-white" size={18} />
-              </div>
-              <Badge className="bg-primary/20 text-primary border-primary/30 py-0.5 px-3 text-[10px] font-black tracking-widest uppercase">
-                {isAdminUser ? "COMMAND CENTER" : "BASE OPERATIONS"}
-              </Badge>
+      <div className="p-6 rounded-xl bg-card border border-border flex flex-col md:flex-row md:items-center justify-between gap-4 shadow-sm">
+        <div className="space-y-1">
+          <div className="flex items-center gap-2">
+            <div className="p-1.5 bg-primary/10 rounded-lg text-primary">
+              <Users size={18} />
+            </div>
+            <span className="text-[10px] font-bold tracking-wider text-primary uppercase">
+              {isAdminUser ? "COMMAND CENTER" : "BASE OPERATIONS"}
+            </span>
           </div>
-          <h1 className="text-3xl lg:text-4xl font-black text-foreground tracking-tighter uppercase premium-text-gradient italic">
-            {t('navigation.drivers')}<span className="text-primary font-black italic ml-2">ELITE</span>
+          <h1 className="text-2xl font-bold text-foreground tracking-tight">
+            {t('navigation.drivers') || "พนักงานขับรถ"}
           </h1>
-          <p className="text-muted-foreground font-black uppercase tracking-[0.4em] text-[10px] italic">{t('dashboard.subtitle')}</p>
+          <p className="text-muted-foreground text-xs">
+            {t('drivers.subtitle') || "จัดการข้อมูลพนักงานขับรถ การมอบหมายยานพาหนะ และข้อมูลเบอร์โทรศัพท์ติดต่อ"}
+          </p>
         </div>
       </div>
 
-      {/* Analytics Placeholder (Future Feature) */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {[
-          { icon: Zap, label: t('navigation.monitoring') + " Matrix", value: "Analytics Offline", color: "text-primary", bg: "bg-primary/10" },
-          { icon: ShieldCheck, label: t('navigation.monitoring') + " Status", value: "Scanning Deferred", color: "text-accent", bg: "bg-accent/10" },
-          { icon: Award, label: "Merit System", value: "Database Sync Required", color: "text-blue-400", bg: "bg-blue-500/10" }
-        ].map((stat, i) => (
-          <PremiumCard key={i} className="glass-panel p-5 rounded-2xl border-border/5 opacity-50">
-             <div className="flex items-center gap-3 mb-2">
-                <div className={cn("p-1.5 rounded-lg", stat.bg)}>
-                    <stat.icon size={16} className={stat.color} />
-                </div>
-                <h4 className="text-foreground font-black text-xs uppercase tracking-widest">{stat.label}</h4>
-             </div>
-             <p className="text-muted-foreground text-[10px] font-black uppercase tracking-widest italic">{stat.value}</p>
-          </PremiumCard>
-        ))}
+      {/* Analytics Summary */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        <div className="bg-card border border-border p-5 rounded-xl shadow-sm">
+          <div className="flex items-center gap-3 mb-2">
+            <div className="p-1.5 rounded-lg bg-primary/10 text-primary">
+              <Users size={16} />
+            </div>
+            <h4 className="text-muted-foreground font-medium text-xs uppercase tracking-wider">
+              {t('drivers.total_drivers') || "พนักงานขับรถทั้งหมด"}
+            </h4>
+          </div>
+          <p className="text-2xl font-bold text-foreground">{count || drivers?.length || 0}</p>
+        </div>
+
+        <div className="bg-card border border-border p-5 rounded-xl shadow-sm">
+          <div className="flex items-center gap-3 mb-2">
+            <div className="p-1.5 rounded-lg bg-emerald-500/10 text-emerald-500">
+              <Truck size={16} />
+            </div>
+            <h4 className="text-muted-foreground font-medium text-xs uppercase tracking-wider">
+              {t('drivers.assigned_drivers') || "มอบหมายรถแล้ว"}
+            </h4>
+          </div>
+          <p className="text-2xl font-bold text-foreground">
+            {drivers?.filter(d => d.Vehicle_Plate).length || 0}
+          </p>
+        </div>
+
+        <div className="bg-card border border-border p-5 rounded-xl shadow-sm">
+          <div className="flex items-center gap-3 mb-2">
+            <div className="p-1.5 rounded-lg bg-blue-500/10 text-blue-500">
+              <Award size={16} />
+            </div>
+            <h4 className="text-muted-foreground font-medium text-xs uppercase tracking-wider">
+              {t('drivers.subcontractors') || "ผู้รับเหมาช่วง (Subcontractor)"}
+            </h4>
+          </div>
+          <p className="text-2xl font-bold text-foreground">{subcontractors?.length || 0}</p>
+        </div>
       </div>
 
       {/* Action Bar */}
-      <div className="flex flex-col md:flex-row gap-4 items-center justify-between glass-panel p-4 rounded-2xl border-border/5">
+      <div className="flex flex-col md:flex-row gap-4 items-center justify-between bg-card border border-border p-4 rounded-xl shadow-sm">
         <div className="flex items-center gap-3 w-full md:w-auto">
             <div className="relative flex-1 md:w-72">
                 <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-muted-foreground" size={16} />
                 <input 
                     type="text" 
-                    placeholder={t('common.search')}
-                    className="w-full h-11 pl-11 pr-4 rounded-xl bg-muted/50 border border-border/10 text-foreground placeholder:text-muted-foreground focus:ring-primary/40 focus:border-primary/40 transition-all font-black text-xs uppercase tracking-widest outline-none"
+                    placeholder={t('common.search') || "ค้นหา..."}
+                    className="w-full h-10 pl-11 pr-4 rounded-lg bg-muted/30 border border-border text-foreground placeholder:text-muted-foreground focus:ring-primary focus:border-primary transition-all text-sm outline-none"
                 />
             </div>
-            <button className="p-3 rounded-xl bg-muted/50 border border-border/10 text-muted-foreground hover:text-primary transition-colors">
+            <button className="p-2.5 rounded-lg bg-muted/30 border border-border text-muted-foreground hover:text-primary transition-colors">
                 <Filter size={16} />
             </button>
         </div>
 
-        <div className="flex items-center gap-3 w-full md:w-auto">
+        <div className="flex items-center gap-3 w-full md:w-auto justify-end">
             {isAdminUser && (
               <>
-                {createBulkDrivers && (
-                    <ExcelImport 
-                        trigger={
-                            <PremiumButton variant="outline" className="h-11 px-5 rounded-xl border-border/10 hover:bg-muted/50 text-muted-foreground text-[10px] font-black uppercase tracking-widest gap-2">
-                                <FileSpreadsheet size={16} />
-                                {t('common.tactical.bulk_import') || 'Import'}
-                            </PremiumButton>
-                        }
-                        title={t('drivers.import_title') || 'Import Drivers'}
-                        onImport={createBulkDrivers}
-                        templateData={[{
-                            Driver_ID: "DRV-001",
-                            Driver_Name: "สมชาย เข็มกลัด",
-                            Mobile_No: "0812345678",
-                            Password: "pass-1234",
-                            Vehicle_Plate: "80-1234 กทม.",
-                            Expire_Date: "2025-12-31",
-                            Branch_ID: "HQ",
-                            Sub_ID: "SUB-001",
-                            Bank_Name: "K-Bank",
-                            Bank_Account_No: "123-4-56789-0",
-                            Bank_Account_Name: "สมชาย เข็มกลัด"
-                        }]}
-                        templateFilename="logispro_drivers_template.xlsx"
-                    />
-                )}
                 <DriverDialog 
                     mode="create"
                     vehicles={vehicles}
@@ -158,11 +147,10 @@ export function DriversContent({
                     subcontractors={subcontractors}
                     driver={{ Branch_ID: branchId }}
                     trigger={
-
-                        <PremiumButton className="h-11 px-6 rounded-xl bg-primary hover:brightness-110 text-foreground font-black uppercase tracking-widest gap-2 shadow-lg text-[10px]">
-                            <Plus size={16} strokeWidth={3} />
-                            {t('common.success')}
-                        </PremiumButton>
+                        <button className="h-10 px-4 rounded-lg bg-primary hover:bg-primary/90 text-primary-foreground font-medium gap-2 text-xs flex items-center justify-center transition-colors shadow-sm">
+                            <Plus size={16} />
+                            {t('drivers.add_driver') || "เพิ่มพนักงานขับรถ"}
+                        </button>
                     }
                 />
               </>
@@ -173,27 +161,27 @@ export function DriversContent({
       {/* Driver Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         {(drivers || []).map((driver) => (
-          <PremiumCard key={driver.Driver_ID} className="group glass-panel rounded-2xl border-border/5 hover:border-primary/30 transition-all duration-500 hover:-translate-y-1 overflow-hidden shadow-lg">
-            <div className="p-6 space-y-6">
+          <div key={driver.Driver_ID} className="group bg-card border border-border rounded-xl hover:shadow-md transition-all duration-200 overflow-hidden">
+            <div className="p-5 space-y-4">
               <div className="flex justify-between items-start">
-                <div className="flex items-center gap-4">
+                <div className="flex items-center gap-3">
                   <div className="relative">
-                    <Avatar className="h-12 w-12 border-2 border-primary/20 shadow-xl">
+                    <Avatar className="h-10 w-10 border border-border shadow-sm">
                       <AvatarImage src={`https://api.dicebear.com/7.x/avataaars/svg?seed=${driver.Driver_Name}`} />
-                      <AvatarFallback className="bg-secondary text-primary font-black uppercase text-xs">{driver.Driver_Name?.charAt(0)}</AvatarFallback>
+                      <AvatarFallback className="bg-muted text-foreground font-bold text-xs">{driver.Driver_Name?.charAt(0)}</AvatarFallback>
                     </Avatar>
-                    <div className="absolute -bottom-0.5 -right-0.5 w-4 h-4 bg-emerald-500 border-2 border-background rounded-full" />
+                    <div className="absolute -bottom-0.5 -right-0.5 w-3 h-3 bg-emerald-500 border-2 border-card rounded-full" />
                   </div>
                   <div>
-                    <h3 className="text-base font-black text-foreground tracking-tight group-hover:text-primary transition-colors line-clamp-1 uppercase italic">{driver.Driver_Name || t('common.loading')}</h3>
-                    <div className="flex items-center gap-2 mt-0.5">
-                        <span className="text-[9px] font-black text-muted-foreground uppercase tracking-widest italic">ID: {driver.Driver_ID}</span>
-                        <div className="w-1 h-1 rounded-full bg-slate-700" />
-                        <span className="text-primary font-black text-[9px] uppercase tracking-widest italic">ACTIVE ELITE</span>
+                    <h3 className="text-sm font-semibold text-foreground group-hover:text-primary transition-colors line-clamp-1">{driver.Driver_Name || t('common.loading')}</h3>
+                    <div className="flex items-center gap-1.5 mt-0.5">
+                        <span className="text-[10px] text-muted-foreground">ID: {driver.Driver_ID}</span>
+                        <div className="w-1 h-1 rounded-full bg-border" />
+                        <span className="text-[10px] text-primary font-medium">{driver.Sub_ID ? (subcontractors.find(s => s.Sub_ID === driver.Sub_ID)?.Sub_Name || "Subcontractor") : "Staff"}</span>
                     </div>
                   </div>
                 </div>
-                <div className="flex gap-1.5">
+                <div className="flex gap-1">
                     <DriverDialog 
                         mode="edit"
                         driver={driver}
@@ -201,7 +189,7 @@ export function DriversContent({
                         branches={branches}
                         subcontractors={subcontractors}
                         trigger={
-                            <button className="p-2 rounded-lg bg-muted/50 border border-border/10 text-muted-foreground hover:text-primary transition-all hover:bg-primary/10">
+                            <button className="p-2 rounded-lg hover:bg-muted text-muted-foreground hover:text-foreground transition-all">
                                 <Edit size={14} />
                             </button>
                         }
@@ -209,7 +197,7 @@ export function DriversContent({
                     <button 
                         onClick={() => handleDelete(driver.Driver_ID, driver.Driver_Name || '')}
                         disabled={deletingId === driver.Driver_ID}
-                        className="p-2 rounded-lg bg-muted/50 border border-border/10 text-muted-foreground hover:text-red-400 transition-all hover:bg-red-400/10 disabled:opacity-50"
+                        className="p-2 rounded-lg hover:bg-red-500/10 text-muted-foreground hover:text-red-600 transition-all disabled:opacity-50"
                     >
                         <Trash2 size={14} />
                     </button>
@@ -217,36 +205,35 @@ export function DriversContent({
               </div>
 
               <div className="grid grid-cols-2 gap-3">
-                  <div className="p-3 bg-muted/40 rounded-xl border border-border/5 group-hover:bg-muted/50 transition-colors">
-                      <p className="text-[9px] font-black text-muted-foreground uppercase tracking-widest mb-1">{t('navigation.vehicles')}</p>
+                  <div className="p-3 bg-muted/20 rounded-lg border border-border/5">
+                      <p className="text-[10px] font-medium text-muted-foreground mb-1">{t('navigation.vehicles') || "ยานพาหนะ"}</p>
                       <div className="flex items-center gap-2">
                         <Truck size={12} className="text-primary" />
-                        <span className="text-xs font-black text-foreground uppercase italic">{driver.Vehicle_Plate || t('common.pending')}</span>
+                        <span className="text-xs font-semibold text-foreground">{driver.Vehicle_Plate || t('common.pending') || "รอดำเนินการ"}</span>
                       </div>
                   </div>
-                  <div className="p-3 bg-muted/40 rounded-xl border border-border/5 group-hover:bg-muted/50 transition-colors">
-                      <p className="text-[9px] font-black text-muted-foreground uppercase tracking-widest mb-1">{t('navigation.chat')}</p>
+                  <div className="p-3 bg-muted/20 rounded-lg border border-border/5">
+                      <p className="text-[10px] font-medium text-muted-foreground mb-1">{t('drivers.phone') || "เบอร์โทรศัพท์"}</p>
                       <div className="flex items-center gap-2">
                         <Phone size={12} className="text-primary" />
-                        <span className="text-xs font-black text-foreground italic">{driver.Mobile_No || "-"}</span>
+                        <span className="text-xs font-semibold text-foreground">{driver.Mobile_No || "-"}</span>
                       </div>
                   </div>
               </div>
 
-              <div className="flex items-center justify-between border-t border-border/5 pt-4">
-                <div className="flex items-center gap-3">
-                    {[
-                        { icon: ShieldCheck, color: "text-primary" },
-                        { icon: Zap, color: "text-accent" },
-                        { icon: Award, color: "text-blue-400" }
-                    ].map((m, i) => <m.icon key={i} size={14} className={m.color} />)}
+              <div className="flex items-center justify-between border-t border-border pt-3.5">
+                <div className="flex items-center gap-2">
+                    <span className="text-[10px] text-muted-foreground">{t('drivers.expiry') || "บัตรหมดอายุ"}:</span>
+                    <span className="text-[10px] font-medium text-foreground">{driver.Expire_Date ? new Date(driver.Expire_Date).toLocaleDateString() : "-"}</span>
                 </div>
-                <button className="text-[9px] font-black uppercase tracking-widest text-muted-foreground hover:text-primary transition-all italic">
-                  Performance DNA
-                </button>
+                {driver.Branch_ID && (
+                  <Badge variant="outline" className="text-[9px] font-medium px-2 py-0">
+                    {branches.find(b => b.Branch_ID === driver.Branch_ID)?.Branch_Name || driver.Branch_ID}
+                  </Badge>
+                )}
               </div>
             </div>
-          </PremiumCard>
+          </div>
         ))}
       </div>
       
@@ -256,4 +243,3 @@ export function DriversContent({
     </div>
   )
 }
-

@@ -60,7 +60,7 @@ export async function updateUserProfile(data: Partial<UserProfile>) {
 
     const supabase = createAdminClient()
 
-    const updatePayload: any = {
+    const updatePayload: Record<string, unknown> = {
         First_Name: data.First_Name,
         Last_Name: data.Last_Name,
         Email: data.Email,

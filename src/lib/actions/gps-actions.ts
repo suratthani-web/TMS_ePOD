@@ -52,20 +52,23 @@ export async function getJobGPSData(jobId: string, driverId: string, date: strin
         const latest = latestData?.[0]
         
         // Final mapping with robustness
-        const route = finalRoute?.map((r: any) => {
-            const lat = r.latitude ?? (r as any).Latitude ?? (r as any).lat ?? 0;
-            const lng = r.longitude ?? (r as any).Longitude ?? (r as any).lng ?? 0;
+        const route = finalRoute?.map((r: unknown) => {
+            const rp = r as { latitude?: number | string, Longitude?: number | string, lat?: number | string, longitude?: number | string, Latitude?: number | string, lng?: number | string };
+            const lat = rp.latitude ?? rp.Latitude ?? rp.lat ?? 0;
+            const lng = rp.longitude ?? rp.Longitude ?? rp.lng ?? 0;
             return [Number(lat), Number(lng)] as [number, number];
         }) || []
 
+        const l = latest as { latitude?: number|string, Latitude?: number|string, lat?: number|string, longitude?: number|string, Longitude?: number|string, lng?: number|string, timestamp?: string, Timestamp?: string, created_at?: string, vehicle_plate?: string, speed?: number } | undefined;
+
         return {
             route,
-            latest: latest ? {
-                lat: latest.latitude ?? (latest as any).Latitude ?? (latest as any).lat ?? 0,
-                lng: latest.longitude ?? (latest as any).Longitude ?? (latest as any).lng ?? 0,
-                timestamp: latest.timestamp ?? (latest as any).Timestamp ?? latest.created_at,
-                vehicle_plate: latest.vehicle_plate,
-                speed: latest.speed
+            latest: l ? {
+                lat: l.latitude ?? l.Latitude ?? l.lat ?? 0,
+                lng: l.longitude ?? l.Longitude ?? l.lng ?? 0,
+                timestamp: l.timestamp ?? l.Timestamp ?? l.created_at,
+                vehicle_plate: l.vehicle_plate,
+                speed: l.speed
             } : null
         }
     } catch {

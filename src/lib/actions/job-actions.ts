@@ -6,32 +6,36 @@ import { revalidatePath } from 'next/cache'
 import { isAdmin } from '@/lib/permissions'
 import { getSession } from '@/lib/session'
 
+import { transitionJobStatus } from "@/services/job-status-machine"
+import { requireAdmin } from "@/services/permission-guards"
+
 export async function verifyJob(
   jobId: string, 
   status: 'Verified' | 'Rejected', 
   note?: string
 ) {
   try {
+    await requireAdmin()
     const session = await getSession()
-
-    if (!session) {
-      throw new Error('Unauthorized: No active session found')
-    }
-
-    const isAdminUser = await isAdmin()
-    if (!isAdminUser) {
-        throw new Error('Unauthorized: Admin privilege required for verification')
-    }
-
     const supabase = createAdminClient()
 
-    // Perform verification update using PascalCase column names matching the DB schema
+    // 1. Transition main Job_Status
+    const transition = await transitionJobStatus(jobId, status, {
+        reason: `Admin Verification: ${status}`,
+        notes: note
+    })
+
+    if (!transition.success) {
+        throw new Error(transition.message)
+    }
+
+    // 2. Perform verification detail update
     const { error } = await supabase
       .from('Jobs_Main')
       .update({
         Verification_Status: status,
         Verification_Note: note || null,
-        Verified_By: session.username || session.userId,
+        Verified_By: session?.username || session?.userId,
         Verified_At: new Date().toISOString()
       })
       .eq('Job_ID', jobId)
@@ -48,9 +52,9 @@ export async function verifyJob(
     // Log the verification event
     await logActivity({
       module: 'Jobs',
-      action_type: (status === 'Verified' ? 'APPROVE' : 'REJECT') as any,
+      action_type: status === 'Verified' ? 'APPROVE' : 'REJECT',
       target_id: jobId,
-      details: { status, note, verified_by: session.username }
+      details: { status, note, verified_by: session?.username || session?.userId || 'system' }
     })
 
     revalidatePath('/jobs/history')

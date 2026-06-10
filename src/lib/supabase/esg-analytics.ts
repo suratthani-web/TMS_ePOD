@@ -83,7 +83,7 @@ export async function getESGStats(startDate?: string, endDate?: string, branchId
         // HEURISTIC: Calculate "Saved KM"
         const totalJobs = jobs.length
         // Optimized jobs are those that have real distance or coordinate data (vs fallback baseline)
-        const optimizedJobs = jobs.filter((j: any) => 
+        const optimizedJobs = jobs.filter((j: { Est_Distance_KM?: string | number, Pickup_Lat?: string | number, Pickup_Lon?: string | number, Delivery_Lat?: string | number, Delivery_Lon?: string | number, original_origins_json?: { lat: number, lng: number }[], original_destinations_json?: { lat: number, lng: number }[], Vehicle_Type?: string, Plan_Date?: string }) => 
             (Number(j.Est_Distance_KM) > 0) || 
             (j.Pickup_Lat && j.Pickup_Lon) ||
             (j.original_origins_json && j.original_origins_json.length > 0)
@@ -91,7 +91,7 @@ export async function getESGStats(startDate?: string, endDate?: string, branchId
         const effectiveOptimizedCount = Math.max(optimizedJobs, Math.round(totalJobs * 0.45), totalJobs > 0 ? 1 : 0)
         
         // Calculate real CO2 saved based on vehicle types
-        const co2SavedKg = jobs.reduce((sum: number, j: any) => {
+        const co2SavedKg = jobs.reduce((sum: number, j: { Est_Distance_KM?: string | number, Pickup_Lat?: string | number, Pickup_Lon?: string | number, Delivery_Lat?: string | number, Delivery_Lon?: string | number, original_origins_json?: { lat: number, lng: number }[], original_destinations_json?: { lat: number, lng: number }[], Vehicle_Type?: string, Plan_Date?: string }) => {
             const vType = j.Vehicle_Type || 'default'
             const rate = CO2_COEFFICIENTS[vType] || CO2_COEFFICIENTS['default']
             
@@ -122,7 +122,7 @@ export async function getESGStats(startDate?: string, endDate?: string, branchId
 
         // 2. Historical Trend (Grouped by Month)
         const monthlyTrend: Record<string, number> = {}
-        jobs.forEach((j: any) => {
+        jobs.forEach((j: { Est_Distance_KM?: string | number, Pickup_Lat?: string | number, Pickup_Lon?: string | number, Delivery_Lat?: string | number, Delivery_Lon?: string | number, original_origins_json?: { lat: number, lng: number }[], original_destinations_json?: { lat: number, lng: number }[], Vehicle_Type?: string, Plan_Date?: string }) => {
             const dateStr = j.Plan_Date as string
             if (!dateStr) return
             const month = dateStr.substring(0, 7)
@@ -147,7 +147,7 @@ export async function getESGStats(startDate?: string, endDate?: string, branchId
             historicalData
         }
 
-    } catch (error: any) {
+    } catch (err) { const error = err as Error;
         console.error("ESG Calculation Error:", error?.message || error)
         return {
             totalSavedKm: 0,

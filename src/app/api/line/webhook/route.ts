@@ -4,6 +4,7 @@ import { replyToUser, verifyLineSignature, getMessageContent, pushToUser } from 
 import { aiToolExecutors, geminiToolDefinitions } from '@/lib/ai/tools'
 import { uploadFileToSupabase } from '@/lib/actions/supabase-upload'
 import { getDetailedDriverAnalytics } from '@/lib/supabase/fleet-analytics'
+import { transitionJobStatus } from "@/services/job-status-machine"
 import fs from 'fs'
 
 // ─────────────────────────────────────────────────────────────────
@@ -184,13 +185,13 @@ function splitLineMessage(text: string, maxLen = 1900): string[] {
 async function callGemini(
     systemPrompt: string, 
     userMessage: string, 
-    history: any[] = []
+    history: Record<string, unknown>[] = []
 ): Promise<{ text: string | null, error: string }> {
     const apiKey = process.env.GEMINI_API_KEY || process.env.NEXT_PUBLIC_GEMINI_API_KEY
     if (!apiKey) return { text: null, error: 'NO_API_KEY' }
 
     // Start with user message
-    let contents = [...history, { role: 'user', parts: [{ text: `${systemPrompt}\n\nคำสั่ง: ${userMessage}` }] }]
+    const contents = [...history, { role: 'user', parts: [{ text: `${systemPrompt}\n\nคำสั่ง: ${userMessage}` }] }]
     
     // Tools definition
     const tools = [{ function_declarations: geminiToolDefinitions }]
@@ -198,7 +199,7 @@ async function callGemini(
     try {
         // --- ROUND 1: Initial Call ---
         const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-lite:generateContent?key=${apiKey}`
-        let res = await fetch(url, {
+        const res = await fetch(url, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ contents, tools }),
@@ -211,9 +212,9 @@ async function callGemini(
         
         // --- LOOP: Handle Tool Calls (up to 3 rounds) ---
         let rounds = 0
-        while (message?.parts?.some((p: any) => p.functionCall) && rounds < 3) {
+        while (message?.parts?.some((p: Record<string, unknown>) => p.functionCall) && rounds < 3) {
             rounds++
-            const toolResults: any[] = []
+            const toolResults: Record<string, unknown>[] = []
             
             // Add model's call to history
             contents.push(message)
@@ -228,8 +229,8 @@ async function callGemini(
                     if (executor) {
                         try {
                             result = await executor(args)
-                        } catch (err: any) {
-                            result = { error: err.message }
+                        } catch (err: unknown) {
+                            result = { error: err instanceof Error ? err.message : String(err) }
                         }
                     } else {
                         result = { error: "Function not found" }
@@ -262,9 +263,9 @@ async function callGemini(
         const finalText = message?.parts?.[0]?.text
         return { text: finalText || null, error: '' }
 
-    } catch (err: any) {
-        console.error('[Gemini Tool Call Error]', err.message)
-        return { text: null, error: err.message }
+    } catch (err: unknown) {
+        console.error('[Gemini Tool Call Error]', err instanceof Error ? err.message : String(err))
+        return { text: null, error: err instanceof Error ? err.message : String(err) }
     }
 }
 
@@ -284,7 +285,7 @@ async function callGeminiMultimodal(
     const url = `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${apiKey}`
     const tools = [{ function_declarations: geminiToolDefinitions }]
     
-    let contents: any[] = [{
+    const contents: Record<string, unknown>[] = [{
         role: 'user',
         parts: [
             { text: systemPrompt },
@@ -294,7 +295,7 @@ async function callGeminiMultimodal(
     }]
 
     try {
-        let res = await fetch(url, {
+        const res = await fetch(url, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ contents, tools }),
@@ -302,12 +303,12 @@ async function callGeminiMultimodal(
         })
 
         if (!res.ok) return null
-        let json = await res.json()
+        const json = await res.json()
         let message = json?.candidates?.[0]?.content
 
         // Handle one round of tool calls for multimodal (usually enough for extraction -> create)
-        if (message?.parts?.some((p: any) => p.functionCall)) {
-            const toolResults: any[] = []
+        if (message?.parts?.some((p: Record<string, unknown>) => p.functionCall)) {
+            const toolResults: Record<string, unknown>[] = []
             contents.push(message)
 
             for (const part of message.parts) {
@@ -407,6 +408,73 @@ export async function POST(req: NextRequest) {
             if (event.type === 'message' && event.message?.type === 'text') {
                 const rawText = (event.message.text || '').trim()
                 const text = rawText.toUpperCase()
+
+                // --- IP APPROVAL COMMAND FROM LINE ---
+                if (text.startsWith('อนุมัติ IP ') || text.startsWith('บล็อก IP ') || text.startsWith('APPROVE IP ') || text.startsWith('BLOCK IP ')) {
+                    if (!boundAdmin || (boundAdmin.Role_ID !== 1 && boundAdmin.Role !== 'Super Admin')) {
+                        await replyToUser(replyToken, '❌ ขออภัยครับ คุณไม่มีสิทธิ์ในการอนุมัติ/บล็อก IP (ต้องเป็นสิทธิ์ Super Admin เท่านั้น)')
+                        continue
+                    }
+
+                    const isApprove = text.startsWith('อนุมัติ IP ') || text.startsWith('APPROVE IP ')
+                    const cleanText = rawText.replace(/(อนุมัติ IP |บล็อก IP |APPROVE IP |BLOCK IP )/i, '').trim()
+                    const parts = cleanText.split(/\s+/) // [username, ip]
+                    
+                    if (parts.length < 2) {
+                        await replyToUser(replyToken, '❌ รูปแบบคำสั่งไม่ถูกต้อง\nรูปแบบ: อนุมัติ IP [Username] [IP]')
+                        continue
+                    }
+
+                    const targetUsername = parts[0]
+                    const targetIp = parts[1]
+
+                    // Find pending IP record
+                    const { data: ipRecord, error: fetchError } = await supabase
+                        .from('user_approved_ips')
+                        .select('*')
+                        .eq('username', targetUsername)
+                        .eq('ip_address', targetIp)
+                        .maybeSingle()
+
+                    if (fetchError || !ipRecord) {
+                        await replyToUser(replyToken, `❌ ไม่พบรายการรออนุมัติสำหรับผู้ใช้ ${targetUsername} และ IP ${targetIp}`)
+                        continue
+                    }
+
+                    const { error: updateError } = await supabase
+                        .from('user_approved_ips')
+                        .update({
+                            status: isApprove ? 'Approved' : 'Blocked',
+                            approved_by: `LINE:${boundAdmin.Username}`,
+                            approved_at: new Date().toISOString()
+                        })
+                        .eq('id', ipRecord.id)
+
+                    if (updateError) {
+                        await replyToUser(replyToken, `❌ เกิดข้อผิดพลาดในการปรับปรุงสถานะ: ${updateError.message}`)
+                        continue
+                    }
+
+                    // Log activity
+                    await supabase.from('System_Logs').insert({
+                        module: 'Settings',
+                        action_type: isApprove ? 'APPROVE' : 'UPDATE',
+                        user_id: boundAdmin.Username,
+                        username: boundAdmin.Username,
+                        role: boundAdmin.Role || 'Super Admin',
+                        details: { 
+                            action: isApprove ? 'APPROVE_IP_LINE' : 'BLOCK_IP_LINE', 
+                            target_user: targetUsername, 
+                            target_ip: targetIp,
+                            approved_via: 'LINE',
+                            ip_address: 'LINE_CALLBACK'
+                        }
+                    })
+
+                    const statusThai = isApprove ? 'อนุมัติ' : 'บล็อก'
+                    await replyToUser(replyToken, `✅ ทำการ${statusThai} IP ${targetIp} ของผู้ใช้ ${targetUsername} เรียบร้อยแล้วครับ!`)
+                    continue
+                }
 
                 // 1. HELP / MENU
                 if (['HELP', 'MENU', 'เมนู', 'ช่วยเหลือ'].includes(text)) {
@@ -555,18 +623,19 @@ export async function POST(req: NextRequest) {
                             await replyToUser(replyToken, `❌ พี่ ${boundDriver.Driver_Name} ยังไม่มีใบงานที่ได้รับมอบหมายสำหรับวันนี้ครับ ลองพิมพ์คำว่า "งาน" เพื่อเช็คดูนะครับ`)
                             continue
                         }
-                        
-                        const { error } = await supabase.from('Jobs_Main')
-                            .update({ Job_Status: 'In Progress' })
-                            .eq('Job_ID', activeJob.Job_ID)
-                            
-                        if (error) {
-                            await replyToUser(replyToken, `❌ ไม่สามารถบันทึกเริ่มงานได้: ${error.message}`)
+
+                        const result = await transitionJobStatus(activeJob.Job_ID, 'In Progress', {
+                            userId: boundDriver.Driver_ID,
+                            username: boundDriver.Driver_Name,
+                            reason: 'LINE Bot: เริ่มงาน'
+                        })
+
+                        if (!result.success) {
+                            await replyToUser(replyToken, `❌ ไม่สามารถบันทึกเริ่มงานได้: ${result.message}`)
                             continue
                         }
-                        
+
                         clearDriverState(userId)
-                        
                         let replyMsg = `✅ เริ่มงาน ${activeJob.Job_ID} (${activeJob.Customer_Name}) เรียบร้อยครับ!\n🚛 ขับรถปลอดภัย พิมพ์คำว่า "รับ" เมื่อถึงจุดโหลดสินค้าครับ`
                         const userLang = getLanguage(userId)
                         if (userLang === 'MM') {
@@ -615,10 +684,11 @@ export async function POST(req: NextRequest) {
                         const match = rawText.match(/JOB-[A-Z0-9-]+/i)
                         const jobId = match ? match[0].toUpperCase() : rawText.split(' ')[0].toUpperCase()
 
-                        const { error } = await supabase.from('Jobs_Main')
-                            .update({ Job_Status: 'In Progress' })
-                            .eq('Job_ID', jobId)
-                            .eq('Driver_ID', boundDriver.Driver_ID)
+                        const result = await transitionJobStatus(jobId, 'In Progress', {
+                            userId: boundDriver.Driver_ID,
+                            username: boundDriver.Driver_Name,
+                            reason: 'LINE Bot: START command'
+                        })
                         let replyMsg = `✅ เริ่มงาน ${jobId} เรียบร้อยครับ!\n🚛 ขอให้เดินทางปลอดภัย`
                         const userLang = getLanguage(userId)
                         if (userLang === 'MM') {
@@ -629,8 +699,8 @@ export async function POST(req: NextRequest) {
                             replyMsg = `✅ Job ${jobId} has successfully started!\n🚛 Have a safe trip.`
                         }
 
-                        await replyToUser(replyToken, error
-                            ? `❌ ไม่สามารถเริ่มงานได้: ${error.message}`
+                        await replyToUser(replyToken, !result.success
+                            ? `❌ ไม่สามารถเริ่มงานได้: ${result.message}`
                             : replyMsg)
                         continue
                     }
@@ -744,7 +814,7 @@ export async function POST(req: NextRequest) {
                             lines.push(`❓ อื่นๆ: ${today.stats.other} งาน (รอระบุสถานะ)`)
                         }
                         lines.push('', '📍 5 งานล่าสุด:')
-                        today.jobs.forEach((j: any) => lines.push(`- ${j.id}: ${j.customer} (${j.status})`))
+                        today.jobs.forEach((j: Record<string, unknown>) => lines.push(`- ${j.id}: ${j.customer} (${j.status})`))
                         await replyToUser(replyToken, lines.join('\n'))
                     }
 
@@ -843,7 +913,7 @@ export async function POST(req: NextRequest) {
                         const driverAnalytics = await getDetailedDriverAnalytics()
                         
                         if (boundDriver) {
-                            const myStat = driverAnalytics.find((d: any) => d.driverId === boundDriver.Driver_ID)
+                            const myStat = driverAnalytics.find((d: Record<string, unknown>) => d.driverId === boundDriver.Driver_ID)
                             if (text === 'อันดับ' || text === 'LEADERBOARD') {
                                 const topDrivers = driverAnalytics.slice(0, 5)
                                 const lines = [
@@ -851,13 +921,13 @@ export async function POST(req: NextRequest) {
                                     `รายชื่อคนขับที่มีผลงานดีเด่นที่สุด:`,
                                     ''
                                 ]
-                                topDrivers.forEach((d: any, index: number) => {
+                                topDrivers.forEach((d: Record<string, unknown>, index: number) => {
                                     const medal = index === 0 ? '🥇' : index === 1 ? '🥈' : index === 2 ? '🥉' : '🎖️'
                                     lines.push(`${medal} อันดับ ${index + 1}: ${d.name} (${d.points} คะแนน, ${d.rank})`)
                                 })
                                 
                                 if (myStat) {
-                                    const myRankIndex = driverAnalytics.findIndex((d: any) => d.driverId === boundDriver.Driver_ID)
+                                    const myRankIndex = driverAnalytics.findIndex((d: Record<string, unknown>) => d.driverId === boundDriver.Driver_ID)
                                     lines.push('', `📍 อันดับของคุณ: อันดับที่ ${myRankIndex + 1} (${myStat.points} คะแนน, ระดับ ${myStat.rank})`)
                                 }
                                 await replyToUser(replyToken, lines.join('\n'))
@@ -890,7 +960,7 @@ export async function POST(req: NextRequest) {
                                 `รายชื่อคนขับที่มีคะแนนสะสมสูงสุดในระบบ:`,
                                 ''
                             ]
-                            topDrivers.forEach((d: any, index: number) => {
+                            topDrivers.forEach((d: Record<string, unknown>, index: number) => {
                                 const medal = index === 0 ? '🥇' : index === 1 ? '🥈' : index === 2 ? '🥉' : '🎖️'
                                 lines.push(`${medal} อันดับ ${index + 1}: ${d.name} [${d.plate}] • ${d.points} คะแนน (${d.rank})`)
                             })
@@ -1010,7 +1080,7 @@ export async function POST(req: NextRequest) {
 
                     // --- 4.1.8 GPS Location Tracking (อยู่ตรงไหน / อยู่ที่ไหน / WHERE) ---
                     if ((text.includes('อยู่ไหน') || text.includes('อยู่ตรงไหน') || text.includes('อยู่ที่ไหน') || text.includes('WHERE')) && boundAdmin) {
-                        let query = rawText
+                        const query = rawText
                             .replace(/อยู่ไหน/g, '')
                             .replace(/อยู่ตรงไหน/g, '')
                             .replace(/อยู่ที่ไหน/g, '')
@@ -1050,7 +1120,7 @@ export async function POST(req: NextRequest) {
                                 .limit(1)
                                 .maybeSingle()
 
-                            const gps = gpsLog as any
+                            const gps = gpsLog as { timestamp?: string | number | Date, latitude?: number, longitude?: number }
                             const lat = gps?.latitude ?? null
                             const lon = gps?.longitude ?? null
                             const lastSeenStr = gps?.timestamp ? new Date(gps.timestamp).toLocaleString('th-TH', { timeZone: 'Asia/Bangkok' }) : null
@@ -1146,7 +1216,7 @@ export async function POST(req: NextRequest) {
                             lines.push('')
                             
                             if (jobSummary.byCustomer && jobSummary.byCustomer.length > 0) {
-                                jobSummary.byCustomer.slice(0, 15).forEach((c: any, index: number) => {
+                                jobSummary.byCustomer.slice(0, 15).forEach((c: Record<string, unknown>, index: number) => {
                                     lines.push(`${index + 1}. 🏢 ${c.name}: ${c.total?.toLocaleString()} งาน (สำเร็จ ${c.completed?.toLocaleString()})`)
                                 })
                                 if (jobSummary.byCustomer.length > 15) {
@@ -1252,9 +1322,9 @@ export async function POST(req: NextRequest) {
                         ]
 
                         if (utilSummary && utilSummary.length > 0) {
-                            utilSummary.forEach((v: any) => {
-                                const weightUtil = v.maxWeightLimit > 0 ? ((v.avgWeightPerJob / v.maxWeightLimit) * 100).toFixed(1) : '0'
-                                const volUtil = v.maxVolumeLimit > 0 ? ((v.avgVolumePerJob / v.maxVolumeLimit) * 100).toFixed(1) : '0'
+                            utilSummary.forEach((v: { type: string, maxWeightLimit?: number | null, avgWeightPerJob?: number | null, maxVolumeLimit?: number | null, avgVolumePerJob?: number | null, jobCount?: number | null, totalWeight?: number | null, totalVolume?: number | null }) => {
+                                const weightUtil = (v.maxWeightLimit && v.maxWeightLimit > 0 && v.avgWeightPerJob) ? ((v.avgWeightPerJob / v.maxWeightLimit) * 100).toFixed(1) : '0'
+                                const volUtil = (v.maxVolumeLimit && v.maxVolumeLimit > 0 && v.avgVolumePerJob) ? ((v.avgVolumePerJob / v.maxVolumeLimit) * 100).toFixed(1) : '0'
                                 
                                 lines.push(`🚚 ประเภทรถ: ${v.type}`)
                                 lines.push(`  • จำนวนงาน: ${v.jobCount} เที่ยว`)
@@ -1278,7 +1348,7 @@ export async function POST(req: NextRequest) {
                             `🔧 รายการแจ้งซ่อมค้างอยู่ (${repairs.length} รายการ)`,
                             ''
                         ]
-                        repairs.slice(0, 10).forEach((t: any) => lines.push(`- ${t.vehicle}: ${t.problem} (${t.status})`))
+                        repairs.slice(0, 10).forEach((t: Record<string, unknown>) => lines.push(`- ${t.vehicle}: ${t.problem} (${t.status})`))
                         if (repairs.length === 0) lines.push('✅ ไม่มีรายการแจ้งซ่อมค้างครับ')
                         await replyToUser(replyToken, lines.join('\n'))
                         continue
@@ -1303,7 +1373,7 @@ export async function POST(req: NextRequest) {
                             `🚛 แจ้งเตือนสถานะยานพาหนะ (${health.length} รายการ)`,
                             ''
                         ]
-                        health.slice(0, 10).forEach((h: any) => lines.push(`- ${h.vehicle}: [${h.severity}] ${h.message}`))
+                        health.slice(0, 10).forEach((h: Record<string, unknown>) => lines.push(`- ${h.vehicle}: [${h.severity}] ${h.message}`))
                         if (health.length === 0) lines.push('✅ สภาพรถทุกคันปกติดีครับ')
                         await replyToUser(replyToken, lines.join('\n'))
                         continue
@@ -1317,7 +1387,7 @@ export async function POST(req: NextRequest) {
                             '👥 รายการลาหยุด (เดือนนี้)',
                             ''
                         ]
-                        leaves.slice(0, 10).forEach((l: any) => lines.push(`- ${l.driver}: ${l.from} ถึง ${l.to} (${l.type})`))
+                        leaves.slice(0, 10).forEach((l: Record<string, unknown>) => lines.push(`- ${l.driver}: ${l.from} ถึง ${l.to} (${l.type})`))
                         if (leaves.length === 0) lines.push('✅ ไม่มีคนขับลาหยุดในช่วงนี้ครับ')
                         await replyToUser(replyToken, lines.join('\n'))
                         continue
@@ -1422,7 +1492,7 @@ export async function POST(req: NextRequest) {
 
                 try {
                     const messageId = event.message.id
-                    const fileName = (event.message as any).fileName || 'image.jpg'
+                    const fileName = (event.message as Record<string, unknown>).fileName || 'image.jpg'
                     const mimeType = event.message.type === 'image' ? 'image/jpeg' : 'application/pdf' // Default to PDF for files
                     
                     const buffer = await getMessageContent(messageId)
@@ -1456,8 +1526,7 @@ export async function POST(req: NextRequest) {
 
                                 if (stateType === 'waiting_for_pickup_proof') {
                                     // Try updating including Actual_Pickup_Time, fallback if column doesn't exist
-                                    let pickupUpdate: any = {
-                                        Job_Status: 'Picked Up',
+                                    const pickupUpdate: Record<string, unknown> = {
                                         Photo_Proof_Url: newPhotos
                                     }
                                     try {
@@ -1465,18 +1534,38 @@ export async function POST(req: NextRequest) {
                                         pickupUpdate.Pickup_Date = dateString
                                     } catch {}
                                     
-                                    await supabase.from('Jobs_Main').update(pickupUpdate).eq('Job_ID', activeJob.Job_ID)
-                                    clearDriverState(userId)
-                                    
-                                    await replyToUser(replyToken, `📦 [บันทึกการรับสินค้าเรียบร้อย]\n\n✅ อัปโหลดรูปภาพหลักฐานรับสินค้าสำหรับงาน #${activeJob.Job_ID} เรียบร้อยแล้วครับ!\n\nสถานะงานถูกปรับเป็น 'รับสินค้าแล้ว' (Picked Up) เข้าระบบส่วนกลางเรียบร้อยครับ 🚛💨\n\nเมื่อพี่ขับรถเดินทางไปถึงปลายทางแล้ว สามารถพิมพ์คำว่า "ส่งของ" เพื่อปิดงานได้เลยครับ`)
+                                    const result = await transitionJobStatus(activeJob.Job_ID, 'Picked Up', {
+                                        userId: boundDriver.Driver_ID,
+                                        username: boundDriver.Driver_Name,
+                                        reason: 'LINE Bot: Smart Pickup Photo'
+                                    })
+
+                                    if (result.success) {
+                                        await supabase.from('Jobs_Main').update(pickupUpdate).eq('Job_ID', activeJob.Job_ID)
+                                        clearDriverState(userId)
+                                        
+                                        await replyToUser(replyToken, `📦 [บันทึกการรับสินค้าเรียบร้อย]\n\n✅ อัปโหลดรูปภาพหลักฐานรับสินค้าสำหรับงาน #${activeJob.Job_ID} เรียบร้อยแล้วครับ!\n\nสถานะงานถูกปรับเป็น 'รับสินค้าแล้ว' (Picked Up) เข้าระบบส่วนกลางเรียบร้อยครับ 🚛💨\n\nเมื่อพี่ขับรถเดินทางไปถึงปลายทางแล้ว สามารถพิมพ์คำว่า "ส่งของ" เพื่อปิดงานได้เลยครับ`)
+                                    } else {
+                                        await replyToUser(replyToken, `❌ ไม่สามารถบันทึกรับสินค้าได้: ${result.message}`)
+                                    }
                                     continue
                                 } else if (stateType === 'waiting_for_delivery_proof') {
                                     await supabase.from('Jobs_Main').update({
-                                        Job_Status: 'Delivered',
                                         Photo_Proof_Url: newPhotos,
                                         Actual_Delivery_Time: timeString,
                                         Delivery_Date: dateString
                                     }).eq('Job_ID', activeJob.Job_ID)
+
+                                    const result = await transitionJobStatus(activeJob.Job_ID, 'Delivered', {
+                                        userId: boundDriver.Driver_ID,
+                                        username: boundDriver.Driver_Name,
+                                        reason: 'LINE Bot: Delivery Photo'
+                                    })
+
+                                    if (!result.success) {
+                                        await replyToUser(replyToken, `Cannot mark delivery as Delivered: ${result.message}`)
+                                        continue
+                                    }
                                     
                                     clearDriverState(userId)
 
@@ -1527,7 +1616,7 @@ export async function POST(req: NextRequest) {
                         `.trim()
 
                         let classification = 'other'
-                        let extracted: any = {}
+                        let extracted: Record<string, unknown> = {}
                         try {
                             const classResText = await callGeminiMultimodal(
                                 "You are a helpful logistics AI coordinator.",
@@ -1596,11 +1685,27 @@ export async function POST(req: NextRequest) {
                                 const dateString = now.toLocaleDateString('en-CA', { timeZone: 'Asia/Bangkok' })
 
                                 await supabase.from('Jobs_Main').update({
-                                    Job_Status: 'Delivered',
                                     Photo_Proof_Url: newPhotos,
                                     Actual_Delivery_Time: timeString,
                                     Delivery_Date: dateString
                                 }).eq('Job_ID', activeJob.Job_ID)
+
+                                const result = await transitionJobStatus(activeJob.Job_ID, 'Delivered', {
+                                    userId: boundDriver.Driver_ID,
+                                    username: boundDriver.Driver_Name,
+                                    reason: 'LINE Bot: Smart Delivery Photo'
+                                })
+
+                                if (result.success) {
+                                    await supabase.from('Jobs_Main').update({
+                                        Photo_Proof_Url: newPhotos,
+                                        Actual_Delivery_Time: timeString,
+                                        Delivery_Date: dateString
+                                    }).eq('Job_ID', activeJob.Job_ID)
+                                } else {
+                                    await replyToUser(replyToken, `❌ ไม่สามารถบันทึกส่งของได้: ${result.message}`)
+                                    continue
+                                }
 
                                 // Trigger Customer Satisfaction Survey (แบบสำรวจความพอใจ)
                                 try {
@@ -1669,7 +1774,7 @@ export async function POST(req: NextRequest) {
                 }
 
                 try {
-                    const loc = event.message as any
+                    const loc = event.message as Record<string, unknown>
                     const address = loc.address || 'ไม่ระบุที่อยู่'
                     const lat = loc.latitude
                     const lon = loc.longitude
@@ -1686,17 +1791,26 @@ export async function POST(req: NextRequest) {
                         const currentNotes = activeJob.Notes || ''
                         const updatedNotes = `🚨 [SOS Emergency Alert: Shared Location: ${address}] ${currentNotes}`.slice(0, 1000)
 
-                        // Update job status to SOS and record coordinates
-                        await supabase.from('Jobs_Main')
-                            .update({
-                                Job_Status: 'SOS',
-                                Delivery_Lat: lat,
-                                Delivery_Lon: lon,
-                                Notes: updatedNotes
-                            })
-                            .eq('Job_ID', activeJob.Job_ID)
+                        const result = await transitionJobStatus(activeJob.Job_ID, 'SOS', {
+                            userId: boundDriver.Driver_ID,
+                            username: boundDriver.Driver_Name,
+                            reason: 'LINE Bot: SOS Location Share'
+                        })
 
-                        await replyToUser(replyToken, `🚨 [แจ้งเหตุฉุกเฉิน SOS สำเร็จ]\n\n📍 ระบบได้บันทึกพิกัดสถานที่เกิดเหตุของคุณสำหรับงาน #${activeJob.Job_ID} เรียบร้อยแล้วครับ!\n🏠 ที่อยู่: ${address}\n\nเจ้าหน้าที่สาขาและหน่วยกู้ภัยกำลังเร่งประสานการเข้าช่วยเหลือ โปรดเตรียมตัวรับสายโทรศัพท์และรออยู่ในจุดที่ปลอดภัยครับ!`)
+                        if (result.success) {
+                            // Update job status to SOS and record coordinates
+                            await supabase.from('Jobs_Main')
+                                .update({
+                                    Delivery_Lat: lat,
+                                    Delivery_Lon: lon,
+                                    Notes: updatedNotes
+                                })
+                                .eq('Job_ID', activeJob.Job_ID)
+
+                            await replyToUser(replyToken, `🚨 [แจ้งเหตุฉุกเฉิน SOS สำเร็จ]\n\n📍 ระบบได้บันทึกพิกัดสถานที่เกิดเหตุของคุณสำหรับงาน #${activeJob.Job_ID} เรียบร้อยแล้วครับ!\n🏠 ที่อยู่: ${address}\n\nเจ้าหน้าที่สาขาและหน่วยกู้ภัยกำลังเร่งประสานการเข้าช่วยเหลือ โปรดเตรียมตัวรับสายโทรศัพท์และรออยู่ในจุดที่ปลอดภัยครับ!`)
+                        } else {
+                            await replyToUser(replyToken, `❌ ไม่สามารถบันทึกแจ้งเหตุได้: ${result.message}`)
+                        }
                     } else {
                         await replyToUser(replyToken, `📍 ได้รับพิกัดตำแหน่งที่ตั้งของคุณแล้วครับ (${address})\n\nเจ้าหน้าที่ได้รับข้อมูลแล้ว หากเกิดเหตุฉุกเฉินด่วน กรุณาติดต่อเบอร์สายตรงสาขาเพิ่มเติมเพื่อความปลอดภัยสูงสุดครับ`)
                     }

@@ -13,14 +13,15 @@ export default async function ChatPage() {
         getChatContacts(),
         getActiveFleetStatus(undefined, customerId)
     ])
+    const chatDrivers = activeDrivers.filter((driver): driver is typeof driver & { Driver_ID: string } => Boolean(driver.Driver_ID))
 
     return (
         <DashboardLayout>
             <div className="flex flex-col gap-8 h-[calc(100vh-140px)]">
                 <div className="flex-1 min-h-0">
                     <ChatWindow 
-                        initialContacts={chatContacts as any[]} 
-                        initialDrivers={activeDrivers as any[]} 
+                        initialContacts={chatContacts} 
+                        initialDrivers={chatDrivers} 
                     />
                 </div>
             </div>

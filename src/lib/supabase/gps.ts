@@ -8,7 +8,7 @@ import { sendDangerZoneAlert } from "../actions/email-actions";
 import { type DangerZone } from "./danger-zones";
 
 // Simple in-memory cache to save CPU/DB calls on Vercel
-let globalZoneCache: Record<string, { zones: DangerZone[], timestamp: number }> = {};
+const globalZoneCache: Record<string, { zones: DangerZone[], timestamp: number }> = {};
 const ZONE_CACHE_TTL = 300000; // 5 minutes cache
 
 // Type matching actual Supabase schema (ProperCase columns!)
@@ -75,7 +75,7 @@ export async function saveGPSLog(data: {
             activeZones = globalZoneCache[branchId].zones;
         } else {
             const zones = await getDangerZones(branchId);
-            activeZones = zones.filter((z: any) => z.Is_Active);
+            activeZones = zones.filter((z: { Is_Active: boolean }) => z.Is_Active);
             globalZoneCache[branchId] = { zones: activeZones, timestamp: now };
             console.log(`[GPS] Cache updated for branch: ${branchId} (${activeZones.length} zones)`);
         }
@@ -126,58 +126,77 @@ export async function getLatestDriverLocations() {
     const customerId = await getCustomerId();
     const supabase = (isSuper || isRegularAdmin || customerId) ? await createAdminClient() : await createClient();
 
-    // ดึงข้อมูล GPS ย้อนหลัง 1 ชั่วโมง
-    const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000).toISOString();
-
     const branchId = await getUserBranchId();
 
+    // Query from the optimized Latest Locations table
     let query = supabase
-      .from("gps_logs")
-      .select(
-        `
+      .from("driver_latest_locations")
+      .select(`
         *,
         Master_Drivers!inner ( Driver_Name, Branch_ID )
-      `,
-      )
-      .gte("timestamp", oneHourAgo);
+      `);
 
     // Super Admin bypass: If 'All' or no branch selected, show all
     if (branchId && branchId !== "All" && !isSuper) {
        query = query.eq('Master_Drivers.Branch_ID', branchId);
     }
 
-    const { data, error } = await query
-      .order("timestamp", { ascending: false })
-      .limit(2000); // Increased limit to ensure coverage of more drivers
+    const { data, error } = await query;
 
-    if (error) {
-      return [];
+    if (error || !data) {
+      // FALLBACK logic if table doesn't exist yet
+      const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000).toISOString();
+      let fallbackQuery = supabase
+        .from("gps_logs")
+        .select(`*, Master_Drivers!inner ( Driver_Name, Branch_ID )`)
+        .gte("timestamp", oneHourAgo);
+
+      if (branchId && branchId !== "All" && !isSuper) {
+         fallbackQuery = fallbackQuery.eq('Master_Drivers.Branch_ID', branchId);
+      }
+
+      const { data: fallbackData, error: fallbackError } = await fallbackQuery
+        .order("timestamp", { ascending: false })
+        .limit(2000);
+
+      if (fallbackError) return [];
+
+      const latestLocations = new Map<string, any>();
+      fallbackData?.forEach((log: any) => {
+        const driverId = log.driver_id || log.Driver_ID;
+        if (!latestLocations.has(driverId)) {
+          latestLocations.set(driverId, {
+            ...log,
+            Driver_ID: driverId,
+            Driver_Name: log.Master_Drivers?.Driver_Name || "Unknown Driver",
+            Latitude: log.latitude || log.Latitude,
+            Longitude: log.longitude || log.Longitude,
+            Timestamp: log.timestamp || log.Timestamp,
+          });
+        }
+      });
+      
+      const logs = Array.from(latestLocations.values());
+      if (customerId) {
+        const { data: activeJobs } = await supabase.from("Jobs_Main").select("Driver_ID")
+          .eq("Customer_ID", customerId)
+          .not("Driver_ID", "is", null)
+          .not("Job_Status", "in", '("Complete", "Completed", "Cancelled", "Delivered")');
+        const activeDriverIds = new Set(activeJobs?.map((j: { Driver_ID: string }) => j.Driver_ID) || []);
+        return logs.filter((l) => activeDriverIds.has(l.Driver_ID));
+      }
+      return logs;
     }
 
-    // Filter to latest record per driver
-    const latestLocations = new Map<
-      string,
-      GPSLog & { Driver_Name: string; Master_Drivers?: Record<string, unknown> }
-    >();
+    const logs = (data || []).map((log: any) => ({
+      ...log,
+      Driver_ID: log.Driver_ID || log.driver_id,
+      Driver_Name: log.Master_Drivers?.Driver_Name || "Unknown Driver",
+      Latitude: log.Latitude ?? log.latitude ?? null,
+      Longitude: log.Longitude ?? log.longitude ?? null,
+      Timestamp: log.Timestamp || log.timestamp || null,
+    }));
 
-    data?.forEach((log: Record<string, unknown>) => {
-      const driverId = (log.driver_id || log.Driver_ID) as string;
-      if (!latestLocations.has(driverId)) {
-        latestLocations.set(driverId, {
-          ...(log as unknown as GPSLog),
-          Driver_ID: driverId,
-          Driver_Name:
-            ((log.Master_Drivers as Record<string, unknown>)
-              ?.Driver_Name as string) || "Unknown Driver",
-          Latitude: (log.latitude || log.Latitude) as number,
-          Longitude: (log.longitude || log.Longitude) as number,
-          Timestamp: (log.timestamp || log.Timestamp) as string,
-        });
-      }
-    });
-
-    // Filter by branch manually if needed
-    const logs = Array.from(latestLocations.values());
     if (customerId) {
       // For customers, further security filter: only show locations of drivers on their active jobs
       const { data: activeJobs } = await supabase
@@ -187,15 +206,13 @@ export async function getLatestDriverLocations() {
         .not("Driver_ID", "is", null)
         .not("Job_Status", "in", '("Complete", "Completed", "Cancelled", "Delivered")');
 
-      const activeDriverIds = new Set(activeJobs?.map((j: any) => j.Driver_ID) || []);
+      const activeDriverIds = new Set(activeJobs?.map((j: { Driver_ID: string }) => j.Driver_ID) || []);
       return logs.filter((l) => activeDriverIds.has(l.Driver_ID));
-    }
-    if (branchId && branchId !== "All") {
-      return logs.filter((l) => l.Master_Drivers?.Branch_ID === branchId);
     }
 
     return logs;
-  } catch {
+  } catch (err) {
+    console.error('[GPS] getLatestDriverLocations exception:', err);
     return [];
   }
 }
@@ -226,7 +243,7 @@ export async function getDriverRouteForDate(driverId: string, date: string) {
 
     // Normalize data
     return (
-      data?.map((d: any) => ({
+      data?.map((d: { id?: string | number, driver_id?: string, Driver_ID?: string, latitude?: number, longitude?: number, timestamp?: string, Latitude?: number, Longitude?: number, Timestamp?: string | number, speed?: number, bearing?: number, battery_level?: number, vehicle_id?: string }) => ({
         Latitude: d.latitude || d.Latitude,
         Longitude: d.longitude || d.Longitude,
         Timestamp: d.timestamp || d.Timestamp,
@@ -244,90 +261,99 @@ export async function getDriverRouteForDate(driverId: string, date: string) {
 export async function getActiveFleetStatus(branchId?: string | null, customerId?: string | null) {
   try {
     const isSuper = await isSuperAdmin();
-    const isAdminUser = await isAdmin();
     const supabase = await createAdminClient();
 
-    // Get branch context
+    // 1. Fetch latest positions directly from optimized table
+    let query = supabase
+      .from("driver_latest_locations")
+      .select(`
+        *,
+        Master_Drivers!inner ( Driver_Name, Mobile_No, Branch_ID )
+      `);
+
+    // Context filtering
     const sessionBranchId = await getUserBranchId();
     const effectiveBranchId = isSuper ? (branchId || sessionBranchId) : sessionBranchId;
 
-    let driversQuery = supabase
-      .from("Master_Drivers")
-      .select("*");
+    if (effectiveBranchId && effectiveBranchId !== "All") {
+      query = query.eq('Master_Drivers.Branch_ID', effectiveBranchId);
+    }
 
     if (customerId) {
       // Find Driver_IDs from Jobs_Main for this customer
-      let activeJobsQuery = supabase
+      const activeJobsQuery = supabase
         .from("Jobs_Main")
         .select("Driver_ID")
         .eq("Customer_ID", customerId)
         .not("Driver_ID", "is", null)
         .not("Job_Status", "in", '("Complete", "Completed", "Cancelled", "Delivered")');
 
-      if (effectiveBranchId && effectiveBranchId !== "All") {
-        activeJobsQuery = activeJobsQuery.eq("Branch_ID", effectiveBranchId);
-      }
-
       const { data: activeJobs } = await activeJobsQuery;
-
-      const activeDriverIds = Array.from(
-        new Set(activeJobs?.map((j: any) => j.Driver_ID) || []),
-      );
-      if (activeDriverIds.length === 0) return [];
-
-      driversQuery = driversQuery.in("Driver_ID", activeDriverIds);
-    }
-
-    if (effectiveBranchId && effectiveBranchId !== "All") {
-      driversQuery = driversQuery.eq("Branch_ID", effectiveBranchId);
-    } else if (!isSuper && !isAdminUser && !effectiveBranchId && !customerId) {
-      return [];
-    }
-
-    const { data: drivers, error: driverError } = await driversQuery;
-
-    if (driverError || !drivers) {
-      console.error('[DEBUG] getActiveFleetStatus driver error:', JSON.stringify(driverError, null, 2))
-      return [];
-    }
-
-    // 2. Fetch latest GPS logs for these drivers (Last 24 hours to keep it efficient)
-    const driverIds = drivers.map((d: any) => d.Driver_ID || d.driver_id);
-    const yesterday = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
-    
-    const { data: latestLogs } = await supabase
-      .from("gps_logs")
-      .select("*")
-      .in("driver_id", driverIds)
-      .gte("timestamp", yesterday)
-      .order("timestamp", { ascending: false })
-      .limit(Math.max(2000, driverIds.length * 2)); // Dynamic limit to ensure enough logs are captured
-
-    // 3. Map logs to drivers
-    const logMap = new Map();
-    latestLogs?.forEach((log: any) => {
-        const dId = log.driver_id || log.Driver_ID;
-        if (dId && !logMap.has(dId)) {
-            logMap.set(dId, log);
-        }
-    });
-
-    // 4. Format the data to match expected return type
-     return drivers.map((driver: any) => {
-      const dId = driver.Driver_ID || driver.driver_id;
-      const log = logMap.get(dId);
+      const activeDriverIds = Array.from(new Set(activeJobs?.map((j: { Driver_ID: string }) => j.Driver_ID) || []));
       
-      return {
-        Driver_ID: dId,
-        Driver_Name: driver.Driver_Name || driver.driver_name || "Unknown",
-        Vehicle_Plate: driver.Vehicle_Plate || driver.vehicle_plate || "-",
-        Mobile_No: driver.Mobile_No || driver.mobile_no || "",
-        Last_Update: log?.timestamp || log?.Timestamp || null,
-        Latitude: log?.latitude ?? log?.Latitude ?? null,
-        Longitude: log?.longitude ?? log?.Longitude ?? null,
-      };
-    });
-  } catch {
+      if (activeDriverIds.length === 0) return [];
+      query = query.in("Driver_ID", activeDriverIds);
+    }
+
+    const { data: latestLogs, error } = await query;
+
+    if (error || !latestLogs) {
+      // FALLBACK logic if table doesn't exist yet
+      let driversQuery = supabase.from("Master_Drivers").select("*");
+      if (customerId) {
+        let activeJobsQuery = supabase.from("Jobs_Main").select("Driver_ID")
+          .eq("Customer_ID", customerId)
+          .not("Driver_ID", "is", null)
+          .not("Job_Status", "in", '("Complete", "Completed", "Cancelled", "Delivered")');
+        if (effectiveBranchId && effectiveBranchId !== "All") activeJobsQuery = activeJobsQuery.eq("Branch_ID", effectiveBranchId);
+        const { data: activeJobs } = await activeJobsQuery;
+        const activeDriverIds = Array.from(new Set(activeJobs?.map((j: { Driver_ID: string }) => j.Driver_ID) || []));
+        if (activeDriverIds.length === 0) return [];
+        driversQuery = driversQuery.in("Driver_ID", activeDriverIds);
+      }
+      if (effectiveBranchId && effectiveBranchId !== "All") driversQuery = driversQuery.eq("Branch_ID", effectiveBranchId);
+      
+      const { data: drivers } = await driversQuery;
+      if (!drivers) return [];
+
+      const driverIds = drivers.map((d: any) => d.Driver_ID || d.driver_id);
+      const yesterday = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+      const { data: fallbackLogs } = await supabase.from("gps_logs").select("*").in("driver_id", driverIds).gte("timestamp", yesterday).order("timestamp", { ascending: false }).limit(Math.max(2000, driverIds.length * 2));
+      
+      const logMap = new Map();
+      fallbackLogs?.forEach((log: any) => {
+          const dId = log.driver_id || log.Driver_ID;
+          if (dId && !logMap.has(dId)) logMap.set(dId, log);
+      });
+
+      return drivers.map((driver: any) => {
+        const dId = driver.Driver_ID || driver.driver_id;
+        const log = logMap.get(dId);
+        return {
+          Driver_ID: dId,
+          Driver_Name: driver.Driver_Name || driver.driver_name || "Unknown",
+          Vehicle_Plate: driver.Vehicle_Plate || driver.vehicle_plate || "-",
+          Mobile_No: driver.Mobile_No || driver.mobile_no || "",
+          Last_Update: log?.timestamp || log?.Timestamp || null,
+          Latitude: log?.latitude ?? log?.Latitude ?? null,
+          Longitude: log?.longitude ?? log?.Longitude ?? null,
+        };
+      });
+    }
+
+    // 2. Map directly to expected return type
+    return latestLogs.map((log: any) => ({
+      Driver_ID: log.Driver_ID || log.driver_id,
+      Driver_Name: log.Master_Drivers?.Driver_Name || "Unknown",
+      Vehicle_Plate: log.Vehicle_Plate || log.vehicle_plate || "-",
+      Mobile_No: log.Master_Drivers?.Mobile_No || "",
+      Last_Update: log.Timestamp || log.timestamp,
+      Latitude: log.Latitude ?? log.latitude ?? null,
+      Longitude: log.Longitude ?? log.longitude ?? null,
+    }));
+
+  } catch (err) {
+    console.error('[GPS] getActiveFleetStatus exception:', err);
     return [];
   }
 }
@@ -360,10 +386,10 @@ export async function getVehicleRouteHistory(plate: string, startDate: string, e
                 .eq('Vehicle_Plate', plate);
             
             if (drivers && drivers.length > 0) {
-                const driverIds = drivers.map((d: any) => d.Driver_ID);
+                const driverIds = drivers.map((d: { Driver_ID: string }) => d.Driver_ID);
                 const { data: driverLogs } = await supabase
                     .from("gps_logs")
-                    .select("latitude, longitude, timestamp")
+                    .select("driver_id, latitude, longitude, timestamp")
                     .in("driver_id", driverIds)
                     .gte("timestamp", s)
                     .lte("timestamp", e)
@@ -373,7 +399,7 @@ export async function getVehicleRouteHistory(plate: string, startDate: string, e
             }
         }
 
-        return logs.map((d: any) => ({
+        return logs.map((d: { id?: string | number, driver_id?: string, latitude?: number, longitude?: number, timestamp?: string, speed?: number, bearing?: number, battery_level?: number, Latitude?: number, Longitude?: number, Timestamp?: string | number }) => ({
             lat: Number(d.latitude || d.Latitude),
             lng: Number(d.longitude || d.Longitude),
             timestamp: d.timestamp || d.Timestamp

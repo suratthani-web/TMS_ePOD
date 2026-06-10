@@ -26,22 +26,27 @@ export default async function FleetStatusPage() {
     <DashboardLayout>
       <div className="space-y-8 pb-12">
         {/* Header Section */}
-        {/* Strategic Header Section */}
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-8 bg-background p-10 rounded-br-[5rem] rounded-tl-[3rem] border border-slate-800 shadow-2xl relative overflow-hidden group">
-          <div className="absolute inset-x-0 top-0 h-1.5 bg-gradient-to-r from-blue-500 via-indigo-500 to-purple-400 opacity-0 group-hover:opacity-100 transition-all duration-700 blur-[0.5px]" />
-          <div className="absolute top-0 right-0 w-64 h-64 bg-blue-500/10 blur-3xl rounded-full -mr-20 -mt-20 pointer-events-none" />
+        {/* Premium Strategic Header Section */}
+        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6 mb-10 bg-background/60 backdrop-blur-3xl p-8 rounded-3xl border border-border/40 shadow-xl relative overflow-hidden group ring-1 ring-border/5 hover:ring-blue-500/20 transition-all duration-700">
+          <div className="absolute top-0 right-0 w-64 h-64 bg-blue-500/5 blur-[100px] pointer-events-none" />
           
-          <div className="relative z-10">
-            <Link href="/reports" className="flex items-center gap-2 text-blue-400 hover:text-foreground font-bold font-black uppercase tracking-[0.2em] mb-4 w-fit group/back">
-              <ArrowLeft className="w-4 h-4 group-hover/back:-translate-x-1 transition-transform" /> Reports Hub
+          <div className="relative z-10 space-y-4">
+            <Link href="/reports" className="flex items-center gap-2 text-blue-500 dark:text-blue-400 hover:text-foreground text-xs font-semibold uppercase tracking-wider w-fit transition-colors">
+              <ArrowLeft className="w-4 h-4" /> Reports Hub
             </Link>
-            <h1 className="text-5xl font-black text-foreground mb-2 tracking-tighter flex items-center gap-4">
-              <div className="p-3 bg-gradient-to-br from-blue-600 to-indigo-700 rounded-3xl shadow-2xl shadow-blue-500/20 text-white transform group-hover:scale-110 transition-transform duration-500">
-                <Truck size={36} />
+            <div className="flex flex-col sm:flex-row sm:items-center gap-4">
+              <div className="p-3 bg-blue-500/10 text-blue-600 dark:text-blue-400 dark:bg-blue-500/20 rounded-2xl shadow-sm w-fit transform group-hover:scale-110 transition-transform duration-500">
+                <Truck size={28} />
               </div>
-              สถานะรถและคนขับ (Fleet Status)
-            </h1>
-            <p className="text-blue-400 font-black ml-[4.5rem] uppercase tracking-[0.3em] text-base font-bold">Strategic Asset Visibility • Operational Compliance COMMAND</p>
+              <div>
+                <h1 className="text-3xl lg:text-4xl font-black text-foreground tracking-tight leading-none">
+                  สถานะรถและคนขับ (Fleet Status)
+                </h1>
+                <p className="text-muted-foreground text-sm font-semibold mt-1 tracking-normal">
+                  Strategic Asset Visibility • Operational Compliance Command
+                </p>
+              </div>
+            </div>
           </div>
         </div>
 

@@ -68,8 +68,8 @@ export default function UserSettingsPage() {
 
             if (rolesResult.success && rolesResult.data) {
                 const perms: Record<string, Record<string, boolean>> = {}
-                rolesResult.data.forEach((r: any) => {
-                    perms[r.Role] = r.Permissions
+                rolesResult.data.forEach((r) => {
+                    perms[r.Role] = r.Permissions && typeof r.Permissions === 'object' ? r.Permissions as Record<string, boolean> : {}
                 })
                 setAllRolePermissions(perms)
             }
@@ -199,7 +199,7 @@ export default function UserSettingsPage() {
         <DashboardLayout>
             <div className="space-y-8 pb-20 p-4 lg:p-10">
                 {/* Tactical Registry Header */}
-                <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6 bg-background/60 backdrop-blur-3xl p-8 rounded-3xl border border-border/5 shadow-xl relative overflow-hidden group">
+                <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6 bg-background/60 backdrop-blur-3xl p-8 rounded-3xl border border-border shadow-xl relative overflow-hidden group">
                     <div className="absolute top-0 right-0 w-80 h-80 bg-primary/10 blur-[120px] rounded-full -mr-40 -mt-40 pointer-events-none" />
                     
                     <div className="relative z-10 space-y-4">
@@ -223,7 +223,7 @@ export default function UserSettingsPage() {
                     <div className="flex flex-wrap gap-3 relative z-10">
                         <ExcelImport 
                             trigger={
-                                <PremiumButton variant="outline" className="h-11 px-5 rounded-xl border-border/10 hover:border-primary/50 text-muted-foreground gap-2 text-[10px] font-black uppercase tracking-widest">
+                                <PremiumButton variant="outline" className="h-11 px-5 rounded-xl border-border hover:border-primary/50 text-muted-foreground gap-2 text-[10px] font-black uppercase tracking-widest">
                                     <FileSpreadsheet size={16} /> {t('settings_pages.users.bulk_import')}
                                 </PremiumButton>
                             }
@@ -239,7 +239,7 @@ export default function UserSettingsPage() {
                 </div>
 
                 {/* Filter Matrix */}
-                <div className="bg-background/40 p-4 rounded-2xl border border-border/5 shadow-lg relative overflow-hidden backdrop-blur-xl max-w-xl">
+                <div className="bg-background/40 p-4 rounded-2xl border border-border shadow-lg relative overflow-hidden backdrop-blur-xl max-w-xl">
                     <div className="relative group w-full">
                         <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-muted-foreground group-focus-within:text-primary transition-colors" size={18} />
                         <input 
@@ -253,14 +253,14 @@ export default function UserSettingsPage() {
                 </div>
 
                 {/* Registry Table */}
-                <PremiumCard className="bg-background/40 border border-border/5 shadow-xl rounded-3xl overflow-hidden group/registry">
-                    <div className="p-6 border-b border-border/5 bg-black/40 flex items-center justify-between relative overflow-hidden">
+                <PremiumCard className="bg-background/40 border border-border shadow-xl rounded-3xl overflow-hidden group/registry">
+                    <div className="p-6 border-b border-border bg-muted/25 flex items-center justify-between relative overflow-hidden">
                         <div className="absolute top-0 right-0 w-64 h-64 bg-primary/5 blur-[80px] pointer-events-none" />
                         <div className="flex items-center gap-4 relative z-10">
                             <Fingerprint size={20} className="text-primary animate-pulse" />
                             <h2 className="text-lg font-black text-foreground tracking-normal uppercase italic">{t('settings_pages.users.registry_title')}</h2>
                         </div>
-                        <div className="flex items-center gap-2 px-3 py-1 bg-muted/50 rounded-full border border-border/10 relative z-10">
+                        <div className="flex items-center gap-2 px-3 py-1 bg-muted/50 rounded-full border border-border relative z-10">
                             <Activity size={12} className="text-primary" />
                             <span className="text-[10px] font-black text-muted-foreground uppercase tracking-normal italic">{t('common.tactical.realtime_active')}</span>
                         </div>
@@ -269,7 +269,7 @@ export default function UserSettingsPage() {
                     <div className="relative w-full overflow-auto custom-scrollbar">
                         <table className="w-full text-sm text-left border-collapse">
                             <thead>
-                                <tr className="bg-black/20 text-[10px] font-black uppercase tracking-widest text-muted-foreground border-b border-border/5 italic">
+                                <tr className="bg-muted/20 text-[10px] font-black uppercase tracking-widest text-muted-foreground border-b border-border italic">
                                     <th className="px-8 py-4">{t('settings_pages.users.table.vector_id')}</th>
                                     <th className="px-6 py-4">{t('settings_pages.users.table.identity')}</th>
                                     <th className="px-6 py-4">{t('settings_pages.users.table.hub')}</th>
@@ -304,7 +304,7 @@ export default function UserSettingsPage() {
                                             </td>
                                             <td className="px-6 py-4">
                                                 <div className="px-3 py-1 rounded-lg bg-primary/10 text-primary border border-primary/20 text-[10px] font-black uppercase tracking-normal italic shadow-[0_0_10px_rgba(255,30,133,0.1)] w-fit">
-                                                    {t(`settings.roles_list.${user.Role}` as any) || user.Role || t('common.tactical.no_roles')}
+                                                    {t(`settings.roles_list.${user.Role}` as never) || user.Role || t('common.tactical.no_roles')}
                                                 </div>
                                             </td>
                                             <td className="px-6 py-4">
@@ -321,14 +321,14 @@ export default function UserSettingsPage() {
                                                  <div className="flex items-center justify-end gap-2 opacity-20 group-hover/row:opacity-100 transition-opacity">
                                                      <button 
                                                         onClick={() => handleOpenDialog(user)} 
-                                                        className="p-2 rounded-lg bg-muted/50 border border-border/5 hover:bg-primary hover:text-black disabled:opacity-30 transition-all shadow-md"
+                                                        className="p-2 rounded-lg bg-muted/50 border border-border hover:bg-primary hover:text-black disabled:opacity-30 transition-all shadow-md"
                                                         disabled={(user.Role === "Super Admin" || user.Role === "Admin") && currentRoleId !== 1}
                                                      >
                                                          <Edit size={14} />
                                                      </button>
                                                      <button 
                                                         onClick={() => handleDelete(user.Username)} 
-                                                        className="p-2 rounded-lg bg-muted/50 border border-border/5 hover:bg-rose-600 hover:text-white disabled:opacity-30 transition-all shadow-md"
+                                                        className="p-2 rounded-lg bg-muted/50 border border-border hover:bg-rose-600 hover:text-white disabled:opacity-30 transition-all shadow-md"
                                                         disabled={(user.Role === "Super Admin" || user.Role === "Admin") && currentRoleId !== 1}
                                                      >
                                                          <Trash2 size={14} />
@@ -345,10 +345,10 @@ export default function UserSettingsPage() {
             </div>
 
             <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-                <DialogContent className="bg-background border-border/10 text-foreground max-w-[95vw] sm:max-w-3xl max-h-[98vh] overflow-hidden flex flex-col p-0 shadow-[0_40px_100px_rgba(0,0,0,1)] rounded-3xl sm:rounded-[2.5rem] backdrop-blur-3xl z-[100]">
+                <DialogContent className="bg-background border-border text-foreground max-w-[95vw] sm:max-w-3xl max-h-[98vh] overflow-hidden flex flex-col p-0 shadow-[0_40px_100px_rgba(0,0,0,1)] rounded-3xl sm:rounded-[2.5rem] backdrop-blur-3xl z-[100]">
                     <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-primary via-indigo-500/50 to-accent" />
                     
-                    <DialogHeader className="p-4 sm:p-6 border-b border-border/5 bg-muted/20">
+                    <DialogHeader className="p-4 sm:p-6 border-b border-border bg-muted/20">
                         <DialogTitle className="flex items-center gap-4 text-xl sm:text-2xl font-black italic uppercase tracking-normal premium-text-gradient">
                             <Shield className="w-6 h-6 sm:w-8 sm:h-8 text-primary animate-pulse" strokeWidth={2.5} />
                             {editingUser ? t('settings_pages.users.dialog.title_edit') : t('settings_pages.users.dialog.title_add')}
@@ -363,7 +363,7 @@ export default function UserSettingsPage() {
                                     value={formData.Username} 
                                     onChange={e => setFormData({...formData, Username: e.target.value})} 
                                     disabled={!!editingUser}
-                                    className="h-12 sm:h-14 rounded-2xl bg-muted border-border/5 text-foreground disabled:opacity-50 font-black italic tracking-normal pl-6 shadow-inner" 
+                                    className="h-12 sm:h-14 rounded-2xl bg-muted border-border text-foreground disabled:opacity-50 font-black italic tracking-normal pl-6 shadow-inner" 
                                 />
                             </div>
                             <div className="space-y-3">
@@ -372,7 +372,7 @@ export default function UserSettingsPage() {
                                     type="password"
                                     value={formData.Password || ""} 
                                     onChange={e => setFormData({...formData, Password: e.target.value})} 
-                                    className="h-12 sm:h-14 rounded-2xl bg-muted border-border/5 text-foreground font-black italic tracking-normal pl-6 shadow-inner" 
+                                    className="h-12 sm:h-14 rounded-2xl bg-muted border-border text-foreground font-black italic tracking-normal pl-6 shadow-inner" 
                                     placeholder={editingUser ? t('settings_pages.users.dialog.password_placeholder_edit') : t('settings_pages.users.dialog.password_placeholder_add')}
                                 />
                             </div>
@@ -383,7 +383,7 @@ export default function UserSettingsPage() {
                             <Input 
                                 value={formData.Name} 
                                 onChange={e => setFormData({...formData, Name: e.target.value})} 
-                                className="h-12 sm:h-14 rounded-2xl bg-muted border-border/5 text-foreground font-black italic tracking-normal pl-6 shadow-inner" 
+                                className="h-12 sm:h-14 rounded-2xl bg-muted border-border text-foreground font-black italic tracking-normal pl-6 shadow-inner" 
                             />
                         </div>
 
@@ -395,10 +395,10 @@ export default function UserSettingsPage() {
                                         value={formData.Branch_ID || ""} 
                                         onValueChange={v => setFormData({...formData, Branch_ID: v})}
                                     >
-                                        <SelectTrigger className="h-12 sm:h-14 rounded-2xl bg-muted border-border/5 text-foreground font-black uppercase italic tracking-normal shadow-inner">
+                                        <SelectTrigger className="h-12 sm:h-14 rounded-2xl bg-muted border-border text-foreground font-black uppercase italic tracking-normal shadow-inner">
                                             <SelectValue placeholder={t('settings_pages.users.dialog.select_hub')} />
                                         </SelectTrigger>
-                                        <SelectContent className="bg-popover border-border/10 text-foreground">
+                                        <SelectContent className="bg-popover border-border text-foreground">
                                             {formData.Role === 'Super Admin' && (
                                                 <SelectItem value="All" className="font-black italic uppercase tracking-normal text-primary">
                                                     -- ALL BRANCHES (GLOBAL) --
@@ -415,7 +415,7 @@ export default function UserSettingsPage() {
                                     <Input 
                                         value={formData.Branch_ID || ""} 
                                         onChange={e => setFormData({...formData, Branch_ID: e.target.value})}
-                                        className="h-14 sm:h-16 rounded-2xl bg-muted border-border/5 text-foreground font-black italic tracking-normal pl-6 shadow-inner" 
+                                        className="h-14 sm:h-16 rounded-2xl bg-muted border-border text-foreground font-black italic tracking-normal pl-6 shadow-inner" 
                                         disabled={currentRoleId !== 1}
                                     />
                                 )}
@@ -426,10 +426,10 @@ export default function UserSettingsPage() {
                                     value={formData.Role || ""} 
                                     onValueChange={handleRoleChange}
                                 >
-                                    <SelectTrigger className="h-12 sm:h-14 rounded-2xl bg-muted border-border/5 text-foreground font-black uppercase italic tracking-normal shadow-inner">
+                                    <SelectTrigger className="h-12 sm:h-14 rounded-2xl bg-muted border-border text-foreground font-black uppercase italic tracking-normal shadow-inner">
                                         <SelectValue placeholder={t('settings_pages.users.dialog.select_role')} />
                                     </SelectTrigger>
-                                    <SelectContent className="bg-popover border-border/10 text-foreground">
+                                    <SelectContent className="bg-popover border-border text-foreground">
                                         {STANDARD_ROLES.map(role => (
                                             <SelectItem key={role} value={role} className="font-black italic uppercase tracking-normal">
                                                 {role}
@@ -458,12 +458,12 @@ export default function UserSettingsPage() {
                                     onValueChange={v => setFormData({...formData, Customer_ID: v === "none" ? null : v})}
                                 >
                                     <SelectTrigger className={cn(
-                                        "h-14 sm:h-16 rounded-2xl bg-muted border-border/5 text-foreground font-black uppercase italic tracking-normal shadow-inner",
+                                        "h-14 sm:h-16 rounded-2xl bg-muted border-border text-foreground font-black uppercase italic tracking-normal shadow-inner",
                                         !formData.Customer_ID && "border-rose-500/50 shake-subtle"
                                     )}>
                                         <SelectValue placeholder={customers.length > 0 ? t('common.tactical.synergy_link') : "--- NO CUSTOMERS FOUND ERROR ---"} />
                                     </SelectTrigger>
-                                    <SelectContent className="bg-popover border-border/10 text-foreground">
+                                    <SelectContent className="bg-popover border-border text-foreground">
                                         <SelectItem value="none" className="font-black italic uppercase tracking-normal text-muted-foreground underline">{t('common.tactical.remove_link')}</SelectItem>
                                         {customers.length === 0 ? (
                                             <div className="p-4 text-center text-rose-500 font-black uppercase italic text-sm">
@@ -481,7 +481,7 @@ export default function UserSettingsPage() {
                             </div>
                         )}
 
-                         <div className="space-y-6 pt-6 border-t border-border/5">
+                         <div className="space-y-6 pt-6 border-t border-border">
                             <div className="flex items-center justify-between px-4">
                                 <div className="space-y-1">
                                     <Label className="text-base font-black text-foreground uppercase italic tracking-normal">กำหนดสิทธิ์รายบุคคล (Individual Permissions)</Label>
@@ -516,7 +516,7 @@ export default function UserSettingsPage() {
                                                                 "p-4 rounded-2xl border-2 transition-all cursor-pointer flex items-center justify-between group/perm",
                                                                 isAllowed 
                                                                 ? "bg-primary/5 border-primary shadow-sm" 
-                                                                : "bg-muted/30 border-transparent hover:border-border/10"
+                                                                : "bg-muted/30 border-transparent hover:border-border"
                                                             )}
                                                         >
                                                             <div className="flex items-center gap-3">
@@ -551,16 +551,16 @@ export default function UserSettingsPage() {
                             )}
                         </div>
 
-                        <div className="space-y-3 pb-4 border-t border-border/5 pt-6">
+                        <div className="space-y-3 pb-4 border-t border-border pt-6">
                              <Label className="text-sm sm:text-base font-bold font-black text-muted-foreground uppercase tracking-widest ml-4">{t('common.tactical.deploy_status')}</Label>
                              <Select 
                                 value={formData.Active_Status} 
                                 onValueChange={v => setFormData({...formData, Active_Status: v})}
                             >
-                                <SelectTrigger className="h-12 sm:h-14 rounded-2xl bg-muted border-border/5 text-foreground font-black uppercase italic tracking-normal shadow-inner">
+                                <SelectTrigger className="h-12 sm:h-14 rounded-2xl bg-muted border-border text-foreground font-black uppercase italic tracking-normal shadow-inner">
                                     <SelectValue />
                                 </SelectTrigger>
-                                <SelectContent className="bg-popover border-border/10 text-foreground">
+                                <SelectContent className="bg-popover border-border text-foreground">
                                     <SelectItem value="Active" className="text-emerald-500 font-black italic uppercase tracking-normal hover:bg-emerald-500/10">{t('common.tactical.node_active')}</SelectItem>
                                     <SelectItem value="Inactive" className="text-rose-500 font-black italic uppercase tracking-normal hover:bg-rose-500/10">{t('common.tactical.node_deactivated')}</SelectItem>
                                 </SelectContent>
@@ -568,8 +568,8 @@ export default function UserSettingsPage() {
                         </div>
                     </div>
  
-                    <DialogFooter className="p-4 sm:p-6 border-t border-border/5 bg-muted/20 gap-4 sm:gap-6 flex-row shrink-0">
-                        <PremiumButton variant="outline" onClick={() => setIsDialogOpen(false)} className="flex-1 sm:flex-none h-12 sm:h-14 px-6 sm:px-10 rounded-xl sm:rounded-2xl border-border/5 text-muted-foreground hover:text-foreground uppercase tracking-normal text-sm sm:text-base font-bold font-black">{t('settings_pages.users.dialog.abort')}</PremiumButton>
+                    <DialogFooter className="p-4 sm:p-6 border-t border-border bg-muted/20 gap-4 sm:gap-6 flex-row shrink-0">
+                        <PremiumButton variant="outline" onClick={() => setIsDialogOpen(false)} className="flex-1 sm:flex-none h-12 sm:h-14 px-6 sm:px-10 rounded-xl sm:rounded-2xl border-border text-muted-foreground hover:text-foreground uppercase tracking-normal text-sm sm:text-base font-bold font-black">{t('settings_pages.users.dialog.abort')}</PremiumButton>
                         <PremiumButton onClick={handleSave} disabled={saving} className="flex-1 sm:flex-none h-12 sm:h-14 px-8 sm:px-12 rounded-xl sm:rounded-2xl gap-3 sm:gap-4 shadow-lg sm:min-w-[200px] text-base sm:text-lg tracking-normal bg-primary text-foreground border-0">
                             {saving ? <Loader2 className="w-5 h-5 animate-spin" /> : <ShieldCheck className="w-5 h-5" />}
                             {t('settings_pages.users.dialog.execute')}

@@ -99,7 +99,7 @@ export function MonthFilter() {
       {/* ── Main pill row ── */}
       <div className={cn(
         "flex items-center gap-1 rounded-2xl p-1",
-        "bg-black/30 border border-white/5 backdrop-blur-xl",
+        "bg-card border border-border shadow-lg",
         isPending && "opacity-80"
       )}>
 
@@ -166,7 +166,7 @@ export function MonthFilter() {
           "animate-in fade-in zoom-in-95 slide-in-from-top-4 duration-300 ease-out"
         )}>
           {/* Header */}
-          <div className="px-5 py-4 border-b border-white/5 bg-white/[0.02] flex items-center gap-3">
+          <div className="px-5 py-4 border-b border-border bg-white/[0.02] flex items-center gap-3">
             <div className="w-8 h-8 rounded-xl bg-primary/10 flex items-center justify-center border border-primary/20">
               <CalendarDays size={14} className="text-primary" />
             </div>
@@ -189,7 +189,7 @@ export function MonthFilter() {
                         "h-8 rounded-xl text-[11px] font-black transition-all duration-200 border",
                         year === y
                           ? "bg-primary/20 text-primary border-primary/30 shadow-[0_0_10px_rgba(255,30,133,0.15)]"
-                          : "text-muted-foreground border-white/5 hover:border-white/15 hover:text-foreground hover:bg-white/5"
+                          : "text-muted-foreground border-border hover:border-white/15 hover:text-foreground hover:bg-white/5"
                       )}
                     >
                       {y}
@@ -199,7 +199,7 @@ export function MonthFilter() {
               </div>
 
               {/* Divider */}
-              <div className="border-t border-white/5" />
+              <div className="border-t border-border" />
 
               {/* Month grid */}
               <div>
@@ -232,7 +232,7 @@ export function MonthFilter() {
               </div>
 
               {/* Quick presets */}
-              <div className="border-t border-white/5 pt-2">
+              <div className="border-t border-border pt-2">
                 <p className="text-[8px] font-black text-muted-foreground uppercase tracking-widest mb-2 px-1 opacity-50">ช่วงเร็ว</p>
                 <div className="grid grid-cols-2 gap-1.5">
                   {[
@@ -250,7 +250,7 @@ export function MonthFilter() {
                           "h-8 rounded-xl text-[9px] font-black transition-all duration-200 border px-2 flex items-center justify-between gap-1",
                           isSelected
                             ? "bg-primary/15 text-primary border-primary/25"
-                            : "text-muted-foreground border-white/5 hover:border-white/15 hover:text-foreground hover:bg-white/5"
+                            : "text-muted-foreground border-border hover:border-white/15 hover:text-foreground hover:bg-white/5"
                         )}
                       >
                         <span className="truncate">{preset.label}</span>
@@ -263,7 +263,7 @@ export function MonthFilter() {
             </div>
 
             {/* Footer */}
-            <div className="px-4 py-2.5 border-t border-white/5 bg-black/20 flex items-center justify-between">
+            <div className="px-4 py-2.5 border-t border-border bg-muted/20 flex items-center justify-between">
               <span className="text-[9px] text-muted-foreground opacity-40 uppercase font-semibold">
                 ข้อมูล: {shortMonths[month-1]} {year}
               </span>

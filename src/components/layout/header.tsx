@@ -35,18 +35,8 @@ export function Header({ sidebarCollapsed = false }: HeaderProps) {
       )}
       style={{ transition: "left 0.5s ease-in-out" }}
     >
-      {/* Central Branding & Navigation */}
-      <div className="flex items-center gap-10 flex-1">
-         {/* System Branding - Header Edition (Text Only) */}
-         <div className="flex flex-col shrink-0 cursor-default">
-            <span className="text-2xl font-black text-accent tracking-tighter uppercase italic leading-none">
-                Logis<span className="text-primary">Pro</span>
-            </span>
-            <span className="text-[10px] font-black text-muted-foreground uppercase tracking-widest mt-1">
-                {t('header.command_centre')}
-            </span>
-         </div>
-
+      {/* Global Filters */}
+      <div className="flex items-center gap-6 flex-1">
          {/* Branch Selector (Global) - Only for Admins */}
          {isAdmin && (
             <div className="w-56 shrink-0 relative z-[60]">

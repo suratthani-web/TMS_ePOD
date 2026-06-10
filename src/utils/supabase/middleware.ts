@@ -18,7 +18,7 @@ export async function updateSession(request: NextRequest) {
           return request.cookies.getAll()
         },
         setAll(cookiesToSet) {
-          cookiesToSet.forEach(({ name, value, options }) => request.cookies.set(name, value))
+          cookiesToSet.forEach(({ name, value }) => request.cookies.set(name, value))
           response = NextResponse.next({
             request,
           })
@@ -32,7 +32,7 @@ export async function updateSession(request: NextRequest) {
 
   try {
     await supabase.auth.getUser()
-  } catch (err) {
+  } catch (_err) {
     // Gracefully handle auth refresh failures (like invalid_grant)
     // The request can still proceed, and RLS will handle unauthorized access
   }

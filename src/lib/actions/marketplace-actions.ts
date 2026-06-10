@@ -149,6 +149,8 @@ export async function getAllActiveBids() {
     return data as JobBid[]
 }
 
+import { transitionJobStatus } from "@/services/job-status-machine"
+
 // ฝั่งแอดมิน: ยืนยันเลือกคนขับ (Accept Bid)
 export async function acceptBid(jobId: string, bidId: string, driverId: string, driverName: string, amount: number) {
     const supabase = createAdminClient()
@@ -164,14 +166,23 @@ export async function acceptBid(jobId: string, bidId: string, driverId: string, 
         return { success: false, message: 'ขออภัย งานนี้มีคนขับรับไปเรียบร้อยแล้ว' }
     }
 
-    // 1. อัปเดตตาราง Jobs_Main (จ่ายงานให้คนขับ และลงราคาจ้าง)
+    // 1. Transition Status using Machine
+    const transition = await transitionJobStatus(jobId, 'Assigned', {
+        reason: 'Bid Accepted',
+        notes: `Driver: ${driverName}, Amount: ${amount}`
+    })
+
+    if (!transition.success) {
+        return { success: false, message: `Status Error: ${transition.message}` }
+    }
+
+    // 2. อัปเดตข้อมูลอื่นๆ ในตาราง Jobs_Main (จ่ายงานให้คนขับ และลงราคาจ้าง)
     const { error: updateJobError } = await supabase
         .from('Jobs_Main')
         .update({
             Driver_ID: driverId,
             Driver_Name: driverName,
-            Cost_Driver_Total: amount,
-            Job_Status: 'Assigned' // เปลี่ยนสถานะเพื่อไม่ให้อยู่ใน Marketplace อีก
+            Cost_Driver_Total: amount
         })
         .eq('Job_ID', jobId)
 
@@ -179,7 +190,7 @@ export async function acceptBid(jobId: string, bidId: string, driverId: string, 
         return { success: false, message: 'ไม่สามารถอัปเดตงานได้' }
     }
 
-    // 2. อัปเดตให้ Bid นี้เป็น Accepted
+    // 3. อัปเดตให้ Bid นี้เป็น Accepted
     await supabase
         .from('Job_Bids')
         .update({ status: 'Accepted' })
@@ -250,15 +261,13 @@ export async function cancelBiddingJob(jobId: string) {
             return { success: false, message: 'ไม่สามารถยกเลิกได้ เนื่องจากมีคนรับงานไปแล้ว' }
         }
 
-        // 2. อัปเดตสถานะเป็น Cancelled
-        const { error } = await supabase
-            .from('Jobs_Main')
-            .update({ Job_Status: 'Cancelled' })
-            .eq('Job_ID', jobId)
+        // 2. Transition Status using Machine
+        const transition = await transitionJobStatus(jobId, 'Cancelled', {
+            reason: 'Admin cancelled bidding job (Customer cancelled plan)'
+        })
 
-        if (error) {
-            console.error('Cancel bidding job error:', error)
-            return { success: false, message: 'เกิดข้อผิดพลาดในการยกเลิกงาน' }
+        if (!transition.success) {
+            return { success: false, message: transition.message }
         }
 
         // 3. ปฏิเสธการประมูลที่มีอยู่ทั้งหมด (ถ้ามี)

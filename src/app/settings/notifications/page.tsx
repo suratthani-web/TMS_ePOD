@@ -38,7 +38,7 @@ export default function NotificationSettingsPage() {
 
   useEffect(() => {
     const supabase = createClient()
-    supabase.auth.getUser().then(({ data }: { data: { user: any } }) => {
+    supabase.auth.getUser().then(({ data }) => {
       if (data.user) setCurrentUser({ id: data.user.id })
     })
   }, [])
@@ -64,7 +64,7 @@ export default function NotificationSettingsPage() {
     <DashboardLayout>
       <div className="space-y-12 pb-20 p-4 lg:p-10">
         {/* Tactical Elite Header */}
-        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-10 bg-background/60 backdrop-blur-3xl p-10 rounded-br-[6rem] rounded-tl-[3rem] border border-border/5 shadow-2xl relative overflow-hidden group">
+        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-10 bg-background/60 backdrop-blur-3xl p-10 rounded-br-[6rem] rounded-tl-[3rem] border border-border shadow-2xl relative overflow-hidden group">
             <div className="absolute top-0 right-0 w-80 h-80 bg-primary/10 blur-[120px] rounded-full -mr-40 -mt-40 pointer-events-none" />
             
             <div className="relative z-10 space-y-8">
@@ -86,7 +86,7 @@ export default function NotificationSettingsPage() {
             </div>
 
             <div className="flex flex-col items-end gap-6 relative z-10">
-                <div className="bg-muted/50 border border-border/10 px-6 py-3 rounded-2xl flex items-center gap-3 backdrop-blur-md">
+                <div className="bg-muted/50 border border-border px-6 py-3 rounded-2xl flex items-center gap-3 backdrop-blur-md">
                     <div className="w-2 h-2 rounded-full bg-primary animate-pulse shadow-[0_0_10px_rgba(255,30,133,1)]" />
                     <span className="text-base font-bold font-black text-muted-foreground uppercase tracking-widest italic">{t('settings_pages.notifications.monitor_status')}</span>
                 </div>
@@ -99,7 +99,7 @@ export default function NotificationSettingsPage() {
 
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-10 items-start">
              <div className="lg:col-span-12">
-                  <PremiumCard className="bg-background/40 border-2 border-border/5 shadow-3xl rounded-[4rem] overflow-hidden group/alert">
+                  <PremiumCard className="bg-background/40 border-2 border-border shadow-3xl rounded-[4rem] overflow-hidden group/alert">
                       <div className="p-20 relative overflow-hidden">
                           <div className="absolute top-0 right-0 w-96 h-96 bg-primary/5 blur-[100px] pointer-events-none" />
                           <div className="absolute -bottom-20 -left-20 w-80 h-80 bg-indigo-500/5 blur-[100px] pointer-events-none" />
@@ -150,13 +150,13 @@ export default function NotificationSettingsPage() {
                                     <div key={pref.id} className={cn(
                                         "flex items-center justify-between p-8 rounded-[2.5rem] border-2 transition-all duration-500 group/pref relative overflow-hidden",
                                         settings[pref.id as keyof NotificationSettings] 
-                                        ? "bg-muted/40 border-border/10 shadow-inner" 
-                                        : "bg-transparent border-border/5 opacity-40 grayscale"
+                                        ? "bg-muted/40 border-border shadow-inner" 
+                                        : "bg-transparent border-border opacity-40 grayscale"
                                     )}>
                                         <div className="flex items-center gap-8 relative z-10">
                                             <div className={cn(
-                                                "w-16 h-16 rounded-[1.5rem] flex items-center justify-center transition-all duration-700 shadow-2xl border border-border/10 shrink-0",
-                                                settings[pref.id as keyof NotificationSettings] ? "bg-black/40 scale-110 rotate-3" : "bg-muted/50"
+                                                "w-16 h-16 rounded-[1.5rem] flex items-center justify-center transition-all duration-700 shadow-2xl border border-border shrink-0",
+                                                settings[pref.id as keyof NotificationSettings] ? "bg-muted/25 scale-110 rotate-3" : "bg-muted/50"
                                             )}>
                                                 <pref.icon size={28} className={pref.color} />
                                             </div>
@@ -168,7 +168,7 @@ export default function NotificationSettingsPage() {
                                                     {pref.label}
                                                     {pref.isCritical && <span className="ml-4 text-base font-bold font-black text-rose-500 bg-rose-500/10 px-3 py-1 rounded-lg border border-rose-500/20">{t('settings_pages.notifications.critical')}</span>}
                                                 </h3>
-                                                <p className="text-base font-bold font-black text-muted-foreground uppercase tracking-widest leading-relaxed italic border-l-2 border-border/5 pl-4">
+                                                <p className="text-base font-bold font-black text-muted-foreground uppercase tracking-widest leading-relaxed italic border-l-2 border-border pl-4">
                                                     {pref.desc}
                                                 </p>
                                             </div>
@@ -196,7 +196,7 @@ export default function NotificationSettingsPage() {
                                   </PremiumButton>
                               </div>
 
-                              <div className="pt-6 border-t border-border/5">
+                              <div className="pt-6 border-t border-border">
                                   <PushTestButton userId={currentUser?.id} />
                               </div>
                           </div>
@@ -217,7 +217,7 @@ export default function NotificationSettingsPage() {
                     {t('settings_pages.notifications.advisory_desc')}
                 </p>
             </div>
-            <PremiumButton variant="outline" className="h-14 px-10 rounded-2xl border-border/10 text-foreground gap-3 uppercase font-black text-base font-bold tracking-[0.3em] ml-auto italic" onClick={() => router.push('/notifications')}>
+            <PremiumButton variant="outline" className="h-14 px-10 rounded-2xl border-border text-foreground gap-3 uppercase font-black text-base font-bold tracking-[0.3em] ml-auto italic" onClick={() => router.push('/notifications')}>
                 <Activity size={18} /> {t('settings_pages.notifications.view_stream')}
             </PremiumButton>
         </div>

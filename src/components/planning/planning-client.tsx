@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useMemo } from "react"
+import { useState, useMemo, useEffect } from "react"
 import { motion } from "framer-motion"
 import { cn } from "@/lib/utils"
 import { 
@@ -15,7 +15,9 @@ import {
     CheckCircle2,
     FileSpreadsheet,
     Loader2,
-    Download
+    Download,
+    Search,
+    X
 } from "lucide-react"
 import { utils, writeFile } from "xlsx"
 import { Job } from "@/lib/supabase/jobs"
@@ -29,7 +31,7 @@ import { toast } from "sonner"
 import { JobDialog } from "@/components/planning/job-dialog"
 import { JobGrid } from "@/components/planning/job-grid"
 import { KanbanBoard } from "@/components/planning/kanban-board"
-import { useRouter } from "next/navigation"
+import { useRouter, useSearchParams } from "next/navigation"
 import { useRealtime } from "@/hooks/useRealtime"
 import { RealtimeIndicator } from "@/components/ui/realtime-indicator"
 import { useLanguage } from "@/components/providers/language-provider"
@@ -97,10 +99,21 @@ export function PlanningClient({
     const { drivers, vehicles, customers, routes, subcontractors } = jobCreationData
     const [view, setView] = useState<'list' | 'kanban' | 'requests'>('list')
     const router = useRouter()
+    const searchParams = useSearchParams()
+    const urlQuery = searchParams.get('query') || ""
+    
     const [publishing, setPublishing] = useState(false)
     const [templateCustomerId, setTemplateCustomerId] = useState<string>("")
+    const [searchQuery, setSearchQuery] = useState(urlQuery)
     const { t } = useLanguage()
     const { selectedCustomer } = useCustomer()
+
+    // Sync external query to internal search state
+    useEffect(() => {
+        if (urlQuery) {
+            setSearchQuery(urlQuery)
+        }
+    }, [urlQuery])
 
     // Real-time: Jobs_Main (Throttled to protect Vercel Serverless quota)
     const throttledRefresh = useMemo(() => {
@@ -273,20 +286,39 @@ export function PlanningClient({
     }
 
     const filteredTodayJobs = useMemo(() => {
+        let base = todayJobs
         if (selectedCustomer && selectedCustomer !== 'All') {
-            return todayJobs.filter(j => j.Customer_ID === selectedCustomer)
+            base = base.filter(j => j.Customer_ID === selectedCustomer)
         }
-        return todayJobs
-    }, [todayJobs, selectedCustomer])
+        if (searchQuery) {
+            const q = searchQuery.toLowerCase()
+            base = base.filter(j => 
+                j.Job_ID.toLowerCase().includes(q) || 
+                j.Customer_Name?.toLowerCase().includes(q) ||
+                j.Driver_Name?.toLowerCase().includes(q) ||
+                j.Vehicle_Plate?.toLowerCase().includes(q)
+            )
+        }
+        return base
+    }, [todayJobs, selectedCustomer, searchQuery])
 
     const filteredJobs = useMemo(() => {
-        if (view === 'requests') {
-            return selectedCustomer && selectedCustomer !== 'All'
-                ? requestedJobs.filter(j => j.Customer_ID === selectedCustomer)
-                : requestedJobs
+        let base = view === 'requests' ? requestedJobs : filteredTodayJobs.filter(j => j.Job_Status !== 'Requested')
+        
+        if (view === 'requests' && selectedCustomer && selectedCustomer !== 'All') {
+            base = base.filter(j => j.Customer_ID === selectedCustomer)
         }
-        return filteredTodayJobs.filter(j => j.Job_Status !== 'Requested')
-    }, [filteredTodayJobs, requestedJobs, view, selectedCustomer])
+        
+        if (view === 'requests' && searchQuery) {
+            const q = searchQuery.toLowerCase()
+            base = base.filter(j => 
+                j.Job_ID.toLowerCase().includes(q) || 
+                j.Customer_Name?.toLowerCase().includes(q)
+            )
+        }
+        
+        return base
+    }, [filteredTodayJobs, requestedJobs, view, selectedCustomer, searchQuery])
 
     const calculatedStats = useMemo(() => {
         if (!selectedCustomer || selectedCustomer === 'All') {
@@ -365,6 +397,27 @@ export function PlanningClient({
                                 </span>
                             )}
                         </button>
+                    </div>
+
+                    <div className="relative flex items-center">
+                        <div className="absolute left-3 text-muted-foreground">
+                            <Search size={14} />
+                        </div>
+                        <input 
+                            type="text" 
+                            placeholder={t('common.search') || "Search Jobs..."}
+                            value={searchQuery}
+                            onChange={(e) => setSearchQuery(e.target.value)}
+                            className="h-10 pl-9 pr-10 w-[200px] lg:w-[240px] bg-muted/50 border border-border/10 rounded-xl text-xs font-bold focus:ring-2 focus:ring-primary outline-none transition-all"
+                        />
+                        {searchQuery && (
+                            <button 
+                                onClick={() => setSearchQuery("")}
+                                className="absolute right-3 text-muted-foreground hover:text-foreground transition-colors"
+                            >
+                                <X size={14} />
+                            </button>
+                        )}
                     </div>
 
                     <div className="flex items-center bg-muted/50 p-1 rounded-xl border border-border/10 shadow-inner ml-2">

@@ -72,6 +72,8 @@ const parseIfString = (val: string | undefined | null) => {
   try { return JSON.parse(val) } catch { return val }
 }
 
+import { calculateJobPrice } from "@/services/pricing-engine"
+
 export async function createJob(data: JobFormData) {
   const supabase = createAdminClient()
 
@@ -118,14 +120,16 @@ export async function createJob(data: JobFormData) {
     if (vehicle) subId = vehicle.Sub_ID || null
   }
 
-  // Get Smart Unit Price for auto-calculation if total is 0
-  let unitPrice = 0
-  if ((!data.Price_Cust_Total || Number(data.Price_Cust_Total) === 0) && data.Customer_ID) {
-    unitPrice = await getSmartUnitPrice(supabase, data.Customer_ID, data.Plan_Date || undefined, data.Vehicle_Type || '4-Wheel')
-  }
+  // Get Pricing from Engine
+  const pricing = await calculateJobPrice({
+      ...data,
+      Driver_Name: driverName,
+      Sub_ID: subId
+  })
 
   // Attempt 1
-  const { error: error1 } = await supabase.from('Jobs_Main').insert(buildInsertPayload(data, driverName, subId, unitPrice))
+  const payload = buildInsertPayload(data, driverName, subId, pricing.unitPrice)
+  const { error: error1 } = await supabase.from('Jobs_Main').insert(payload)
   
   if (!error1) {
       // Send notifications - ONLY if NOT a draft
@@ -139,10 +143,6 @@ export async function createJob(data: JobFormData) {
 
       revalidatePath('/planning')
       
-      // Auto-save locations for future use
-      // Disable auto-save to Master_Routes as per user request to prevent data clutter
-      // autoSaveOriginDestinations(data.Branch_ID || null, data.original_origins_json, data.original_destinations_json).catch(() => {})
-      
       // Save Container Data if applicable
       await handleContainerData(supabase, data.Job_ID, data)
 
@@ -152,7 +152,7 @@ export async function createJob(data: JobFormData) {
   // If duplicate key (23505), try regenerating ID once
   if (error1.code === '23505') {
       const newId = `${data.Job_ID}-${Math.floor(Math.random() * 1000)}`
-      const { error: error2 } = await supabase.from('Jobs_Main').insert(buildInsertPayload({ ...data, Job_ID: newId }, driverName, subId, unitPrice))
+      const { error: error2 } = await supabase.from('Jobs_Main').insert(buildInsertPayload({ ...data, Job_ID: newId }, driverName, subId, pricing.unitPrice))
       
       if (!error2) {
           if (data.Job_Status !== 'Draft') {
@@ -221,7 +221,7 @@ function buildInsertPayload(data: JobFormData, driverName: string, subId: string
       Delivery_Lon: data.Delivery_Lon || null,
       Branch_ID: data.Branch_ID || null,
       Total_Drop: Array.isArray(parseIfString(data.original_destinations_json)) 
-        ? (parseIfString(data.original_destinations_json) as any[]).length 
+        ? (parseIfString(data.original_destinations_json) as unknown[]).length 
         : (data.original_destinations_json ? 1 : 1),
       Loaded_Qty: Number(data.Loaded_Qty) || 0,
       Created_At: new Date().toISOString(),
@@ -230,7 +230,7 @@ function buildInsertPayload(data: JobFormData, driverName: string, subId: string
   }
 }
 
-async function handleContainerData(supabase: any, jobId: string, data: JobFormData) {
+async function handleContainerData(supabase: Awaited<ReturnType<typeof createAdminClient>>, jobId: string, data: JobFormData) {
   if (data.job_type !== 'container') return
 
   const containerData = {
@@ -242,7 +242,7 @@ async function handleContainerData(supabase: any, jobId: string, data: JobFormDa
     vessel_voyage: data.vessel_voyage || null,
     lfd_demurrage: data.lfd_demurrage || null,
     lfd_detention: data.lfd_detention || null,
-    target_temperature: data.target_temperature ? Number(data.target_temperature) : null,
+    target_temperature: data.target_temperature as string | number | null | undefined ? Number(data.target_temperature) : null,
     booking_no: data.booking_no || null,
     container_subtype: data.container_subtype || 'import',
     pickup_empty_date: data.pickup_empty_date || null,
@@ -295,10 +295,18 @@ export async function createBulkJobs(
     supabase.from('Master_Routes').select('*')
   ])
 
-  const driverMap = new Map<string, any>(allDrivers?.map((d: { Driver_ID: string; Driver_Name: string; Sub_ID?: string | null }) => [d.Driver_ID, d]) || [])
-  const vehicleMap = new Map<string, any>(allVehicles?.map((v: { Vehicle_Plate: string; Sub_ID?: string | null }) => [v.Vehicle_Plate, v]) || [])
-  const customerMap = new Map<string, any>(allCustomers?.map((c: { Customer_ID: string; Customer_Name?: string | null }) => [c.Customer_Name?.toLowerCase().trim(), c.Customer_ID]) || [])
-  const routeMap = new Map<string, any>(allRoutes?.map((r: { Route_Name?: string | null; Origin?: string | null; Destination?: string | null; Origin_Lat?: number | null; Origin_Lon?: number | null; Dest_Lat?: number | null; Dest_Lon?: number | null; Distance_KM?: number | null }) => [r.Route_Name?.trim(), r]) || [])
+  const driverMap = new Map<string, { Driver_ID: string; Driver_Name: string; Sub_ID?: string | null }>(allDrivers?.map((d: { Driver_ID: string; Driver_Name: string; Sub_ID?: string | null }) => [d.Driver_ID, d]) || [])
+  const vehicleMap = new Map<string, { Vehicle_Plate: string; Sub_ID?: string | null }>(allVehicles?.map((v: { Vehicle_Plate: string; Sub_ID?: string | null }) => [v.Vehicle_Plate, v]) || [])
+  const customerMap = new Map<string, string>(
+    (allCustomers || [])
+      .map((c: { Customer_ID: string; Customer_Name?: string | null }) => [c.Customer_Name?.toLowerCase().trim(), c.Customer_ID] as const)
+      .filter((entry): entry is readonly [string, string] => Boolean(entry[0]))
+  )
+  const routeMap = new Map<string, { Route_Name?: string | null; Origin?: string | null; Destination?: string | null; Origin_Lat?: number | null; Origin_Lon?: number | null; Dest_Lat?: number | null; Dest_Lon?: number | null; Distance_KM?: number | null }>(
+    (allRoutes || [])
+      .map((r: { Route_Name?: string | null; Origin?: string | null; Destination?: string | null; Origin_Lat?: number | null; Origin_Lon?: number | null; Dest_Lat?: number | null; Dest_Lon?: number | null; Distance_KM?: number | null }) => [r.Route_Name?.trim(), r] as const)
+      .filter((entry): entry is readonly [string, { Route_Name?: string | null; Origin?: string | null; Destination?: string | null; Origin_Lat?: number | null; Origin_Lon?: number | null; Dest_Lat?: number | null; Dest_Lon?: number | null; Distance_KM?: number | null }] => Boolean(entry[0]))
+  )
 
   // Helper to normalize keys
   const normalizeData = (row: Partial<JobFormData>) => {
@@ -391,7 +399,7 @@ export async function createBulkJobs(
     })
 
     additionalOriginKeys.forEach(key => {
-        const val = (row as any)[key]
+        const val = (row as Record<string, unknown>)[key]
         if (val && String(val).trim()) {
             origins.push({ name: String(val).trim(), lat: null, lng: null })
         }
@@ -434,7 +442,7 @@ export async function createBulkJobs(
     })
 
     additionalDestKeys.forEach(key => {
-        const val = (row as any)[key]
+        const val = (row as Record<string, unknown>)[key]
         if (val && String(val).trim()) {
             destinations.push({ name: String(val).trim(), lat: null, lng: null })
         }
@@ -447,14 +455,14 @@ export async function createBulkJobs(
     return normalized
   }
 
-  const cleanId = (val: any) => {
+  const cleanId = (val: unknown) => {
     if (val === undefined || val === null) return undefined
     const s = String(val).trim()
     if (s.endsWith('.0')) return s.slice(0, -2)
     return s
   }
 
-  const normalizeDate = (val: any) => {
+  const normalizeDate = (val: unknown) => {
     if (!val) return null
     if (typeof val === 'number') {
       // Excel serial date (days since 1900-01-01)
@@ -520,7 +528,7 @@ export async function createBulkJobs(
       Notes: data.Notes as string || null,
       Price_Cust_Total: Number(data.Price_Cust_Total) || 0,
       Cost_Driver_Total: Number(data.Cost_Driver_Total) || 0,
-      Sub_ID: driver?.Sub_ID || (vehicle as any)?.Sub_ID || null,
+      Sub_ID: driver?.Sub_ID || (vehicle as { Sub_ID?: string | null })?.Sub_ID || null,
       Weight_Kg: Number(data.Weight_Kg) || 0,
       Volume_Cbm: Number(data.Volume_Cbm) || 0,
       Created_At: new Date().toISOString(),
@@ -544,26 +552,26 @@ export async function createBulkJobs(
     })
     
     // Add raw container fields back to the object so handleContainerData can find them
-    const fullJobData: any = {
+    const fullJobData: Partial<JobFormData> = {
         ...sanitized,
-        container_no: data.container_no,
-        seal_no: data.seal_no,
-        container_size: data.container_size,
-        shipping_line: data.shipping_line,
-        vessel_voyage: data.vessel_voyage,
-        lfd_demurrage: data.lfd_demurrage,
-        lfd_detention: data.lfd_detention,
-        target_temperature: data.target_temperature
+        container_no: data.container_no as string | null | undefined,
+        seal_no: data.seal_no as string | null | undefined,
+        container_size: data.container_size as string | null | undefined,
+        shipping_line: data.shipping_line as string | null | undefined,
+        vessel_voyage: data.vessel_voyage as string | null | undefined,
+        lfd_demurrage: data.lfd_demurrage as string | null | undefined,
+        lfd_detention: data.lfd_detention as string | null | undefined,
+        target_temperature: data.target_temperature as string | number | null | undefined
     }
     
     if (typeof sanitized.Price_Cust_Total === 'string') fullJobData.Price_Cust_Total = parseFloat(sanitized.Price_Cust_Total) || 0
     if (typeof sanitized.Cost_Driver_Total === 'string') fullJobData.Cost_Driver_Total = parseFloat(sanitized.Cost_Driver_Total) || 0
     
     return fullJobData
-  }).filter((j: any) => j.Customer_Name)
+  }).filter((j: Partial<JobFormData>) => j.Customer_Name)
 
   // Apply Draft status if requested via options
-  const finalCleanData: any[] = options.isDraft 
+  const finalCleanData: Partial<JobFormData>[] = options.isDraft 
     ? cleanData.map(j => ({ ...j, Job_Status: 'Draft' }))
     : cleanData
 
@@ -571,10 +579,12 @@ export async function createBulkJobs(
   const finalizedData = await Promise.all(finalCleanData.map(async (j) => {
     let total = Number(j.Price_Cust_Total) || 0
     if (total === 0 && j.Customer_ID) {
-        const unitPrice = await getSmartUnitPrice(supabase, j.Customer_ID, j.Plan_Date, j.Vehicle_Type || '4-Wheel')
-        const qty = Number(j.Weight_Kg || j.Volume_Cbm || 0)
-        if (unitPrice > 0 && qty > 0) {
-            total = Number((qty * unitPrice).toFixed(2))
+        const pricing = await calculateJobPrice({
+            ...j,
+            Job_ID: j.Job_ID || ''
+        })
+        if (pricing.totalPrice > 0) {
+            total = pricing.totalPrice
         }
     }
     const roundInfo = j.Round ? `[รอบ: ${j.Round}] ` : ''
@@ -596,7 +606,7 @@ export async function createBulkJobs(
   ]
   const jobsMainData = finalizedData.map(j => {
       const cleanJob = { ...j }
-      containerFields.forEach(f => delete (cleanJob as any)[f])
+      containerFields.forEach(f => delete (cleanJob as Record<string, unknown>)[f])
       return cleanJob
   })
 
@@ -609,7 +619,7 @@ export async function createBulkJobs(
   }
 
   // Save Container Data for each job (if applicable)
-  await Promise.allSettled(finalizedData.map(j => handleContainerData(supabase, j.Job_ID, j as JobFormData)))
+  await Promise.allSettled(finalizedData.map(j => handleContainerData(supabase, j.Job_ID!, j as JobFormData)))
 
   // Auto-save locations from the batch
   const locationsToSave: { name: string, lat: number, lng: number }[] = []
@@ -649,7 +659,7 @@ export async function createBulkJobs(
         details: {
           type: 'BACKDATED_ENTRY',
           customer: j.Customer_Name,
-          plan_date: j.Plan_Date,
+          plan_date: j.Plan_Date || undefined,
           days_backdated: daysDiff(j.Plan_Date!),
           created_at_actual: new Date().toISOString(),
           note: `Admin created job for past date (${j.Plan_Date}) on ${new Date().toLocaleDateString('th-TH')}`
@@ -665,18 +675,18 @@ export async function createBulkJobs(
       let sampleJobId = ""
       let sampleCustomer = ""
 
-      const notiPromises: Promise<any>[] = []
+      const notiPromises: Promise<unknown>[] = []
       
       finalizedData.forEach(j => {
           if (j.Driver_ID) {
               assignedDrivers.add(j.Driver_ID)
               // Only notify about the first job for this driver in this batch to avoid spam
               if (j.Job_Status !== 'Draft') {
-                  notiPromises.push(notifyDriverNewJob(j.Driver_ID, j.Job_ID, j.Customer_Name || 'ไม่ระบุ'))
+                  notiPromises.push(notifyDriverNewJob(j.Driver_ID, j.Job_ID!, j.Customer_Name || 'ไม่ระบุ'))
               }
           } else {
               hasMarketplaceJob = true
-              sampleJobId = j.Job_ID
+              sampleJobId = j.Job_ID!
               sampleCustomer = j.Customer_Name || 'ไม่ระบุ'
           }
       })
@@ -701,44 +711,13 @@ export async function createBulkJobs(
   revalidatePath('/jobs/history')
   revalidatePath('/mobile/jobs')
 
-  const uniqueDates = Array.from(new Set((finalizedData as any[]).map(j => j.Plan_Date))).filter(Boolean)
+  const uniqueDates = Array.from(new Set((finalizedData as Partial<JobFormData>[]).map((j: Partial<JobFormData>) => j.Plan_Date))).filter(Boolean)
   const dateStr = uniqueDates.length === 1 ? ` for ${uniqueDates[0]}` : ""
   
   return { 
     success: true, 
     message: `Successfully imported ${finalizedData.length} jobs${dateStr}` 
   }
-}
-
-
-/**
- * Helper to get the most appropriate unit price based on fuel rates or master data
- */
-async function getSmartUnitPrice(supabase: any, customerId: string, planDate?: string, vehicleType: string = '4-Wheel'): Promise<number> {
-    if (!customerId) return 0
-    
-    try {
-        // 1. Try to find a dynamic rate based on fuel for 'SYSTEM_PER_PIECE'
-        const fuelPrice = await getFuelPriceNumber(planDate || undefined)
-        if (fuelPrice) {
-            const suggestedRate = await getSuggestedRate(customerId, 'SYSTEM_PER_PIECE', fuelPrice, vehicleType)
-            if (suggestedRate && suggestedRate > 0) {
-                return suggestedRate
-            }
-        }
-
-        // 2. Fallback to static price in Master_Customers
-        const { data: cust } = await supabase
-            .from("Master_Customers")
-            .select("Price_Per_Unit")
-            .eq("Customer_ID", customerId)
-            .single()
-        
-        return Number(cust?.Price_Per_Unit || 0)
-    } catch (err) {
-        console.error("[PRICE_ERROR] Failed to fetch smart unit price:", err)
-        return 0
-    }
 }
 
 export async function updateJob(jobId: string, data: Partial<JobFormData>) {
@@ -782,32 +761,34 @@ export async function updateJob(jobId: string, data: Partial<JobFormData>) {
     if (vehicle) updateData.Sub_ID = vehicle.Sub_ID || null
   }
   
-  // Auto-calculate Price_Cust_Total for updates 
-  // Trigger if Price_Cust_Total is missing/0 OR if Loaded_Qty was explicitly updated
+  // 1. Handle Status Transition if requested
+  if (data.Job_Status) {
+    const transition = await transitionJobStatus(jobId, data.Job_Status as import("@/services/job-status-machine").JobStatus, {
+      reason: 'Manual update from planning'
+    })
+    if (!transition.success) {
+      return { success: false, message: transition.message || 'Invalid job status transition' }
+    }
+    // Remove from updateData to prevent double update
+    delete updateData.Job_Status
+  }
+
+  // 2. Pricing Engine Integration
   if ((!updateData.Price_Cust_Total || Number(updateData.Price_Cust_Total) === 0) || (data.Loaded_Qty !== undefined)) {
-     // 1. Get current job metadata
      const { data: currentJob } = await supabase
         .from('Jobs_Main')
-        .select('Customer_ID, Loaded_Qty, Plan_Date, Vehicle_Type')
+        .select('*')
         .eq('Job_ID', jobId)
         .single()
 
-     const targetCustomerId = updateData.Customer_ID || currentJob?.Customer_ID
+     const pricing = await calculateJobPrice({
+         ...currentJob,
+         ...updateData
+     })
      
-     if (targetCustomerId) {
-         // 2. Fetch Smart Unit Price (considering fuel)
-         const unitPrice = await getSmartUnitPrice(
-             supabase, 
-             targetCustomerId, 
-             updateData.Plan_Date || currentJob?.Plan_Date,
-             updateData.Vehicle_Type || currentJob?.Vehicle_Type || '4-Wheel'
-         )
-         
-         const qty = Number((updateData.Loaded_Qty ?? currentJob?.Loaded_Qty) || 0)
-         
-         if (unitPrice > 0 && qty > 0) {
-             updateData.Price_Cust_Total = Number((qty * unitPrice).toFixed(2))
-         }
+     if (pricing.totalPrice > 0) {
+         updateData.Price_Cust_Total = pricing.totalPrice
+         updateData.Price_Per_Unit = pricing.unitPrice
      }
   }
 
@@ -898,9 +879,9 @@ export async function getJobCreationData(selectedBranchId?: string) {
   let subcontractors = subcontractorsResult.data || []
 
   if (branchId && branchId !== 'All') {
-      customers = customers.filter((c: any) => c.Branch_ID === branchId)
-      routes = routes.filter((r: any) => r.Branch_ID === branchId)
-      subcontractors = subcontractors.filter((s: any) => s.Branch_ID === branchId)
+      customers = customers.filter((c: { Branch_ID?: string }) => c.Branch_ID === branchId)
+      routes = routes.filter((r: { Branch_ID?: string }) => r.Branch_ID === branchId)
+      subcontractors = subcontractors.filter((s: { Branch_ID?: string }) => s.Branch_ID === branchId)
   }
 
   return {
@@ -1005,51 +986,27 @@ export async function requestShipment(data: {
   return { success: true, message: 'Shipment request submitted successfully' }
 }
 
+import { transitionJobStatus } from "@/services/job-status-machine"
+
 export async function cancelJobRequest(jobId: string) {
-  const supabase = await createClient()
   const customerId = await getCustomerId()
 
   if (!customerId) {
     return { success: false, message: 'Unauthorized' }
   }
 
-  // Verify ownership and status
-  const { data: job, error: fetchError } = await supabase
-    .from('Jobs_Main')
-    .select('Job_Status')
-    .eq('Job_ID', jobId)
-    .eq('Customer_ID', customerId)
-    .single()
+  // Perform transition using machine (validates ownership inside or we can trust the current logic)
+  const result = await transitionJobStatus(jobId, 'Cancelled', {
+    reason: 'Customer cancellation'
+  })
 
-  if (fetchError || !job) {
-    return { success: false, message: 'Job not found or unauthorized' }
-  }
-
-  if (job.Job_Status !== 'Requested' && job.Job_Status !== 'New') {
-    return { success: false, message: 'Only Requested or New jobs can be cancelled' }
-  }
-
-  const { error } = await supabase
-    .from('Jobs_Main')
-    .update({ Job_Status: 'Cancelled' })
-    .eq('Job_ID', jobId)
-
-  if (error) {
-    return { success: false, message: 'Failed to cancel job: ' + error.message }
+  if (!result.success) {
+    return { success: false, message: result.message }
   }
 
   revalidatePath('/dashboard')
   revalidatePath('/planning')
   revalidatePath('/jobs/history')
-
-  await logActivity({
-    module: 'Jobs',
-    action_type: 'UPDATE',
-    target_id: jobId,
-    details: {
-      description: `Customer cancelled job request ${jobId}`
-    }
-  })
 
   return { success: true, message: 'Job request cancelled successfully' }
 }
@@ -1082,12 +1039,13 @@ export async function publishAllDrafts(date: string, branchId?: string) {
         if (!success) {
             return { success: false, error: error || { message: "Failed to update jobs in database" } }
         }
+        const publishedJobs = jobs ?? []
 
-        if (jobs.length > 0) {
+        if (publishedJobs.length > 0) {
             // Group jobs by driver to consolidate notifications
             const driverJobs = new Map<string, number>()
             
-            jobs.forEach((job: any) => {
+            publishedJobs.forEach((job: Partial<JobFormData>) => {
                 if (job.Driver_ID) {
                     driverJobs.set(job.Driver_ID, (driverJobs.get(job.Driver_ID) || 0) + 1)
                 }
@@ -1096,17 +1054,17 @@ export async function publishAllDrafts(date: string, branchId?: string) {
             // Fire notifications in parallel (one per driver)
             const notificationPromises = Array.from(driverJobs.entries()).map(([driverId, count]) => {
                 if (count === 1) {
-                    const job = jobs.find((j: any) => j.Driver_ID === driverId)
-                    return notifyDriverNewJob(driverId, job!.Job_ID, job!.Customer_Name || 'N/A')
+                    const job = publishedJobs.find((j: Partial<JobFormData>) => j.Driver_ID === driverId)
+                    return notifyDriverNewJob(driverId, job?.Job_ID || '', job?.Customer_Name || 'N/A')
                 } else {
                     return notifyDriverNewBatch(driverId, count)
                 }
             })
 
             // Marketplace jobs (those without assigned drivers)
-            const marketplaceJobs = jobs.filter((j: any) => !j.Driver_ID)
-            const marketplacePromises = marketplaceJobs.map((job: any) => 
-                notifyMarketplaceNewJob(job.Job_ID, job.Customer_Name || 'N/A')
+            const marketplaceJobs = publishedJobs.filter((j: Partial<JobFormData>) => !j.Driver_ID)
+            const marketplacePromises = marketplaceJobs.map((job: Partial<JobFormData>) => 
+                notifyMarketplaceNewJob(job.Job_ID || '', job.Customer_Name || 'N/A')
             )
 
             // Wait for all notifications
@@ -1117,7 +1075,7 @@ export async function publishAllDrafts(date: string, branchId?: string) {
             revalidatePath('/mobile/jobs')
         }
 
-        return { success: true, jobsCount: jobs.length }
+        return { success: true, jobsCount: publishedJobs.length }
     } catch (e) {
         console.error('[Actions] publishAllDrafts error:', e)
         return { success: false, error: { message: e instanceof Error ? e.message : "Internal Server Error" } }

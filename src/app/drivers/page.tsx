@@ -35,7 +35,7 @@ export default async function DriversPage(props: Props) {
         drivers={drivers} 
         count={count} 
         branches={branches} 
-        vehicles={vehicles}
+        vehicles={(vehicles || []).filter((v): v is typeof v & { Vehicle_Plate: string } => Boolean(v.Vehicle_Plate))}
         subcontractors={subcontractors}
         branchId={searchParams.branchId as string}
         createBulkDrivers={createBulkDrivers}

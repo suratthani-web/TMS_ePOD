@@ -2,9 +2,10 @@
 
 import { FileDown, Loader2 } from "lucide-react"
 import { useState } from "react"
+import type { TripCost } from "./actions"
 
 interface ExportCSVButtonProps {
-    data: any[]
+    data: TripCost[]
 }
 
 export function ExportCSVButton({ data }: ExportCSVButtonProps) {
@@ -45,6 +46,7 @@ export function ExportCSVButton({ data }: ExportCSVButtonProps) {
             const rows = data.map(t => {
                 let origin = (t.Origin_Location || "").trim()
                 let dest = (t.Dest_Location || "").trim()
+                const loadedQty = Number(t.loaded_qty) || 0
 
                 // Fallback: Parse from Route_Name if locations are missing
                 if ((!origin || !dest) && t.Route_Name) {
@@ -63,10 +65,10 @@ export function ExportCSVButton({ data }: ExportCSVButtonProps) {
                     origin || "-",
                     dest || "-",
                     t.Route_Name || "-",
-                    t.loaded_qty || 0,
+                    loadedQty,
                     t.distance_km || 0,
-                    (t.loaded_qty > 0 && (t.Cost_Customer_Total % t.loaded_qty === 0)) 
-                        ? (t.Cost_Customer_Total / t.loaded_qty).toString() 
+                    (loadedQty > 0 && (t.Cost_Customer_Total % loadedQty === 0)) 
+                        ? (t.Cost_Customer_Total / loadedQty).toString() 
                         : "-",
                     t.Cost_Customer_Total || 0,
                     (t.Cost_Driver_Total || 0) + (t.extra_cost || 0),
@@ -110,7 +112,7 @@ export function ExportCSVButton({ data }: ExportCSVButtonProps) {
         <button 
             onClick={handleExport}
             disabled={loading || !data || data.length === 0}
-            className="h-11 px-6 rounded-2xl bg-slate-900 text-white font-black uppercase tracking-widest hover:bg-slate-800 transition-all shadow-xl flex items-center gap-2 group/btn text-xs border border-slate-700"
+            className="h-11 px-5 rounded-xl bg-primary text-primary-foreground font-semibold hover:bg-primary/90 transition-all shadow-sm flex items-center gap-2 group/btn text-sm border border-primary/20 disabled:opacity-50"
         >
             {loading ? (
                 <Loader2 className="w-4 h-4 animate-spin" />

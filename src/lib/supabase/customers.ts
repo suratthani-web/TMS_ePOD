@@ -113,7 +113,7 @@ export async function createCustomer(customerData: Partial<Customer>) {
 
         Credit_Term: customerData.Credit_Term || 30, // Default to 30 days if not set
         Price_Per_Unit: customerData.Price_Per_Unit || 0,
-        Incentive_Sensor_Check: (customerData as any).Incentive_Sensor_Check || false
+        Incentive_Sensor_Check: (customerData as { Incentive_Sensor_Check?: boolean }).Incentive_Sensor_Check || false
       })
       .select()
       .single()
@@ -225,7 +225,7 @@ export async function createBulkCustomers(customers: Record<string, unknown>[]) 
              
              return {
                 Customer_ID: customerId,
-                Customer_Name: c.Customer_Name,
+                Customer_Name: String(c.Customer_Name || ''),
                 Contact_Person: c.Contact_Person,
                 Phone: c.Phone,
                 Email: c.Email,

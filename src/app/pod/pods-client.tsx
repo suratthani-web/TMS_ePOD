@@ -26,8 +26,17 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Badge } from "@/components/ui/badge"
 import { Pagination } from "@/components/ui/pagination"
+import type { PODRecord } from "@/lib/supabase/pod"
 
-export default function PODPage({ pods, stats, count, limit, searchParams }: any) {
+type PODPageProps = {
+  pods: PODRecord[]
+  stats: Awaited<ReturnType<typeof getPODStats>>
+  count: number
+  limit: number
+  searchParams: { q?: string; from?: string; to?: string; page?: string | number }
+}
+
+export default function PODPage({ pods, stats, count, limit, searchParams }: PODPageProps) {
   const { t } = useLanguage()
   const [filterQuery, setFilterQuery] = useState('')
   
@@ -142,7 +151,7 @@ export default function PODPage({ pods, stats, count, limit, searchParams }: any
               </tr>
             </thead>
             <tbody>
-              {pods.map((pod: any) => (
+              {pods.map((pod) => (
                 <tr key={pod.Job_ID} className="border-b border-white/[0.02] hover:bg-muted/40 transition-all group">
                   <td className="px-6 py-3">
                     <Link href={`/admin/jobs/${pod.Job_ID}?from=pod`}>

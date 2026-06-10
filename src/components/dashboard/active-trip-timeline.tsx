@@ -26,6 +26,14 @@ interface ActiveTripTimelineProps {
     job?: Job | null
 }
 
+type StopPoint = {
+    name?: string
+    lat?: number | string
+    lng?: number | string
+    status?: string
+    so_no?: string
+}
+
 export function ActiveTripTimeline({ job }: ActiveTripTimelineProps) {
     if (!job) return null
 
@@ -43,14 +51,14 @@ export function ActiveTripTimeline({ job }: ActiveTripTimelineProps) {
     }
 
     const currentWeight = getStatusWeight(job.Job_Status || 'New')
-    let stops: any[] = []
+    let stops: StopPoint[] = []
     if (job.original_destinations_json) {
         try {
             const parsed = typeof job.original_destinations_json === 'string'
                 ? JSON.parse(job.original_destinations_json)
                 : job.original_destinations_json
             if (Array.isArray(parsed)) {
-                stops = parsed
+                stops = parsed as StopPoint[]
             }
         } catch {
             stops = []
@@ -84,7 +92,7 @@ export function ActiveTripTimeline({ job }: ActiveTripTimelineProps) {
     if (isMultiStop) {
         const completedDrops = job.Signature_Url ? job.Signature_Url.split(',').filter(Boolean).length : 0
         
-        stops.forEach((stop: { name?: string; lat?: number; lng?: number; status?: string; so_no?: string }, idx: number) => {
+        stops.forEach((stop: StopPoint, idx: number) => {
             let stopStatus: 'completed' | 'current' | 'upcoming' = 'upcoming'
             let stopTime = 'Pending'
             let isCurrent = false

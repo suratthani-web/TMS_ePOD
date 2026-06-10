@@ -1,21 +1,25 @@
 export const dynamic = 'force-dynamic'
 
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { Button } from "@/components/ui/button"
 import Link from "next/link"
-import { 
+import {
+  Activity,
+  ArrowLeft,
+  Fuel,
+  Target,
+  TrendingUp,
+  Truck,
+  Users,
+} from "lucide-react"
+import {
+  getDriverLeaderboard,
   getOperationalStats,
   getSubcontractorPerformance,
-  getDriverLeaderboard,
 } from "@/lib/supabase/analytics"
 import { DriverLeaderboard } from "@/components/analytics/driver-leaderboard"
-import { SubcontractorPerformance } from "@/components/analytics/subcontractor-performance"
-import { Truck, Users, Fuel, TrendingUp, ArrowLeft, Activity, Zap, ShieldCheck, Target, Sparkles, Cpu } from "lucide-react"
 import { MonthFilter } from "@/components/analytics/month-filter"
+import { SubcontractorPerformance } from "@/components/analytics/subcontractor-performance"
 import { PremiumCard } from "@/components/ui/premium-card"
-import { PremiumButton } from "@/components/ui/premium-button"
 import { cn } from "@/lib/utils"
-
 import { isSuperAdmin } from "@/lib/permissions"
 
 export default async function FleetDashboardPage(props: { searchParams: Promise<{ [key: string]: string | undefined }> }) {
@@ -31,183 +35,194 @@ export default async function FleetDashboardPage(props: { searchParams: Promise<
     getDriverLeaderboard(startDate, endDate, branchId)
   ])
 
+  const utilization = opStats.fleet.utilization
+  const fuelEfficiency = opStats.fleet.fuelEfficiency
+
   return (
-    <div className="space-y-8 pb-10 p-4 lg:p-6 bg-background">
-      {/* Tactical Fleet Header */}
-      <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6 bg-background/60 backdrop-blur-3xl p-6 lg:p-8 rounded-br-[4rem] rounded-tl-[2rem] border border-border/5 shadow-2xl relative overflow-hidden group">
-          <div className="absolute top-0 right-0 w-80 h-80 bg-emerald-500/10 blur-[120px] rounded-full -mr-40 -mt-40 pointer-events-none" />
-          
-          <div className="relative z-10 space-y-4">
-              <Link href="/admin/analytics" className="inline-flex items-center gap-2 text-muted-foreground hover:text-emerald-500 transition-all font-black uppercase tracking-[0.4em] text-xs font-bold group/back italic">
-                  <ArrowLeft className="w-3 h-3 group-hover/back:-translate-x-1 transition-transform" /> 
-                  Strategic Intelligence
-              </Link>
-              <div className="flex items-center gap-4">
-                  <div className="p-3 bg-emerald-500/20 rounded-[1.5rem] border-2 border-emerald-500/30 shadow-[0_0_40px_rgba(16,185,129,0.2)] text-emerald-400 group-hover:scale-110 transition-all duration-500">
-                      <Truck size={32} strokeWidth={2.5} />
-                  </div>
-                  <div>
-                      <h1 className="text-3xl font-black text-foreground tracking-widest uppercase leading-none italic premium-text-gradient">
-                          Fleet Nexus
-                      </h1>
-                      <p className="text-xs font-bold font-black text-emerald-500 uppercase tracking-[0.4em] mt-1 opacity-80 italic">Asset Optimization & Tactical Performance Matrix</p>
-                  </div>
-              </div>
-          </div>
-
-          <div className="flex flex-col items-end gap-6 relative z-10">
-              <div className="bg-muted/50 border border-border/10 px-6 py-3 rounded-2xl flex items-center gap-3 backdrop-blur-md">
-                  <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse shadow-[0_0_10px_rgba(16,185,129,1)]" />
-                  <span className="text-base font-bold font-black text-muted-foreground uppercase tracking-widest italic">FLEET_STATE: OPTIMIZED</span>
-              </div>
-              <div className="flex items-center gap-4 bg-muted/50 p-2 rounded-3xl backdrop-blur-3xl">
-                  <MonthFilter />
-              </div>
-          </div>
-      </div>
-
-      {/* Fleet Utilization Terminal */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-10">
-          <PremiumCard className="lg:col-span-2 bg-background/40 border-2 border-border/5 shadow-3xl rounded-[4rem] overflow-hidden group/util relative">
-              <div className="absolute top-0 right-0 w-96 h-96 bg-emerald-500/5 blur-[100px] pointer-events-none" />
-              <div className="p-10 border-b border-border/5 bg-black/40 flex items-center justify-between relative overflow-hidden">
-                  <div className="flex items-center gap-5 relative z-10">
-                      <Activity size={24} className="text-emerald-500 animate-pulse" />
-                      <h2 className="text-2xl font-black text-foreground tracking-widest uppercase italic border-l-4 border-emerald-500 pl-6">Utilization Health Matrix</h2>
-                  </div>
-                  <div className="flex items-center gap-3 px-5 py-2 bg-emerald-500/10 rounded-full border border-emerald-500/20 relative z-10">
-                      <Zap size={14} className="text-emerald-400" />
-                      <span className="text-base font-bold font-black text-emerald-400 uppercase tracking-widest italic">REALTIME_FLOW</span>
-                  </div>
-              </div>
-              <CardContent className="p-12 space-y-12 relative z-10">
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-12">
-                      <div className="space-y-6">
-                          <p className="text-base font-bold font-black text-muted-foreground uppercase tracking-[0.4em] italic mb-2">ACTIVE_RATIO_SYNC</p>
-                          <div className="flex items-baseline gap-4">
-                              <span className="text-5xl font-black text-foreground italic premium-text-gradient">{opStats.fleet.utilization.toFixed(1)}%</span>
-                              <span className="text-xs font-bold text-emerald-400 font-black flex items-center gap-1 uppercase tracking-widest italic animate-pulse">
-                                  <TrendingUp size={12} /> TGT_85%
-                              </span>
-                          </div>
-                          <div className="w-full bg-muted/50 rounded-full h-2 overflow-hidden border border-border/5 shadow-inner">
-                              <div 
-                                  className="h-full rounded-full bg-gradient-to-r from-emerald-500 to-indigo-600 shadow-[0_0_15px_rgba(16,185,129,0.5)] transition-all duration-1000" 
-                                  style={{ width: `${opStats.fleet.utilization}%` }} 
-                              />
-                          </div>
-                      </div>
-                      <div className="space-y-4 md:border-l md:border-border/5 md:pl-10">
-                          <p className="text-xs font-bold font-black text-muted-foreground uppercase tracking-[0.4em] italic mb-1">ON_TIME_PRECISION</p>
-                          <p className="text-5xl font-black text-emerald-500 leading-none italic">{opStats.fleet.onTimeDelivery.toFixed(1)}%</p>
-                          <div className="px-4 py-1.5 rounded-xl bg-muted/50 border border-border/10 text-xs font-bold font-black text-muted-foreground uppercase tracking-widest italic w-fit">
-                            // ACTUAL_VS_PLAN_DELTA
-                          </div>
-                      </div>
-                      <div className="space-y-4 md:border-l md:border-border/5 md:pl-10">
-                          <p className="text-xs font-bold font-black text-muted-foreground uppercase tracking-[0.4em] italic mb-1">TRANSIT_NODES</p>
-                          <p className="text-5xl font-black text-foreground leading-none italic">{opStats.fleet.active}</p>
-                          <div className="flex items-center gap-2">
-                             <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 shadow-[0_0_10px_rgba(16,185,129,1)]" />
-                             <p className="text-xs font-bold font-black text-muted-foreground uppercase tracking-widest italic">IN_FIELD_OPERATIONS: {opStats.fleet.active}</p>
-                          </div>
-                      </div>
-                  </div>
-              </CardContent>
-          </PremiumCard>
-
-          <PremiumCard className="bg-background/40 border-2 border-border/5 shadow-3xl rounded-[4rem] overflow-hidden group/sub relative">
-              <div className="p-10 border-b border-border/5 bg-black/40 flex items-center justify-between">
-                  <h3 className="text-xl font-black text-foreground uppercase tracking-[0.4em] flex items-center gap-3 italic">
-                      <Truck size={18} className="text-orange-500" /> Crew Mix Synthesis
-                  </h3>
-                  <div className="w-2 h-2 rounded-full bg-orange-500 shadow-[0_0_10px_rgba(249,115,22,1)]" />
-              </div>
-              <CardContent className="p-8">
-                  <SubcontractorPerformance data={subPerf} />
-              </CardContent>
-          </PremiumCard>
-      </div>
-
-      {/* Driver Performance & Fuel Optimization */}
-      <div className="grid grid-cols-1 lg:grid-cols-5 gap-10">
-          <PremiumCard className="lg:col-span-3 bg-background/40 border-2 border-border/5 shadow-3xl rounded-[4rem] overflow-hidden group/rank relative">
-              <div className="absolute top-0 left-0 w-96 h-96 bg-primary/5 blur-[120px] pointer-events-none" />
-              <div className="p-10 border-b border-border/5 bg-black/40 flex items-center justify-between">
-                  <div className="flex items-center gap-4 font-black">
-                    <Users className="text-primary" size={24} strokeWidth={2.5} /> 
-                    <h2 className="text-2xl font-black text-foreground uppercase tracking-widest italic">Personnel Yield Matrix</h2>
-                  </div>
-                  <span className="text-base font-bold text-muted-foreground font-black uppercase tracking-widest italic bg-muted/50 px-5 py-2 rounded-full border border-border/10">Top Tier Operators</span>
-              </div>
-              <CardContent className="p-8">
-                  <DriverLeaderboard data={driverRank} />
-              </CardContent>
-          </PremiumCard>
-
-          <PremiumCard className="lg:col-span-2 bg-background/40 border-2 border-border/5 shadow-3xl rounded-[4rem] overflow-hidden group/fuel relative self-start">
-              <div className="absolute inset-0 bg-gradient-to-b from-amber-500/5 to-transparent pointer-events-none" />
-              <div className="p-10 border-b border-border/5 bg-black/40 flex items-center gap-4">
-                  <div className="p-3 bg-amber-500/20 rounded-2xl text-amber-500 border border-amber-500/30">
-                     <Fuel size={24} strokeWidth={2.5} />
-                  </div>
-                  <h3 className="text-xl font-black text-foreground uppercase tracking-widest italic">Energy Efficiency</h3>
-              </div>
-              <CardContent className="flex flex-col items-center justify-center py-20 px-12">
-                  <div className="relative group/score">
-                      <div className="absolute inset-0 bg-amber-500/20 blur-[60px] rounded-full group-hover/score:blur-[80px] transition-all" />
-                      <div className="relative z-10 flex flex-col items-center">
-                          <div className="text-[120px] font-black text-white leading-none tracking-tighter italic premium-text-gradient drop-shadow-[0_0_30px_rgba(245,158,11,0.3)]">
-                            {opStats.fleet.fuelEfficiency.toFixed(1)}
-                          </div>
-                          <div className="text-2xl font-black text-amber-500 uppercase tracking-[0.4em] italic mt-2">KM / LTR</div>
-                      </div>
-                  </div>
-                  
-                  <div className="mt-16 flex gap-2 w-full max-w-[300px] h-3">
-                      {[1,2,3,4,5,6,7,8,9,10].map(i => (
-                          <div 
-                              key={i} 
-                              className={cn(
-                                "flex-1 rounded-full transition-all duration-1000",
-                                i <= (opStats.fleet.fuelEfficiency / 1.5) 
-                                    ? 'bg-gradient-to-t from-amber-600 to-amber-400 shadow-[0_0_10px_rgba(245,158,11,0.5)]' 
-                                    : 'bg-muted/50'
-                              )} 
-                          />
-                      ))}
-                  </div>
-                  
-                  <div className="mt-12 p-8 rounded-[2.5rem] bg-amber-500/5 border-2 border-amber-500/10 w-full relative overflow-hidden group/intel">
-                      <div className="absolute top-0 right-0 p-4 opacity-10">
-                          <Activity size={40} className="text-amber-500" />
-                      </div>
-                      <p className="text-base font-bold font-black text-amber-500/60 uppercase tracking-[0.4em] text-center italic relative z-10">
-                          EFFICIENCY_RATING: {opStats.fleet.fuelEfficiency > 10 ? 'EXCEPTIONAL_YIELD' : 'NOMINAL_FLOW'}
-                      </p>
-                  </div>
-              </CardContent>
-          </PremiumCard>
-      </div>
-      
-      {/* Global Tactical Advisory */}
-      <div className="mt-20 p-12 rounded-[3.5rem] bg-primary/5 border-2 border-primary/10 flex flex-col md:flex-row gap-10 items-center relative overflow-hidden">
-          <div className="absolute top-0 right-0 w-80 h-full bg-gradient-to-l from-primary/5 to-transparent pointer-events-none" />
-          <div className="p-6 rounded-[2rem] bg-primary/20 text-primary border-2 border-primary/30 shadow-2xl animate-pulse">
-              <Cpu size={32} />
-          </div>
-          <div className="space-y-4 text-center md:text-left flex-1">
-              <p className="text-xl font-black text-primary italic uppercase tracking-widest">FLEET_OPTIMIZATION_ADVISORY</p>
-              <p className="text-xl font-bold text-muted-foreground leading-relaxed uppercase tracking-wider italic">
-                  Fleet telemetry is updated every orbital cycle. Strategic diversions and energy fluctuations are flagged in real-time. <br />
-                  For granular asset control, initiate a deep-scan of the specific transport node.
+    <div className="space-y-6 pb-10 p-4 lg:p-6 bg-background text-foreground">
+      <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6 bg-card p-6 lg:p-8 rounded-2xl border border-border shadow-sm">
+        <div className="space-y-4">
+          <Link href="/admin/analytics" className="inline-flex items-center gap-2 text-muted-foreground hover:text-primary transition-colors text-sm font-medium group/back">
+            <ArrowLeft className="w-4 h-4 group-hover/back:-translate-x-1 transition-transform" />
+            กลับไปแดชบอร์ดสถิติ
+          </Link>
+          <div className="flex items-center gap-4">
+            <div className="p-3 bg-primary/10 rounded-2xl border border-primary/20 text-primary">
+              <Truck size={28} strokeWidth={2.5} />
+            </div>
+            <div>
+              <h1 className="text-3xl font-semibold text-foreground tracking-tight">
+                Trip performance
+              </h1>
+              <p className="text-sm font-medium text-muted-foreground mt-1">
+                วิเคราะห์การใช้รถ ผู้รับเหมาขนส่ง พนักงานขับรถ และต้นทุนพลังงาน
               </p>
+            </div>
           </div>
-          <PremiumButton variant="outline" className="h-14 px-10 rounded-2xl border-border/10 text-foreground font-bold tracking-[0.3em] ml-auto italic">
-              <Target size={18} /> SYNC_FLEET_STATE
-          </PremiumButton>
+        </div>
+
+        <div className="flex flex-col items-start lg:items-end gap-4">
+          <div className="bg-muted/40 border border-border px-4 py-2 rounded-xl flex items-center gap-3">
+            <div className="w-2 h-2 rounded-full bg-emerald-500" />
+            <span className="text-sm font-medium text-muted-foreground">ข้อมูลพร้อมใช้งาน</span>
+          </div>
+          <div className="flex items-center gap-4 bg-muted/30 p-2 rounded-2xl border border-border">
+            <MonthFilter />
+          </div>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <PremiumCard className="lg:col-span-2 bg-card border border-border shadow-sm rounded-2xl overflow-hidden">
+          <div className="p-6 border-b border-border bg-muted/20 flex flex-col md:flex-row md:items-center justify-between gap-4">
+            <div className="flex items-center gap-3">
+              <Activity size={22} className="text-primary" />
+              <h2 className="text-xl font-semibold text-foreground">ประสิทธิภาพการใช้รถ</h2>
+            </div>
+            <div className="flex items-center gap-2 px-3 py-1.5 bg-emerald-500/10 rounded-xl border border-emerald-500/20">
+              <TrendingUp size={14} className="text-emerald-600" />
+              <span className="text-sm font-medium text-emerald-600">เป้าหมายการใช้รถ 85%</span>
+            </div>
+          </div>
+
+          <div className="p-6 lg:p-8 space-y-8">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+              <MetricPanel
+                label="อัตราการออกงานรถ"
+                value={`${utilization.toFixed(1)}%`}
+                helper="เทียบกับรถทั้งหมดในช่วงที่เลือก"
+                accent="primary"
+              />
+              <MetricPanel
+                label="ส่งงานตรงเวลา"
+                value={`${opStats.fleet.onTimeDelivery.toFixed(1)}%`}
+                helper="คำนวณจากงานที่มีเวลาส่งมอบ"
+                accent="success"
+              />
+              <MetricPanel
+                label="รถที่กำลังเดินทาง"
+                value={`${opStats.fleet.active}`}
+                helper="งานที่ยังอยู่ในสถานะ active"
+                accent="neutral"
+              />
+            </div>
+
+            <div className="space-y-3">
+              <div className="flex items-center justify-between text-sm font-medium">
+                <span className="text-muted-foreground">Utilization</span>
+                <span className="text-foreground">{utilization.toFixed(1)}%</span>
+              </div>
+              <div className="w-full bg-muted rounded-full h-2 overflow-hidden border border-border">
+                <div
+                  className="h-full rounded-full bg-primary transition-all duration-1000"
+                  style={{ width: `${Math.min(utilization, 100)}%` }}
+                />
+              </div>
+            </div>
+          </div>
+        </PremiumCard>
+
+        <PremiumCard className="bg-card border border-border shadow-sm rounded-2xl overflow-hidden">
+          <div className="p-6 border-b border-border bg-muted/20 flex items-center justify-between">
+            <h3 className="text-lg font-semibold text-foreground flex items-center gap-3">
+              <Truck size={18} className="text-primary" />
+              ประเภทงานขนส่ง
+            </h3>
+            <div className="w-2 h-2 rounded-full bg-primary" />
+          </div>
+          <div className="p-6">
+            <SubcontractorPerformance data={subPerf} />
+          </div>
+        </PremiumCard>
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-5 gap-6">
+        <PremiumCard className="lg:col-span-3 bg-card border border-border shadow-sm rounded-2xl overflow-hidden">
+          <div className="p-6 border-b border-border bg-muted/20 flex flex-col md:flex-row md:items-center justify-between gap-3">
+            <div className="flex items-center gap-3">
+              <Users className="text-primary" size={22} strokeWidth={2.5} />
+              <h2 className="text-xl font-semibold text-foreground">อันดับผลงานพนักงานขับรถ</h2>
+            </div>
+            <span className="text-sm font-medium text-muted-foreground bg-muted px-3 py-1.5 rounded-xl border border-border">
+              เรียงตามผลงานในช่วงที่เลือก
+            </span>
+          </div>
+          <div className="p-6">
+            <DriverLeaderboard data={driverRank} />
+          </div>
+        </PremiumCard>
+
+        <PremiumCard className="lg:col-span-2 bg-card border border-border shadow-sm rounded-2xl overflow-hidden self-start">
+          <div className="p-6 border-b border-border bg-muted/20 flex items-center gap-4">
+            <div className="p-3 bg-amber-500/10 rounded-2xl text-amber-600 border border-amber-500/20">
+              <Fuel size={22} strokeWidth={2.5} />
+            </div>
+            <h3 className="text-lg font-semibold text-foreground">อัตราสิ้นเปลืองพลังงาน</h3>
+          </div>
+          <div className="flex flex-col items-center justify-center py-12 px-8">
+            <div className="text-6xl font-semibold text-foreground leading-none">
+              {fuelEfficiency.toFixed(1)}
+            </div>
+            <div className="text-sm font-medium text-amber-600 mt-2">กิโลเมตร / ลิตร</div>
+
+            <div className="mt-10 flex gap-2 w-full max-w-[300px] h-3">
+              {[1,2,3,4,5,6,7,8,9,10].map(i => (
+                <div
+                  key={i}
+                  className={cn(
+                    "flex-1 rounded-full transition-all duration-1000",
+                    i <= (fuelEfficiency / 1.5) ? 'bg-amber-500' : 'bg-muted'
+                  )}
+                />
+              ))}
+            </div>
+
+            <div className="mt-8 p-5 rounded-2xl bg-amber-500/10 border border-amber-500/20 w-full">
+              <p className="text-sm font-medium text-amber-700 dark:text-amber-400 text-center">
+                ระดับประสิทธิภาพ: {fuelEfficiency > 10 ? 'ดีเยี่ยม' : 'ปกติ'}
+              </p>
+            </div>
+          </div>
+        </PremiumCard>
+      </div>
+
+      <div className="mt-8 p-6 rounded-2xl bg-muted/30 border border-border flex flex-col md:flex-row gap-6 items-center">
+        <div className="p-4 rounded-2xl bg-primary/10 text-primary border border-primary/20">
+          <Target size={28} />
+        </div>
+        <div className="space-y-2 text-center md:text-left flex-1">
+          <p className="text-lg font-semibold text-foreground">ข้อสังเกตจากข้อมูลการเดินรถ</p>
+          <p className="text-sm font-medium text-muted-foreground leading-relaxed">
+            ใช้หน้านี้เพื่อตรวจอัตราการใช้รถ ความตรงเวลา ผลงานพนักงานขับรถ และแนวโน้มการใช้พลังงานก่อนวางแผนงานรอบถัดไป
+          </p>
+        </div>
       </div>
     </div>
   )
 }
 
+function MetricPanel({
+  label,
+  value,
+  helper,
+  accent,
+}: {
+  label: string
+  value: string
+  helper: string
+  accent: "primary" | "success" | "neutral"
+}) {
+  const valueClass = {
+    primary: "text-primary",
+    success: "text-emerald-600",
+    neutral: "text-foreground",
+  }[accent]
+
+  return (
+    <div className="rounded-2xl border border-border bg-background/60 p-5 space-y-3">
+      <p className="text-sm font-medium text-muted-foreground">{label}</p>
+      <p className={cn("text-4xl font-semibold leading-none", valueClass)}>{value}</p>
+      <p className="text-xs font-medium text-muted-foreground leading-relaxed">{helper}</p>
+    </div>
+  )
+}

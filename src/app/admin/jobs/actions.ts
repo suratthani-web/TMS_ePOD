@@ -4,7 +4,44 @@ import { createClient, createAdminClient } from '@/utils/supabase/server'
 import { revalidatePath } from 'next/cache'
 import { getUserBranchId, isSuperAdmin } from '@/lib/permissions'
 
+import { type JobStatus, transitionJobStatus } from "@/services/job-status-machine"
+
+const JOB_STATUSES: readonly JobStatus[] = [
+  'Draft',
+  'Requested',
+  'New',
+  'Pending',
+  'Assigned',
+  'Confirmed',
+  'Picked Up',
+  'En Route',
+  'En-Route',
+  'In Transit',
+  'In Progress',
+  'Arrived',
+  'Arrived Pickup',
+  'Arrived Dropoff',
+  'Completed',
+  'Complete',
+  'Delivered',
+  'Verified',
+  'Rejected',
+  'Billed',
+  'Paid',
+  'Cancelled',
+  'Failed',
+  'SOS'
+]
+
+function isJobStatus(status: string): status is JobStatus {
+  return JOB_STATUSES.includes(status as JobStatus)
+}
+
 export async function adminUpdateJobStatus(jobId: string, newStatus: string, note?: string) {
+  if (!isJobStatus(newStatus)) {
+      return { success: false, message: `Invalid job status: ${newStatus}` }
+  }
+
   const isAdmin = await isSuperAdmin()
   const supabase = isAdmin ? await createAdminClient() : await createClient()
   const branchId = await getUserBranchId()
@@ -17,25 +54,26 @@ export async function adminUpdateJobStatus(jobId: string, newStatus: string, not
           .eq('Job_ID', jobId)
           .single()
       
-      if (!job || job.Branch_ID !== branchId) {
+      if (!job || (job.Branch_ID !== branchId && branchId !== 'All')) {
           return { success: false, message: 'Unauthorized: Job belongs to another branch' }
       }
   }
 
-  // 2. Prepare Update Data
-  const updateData: Record<string, unknown> = {
-      Job_Status: newStatus
+  // 2. Transition Status using Machine
+  const transition = await transitionJobStatus(jobId, newStatus, {
+      reason: 'Admin manual status update',
+      notes: note
+  })
+
+  if (!transition.success) {
+      return { success: false, message: `Status Machine Error: ${transition.message}` }
   }
 
-  // Add note if provided
-  if (note) {
-      updateData.Notes = note 
-  }
-
-  // Handle timestamps based on status
+  // 3. Handle additional timestamp updates if needed
+  const updateData: Record<string, unknown> = {}
   const now = new Date()
-  const timeString = now.toTimeString().split(' ')[0] // Provides "HH:mm:ss"
-  const dateString = now.toISOString().split('T')[0]  // Provides "YYYY-MM-DD"
+  const timeString = now.toTimeString().split(' ')[0] 
+  const dateString = now.toISOString().split('T')[0]  
   
   if (newStatus === 'Picked Up') {
       updateData.Actual_Pickup_Time = timeString
@@ -47,23 +85,9 @@ export async function adminUpdateJobStatus(jobId: string, newStatus: string, not
       updateData.Delivery_Date = dateString
   }
 
-  // 3. Perform Update
-  const { data, error } = await supabase
-    .from('Jobs_Main')
-    .update(updateData)
-    .eq('Job_ID', jobId)
-    .select()
-
-  if (error) {
-    return { success: false, message: `Failed to update: ${error.message}` }
+  if (Object.keys(updateData).length > 0) {
+      await supabase.from('Jobs_Main').update(updateData).eq('Job_ID', jobId)
   }
-
-  if (!data || data.length === 0) {
-    return { success: false, message: 'No job found with the given ID' }
-  }
-
-  // 4. Log Admin Action (Optional, can be added to a logs table later)
-  // No console.error or console.log statements
 
   revalidatePath(`/admin/jobs/${jobId}`)
   revalidatePath('/planning')

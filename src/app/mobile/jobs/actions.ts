@@ -89,6 +89,8 @@ export async function verifyStairClimbing(sensorLogs: Array<{ pressure: number; 
   }
 }
 
+import { transitionJobStatus } from "@/services/job-status-machine"
+
 export async function updateJobStatus(
   jobId: string, 
   status: string, 
@@ -101,18 +103,26 @@ export async function updateJobStatus(
   try {
     const supabase = createAdminClient()
 
-    // 1. Update Job Status & Sensor Analytics
-    const updatePayload: Record<string, any> = { 
-        Job_Status: status,
+    // 1. Transition Job Status using Machine
+    const transition = await transitionJobStatus(jobId, status as import("@/services/job-status-machine").JobStatus, {
+        userId: driverId,
+        reason: 'Mobile status update',
+        notes: `Incentive Claimed: ${options?.incentiveClaimed || false}`
+    })
+
+    if (!transition.success) {
+        return { success: false, message: transition.message }
     }
+
+    // 2. Sensor Analytics & Supplemental Data
+    const updatePayload: Record<string, unknown> = {}
 
     // ประมวลผลเซนเซอร์กรณีคนขับกดปิดงานเป็น 'Completed' หรือ 'Delivered'
     if (status === 'Completed' || status === 'Delivered') {
-        // 1.1 ตรวจสอบสิทธิ์การจ่ายเงินพิเศษ (ถ้ามีระบุเข้ามา)
+        // ... sensor logic remains same ...
         if (options?.incentiveClaimed) {
             updatePayload.Incentive_Claimed = true;
             
-            // อ่านค่าข้อมูลออเดอร์นี้จาก DB เพื่อดูว่าลูกค้าเปิดระบบตรวจเซนเซอร์ไว้ไหม
             const { data: jobInfo } = await supabase
                 .from('Jobs_Main')
                 .select('Requires_Incentive_Check')
@@ -120,7 +130,6 @@ export async function updateJobStatus(
                 .single();
 
             if (jobInfo?.Requires_Incentive_Check && options.sensorLogs) {
-                // ทำการวิเคราะห์ตรวจจับความทุจริตจากข้อมูลที่ส่งมา
                 const sensorResult = await verifyStairClimbing(options.sensorLogs);
                 
                 updatePayload.Sensor_Verified = sensorResult.status;
@@ -128,17 +137,15 @@ export async function updateJobStatus(
                 updatePayload.Sensor_Total_Steps_Upward = sensorResult.totalStepsUp;
                 updatePayload.Sensor_Logs_Json = options.sensorLogs;
                 
-                // แนบบันทึกผลเซนเซอร์ลงในบันทึกเพิ่มเติม
                 const sensorNote = `[ระบบเซนเซอร์: ${sensorResult.status}] ${sensorResult.reason}`;
                 const { data: currentJob } = await supabase.from('Jobs_Main').select('Notes').eq('Job_ID', jobId).single();
                 updatePayload.Notes = currentJob?.Notes ? `${currentJob.Notes}\n${sensorNote}` : sensorNote;
             } else {
-                // ถ้าออเดอร์นี้ไม่ได้สั่งเปิดตรวจสอบเซนเซอร์ ให้ผ่านการเคลมไปก่อน
                 updatePayload.Sensor_Verified = 'Verified';
             }
         }
 
-        // 1.2 คำนวณ CO2 อัตโนมัติ
+        // คำนวณ CO2 อัตโนมัติ
         const co2Data = await calculateJobCO2(supabase, jobId)
         if (co2Data) {
             updatePayload.Notes = updatePayload.Notes 
@@ -147,16 +154,18 @@ export async function updateJobStatus(
         }
     }
 
-    const { error } = await supabase
-      .from('Jobs_Main')
-      .update(updatePayload)
-      .eq('Job_ID', jobId)
+    if (Object.keys(updatePayload).length > 0) {
+        const { error } = await supabase
+          .from('Jobs_Main')
+          .update(updatePayload)
+          .eq('Job_ID', jobId)
 
-    if (error) {
-      return { success: false, message: `Failed to update status: ${error.message}` }
+        if (error) {
+          return { success: false, message: `Failed to update metadata: ${error.message}` }
+        }
     }
 
-    // 2. Push notify admin (fire-and-forget)
+    // 3. Push notify admin (fire-and-forget)
     if (driverId) {
       const { data: driver } = await supabase
         .from('Master_Drivers')

@@ -29,58 +29,57 @@ export function CustomerRouteSection({
   const { t } = useLanguage()
 
   return (
-    <div className="space-y-10">
+    <div className="space-y-6">
       {/* Sub-Section Header */}
       <div className="flex items-center gap-3">
-        <div className="p-2 bg-muted/60 rounded-xl text-purple-500 shadow-lg border border-border/10">
-          <MapPin size={18} />
+        <div className="p-2 bg-muted rounded-xl text-primary border border-border/80 shadow-sm">
+          <MapPin size={16} />
         </div>
-        <h3 className="text-xl font-black text-foreground tracking-tight uppercase premium-text-gradient">{t('dashboard.customer_route_header')}</h3>
+        <h3 className="text-lg font-black text-foreground uppercase tracking-tight">{t('dashboard.customer_route_header')}</h3>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
         {/* Top Customers Elite */}
-        <PremiumCard className="bg-muted/50 border border-border/10 shadow-2xl p-0 overflow-hidden rounded-br-[5rem] rounded-tl-[3rem]">
-           <div className="p-8 border-b border-border/5 bg-gradient-to-r from-purple-500/20 via-purple-500/5 to-transparent backdrop-blur-md relative overflow-hidden flex items-center justify-between">
-              <div className="absolute inset-0 bg-gradient-to-r from-purple-500/10 to-transparent pointer-events-none" />
-              <div className="flex items-center gap-3 relative z-10">
-                <div className="p-2 bg-purple-600 rounded-xl text-white shadow-lg">
-                  <Building2 size={16} />
+        <PremiumCard className="bg-card border border-border p-0 overflow-hidden rounded-2xl shadow-sm">
+           <div className="p-4 border-b border-border bg-muted/30 flex items-center justify-between">
+              <div className="flex items-center gap-2.5">
+                <div className="p-1.5 bg-primary/10 rounded-lg text-primary border border-primary/20 shrink-0">
+                  <Building2 size={14} />
                 </div>
                 <div>
-                  <h3 className="text-lg font-black text-foreground italic uppercase">{t('dashboard.market_command')}</h3>
-                  <p className="text-purple-400 text-base font-bold font-bold uppercase italic">{t('dashboard.customer_yield')}</p>
+                  <h3 className="text-sm font-black text-foreground">{t('dashboard.market_command')}</h3>
+                  <p className="text-primary text-[10px] font-bold uppercase tracking-wider">{t('dashboard.customer_yield')}</p>
                 </div>
               </div>
            </div>
            <div className="p-0">
-              <div className="divide-y divide-white/5">
+              <div className="divide-y divide-border">
                 {customers.map((c, i) => (
-                    <div key={i} className="p-8 flex items-center justify-between group/cust hover:bg-muted/50 transition-all border-l-4 border-transparent hover:border-purple-500">
-                        <div className="flex items-center gap-6">
+                    <div key={i} className="p-4 flex items-center justify-between group/cust hover:bg-muted/20 transition-all border-l-4 border-transparent hover:border-primary">
+                        <div className="flex items-center gap-3">
                             <div className={cn(
-                                "w-14 h-14 rounded-2xl flex items-center justify-center text-[12px] font-black shadow-xl italic transition-transform duration-500 transition-all uppercase",
-                                i < 3 ? "bg-purple-100 text-purple-700" : "bg-background text-foreground"
+                                "w-8 h-8 rounded-lg flex items-center justify-center text-xs font-black border transition-all uppercase",
+                                i < 3 ? "bg-primary/15 text-primary border-primary/25" : "bg-muted text-muted-foreground border-border"
                             )}>
                                 #{i + 1}
                             </div>
                             <div>
-                                <div className="text-foreground font-black text-xl tracking-tight uppercase italic group-hover/cust:text-purple-400 transition-colors">{c.name}</div>
-                                <div className="text-base font-bold text-muted-foreground font-black mt-2 italic uppercase">
+                                <div className="text-foreground font-black text-sm group-hover/cust:text-primary transition-colors">{c.name}</div>
+                                <div className="text-xs text-muted-foreground font-medium mt-0.5">
                                     {t('dashboard.mission_volume')}: {c.jobCount}
                                 </div>
                             </div>
                         </div>
                         <div className="text-right">
-                             <div className="text-foreground tracking-tighter italic">฿{c.revenue.toLocaleString()}</div>
-                              <div className="text-base font-bold text-muted-foreground font-black uppercase mt-1 italic">{t('dashboard.aggregate_revenue')}</div>
+                             <div className="text-foreground font-black text-base">฿{c.revenue.toLocaleString()}</div>
+                              <div className="text-[9px] text-muted-foreground font-bold uppercase mt-0.5">{t('dashboard.aggregate_revenue')}</div>
                         </div>
                     </div>
                 ))}
                 {customers.length === 0 && (
-                     <div className="p-24 text-center">
-                        <Building2 size={48} strokeWidth={1} className="mx-auto mb-4 text-muted-foreground" />
-                        <p className="text-base font-bold font-black text-muted-foreground uppercase italic">{t('dashboard.awaiting_market')}</p>
+                     <div className="p-12 text-center">
+                        <Building2 size={36} strokeWidth={1.5} className="mx-auto mb-3 text-muted-foreground opacity-60" />
+                        <p className="text-xs font-bold text-muted-foreground uppercase">{t('dashboard.awaiting_market')}</p>
                     </div>
                 )}
               </div>
@@ -88,47 +87,46 @@ export function CustomerRouteSection({
         </PremiumCard>
 
         {/* Route Profitability Elite */}
-        <PremiumCard className="bg-muted/50 border border-border/10 shadow-2xl p-0 overflow-hidden rounded-br-[5rem] rounded-tl-[3rem]">
-           <div className="p-8 border-b border-border/5 bg-gradient-to-r from-emerald-500/20 via-emerald-500/5 to-transparent backdrop-blur-md relative overflow-hidden flex items-center justify-between">
-              <div className="absolute inset-0 bg-gradient-to-r from-emerald-500/10 to-transparent pointer-events-none" />
-              <div className="flex items-center gap-3 relative z-10">
-                <div className="p-2 bg-emerald-600 rounded-xl text-white shadow-lg">
-                  <TrendingUp size={16} />
+        <PremiumCard className="bg-card border border-border p-0 overflow-hidden rounded-2xl shadow-sm">
+           <div className="p-4 border-b border-border bg-muted/30 flex items-center justify-between">
+              <div className="flex items-center gap-2.5">
+                <div className="p-1.5 bg-success/15 rounded-lg text-success border border-success/20 shrink-0">
+                  <TrendingUp size={14} />
                 </div>
                 <div>
-                  <h3 className="text-lg font-black text-foreground italic uppercase">{t('dashboard.corridor_yield')}</h3>
-                  <p className="text-emerald-400 text-base font-bold font-bold uppercase italic">{t('dashboard.route_margin')}</p>
+                  <h3 className="text-sm font-black text-foreground">{t('dashboard.corridor_yield')}</h3>
+                  <p className="text-success text-[10px] font-bold uppercase tracking-wider">{t('dashboard.route_margin')}</p>
                 </div>
               </div>
            </div>
            <div className="p-0">
-              <div className="divide-y divide-white/5">
+              <div className="divide-y divide-border">
                 {routes.slice(0, 5).map((r, i) => (
-                    <div key={i} className="p-8 flex items-center justify-between group/route hover:bg-muted/50 transition-all border-l-4 border-transparent hover:border-emerald-500">
-                        <div className="flex items-center gap-6">
-                            <div className="w-14 h-14 rounded-2xl bg-background text-foreground flex items-center justify-center text-[12px] font-black shadow-xl italic uppercase">
+                    <div key={i} className="p-4 flex items-center justify-between group/route hover:bg-muted/20 transition-all border-l-4 border-transparent hover:border-success">
+                        <div className="flex items-center gap-3">
+                            <div className="w-8 h-8 rounded-lg bg-muted text-muted-foreground border border-border flex items-center justify-center text-xs font-black uppercase">
                                 {r.route.slice(0, 2)}
                             </div>
                             <div>
-                                <div className="text-foreground font-black text-xl tracking-tight uppercase italic">{r.route}</div>
-                                <div className="flex items-center gap-3 mt-2">
-                                    <span className="text-base font-bold font-black text-muted-foreground bg-muted/50 px-2 py-0.5 rounded-full border border-border/10 uppercase">
+                                <div className="text-foreground font-black text-sm">{r.route}</div>
+                                <div className="flex items-center gap-2 mt-0.5">
+                                    <span className="text-[9px] text-muted-foreground bg-muted px-1.5 py-0.5 rounded border border-border font-bold uppercase">
                                         {r.count} {t('dashboard.missions')}
                                     </span>
-                                    <span className="text-base font-bold text-muted-foreground font-bold italic">COST: ฿{r.cost.toLocaleString()}</span>
+                                    <span className="text-[10px] text-muted-foreground font-medium">COST: ฿{r.cost.toLocaleString()}</span>
                                 </div>
                             </div>
                         </div>
                         <div className="text-right">
-                             <div className="text-lg font-black text-emerald-400 tracking-tighter italic">+{r.margin.toFixed(1)}%</div>
-                              <div className="text-base font-bold text-muted-foreground font-black uppercase mt-1 italic">{t('dashboard.net_margin')}</div>
+                             <div className="text-base font-black text-success">+{r.margin.toFixed(1)}%</div>
+                              <div className="text-[9px] text-muted-foreground font-bold uppercase mt-0.5">{t('dashboard.net_margin')}</div>
                         </div>
                     </div>
                 ))}
                 {routes.length === 0 && (
-                     <div className="p-24 text-center">
-                        <Activity size={48} strokeWidth={1} className="mx-auto mb-4 text-muted-foreground" />
-                        <p className="text-base font-bold font-black text-muted-foreground uppercase italic">{t('dashboard.sector_nominal')}</p>
+                     <div className="p-12 text-center">
+                        <Activity size={36} strokeWidth={1.5} className="mx-auto mb-3 text-muted-foreground opacity-60" />
+                        <p className="text-xs font-bold text-muted-foreground uppercase">{t('dashboard.sector_nominal')}</p>
                     </div>
                 )}
               </div>

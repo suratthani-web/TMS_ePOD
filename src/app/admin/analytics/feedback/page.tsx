@@ -67,7 +67,7 @@ export default async function CustomerFeedbackPage() {
 
   const totalFeedback = feedbackData.length
   const averageRating = totalFeedback > 0 
-    ? (feedbackData.reduce((acc: number, f: any) => acc + (f.rating || 0), 0) / totalFeedback).toFixed(1)
+    ? (feedbackData.reduce((acc: number, f) => acc + (f.rating || 0), 0) / totalFeedback).toFixed(1)
     : "0.0"
 
   return (
@@ -166,7 +166,7 @@ export default async function CustomerFeedbackPage() {
             </div>
           ) : (
             <div className="grid grid-cols-1 gap-10">
-              {feedbackData.map((f: any) => (
+              {feedbackData.map((f) => (
                 <div key={f.id} className="relative group/msg p-10 rounded-[3rem] border-2 border-border/5 bg-black/20 hover:bg-background/60 hover:border-indigo-500/20 transition-all duration-500 overflow-hidden">
                   <div className="flex flex-col lg:flex-row lg:items-start justify-between gap-10 relative z-10">
                     <div className="flex-1 space-y-6">

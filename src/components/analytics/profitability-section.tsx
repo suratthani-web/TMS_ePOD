@@ -94,42 +94,42 @@ function JobDetailsModal({
 
     return (
         <Dialog open={isOpen} onOpenChange={onClose}>
-            <DialogContent className="max-w-4xl bg-background border-2 border-border/10 text-foreground rounded-[2rem] overflow-hidden p-0 shadow-3xl">
-                <DialogHeader className="p-8 border-b border-border/5 bg-black/40">
-                    <DialogTitle className="text-2xl font-black italic uppercase flex items-center gap-4">
-                        <div className="p-2 bg-primary/20 rounded-xl text-primary border border-primary/30">
-                            <Truck size={20} />
+            <DialogContent className="max-w-3xl bg-card border border-border text-foreground rounded-2xl overflow-hidden p-0 shadow-lg">
+                <DialogHeader className="p-4 border-b border-border bg-muted/30">
+                    <DialogTitle className="text-sm font-black flex items-center gap-2.5">
+                        <div className="p-1.5 bg-primary/10 rounded-lg text-primary border border-primary/20">
+                            <Truck size={14} />
                         </div>
                         {t('analytics.vehicle_audit') || 'Vehicle Mission Audit'}: <span className="text-primary">{plate}</span>
                     </DialogTitle>
                 </DialogHeader>
-                <div className="p-8 max-h-[60vh] overflow-y-auto custom-scrollbar">
+                <div className="p-5 max-h-[60vh] overflow-y-auto">
                     {loading ? (
-                        <div className="py-20 text-center animate-pulse text-muted-foreground font-black uppercase tracking-widest">{t('common.loading') || 'Accessing Data...'}</div>
+                        <div className="py-10 text-center text-muted-foreground text-xs font-bold uppercase tracking-wider">{t('common.loading') || 'Accessing Data...'}</div>
                     ) : (
-                        <div className="space-y-4">
+                        <div className="space-y-3">
                             <table className="w-full text-left border-collapse">
                                 <thead>
-                                    <tr className="border-b border-border/10">
-                                        <th className="py-4 text-[10px] font-black text-muted-foreground uppercase tracking-widest">{t('common.job_id') || 'JOB ID'}</th>
-                                        <th className="py-4 text-[10px] font-black text-muted-foreground uppercase tracking-widest">{t('common.customer') || 'CUSTOMER'}</th>
-                                        <th className="py-4 text-[10px] font-black text-muted-foreground uppercase tracking-widest text-right">{t('common.revenue') || 'REVENUE'}</th>
-                                        <th className="py-4 text-[10px] font-black text-muted-foreground uppercase tracking-widest text-center">{t('common.status') || 'STATUS'}</th>
+                                    <tr className="border-b border-border">
+                                        <th className="py-2.5 text-[10px] font-bold text-muted-foreground uppercase tracking-wider">{t('common.job_id') || 'JOB ID'}</th>
+                                        <th className="py-2.5 text-[10px] font-bold text-muted-foreground uppercase tracking-wider">{t('common.customer') || 'CUSTOMER'}</th>
+                                        <th className="py-2.5 text-[10px] font-bold text-muted-foreground uppercase tracking-wider text-right">{t('common.revenue') || 'REVENUE'}</th>
+                                        <th className="py-2.5 text-[10px] font-bold text-muted-foreground uppercase tracking-wider text-center">{t('common.status') || 'STATUS'}</th>
                                     </tr>
                                 </thead>
-                                <tbody className="divide-y divide-white/5">
+                                <tbody className="divide-y divide-border">
                                     {jobs.map(job => (
-                                        <tr key={job.Job_ID} className="group hover:bg-muted/50 transition-colors">
-                                            <td className="py-4 font-bold text-muted-foreground">{job.Job_ID}</td>
-                                            <td className="py-4">
+                                        <tr key={job.Job_ID} className="group hover:bg-muted/10 transition-colors">
+                                            <td className="py-2 text-xs text-muted-foreground font-medium">{job.Job_ID}</td>
+                                            <td className="py-2 text-xs">
                                                 <div className="font-bold text-foreground">{job.Customer_Name}</div>
-                                                <div className="text-[10px] text-muted-foreground uppercase font-black">{job.Route_Name}</div>
+                                                <div className="text-[9px] text-muted-foreground uppercase font-bold">{job.Route_Name}</div>
                                             </td>
-                                            <td className="py-4 text-right font-black text-primary italic">฿{job.Price_Cust_Total?.toLocaleString()}</td>
-                                            <td className="py-4 text-center">
+                                            <td className="py-2 text-right font-black text-primary text-xs">฿{job.Price_Cust_Total?.toLocaleString()}</td>
+                                            <td className="py-2 text-center">
                                                 <Badge className={cn(
-                                                    "bg-transparent border-2 uppercase font-black text-[9px] tracking-tighter",
-                                                    job.Job_Status === 'Completed' ? "border-emerald-500/50 text-emerald-500" : "border-amber-500/50 text-amber-500"
+                                                    "bg-transparent border uppercase text-[9px] font-bold px-1.5 py-0.5",
+                                                    job.Job_Status === 'Completed' ? "border-emerald-500/30 text-emerald-500" : "border-amber-500/30 text-amber-500"
                                                 )}>
                                                     {job.Job_Status}
                                                 </Badge>
@@ -162,7 +162,7 @@ export function ProfitabilitySection({ data = [], financials, startDate, endDate
     ]
 
     return (
-        <div className="space-y-12">
+        <div className="space-y-6">
             <JobDetailsModal 
                 plate={selectedVehicle} 
                 isOpen={!!selectedVehicle} 
@@ -172,52 +172,50 @@ export function ProfitabilitySection({ data = [], financials, startDate, endDate
             />
 
             {/* Sub-Section Header */}
-            <div className="flex items-center gap-6 group/h">
-                <div className="p-4 bg-emerald-500/20 rounded-2xl text-emerald-500 shadow-[0_0_20px_rgba(16,185,129,0.2)] border border-emerald-500/30 group-hover/h:scale-110 transition-transform duration-500">
-                    <TrendingUp size={24} strokeWidth={2.5} />
+            <div className="flex items-center gap-3">
+                <div className="p-2 bg-muted rounded-xl text-primary border border-border/80 shadow-sm">
+                    <TrendingUp size={16} />
                 </div>
-                <div className="space-y-1">
-                    <h3 className="text-3xl font-black text-foreground tracking-widest uppercase italic premium-text-gradient">{t('analytics.profitability_matrix')}</h3>
-                    <p className="text-base font-bold font-black text-emerald-500 uppercase tracking-[0.4em] italic opacity-60">{t('analytics.fleet_audit')}</p>
+                <div className="space-y-0.5">
+                    <h3 className="text-lg font-black text-foreground uppercase tracking-tight">{t('analytics.profitability_matrix')}</h3>
                 </div>
             </div>
 
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-10">
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
                 {/* Vehicle Profitability Chart */}
-                <PremiumCard className="lg:col-span-2 bg-muted/50 border border-border/10 shadow-3xl p-0 overflow-hidden rounded-br-[6rem] rounded-tl-[3rem] group/chart">
-                    <div className="p-10 border-b border-border/5 bg-gradient-to-r from-emerald-500/20 via-emerald-500/5 to-transparent backdrop-blur-md relative overflow-hidden flex items-center justify-between">
-                        <div className="absolute inset-0 bg-gradient-to-r from-emerald-500/10 to-transparent pointer-events-none" />
-                        <div className="flex items-center gap-5 relative z-10">
-                            <div className="p-3 bg-emerald-500/20 rounded-2xl text-emerald-500 border border-emerald-500/30 shadow-[0_0_20px_rgba(16,185,129,0.2)]">
-                                <Truck size={22} />
+                <PremiumCard className="lg:col-span-2 bg-card border border-border shadow-sm p-0 overflow-hidden rounded-2xl">
+                    <div className="p-4 border-b border-border bg-muted/30 flex items-center justify-between">
+                        <div className="flex items-center gap-2.5 relative z-10">
+                            <div className="p-1.5 bg-primary/10 rounded-lg text-primary border border-primary/20">
+                                <Truck size={14} />
                             </div>
                             <div>
-                                <h3 className="text-lg font-black text-foreground italic uppercase">{t('dashboard.asset_yield_spectrum')}</h3>
-                                <p className="text-primary text-base font-bold font-black uppercase italic">{t('dashboard.strategic_revenue_distribution')}</p>
+                                <h3 className="text-sm font-black text-foreground">{t('dashboard.asset_yield_spectrum')}</h3>
+                                <p className="text-primary text-[10px] font-bold uppercase tracking-wider">{t('dashboard.strategic_revenue_distribution')}</p>
                             </div>
                         </div>
                     </div>
-                    <div className="p-12">
-                        <ChartContainer height={450}>
-                            <BarChart data={topPerformers} layout="vertical" margin={{ left: 40, right: 40 }}>
+                    <div className="p-6">
+                        <ChartContainer height={350}>
+                            <BarChart data={topPerformers} layout="vertical" margin={{ left: 20, right: 20 }}>
                                 <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" horizontal={false} />
-                                <XAxis type="number" stroke="#1e293b" fontSize={11} fontWeight="900" tickLine={false} axisLine={false} />
-                                <YAxis dataKey="plate" type="category" stroke="#1e293b" width={100} fontSize={11} fontWeight="900" tickLine={false} axisLine={false} className="uppercase italic" />
+                                <XAxis type="number" stroke="#94a3b8" fontSize={10} fontWeight="normal" tickLine={false} axisLine={false} />
+                                <YAxis dataKey="plate" type="category" stroke="#94a3b8" width={80} fontSize={10} fontWeight="bold" tickLine={false} axisLine={false} className="uppercase" />
                                 <Tooltip 
                                     cursor={{ fill: 'rgba(255,255,255,0.03)' }}
                                     contentStyle={{ 
-                                        backgroundColor: 'rgba(2, 6, 23, 0.95)', 
-                                        borderColor: 'rgba(255, 255, 255, 0.1)', 
-                                        borderRadius: '24px', 
-                                        border: '2px solid rgba(255,255,255,0.05)',
-                                        backdropFilter: 'blur(12px)',
-                                        padding: '20px'
+                                        backgroundColor: 'hsl(var(--card))', 
+                                        borderColor: 'hsl(var(--border))', 
+                                        borderRadius: '12px', 
+                                        border: '1px solid hsl(var(--border))',
+                                        color: 'hsl(var(--foreground))',
+                                        padding: '12px'
                                     }}
-                                    labelStyle={{ color: '#fff', marginBottom: '8px', borderBottom: '1px solid rgba(255,255,255,0.1)', paddingBottom: '8px', fontWeight: '900' }}
-                                    itemStyle={{ fontSize: '11px', fontWeight: '900', textTransform: 'uppercase', color: '#fff' }}
-                                    formatter={(value: any) => [`฿${Number(value || 0).toLocaleString()}`, t('common.net_margin')]}
+                                    labelStyle={{ color: 'hsl(var(--foreground))', marginBottom: '4px', borderBottom: '1px solid hsl(var(--border))', paddingBottom: '4px', fontWeight: 'bold' }}
+                                    itemStyle={{ fontSize: '10px', fontWeight: 'bold', textTransform: 'uppercase', color: 'hsl(var(--foreground))' }}
+                                    formatter={(value: unknown) => [`฿${Number(value || 0).toLocaleString()}`, t('common.net_margin')]}
                                 />
-                                <Bar dataKey="netProfit" radius={[0, 8, 8, 0]} barSize={32}>
+                                <Bar dataKey="netProfit" radius={[0, 4, 4, 0]} barSize={20}>
                                     {topPerformers.map((entry, index) => (
                                         <Cell key={`cell-${index}`} fill={entry.netProfit > 0 ? '#10b981' : '#f43f5e'} fillOpacity={0.8} />
                                     ))}
@@ -228,150 +226,156 @@ export function ProfitabilitySection({ data = [], financials, startDate, endDate
                 </PremiumCard>
 
                 {/* Cost Structure Analysis */}
-                <PremiumCard className="bg-muted/50 border border-border/10 shadow-3xl relative overflow-hidden group/cost p-0 rounded-br-[5rem] rounded-tl-[3rem]">
-                    <div className="p-10 border-b border-border/5 bg-gradient-to-r from-indigo-500/20 via-indigo-500/5 to-transparent backdrop-blur-md relative overflow-hidden flex items-center justify-between">
-                        <div className="absolute inset-0 bg-gradient-to-r from-indigo-500/10 to-transparent pointer-events-none" />
-                        <div className="flex items-center gap-5 relative z-10">
-                            <div className="p-3 bg-indigo-500/20 rounded-2xl text-indigo-500 border border-indigo-500/30 shadow-[0_0_20px_rgba(99,102,241,0.2)]">
-                                <Coins size={22} />
-                            </div>
-                            <div>
-                                <h3 className="text-lg font-black text-foreground italic uppercase">{t('dashboard.cost_composition_matrix')}</h3>
-                                <p className="text-amber-400 text-base font-bold font-black uppercase italic">{t('dashboard.operational_expenditure_analytics')}</p>
+                <PremiumCard className="bg-card border border-border shadow-sm p-0 overflow-hidden rounded-2xl relative flex flex-col justify-between">
+                    <div>
+                        <div className="p-4 border-b border-border bg-muted/30 flex items-center justify-between">
+                            <div className="flex items-center gap-2.5 relative z-10">
+                                <div className="p-1.5 bg-primary/10 rounded-lg text-primary border border-primary/20">
+                                    <Coins size={14} />
+                                </div>
+                                <div>
+                                    <h3 className="text-sm font-black text-foreground">{t('dashboard.cost_composition_matrix')}</h3>
+                                    <p className="text-primary text-[10px] font-bold uppercase tracking-wider">{t('dashboard.operational_expenditure_analytics')}</p>
+                                </div>
                             </div>
                         </div>
-                    </div>
-                    <div className="p-10">
-                        <ChartContainer height={280}>
-                                <PieChart>
-                                    <Pie
-                                        data={costBreakdownData}
-                                        cx="50%"
-                                        cy="50%"
-                                        innerRadius={75}
-                                        outerRadius={105}
-                                        paddingAngle={8}
-                                        dataKey="value"
-                                        stroke="none"
-                                    >
-                                        {costBreakdownData.map((entry, index) => (
-                                            <Cell key={`cell-${index}`} fill={entry.color} fillOpacity={0.8} />
-                                        ))}
-                                    </Pie>
-                                    <Tooltip 
-                                        contentStyle={{ backgroundColor: 'rgba(2, 6, 23, 0.95)', border: '2px solid rgba(255,255,255,0.1)', borderRadius: '24px', backdropFilter: 'blur(12px)' }}
-                                        labelStyle={{ color: '#fff', fontWeight: '900', marginBottom: '4px' }}
-                                        itemStyle={{ fontSize: '11px', fontWeight: '900', textTransform: 'uppercase', color: '#fff' }}
-                                        formatter={(value: any) => [`฿${Number(value || 0).toLocaleString()}`, t('settings.items.accounting')]}
-                                    />
-                                </PieChart>
-                        </ChartContainer>
-                            <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
-                                <span className="text-base font-bold font-black text-muted-foreground uppercase tracking-[0.2em] leading-none mb-1">TOTAL OpEx</span>
-                                <span className="text-3xl font-black text-foreground tracking-tighter italic">
+                        <div className="p-4 relative">
+                            <ChartContainer height={200}>
+                                    <PieChart>
+                                        <Pie
+                                            data={costBreakdownData}
+                                            cx="50%"
+                                            cy="50%"
+                                            innerRadius={55}
+                                            outerRadius={75}
+                                            paddingAngle={4}
+                                            dataKey="value"
+                                            stroke="none"
+                                        >
+                                            {costBreakdownData.map((entry, index) => (
+                                                <Cell key={`cell-${index}`} fill={entry.color} fillOpacity={0.8} />
+                                            ))}
+                                        </Pie>
+                                        <Tooltip 
+                                            contentStyle={{ 
+                                                backgroundColor: 'hsl(var(--card))', 
+                                                borderColor: 'hsl(var(--border))', 
+                                                borderRadius: '12px',
+                                                border: '1px solid hsl(var(--border))',
+                                                color: 'hsl(var(--foreground))'
+                                            }}
+                                            labelStyle={{ color: 'hsl(var(--foreground))', fontWeight: 'bold' }}
+                                            itemStyle={{ fontSize: '10px', fontWeight: 'bold', textTransform: 'uppercase', color: 'hsl(var(--foreground))' }}
+                                            formatter={(value: unknown) => [`฿${Number(value || 0).toLocaleString()}`, t('settings.items.accounting')]}
+                                        />
+                                    </PieChart>
+                            </ChartContainer>
+                            <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none mt-2">
+                                <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">TOTAL OpEx</span>
+                                <span className="text-lg font-black text-foreground">
                                     ฿{(financials.cost.total / 1000).toFixed(0)}K
                                 </span>
                             </div>
-                        
-                        <div className="space-y-4 mt-8">
-                            {costBreakdownData.map((item) => (
-                                <div key={item.name} className="flex items-center justify-between p-5 bg-muted/40 rounded-2xl border border-border/5 hover:border-border/10 transition-all">
-                                    <div className="flex items-center gap-4">
-                                        <div className="w-3 h-3 rounded-full" style={{ backgroundColor: item.color, boxShadow: `0 0 15px ${item.color}50` }} />
-                                        <span className="text-base font-bold font-black text-muted-foreground uppercase tracking-widest italic">{item.name}</span>
-                                    </div>
-                                    <span className="text-xl font-black text-foreground italic">
-                                        {financials.cost.total > 0 ? ((item.value / financials.cost.total) * 100).toFixed(1) : 0}%
-                                    </span>
-                                </div>
-                            ))}
                         </div>
+                    </div>
+                    
+                    <div className="p-4 pt-0 space-y-2">
+                        {costBreakdownData.map((item) => (
+                            <div key={item.name} className="flex items-center justify-between p-2.5 bg-muted/20 rounded-xl border border-border hover:bg-muted/30 transition-all">
+                                <div className="flex items-center gap-2">
+                                    <div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: item.color }} />
+                                    <span className="text-xs text-muted-foreground font-medium uppercase">{item.name}</span>
+                                </div>
+                                <span className="text-xs font-black text-foreground">
+                                    {financials.cost.total > 0 ? ((item.value / financials.cost.total) * 100).toFixed(1) : 0}%
+                                </span>
+                            </div>
+                        ))}
                     </div>
                 </PremiumCard>
 
                 {/* Performance Ledger Table - Full Width with Advanced Metrics */}
-                <PremiumCard className="lg:col-span-3 bg-muted/50 border border-border/10 shadow-3xl p-0 overflow-hidden rounded-br-[6rem] rounded-tl-[3rem]">
-                    <div className="p-10 border-b border-border/5 bg-gradient-to-r from-slate-500/20 via-slate-500/5 to-transparent backdrop-blur-md relative overflow-hidden flex items-center justify-between">
-                        <div className="absolute inset-0 bg-gradient-to-r from-slate-500/10 to-transparent pointer-events-none" />
-                        <div className="flex items-center gap-5 relative z-10">
-                            <div className="p-3 bg-muted/80 rounded-2xl text-foreground border border-border/10">
-                                <Activity size={22} />
+                <PremiumCard className="lg:col-span-3 bg-card border border-border shadow-sm p-0 overflow-hidden rounded-2xl">
+                    <div className="p-4 border-b border-border bg-muted/30 flex items-center justify-between">
+                        <div className="flex items-center gap-2.5 relative z-10">
+                            <div className="p-1.5 bg-muted rounded-lg text-foreground border border-border">
+                                <Activity size={14} />
                             </div>
                             <div>
-                                <h4 className="text-2xl font-black text-foreground tracking-tighter italic uppercase underline decoration-primary/30 underline-offset-8">{t('analytics.performance_ledger')}</h4>
-                                <p className="text-muted-foreground text-base font-bold font-black uppercase tracking-[0.4em] mt-2">{t('analytics.detailed_audit')}</p>
+                                <h4 className="text-sm font-black text-foreground uppercase">{t('analytics.performance_ledger')}</h4>
+                                <p className="text-primary text-[10px] font-bold uppercase tracking-wider">{t('analytics.detailed_audit')}</p>
                             </div>
                         </div>
-                        <div className="hidden md:flex items-center gap-8 bg-muted/50 px-8 py-4 rounded-3xl border border-border/10 backdrop-blur-md">
-                            <div className="flex items-center gap-3">
-                                <Truck size={16} className="text-primary" />
-                                <span className="text-base font-black text-foreground">{data.length} <span className="text-muted-foreground text-[10px] uppercase">{t('common.vehicles')}</span></span>
+                        <div className="hidden md:flex items-center gap-4 bg-muted px-4 py-2 rounded-xl border border-border">
+                            <div className="flex items-center gap-2">
+                                <Truck size={14} className="text-primary" />
+                                <span className="text-xs font-black text-foreground">{data.length} <span className="text-muted-foreground text-[9px] uppercase">{t('common.vehicles')}</span></span>
                             </div>
-                            <div className="h-6 w-px bg-border/20" />
-                            <div className="flex items-center gap-3">
-                                <Zap size={14} className="text-primary animate-pulse" />
-                                <span className="text-base font-bold font-black text-muted-foreground uppercase tracking-[0.2em]">{t('analytics.live_uplink')}</span>
+                            <div className="h-4 w-px bg-border" />
+                            <div className="flex items-center gap-2">
+                                <Zap size={12} className="text-primary" />
+                                <span className="text-xs font-bold text-muted-foreground uppercase">{t('analytics.live_uplink')}</span>
                             </div>
                         </div>
                     </div>
-                    <div className="p-0 overflow-x-auto custom-scrollbar">
-                        <table className="w-full text-left border-collapse min-w-[1200px]">
+                    <div className="p-0 overflow-x-auto">
+                        <table className="w-full text-left border-collapse min-w-[1000px]">
                             <thead>
-                                <tr className="border-b-2 border-border/5 bg-muted/30">
-                                    <th className="px-6 py-8 text-[12px] font-black text-muted-foreground uppercase tracking-[0.1em] italic">{t('common.asset_id')}</th>
-                                    <th className="px-6 py-8 text-[12px] font-black text-muted-foreground uppercase tracking-[0.1em] italic text-center">Trips</th>
-                                    <th className="px-6 py-8 text-[12px] font-black text-muted-foreground uppercase tracking-[0.1em] italic text-right">{t('common.revenue_yield')}</th>
-                                    <th className="px-6 py-8 text-[12px] font-black text-muted-foreground uppercase tracking-[0.1em] italic text-right">Actual Driver</th>
-                                    <th className="px-6 py-8 text-[12px] font-black text-blue-400 uppercase tracking-[0.1em] italic text-right">Forecast Fuel</th>
-                                    <th className="px-6 py-8 text-[12px] font-black text-amber-400 uppercase tracking-[0.1em] italic text-right">Forecast Maint</th>
-                                    <th className="px-6 py-8 text-[12px] font-black text-foreground uppercase tracking-[0.1em] italic text-right">{t('common.net_margin')}</th>
-                                    <th className="px-6 py-8 text-[12px] font-black text-emerald-400 uppercase tracking-[0.1em] italic text-right">Total KM</th>
-                                    <th className="px-6 py-8 text-[12px] font-black text-primary uppercase tracking-[0.1em] italic text-right">Yield/KM</th>
-                                    <th className="px-6 py-8 text-[12px] font-black text-muted-foreground uppercase tracking-[0.1em] italic text-center">{t('common.efficiency_rating')}</th>
+                                <tr className="border-b border-border bg-muted/20">
+                                    <th className="px-4 py-3 text-[10px] font-bold text-muted-foreground uppercase tracking-wider">{t('common.asset_id')}</th>
+                                    <th className="px-4 py-3 text-[10px] font-bold text-muted-foreground uppercase tracking-wider text-center">Trips</th>
+                                    <th className="px-4 py-3 text-[10px] font-bold text-muted-foreground uppercase tracking-wider text-right">{t('common.revenue_yield')}</th>
+                                    <th className="px-4 py-3 text-[10px] font-bold text-muted-foreground uppercase tracking-wider text-right">Actual Driver</th>
+                                    <th className="px-4 py-3 text-[10px] font-bold text-blue-500 uppercase tracking-wider text-right">Forecast Fuel</th>
+                                    <th className="px-4 py-3 text-[10px] font-bold text-amber-500 uppercase tracking-wider text-right">Forecast Maint</th>
+                                    <th className="px-4 py-3 text-[10px] font-bold text-foreground uppercase tracking-wider text-right">{t('common.net_margin')}</th>
+                                    <th className="px-4 py-3 text-[10px] font-bold text-emerald-500 uppercase tracking-wider text-right">Total KM</th>
+                                    <th className="px-4 py-3 text-[10px] font-bold text-primary uppercase tracking-wider text-right">Yield/KM</th>
+                                    <th className="px-4 py-3 text-[10px] font-bold text-muted-foreground uppercase tracking-wider text-center">{t('common.efficiency_rating')}</th>
                                 </tr>
                             </thead>
-                            <tbody className="divide-y divide-white/5">
+                            <tbody className="divide-y divide-border">
                                 {data.slice(0, 15).map((item) => (
                                     <tr 
                                         key={item.plate} 
-                                        className="group/row hover:bg-white/[0.04] transition-all border-l-4 border-transparent hover:border-primary/50 cursor-pointer"
+                                        className="group/row hover:bg-muted/10 transition-all border-l-4 border-transparent hover:border-primary cursor-pointer"
                                         onClick={() => setSelectedVehicle(item.plate)}
                                     >
-                                        <td className="px-6 py-8">
-                                            <div className="flex items-center gap-3">
-                                                <span className="font-black text-foreground text-lg tracking-tighter uppercase italic group-hover/row:translate-x-2 transition-transform duration-500">{item.plate}</span>
-                                                <Info size={14} className="text-primary opacity-0 group-hover/row:opacity-100 transition-opacity" />
+                                        <td className="px-4 py-3">
+                                            <div className="flex items-center gap-2">
+                                                <span className="font-bold text-foreground text-sm uppercase transition-transform duration-300">{item.plate}</span>
+                                                <Info size={12} className="text-primary opacity-0 group-hover/row:opacity-100 transition-opacity" />
                                             </div>
                                         </td>
-                                        <td className="px-6 py-8 text-center">
-                                            <Badge className="bg-primary/10 text-primary border-primary/20 font-black px-3 py-1">
+                                        <td className="px-4 py-3 text-center">
+                                            <Badge className="bg-primary/10 text-primary border-primary/20 font-bold px-2 py-0.5 text-[10px]">
                                                 {item.count || 0}
                                             </Badge>
                                         </td>
-                                        <td className="px-6 py-8 text-right font-black text-primary text-xl tracking-tighter italic">฿{item.revenue.toLocaleString()}</td>
-                                        <td className="px-6 py-8 text-right font-black text-muted-foreground text-xl italic">฿{item.driverCost.toLocaleString()}</td>
-                                        <td className="px-6 py-8 text-right font-black text-blue-400/60 text-lg italic">฿{Math.round(item.predictedFuel || 0).toLocaleString()}</td>
-                                        <td className="px-6 py-8 text-right font-black text-amber-400/60 text-lg italic">฿{Math.round(item.predictedMaintenance || 0).toLocaleString()}</td>
+                                        <td className="px-4 py-3 text-right font-bold text-primary text-sm">฿{item.revenue.toLocaleString()}</td>
+                                        <td className="px-4 py-3 text-right font-bold text-muted-foreground text-sm">฿{item.driverCost.toLocaleString()}</td>
+                                        <td className="px-4 py-3 text-right font-bold text-blue-500/70 text-sm">฿{Math.round(item.predictedFuel || 0).toLocaleString()}</td>
+                                        <td className="px-4 py-3 text-right font-bold text-amber-500/70 text-sm">฿{Math.round(item.predictedMaintenance || 0).toLocaleString()}</td>
                                         <td className={cn(
-                                            "px-6 py-8 text-right font-black text-2xl tracking-tighter italic",
-                                            item.netProfit > 0 ? 'text-emerald-500' : 'text-rose-500'
+                                            "px-4 py-3 text-right font-black text-sm",
+                                            item.netProfit > 0 ? 'text-emerald-500' : 'text-destructive'
                                         )}>
                                             ฿{item.netProfit.toLocaleString()}
                                         </td>
-                                        <td className="px-6 py-8 text-right font-black text-emerald-400/80 text-xl italic">
-                                            {item.totalKm?.toLocaleString()} <span className="text-[10px] text-muted-foreground uppercase not-italic">KM</span>
+                                        <td className="px-4 py-3 text-right font-bold text-emerald-500/80 text-sm">
+                                            {item.totalKm?.toLocaleString()} <span className="text-[9px] text-muted-foreground uppercase font-bold">KM</span>
                                         </td>
-                                        <td className="px-6 py-8 text-right font-black text-primary text-2xl tracking-tighter italic">
+                                        <td className="px-4 py-3 text-right font-bold text-primary text-sm">
                                             ฿{item.totalKm && item.totalKm > 0 ? (item.netProfit / item.totalKm).toFixed(1) : 0}
                                         </td>
-                                        <td className="px-6 py-8 text-center">
+                                        <td className="px-4 py-3 text-center">
                                             <div className={cn(
-                                                "inline-block px-6 py-2.5 rounded-2xl text-base font-bold font-black uppercase tracking-[0.2em] italic border transition-all duration-500",
+                                                "inline-flex px-2 py-0.5 rounded-md text-[10px] font-bold uppercase border",
                                                 item.revenue > 0 && (item.netProfit / item.revenue) > 0.2 
                                                     ? 'bg-emerald-500/10 text-emerald-500 border-emerald-500/30' 
                                                     : item.revenue > 0 && (item.netProfit / item.revenue) > 0.1 
-                                                        ? 'bg-blue-500/10 text-blue-500 border-blue-500/30' 
-                                                        : 'bg-rose-500/10 text-rose-500 border-rose-500/30 animate-pulse'
+                                                        ? 'bg-primary/10 text-primary border-primary/30' 
+                                                        : 'bg-destructive/10 text-destructive border-destructive/30'
                                             )}>
                                                 {item.revenue > 0 ? ((item.netProfit / item.revenue) * 100).toFixed(1) : 0}% {t('common.yield')}
                                             </div>

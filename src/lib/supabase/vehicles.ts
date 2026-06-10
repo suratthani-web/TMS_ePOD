@@ -211,7 +211,7 @@ export async function getAllVehicles(page?: number, limit?: number, query?: stri
     }
 
     // Manual Driver Mapping (since PGRST relationship may not be defined)
-    const driverIds = Array.from(new Set(data?.map((v: any) => v.Driver_ID).filter(Boolean)))
+    const driverIds = Array.from(new Set(data?.map((v: Partial<Vehicle>) => v.Driver_ID).filter(Boolean)))
     const driverMap = new Map<string, string>()
     
     if (driverIds.length > 0) {
@@ -220,7 +220,7 @@ export async function getAllVehicles(page?: number, limit?: number, query?: stri
             .select('Driver_ID, Driver_Name')
             .in('Driver_ID', driverIds)
         
-        drivers?.forEach((d: any) => {
+        drivers?.forEach((d: { Driver_ID: string, Driver_Name: string }) => {
             if (d.Driver_ID && d.Driver_Name) {
                 driverMap.set(d.Driver_ID, d.Driver_Name)
             }
@@ -230,9 +230,9 @@ export async function getAllVehicles(page?: number, limit?: number, query?: stri
     console.log(`[DB] Mapping ${driverMap.size} drivers to ${data?.length || 0} vehicles.`)
     
     // Map joined driver name to the flat field
-    const mappedData = (data || []).map((v: any) => ({
+    const mappedData = (data || []).map((v: Partial<Vehicle>) => ({
       ...v,
-      Primary_Driver_Name: driverMap.get(v.Driver_ID) || null
+      Primary_Driver_Name: driverMap.get(v.Driver_ID || '') || null
     }))
     
     return { data: mappedData, count: count || 0 }
@@ -266,10 +266,10 @@ export async function getVehicleStats(providedBranchId?: string) {
     if (error) return { total: 0, active: 0, maintenance: 0, dueSoon: 0 }
     
     const total = data?.length || 0
-    const active = data?.filter((v: any) => v.Active_Status === 'Active').length || 0
-    const maintenance = data?.filter((v: any) => v.Active_Status === 'Maintenance').length || 0
+    const active = data?.filter((v: Partial<Vehicle>) => v.Active_Status === 'Active').length || 0
+    const maintenance = data?.filter((v: Partial<Vehicle>) => v.Active_Status === 'Maintenance').length || 0
     
-    const dueSoon = data?.filter((v: any) => {
+    const dueSoon = data?.filter((v: Partial<Vehicle>) => {
       if (v.Current_Mileage && v.Next_Service_Mileage) {
         return (v.Next_Service_Mileage - v.Current_Mileage) <= 1000
       }
@@ -323,7 +323,7 @@ export async function getSampledVehicleUtilization(providedBranchId?: string) {
 /**
  * Create multiple vehicles in bulk
  */
-export async function createBulkVehicles(vehicles: Partial<Vehicle>[]) {
+export async function createBulkVehicles(vehicles: Record<string, unknown>[]) {
   const isSuper = await isSuperAdmin()
   const isAdminUser = await isAdmin()
   const supabase = (isSuper || isAdminUser) ? await createAdminClient() : await createClient()
@@ -331,14 +331,14 @@ export async function createBulkVehicles(vehicles: Partial<Vehicle>[]) {
   const branchId = await getUserBranchId()
   const effectiveBranchId = (branchId && branchId !== 'All') ? branchId : null
 
-  const normalizeData = (row: any) => {
-    const normalized: Record<string, any> = {}
+  const normalizeData = (row: Record<string, unknown>) => {
+    const normalized: Record<string, string | number | boolean | null | undefined> = {}
     const getValue = (keys: string[]) => {
       const rowKeys = Object.keys(row)
       for (const key of keys) {
         const foundKey = rowKeys.find(k => k.toLowerCase().replace(/\s+/g, '_') === key.toLowerCase().replace(/\s+/g, '_'))
         if (foundKey && row[foundKey] !== undefined && row[foundKey] !== null) {
-          return row[foundKey]
+          return row[foundKey] as string | number | boolean
         }
       }
       return undefined

@@ -72,7 +72,7 @@ export async function getBranchPlates(branchId: string) {
         .from('Master_Vehicles')
         .select('Vehicle_Plate')
         .eq('Branch_ID', branchId)
-    return (data || []).map((v: any) => v.Vehicle_Plate).filter(Boolean) as string[]
+    return (data || []).map((v: { Vehicle_Plate?: string | null }) => v.Vehicle_Plate).filter(Boolean) as string[]
 }
 
 // Common helper to resolve branch filtering
@@ -92,7 +92,7 @@ export async function getEffectiveBranchId(branchId?: string) {
                 const supabase = await createAdminClient()
                 const { data: branches } = await supabase.from('Master_Branches').select('Branch_ID, Branch_Name')
                 if (branches) {
-                    const match = branches.find((b: any) => 
+                    const match = branches.find((b: { Branch_Name: string, Branch_ID: string }) => 
                         b.Branch_Name.trim().toLowerCase() === branchId.trim().toLowerCase() ||
                         b.Branch_ID.trim().toLowerCase() === branchId.trim().toLowerCase()
                     )
@@ -115,7 +115,7 @@ export async function getEffectiveBranchId(branchId?: string) {
     }
 
     // Super Admin can override with provided branchId
-    let target = branchId || userBranchId
+    const target = branchId || userBranchId
     
     if (!target || target.toLowerCase() === 'all' || target.toLowerCase() === 'ทุกสาขา') return null
 
@@ -131,7 +131,7 @@ export async function getEffectiveBranchId(branchId?: string) {
             
             if (branches) {
                 // Find by name (case-insensitive, trimmed)
-                const match = branches.find((b: any) => 
+                const match = branches.find((b: { Branch_Name: string, Branch_ID: string }) => 
                     b.Branch_Name.trim().toLowerCase() === target.trim().toLowerCase() ||
                     b.Branch_ID.trim().toLowerCase() === target.trim().toLowerCase()
                 )

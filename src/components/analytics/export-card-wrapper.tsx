@@ -6,7 +6,7 @@ import { exportToCSV } from "@/lib/utils/export"
 import { ReactNode } from "react"
 
 interface ExportCardWrapperProps {
-    data: Record<string, any>[];
+    data: Record<string, unknown>[];
     filename: string;
     children: ReactNode;
 }

@@ -2,17 +2,20 @@
 
 import { submitJobPOD, submitJobPickup } from "@/lib/actions/pod-actions"
 
-interface OfflineJob {
+export interface OfflineJob {
     id: string
     jobId: string
     data: Record<string, unknown>
     timestamp: number
     type: 'POD' | 'PICKUP'
+    retryCount?: number
+    lastError?: string
 }
 
 const DB_NAME = 'tms_offline_db'
 const STORE_NAME = 'offline_jobs'
 const DB_VERSION = 1
+const MAX_RETRIES = 5
 
 function openDB(): Promise<IDBDatabase> {
     return new Promise((resolve, reject) => {
@@ -57,7 +60,8 @@ export const saveJobOffline = async (jobId: string, data: Record<string, unknown
                 jobId,
                 data: enrichedData,
                 timestamp: Date.now(),
-                type
+                type,
+                retryCount: 0
             })
             request.onsuccess = resolve
             request.onerror = reject
@@ -66,13 +70,29 @@ export const saveJobOffline = async (jobId: string, data: Record<string, unknown
         notifyQueueChange()
     } catch (err) {
         console.error('Failed to save to IndexedDB, falling back to localStorage', err)
-        // Fallback to localStorage for very basic data if IndexedDB fails
         try {
             const legacy = JSON.parse(localStorage.getItem('tms_offline_jobs') || '[]')
             legacy.push({ jobId, timestamp: Date.now(), type, note: 'fallback' })
             localStorage.setItem('tms_offline_jobs', JSON.stringify(legacy))
             notifyQueueChange()
         } catch (e) { /* give up */ }
+    }
+}
+
+export const updateOfflineJob = async (job: OfflineJob) => {
+    if (typeof window === 'undefined') return
+    try {
+        const db = await openDB()
+        const tx = db.transaction(STORE_NAME, 'readwrite')
+        const store = tx.objectStore(STORE_NAME)
+        await new Promise((resolve, reject) => {
+            const request = store.put(job)
+            request.onsuccess = resolve
+            request.onerror = reject
+        })
+        notifyQueueChange()
+    } catch (err) {
+        console.error('Failed to update offline job', err)
     }
 }
 
@@ -118,6 +138,8 @@ export const syncOfflineJobs = async () => {
     if (jobs.length === 0) return
 
     for (const job of jobs) {
+        if ((job.retryCount || 0) >= MAX_RETRIES) continue
+
         try {
             const formData = new FormData()
             Object.entries(job.data).forEach(([key, value]) => {
@@ -144,9 +166,19 @@ export const syncOfflineJobs = async () => {
 
             if (result.success) {
                 await removeOfflineJob(job.id)
+            } else {
+                await updateOfflineJob({
+                    ...job,
+                    retryCount: (job.retryCount || 0) + 1,
+                    lastError: typeof result.error === 'string' ? result.error : 'Server error'
+                })
             }
-        } catch (_error) {
-            // Failed to sync
+        } catch (error) {
+            await updateOfflineJob({
+                ...job,
+                retryCount: (job.retryCount || 0) + 1,
+                lastError: error instanceof Error ? error.message : 'Unknown exception'
+            })
         }
     }
 }

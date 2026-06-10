@@ -1,6 +1,7 @@
 "use server"
 
 import { createClient, createAdminClient } from "@/utils/supabase/server"
+import { requireAdmin } from "@/services/permission-guards"
 import { revalidatePath } from "next/cache"
 import { Subcontractor } from "@/types/subcontractor"
 import { isAdmin } from "@/lib/permissions"
@@ -12,6 +13,9 @@ export async function createSubcontractor(data: Partial<Subcontractor>) {
         }
 
         const adminStatus = await isAdmin()
+        if (adminStatus) {
+            await requireAdmin()
+        }
         const supabase = adminStatus ? createAdminClient() : await createClient()
         const { error } = await supabase
             .from("Master_Subcontractors")
@@ -39,6 +43,9 @@ export async function createSubcontractor(data: Partial<Subcontractor>) {
 export async function updateSubcontractor(id: string, data: Partial<Subcontractor>) {
     try {
         const adminStatus = await isAdmin()
+        if (adminStatus) {
+            await requireAdmin()
+        }
         const supabase = adminStatus ? createAdminClient() : await createClient()
         const { error } = await supabase
             .from("Master_Subcontractors")
@@ -58,6 +65,9 @@ export async function updateSubcontractor(id: string, data: Partial<Subcontracto
 export async function deleteSubcontractor(id: string) {
     try {
         const adminStatus = await isAdmin()
+        if (adminStatus) {
+            await requireAdmin()
+        }
         const supabase = adminStatus ? createAdminClient() : await createClient()
         const { error } = await supabase
             .from("Master_Subcontractors")
@@ -80,10 +90,13 @@ export async function deleteSubcontractor(id: string) {
 export async function createBulkSubcontractors(subcontractors: Partial<Subcontractor>[]) {
     try {
         const adminStatus = await isAdmin()
+        if (adminStatus) {
+            await requireAdmin()
+        }
         const supabase = adminStatus ? createAdminClient() : await createClient()
 
-        const normalizeData = (row: any) => {
-            const normalized: Record<string, any> = {}
+        const normalizeData = (row: Record<string, unknown>) => {
+            const normalized: Record<string, unknown> = {}
             const getValue = (keys: string[]) => {
                 const rowKeys = Object.keys(row)
                 for (const key of keys) {

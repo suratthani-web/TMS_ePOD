@@ -80,10 +80,10 @@ export default function PermissionsPage() {
                     description: "รบกวนตรวจสอบ SUPABASE_SERVICE_ROLE_KEY ใน .env.local หรือติดต่อผู้ดูแลระบบ"
                 })
             }
-        } catch (error: any) {
+        } catch (error: unknown) {
             console.error("Save catch error:", error)
             toast.error("เกิดข้อผิดพลาดในการบันทึก", {
-                description: error.message || "Unknown error"
+                description: error instanceof Error ? error.message : "Unknown error"
             })
         } finally {
             setSaving(false)
@@ -110,7 +110,7 @@ export default function PermissionsPage() {
                 </Link>
 
                 {/* Header */}
-                <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 bg-background/60 backdrop-blur-3xl p-10 rounded-br-[6rem] rounded-tl-[3rem] border border-border/5 shadow-2xl relative overflow-hidden group">
+                <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 bg-background/60 backdrop-blur-3xl p-10 rounded-br-[6rem] rounded-tl-[3rem] border border-border shadow-2xl relative overflow-hidden group">
                     <div className="absolute top-0 right-0 w-80 h-80 bg-primary/10 blur-[120px] rounded-full -mr-40 -mt-40 pointer-events-none" />
                     <div className="flex items-center gap-6 relative z-10">
                         <div className="w-20 h-20 bg-primary/10 rounded-3xl flex items-center justify-center text-primary shadow-inner border border-primary/20">
@@ -152,7 +152,7 @@ export default function PermissionsPage() {
                                     "w-full h-16 px-6 rounded-2xl flex items-center justify-between font-black uppercase tracking-widest transition-all active:scale-95",
                                     selectedRole === role 
                                     ? "bg-primary text-white shadow-2xl shadow-primary/20 scale-[1.02]" 
-                                    : "bg-background/40 text-slate-500 border border-border/10 hover:bg-muted/50"
+                                    : "bg-background/40 text-slate-500 border border-border hover:bg-muted/50"
                                 )}
                             >
                                 {role}

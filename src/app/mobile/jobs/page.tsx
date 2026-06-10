@@ -10,7 +10,6 @@ import { MobileJobFilter } from "@/components/mobile/job-filter"
 import { MobileJobSearchList } from "@/components/mobile/job-search-list"
 import { cn } from "@/lib/utils"
 import { RealtimeJobsTrigger } from "@/components/mobile/realtime-jobs-trigger"
-import { MobileRefreshButton } from "@/components/mobile/refresh-button"
 import { Suspense } from "react"
 import JobsLoading from "./loading"
 
@@ -49,7 +48,6 @@ async function JobsContent({ driverId, searchParams }: { driverId: string, searc
                 <h2 className="text-4xl font-black text-foreground tracking-tighter uppercase italic">รายการงาน</h2>
             </div>
             <div className="flex items-center gap-3 pb-1">
-                <MobileRefreshButton />
                 <div className="inline-flex items-center gap-1.5 h-11 px-4 bg-primary/10 rounded-2xl border border-primary/20 shadow-sm">
                     <span className="text-primary font-black text-xl leading-none">{displayJobs.length}</span>
                     <span className="text-[10px] font-black text-primary uppercase tracking-widest ml-1">งาน</span>

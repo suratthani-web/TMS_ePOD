@@ -22,6 +22,12 @@ export type ChatContact = {
   updated_at: string
 }
 
+type ChatMessageRow = Record<string, string | boolean | number | null | undefined>
+
+const toText = (value: ChatMessageRow[string]) => value == null ? "" : String(value)
+const toBool = (value: ChatMessageRow[string]) => value === true || value === "true" || value === 1
+const toNumber = (value: ChatMessageRow[string]) => Number(value) || 0
+
 // Cache schema detection to avoid multiple DB roundtrips per action call
 let _cachedSchema: { tableName: string; columns: { id: string; sender_id: string; receiver_id: string; message: string; is_read: string; created_at: string } } | null = null
 
@@ -100,13 +106,13 @@ export async function getChatContacts(): Promise<ChatContact[]> {
     }
 
     // Normalizing results to lowercase keys for internal logic
-    const normalizedMessages = messages?.map((msg: any) => ({
-        id: msg[columns.id],
-        sender_id: msg[columns.sender_id],
-        receiver_id: msg[columns.receiver_id],
-        message: msg[columns.message],
-        is_read: msg[columns.is_read],
-        created_at: msg[columns.created_at]
+    const normalizedMessages = (messages as ChatMessageRow[] | null)?.map((msg) => ({
+        id: toNumber(msg[columns.id]),
+        sender_id: toText(msg[columns.sender_id]),
+        receiver_id: toText(msg[columns.receiver_id]),
+        message: toText(msg[columns.message]),
+        is_read: toBool(msg[columns.is_read]),
+        created_at: toText(msg[columns.created_at])
     })) || []
 
     // 1. Get Drivers in my branch to filter messages (Use Admin client for names to ensure visibility)
@@ -116,21 +122,21 @@ export async function getChatContacts(): Promise<ChatContact[]> {
     // STRICT ISOLATION
     if (!isSuper) {
         if (branchId && branchId !== 'All') {
-            allowedDriverIds = new Set(allDrivers?.filter((d: any) => d.Branch_ID === branchId).map((d: any) => d.Driver_ID) || [])
+            allowedDriverIds = new Set(allDrivers?.filter((d: { Branch_ID?: string }) => d.Branch_ID === branchId).map((d: { Driver_ID: string }) => d.Driver_ID) || [])
         } else {
             return []
         }
     } else if (branchId && branchId !== 'All') {
-        allowedDriverIds = new Set(allDrivers?.filter((d: any) => d.Branch_ID === branchId).map((d: any) => d.Driver_ID) || [])
+        allowedDriverIds = new Set(allDrivers?.filter((d: { Branch_ID?: string }) => d.Branch_ID === branchId).map((d: { Driver_ID: string }) => d.Driver_ID) || [])
     }
 
     // Map to lookup driver info easily
-    const driverInfoMap = new Map<string, { name: string, plate: string | null }>(allDrivers?.map((d: any) => [d.Driver_ID, { name: d.Driver_Name, plate: d.Vehicle_Plate }]) || [])
+    const driverInfoMap = new Map<string, { name: string, plate: string | null }>(allDrivers?.map((d: { Driver_ID: string, Driver_Name: string, Vehicle_Plate: string }) => [d.Driver_ID, { name: d.Driver_Name, plate: d.Vehicle_Plate }]) || [])
 
     // 2. Group by driver and find last message
     const contactMap = new Map<string, ChatContact>()
 
-    normalizedMessages.forEach((msg: any) => {
+    normalizedMessages.forEach((msg) => {
       const driverId = msg.sender_id === 'admin' ? msg.receiver_id : msg.sender_id
       
       if (allowedDriverIds && !allowedDriverIds.has(driverId)) return
@@ -204,13 +210,13 @@ export async function getMessages(driverId: string): Promise<ChatMessage[]> {
     }
 
     // Normalize
-    return data?.map((msg: any) => ({
-        id: msg[columns.id],
-        sender_id: msg[columns.sender_id],
-        receiver_id: msg[columns.receiver_id],
-        message: msg[columns.message],
-        is_read: msg[columns.is_read],
-        created_at: msg[columns.created_at]
+    return (data as ChatMessageRow[] | null)?.map((msg) => ({
+        id: toNumber(msg[columns.id]),
+        sender_id: toText(msg[columns.sender_id]),
+        receiver_id: toText(msg[columns.receiver_id]),
+        message: toText(msg[columns.message]),
+        is_read: toBool(msg[columns.is_read]),
+        created_at: toText(msg[columns.created_at])
     })) || []
   } catch (error) {
     return []

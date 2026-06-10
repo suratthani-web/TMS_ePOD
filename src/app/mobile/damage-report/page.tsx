@@ -1,6 +1,6 @@
 import { getDriverSession } from "@/lib/actions/auth-actions"
 import { redirect } from "next/navigation"
-import { getMyDamageReports } from "@/lib/supabase/damage-reports"
+import { getMyDamageReports, type DamageReport } from "@/lib/supabase/damage-reports"
 import { MobileDamageClient } from "./damage-client"
 import { createClient } from "@/utils/supabase/server"
 import { Suspense } from "react"
@@ -8,12 +8,19 @@ import { MobileHeader } from "@/components/mobile/mobile-header"
 
 export const dynamic = 'force-dynamic'
 
+type RecentDamageJob = {
+  Job_ID: string
+  Plan_Date: string | null
+  Customer_Name: string | null
+  Vehicle_Plate: string | null
+}
+
 async function DamageReportContent() {
   const session = await getDriverSession()
   if (!session) redirect("/mobile/login")
 
-  let reports: any[] = []
-  let jobs: any[] = []
+  let reports: DamageReport[] = []
+  let jobs: RecentDamageJob[] = []
 
   try {
     reports = await getMyDamageReports(session.driverId)
@@ -28,7 +35,7 @@ async function DamageReportContent() {
       .order('Created_At', { ascending: false })
       .limit(20)
     
-    jobs = data || []
+    jobs = (data || []) as RecentDamageJob[]
   } catch (err) {
     console.error("Damage Report Data Fetch Error:", err)
   }

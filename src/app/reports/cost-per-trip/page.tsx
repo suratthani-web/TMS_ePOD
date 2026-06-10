@@ -35,28 +35,32 @@ export default async function CostPerTripPage(props: PageProps) {
   return (
     <DashboardLayout>
       <div className="space-y-6">
-        {/* Bespoke Strategic Header */}
-        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-8 mb-12 bg-background p-10 rounded-br-[5rem] rounded-tl-[2rem] border border-slate-800 shadow-2xl relative overflow-hidden group">
-          <div className="absolute inset-0 bg-gradient-to-r from-violet-500/10 to-transparent pointer-events-none" />
-          
-          <div className="relative z-10 text-left">
-            <Link href="/reports" className="flex items-center gap-2 text-violet-400 hover:text-foreground font-bold font-black uppercase tracking-[0.2em] w-fit">
-              <ArrowLeft className="w-4 h-4" /> Reports Hub
+        {/* Report header */}
+        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6 mb-8 bg-card p-8 rounded-2xl border border-border shadow-sm relative overflow-hidden">
+          <div className="relative z-10 space-y-4">
+            <Link href="/reports" className="flex items-center gap-2 text-primary hover:text-foreground text-sm font-medium w-fit transition-colors">
+              <ArrowLeft className="w-4 h-4" /> Reports
             </Link>
-            <h1 className="text-5xl font-black text-foreground mb-2 tracking-tighter flex items-center gap-4">
-              <div className="p-3 bg-violet-500 rounded-3xl shadow-2xl shadow-violet-500/20 text-white transform group-hover:scale-110 transition-transform duration-500">
-                <DollarSign size={32} />
+            <div className="flex flex-col sm:flex-row sm:items-center gap-4">
+              <div className="p-3 bg-primary/10 text-primary rounded-2xl shadow-sm w-fit">
+                <DollarSign size={28} />
               </div>
-              Trip PERFORMANCE
-            </h1>
-            <p className="text-violet-400 font-black ml-[4.5rem] uppercase tracking-[0.3em] text-base font-bold">Cost Efficiency & Profitability Analysis {start || end ? `(${start} to ${end})` : '(Last 30 Days)'}</p>
+              <div>
+                <h1 className="text-3xl lg:text-4xl font-semibold text-foreground tracking-tight leading-none">
+                  Trip Performance
+                </h1>
+                <p className="text-muted-foreground text-sm font-medium mt-2 tracking-normal">
+                  Cost Efficiency & Profitability Analysis {start || end ? `(${start} to ${end})` : '(Last 30 Days)'}
+                </p>
+              </div>
+            </div>
           </div>
 
-          <div className="flex flex-wrap gap-4 relative z-10">
+          <div className="flex flex-wrap items-center gap-3 relative z-10">
             <ExportCSVButton data={trips} />
-            <div className="flex items-center gap-3 px-6 py-3 bg-violet-500/10 rounded-2xl border border-violet-500/20">
-              <div className="w-2 h-2 rounded-full bg-violet-500 animate-pulse" />
-              <span className="text-base font-bold font-black text-violet-400 uppercase tracking-widest">Live Financial Audit</span>
+            <div className="flex items-center gap-2.5 px-4 py-2 bg-primary/10 rounded-xl border border-primary/20">
+              <div className="w-2 h-2 rounded-full bg-primary" />
+              <span className="text-xs font-semibold text-primary">Financial audit</span>
             </div>
           </div>
         </div>
@@ -70,67 +74,67 @@ export default async function CostPerTripPage(props: PageProps) {
 
         {/* Summary Cards */}
         <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
-          <div className="bg-white rounded-2xl border border-gray-100 p-5 shadow-sm">
-            <p className="text-base font-bold font-black text-gray-400 uppercase tracking-widest mb-1">จำนวนเที่ยว</p>
-            <p className="text-3xl font-black text-gray-900">{summary.totalTrips}</p>
+          <div className="bg-card rounded-2xl border border-border p-5 shadow-sm">
+            <p className="text-sm font-medium text-muted-foreground mb-1">จำนวนเที่ยว</p>
+            <p className="text-3xl font-semibold text-foreground">{summary.totalTrips}</p>
           </div>
-          <div className="bg-white rounded-2xl border border-gray-100 p-5 shadow-sm">
-            <p className="text-base font-bold font-black text-gray-400 uppercase tracking-widest mb-1">ระยะทางรวม</p>
-            <p className="text-2xl font-black text-slate-700">{(summary.totalDistance || 0).toLocaleString()} KM</p>
-            <p className="text-sm font-bold text-muted-foreground mt-1">฿{summary.avgCostPerKm.toFixed(2)} / KM</p>
+          <div className="bg-card rounded-2xl border border-border p-5 shadow-sm">
+            <p className="text-sm font-medium text-muted-foreground mb-1">ระยะทางรวม</p>
+            <p className="text-2xl font-semibold text-foreground">{(summary.totalDistance || 0).toLocaleString()} KM</p>
+            <p className="text-sm font-medium text-muted-foreground mt-1">฿{summary.avgCostPerKm.toFixed(2)} / KM</p>
           </div>
-          <div className="bg-white rounded-2xl border border-gray-100 p-5 shadow-sm">
-            <p className="text-base font-bold font-black text-gray-400 uppercase tracking-widest mb-1">รายได้รวม</p>
-            <p className="text-2xl font-black text-blue-600">฿{formatMoney(summary.totalRevenue)}</p>
+          <div className="bg-card rounded-2xl border border-border p-5 shadow-sm">
+            <p className="text-sm font-medium text-muted-foreground mb-1">รายได้รวม</p>
+            <p className="text-2xl font-semibold text-primary">฿{formatMoney(summary.totalRevenue)}</p>
           </div>
-          <div className="bg-white rounded-2xl border border-gray-100 p-5 shadow-sm">
-            <p className="text-base font-bold font-black text-gray-400 uppercase tracking-widest mb-1">ต้นทุนรวม</p>
-            <p className="text-2xl font-black text-red-500">฿{formatMoney(summary.totalCost)}</p>
+          <div className="bg-card rounded-2xl border border-border p-5 shadow-sm">
+            <p className="text-sm font-medium text-muted-foreground mb-1">ต้นทุนรวม</p>
+            <p className="text-2xl font-semibold text-red-500">฿{formatMoney(summary.totalCost)}</p>
           </div>
-          <div className={`rounded-2xl border p-5 shadow-sm ${summary.totalProfit >= 0 ? 'bg-emerald-50 border-emerald-100' : 'bg-red-50 border-red-100'}`}>
-            <p className="text-base font-bold font-black text-gray-400 uppercase tracking-widest mb-1">กำไรรวม</p>
-            <p className={`text-2xl font-black ${summary.totalProfit >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
+          <div className={`rounded-2xl border p-5 shadow-sm ${summary.totalProfit >= 0 ? 'bg-emerald-500/10 border-emerald-500/20' : 'bg-red-500/10 border-red-500/20'}`}>
+            <p className="text-sm font-medium text-muted-foreground mb-1">กำไรรวม</p>
+            <p className={`text-2xl font-semibold ${summary.totalProfit >= 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-600 dark:text-red-400'}`}>
               ฿{formatMoney(summary.totalProfit)}
             </p>
-            <p className="text-lg font-bold text-muted-foreground mt-1">
+            <p className="text-sm font-medium text-muted-foreground mt-1">
               {Math.round(summary.avgProfitPct)}% Margin
             </p>
           </div>
         </div>
 
         {/* Cost Breakdown Table */}
-        <div className="bg-white rounded-3xl border border-gray-100 shadow-sm overflow-hidden">
-          <div className="px-6 py-4 border-b border-gray-100 bg-gradient-to-r from-violet-50 to-white flex justify-between items-center">
-            <h2 className="font-black text-gray-900">รายละเอียดกำไร-ขาดทุนรายเที่ยว (Dynamic Profitability)</h2>
-            <div className="text-xs font-bold text-amber-600/80 bg-amber-50 px-3 py-1 rounded-full italic">
+        <div className="bg-card rounded-2xl border border-border shadow-sm overflow-hidden">
+          <div className="px-6 py-4 border-b border-border bg-muted/30 flex flex-col lg:flex-row lg:justify-between lg:items-center gap-3">
+            <h2 className="font-semibold text-foreground">รายละเอียดกำไร-ขาดทุนรายเที่ยว</h2>
+            <div className="text-xs font-medium text-amber-600 dark:text-amber-400 bg-amber-500/10 px-3 py-1 rounded-full">
               * ต้นทุนคาดการณ์ (น้ำมัน/ซ่อมบำรุง) ใช้เป็นข้อมูลอ้างอิงเท่านั้น และไม่ถูกนำมาหักลบในกำไรจริง
             </div>
           </div>
 
           {trips.length === 0 ? (
-            <div className="p-12 text-center text-gray-400">
+            <div className="p-12 text-center text-muted-foreground">
               <DollarSign size={48} strokeWidth={1.5} className="mx-auto mb-4" />
-              <p className="font-bold">ไม่พบข้อมูลในช่วงเวลาที่เลือก</p>
+              <p className="font-medium">ไม่พบข้อมูลในช่วงเวลาที่เลือก</p>
             </div>
           ) : (
             <div className="max-h-[700px] overflow-auto relative">
-              <table className="w-full text-xl border-collapse">
+              <table className="w-full text-sm border-collapse">
                 <thead className="sticky top-0 z-30">
-                  <tr className="bg-slate-50/95 backdrop-blur-md text-lg font-bold text-muted-foreground uppercase tracking-wider border-b border-gray-200">
-                    <th className="text-left px-4 py-4 font-black">วันที่ / งาน</th>
-                    <th className="text-left px-4 py-4 font-black">ลูกค้า / เส้นทาง</th>
-                    <th className="text-right px-4 py-4 font-black">ระยะทาง</th>
-                    <th className="text-right px-4 py-4 font-black text-blue-600">รายได้</th>
-                    <th className="text-right px-4 py-4 font-black">ค่าคนขับ</th>
-                    <th className="text-right px-4 py-4 font-black">น้ำมัน(จริง)</th>
-                    <th className="text-right px-4 py-4 font-black text-amber-500/80 text-sm italic">น้ำมัน(อ้างอิง)</th>
-                    <th className="text-right px-4 py-4 font-black">ซ่อมบำรุง(จริง)</th>
-                    <th className="text-right px-4 py-4 font-black text-amber-500/80 text-sm italic">ซ่อมบำรุง(อ้างอิง)</th>
-                    <th className="text-right px-4 py-4 font-black text-red-500">ต้นทุนรวม(จริง)</th>
-                    <th className="text-right px-4 py-4 font-black">กำไร</th>
+                  <tr className="bg-muted/95 backdrop-blur-md text-xs font-medium text-muted-foreground border-b border-border">
+                    <th className="text-left px-4 py-4 font-medium">วันที่ / งาน</th>
+                    <th className="text-left px-4 py-4 font-medium">ลูกค้า / เส้นทาง</th>
+                    <th className="text-right px-4 py-4 font-medium">ระยะทาง</th>
+                    <th className="text-right px-4 py-4 font-medium text-primary">รายได้</th>
+                    <th className="text-right px-4 py-4 font-medium">ค่าคนขับ</th>
+                    <th className="text-right px-4 py-4 font-medium">น้ำมัน(จริง)</th>
+                    <th className="text-right px-4 py-4 font-medium text-amber-600 dark:text-amber-400">น้ำมัน(อ้างอิง)</th>
+                    <th className="text-right px-4 py-4 font-medium">ซ่อมบำรุง(จริง)</th>
+                    <th className="text-right px-4 py-4 font-medium text-amber-600 dark:text-amber-400">ซ่อมบำรุง(อ้างอิง)</th>
+                    <th className="text-right px-4 py-4 font-medium text-red-500">ต้นทุนรวม(จริง)</th>
+                    <th className="text-right px-4 py-4 font-medium">กำไร</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-gray-50">
+                <tbody className="divide-y divide-border">
                   {trips.map((trip, idx) => {
                     const prevTrip = trips[idx - 1]
                     const showDateHeader = !prevTrip || prevTrip.Plan_Date !== trip.Plan_Date
@@ -138,27 +142,27 @@ export default async function CostPerTripPage(props: PageProps) {
                     return (
                       <React.Fragment key={trip.Job_ID}>
                         {showDateHeader && (
-                          <tr className="bg-slate-100/80 sticky top-[60px] z-20 backdrop-blur-sm">
+                          <tr className="bg-muted/80 sticky top-[52px] z-20 backdrop-blur-sm">
                             <td colSpan={11} className="px-6 py-2.5">
-                              <div className="flex items-center gap-2 text-slate-600 font-black text-xs uppercase tracking-[0.2em]">
-                                <Calendar size={14} className="text-slate-400" />
+                              <div className="flex items-center gap-2 text-muted-foreground font-medium text-xs">
+                                <Calendar size={14} className="text-muted-foreground" />
                                 {trip.Plan_Date ? new Date(trip.Plan_Date + 'T00:00:00').toLocaleDateString('th-TH', { day: 'numeric', month: 'long', year: 'numeric' }) : 'ไม่ระบุวันที่'}
                               </div>
                             </td>
                           </tr>
                         )}
-                        <tr className={`hover:bg-violet-50/30 transition-colors group ${trip.profit < 0 ? 'bg-rose-50/30' : ''}`}>
+                        <tr className={`hover:bg-muted/40 transition-colors group ${trip.profit < 0 ? 'bg-rose-500/5' : ''}`}>
                           <td className="px-4 py-4">
                             <div className="flex flex-col">
-                              <p className="text-sm font-bold text-slate-400 leading-none mb-2">
+                              <p className="text-xs font-medium text-muted-foreground leading-none mb-2">
                                 {trip.Plan_Date ? new Date(trip.Plan_Date + 'T00:00:00').toLocaleDateString('th-TH', { day: 'numeric', month: 'short' }) : '-'}
                               </p>
                               <div className="flex items-center gap-2">
-                                <span className="text-[10px] font-black text-violet-600 bg-violet-100/50 px-2 py-0.5 rounded-lg border border-violet-200 uppercase tracking-tighter shadow-sm group-hover:bg-violet-500 group-hover:text-white transition-colors">
+                                <span className="text-[10px] font-semibold text-primary bg-primary/10 px-2 py-0.5 rounded-lg border border-primary/20 shadow-sm transition-colors">
                                   #{trip.Job_ID.slice(-8).toUpperCase()}
                                 </span>
                                 {trip.Vehicle_Plate && (
-                                  <span className="text-[10px] font-black text-slate-400 uppercase tracking-tighter bg-slate-50 px-2 py-0.5 rounded-lg border border-slate-100">
+                                  <span className="text-[10px] font-medium text-muted-foreground bg-muted px-2 py-0.5 rounded-lg border border-border">
                                     {trip.Vehicle_Plate}
                                   </span>
                                 )}
@@ -166,33 +170,33 @@ export default async function CostPerTripPage(props: PageProps) {
                             </div>
                           </td>
                           <td className="px-4 py-4">
-                            <p className="font-black text-slate-700 max-w-[200px] truncate">{trip.Customer_Name || '-'}</p>
-                            <span className="flex items-center gap-1 text-xs font-bold text-muted-foreground truncate opacity-70">
+                            <p className="font-semibold text-foreground max-w-[200px] truncate">{trip.Customer_Name || '-'}</p>
+                            <span className="flex items-center gap-1 text-xs font-medium text-muted-foreground truncate opacity-80">
                               <MapPin size={10} /> {trip.Route_Name || '-'}
                             </span>
                           </td>
-                          <td className="px-4 py-4 text-right font-bold text-slate-500">
+                          <td className="px-4 py-4 text-right font-medium text-muted-foreground">
                             {trip.distance_km.toLocaleString()} KM
                           </td>
-                          <td className="px-4 py-4 text-right font-black text-blue-600 whitespace-nowrap">
+                          <td className="px-4 py-4 text-right font-semibold text-primary whitespace-nowrap">
                             ฿{formatMoney(trip.Cost_Customer_Total)}
                           </td>
-                          <td className="px-4 py-4 text-right text-slate-600 whitespace-nowrap font-bold">
+                          <td className="px-4 py-4 text-right text-foreground whitespace-nowrap font-medium">
                             ฿{formatMoney(trip.Cost_Driver_Total + trip.extra_cost)}
                           </td>
-                          <td className="px-4 py-4 text-right text-slate-600 whitespace-nowrap">
+                          <td className="px-4 py-4 text-right text-foreground whitespace-nowrap">
                             ฿{formatMoney(trip.fuel_real)}
                           </td>
-                          <td className="px-4 py-4 text-right text-amber-500/70 italic whitespace-nowrap text-sm">
+                          <td className="px-4 py-4 text-right text-amber-600 dark:text-amber-400 whitespace-nowrap text-sm">
                             ฿{formatMoney(trip.fuel_est)}
                           </td>
-                          <td className="px-4 py-4 text-right text-slate-600 whitespace-nowrap">
+                          <td className="px-4 py-4 text-right text-foreground whitespace-nowrap">
                             ฿{formatMoney(trip.maint_real)}
                           </td>
-                          <td className="px-4 py-4 text-right text-amber-500/70 italic whitespace-nowrap text-sm">
+                          <td className="px-4 py-4 text-right text-amber-600 dark:text-amber-400 whitespace-nowrap text-sm">
                             ฿{formatMoney(trip.maint_est)}
                           </td>
-                          <td className="px-4 py-4 text-right font-bold text-red-500 whitespace-nowrap bg-red-50/20">
+                          <td className="px-4 py-4 text-right font-semibold text-red-500 whitespace-nowrap bg-red-500/5">
                             ฿{formatMoney(trip.total_cost)}
                           </td>
                           <td className="px-4 py-4 text-right whitespace-nowrap">
@@ -202,11 +206,11 @@ export default async function CostPerTripPage(props: PageProps) {
                               ) : (
                                 <TrendingDown size={14} className="text-red-500" />
                               )}
-                              <span className={`font-black text-2xl tracking-tighter ${trip.profit >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
+                              <span className={`font-semibold text-xl ${trip.profit >= 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-600 dark:text-red-400'}`}>
                                 ฿{formatMoney(trip.profit)}
                               </span>
                             </div>
-                            <p className={`text-sm font-black uppercase tracking-widest ${trip.profit >= 0 ? 'text-emerald-500/60' : 'text-red-400'}`}>{trip.profit_pct}% Margin</p>
+                            <p className={`text-xs font-medium ${trip.profit >= 0 ? 'text-emerald-600/80 dark:text-emerald-400/80' : 'text-red-400'}`}>{trip.profit_pct}% Margin</p>
                           </td>
                         </tr>
                       </React.Fragment>
@@ -220,38 +224,38 @@ export default async function CostPerTripPage(props: PageProps) {
         {/* Actionable Insights */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           {/* Top Loss Makers */}
-          <div className="bg-white rounded-3xl border border-red-100 shadow-sm overflow-hidden">
-            <div className="px-6 py-4 bg-red-50 border-b border-red-100">
-              <h3 className="font-black text-red-700 flex items-center gap-2">
-                <TrendingDown size={18} /> เที่ยวรถที่ขาดทุนหรือกำไรต่ำ (Attention Required)
+          <div className="bg-card rounded-2xl border border-red-500/20 shadow-sm overflow-hidden">
+            <div className="px-6 py-4 bg-red-500/10 border-b border-red-500/20">
+              <h3 className="font-semibold text-red-600 dark:text-red-400 flex items-center gap-2">
+                <TrendingDown size={18} /> เที่ยวรถที่ขาดทุนหรือกำไรต่ำ
               </h3>
             </div>
             <div className="p-4 space-y-3">
               {trips.filter(t => t.profit_pct < 10).slice(0, 5).map(trip => (
-                <div key={trip.Job_ID} className="flex items-center justify-between p-3 bg-gray-50 rounded-2xl">
+                <div key={trip.Job_ID} className="flex items-center justify-between p-3 bg-muted/40 rounded-2xl border border-border">
                   <div>
-                    <p className="font-black text-gray-900 text-sm">{trip.Route_Name || 'Unknown Route'}</p>
-                    <p className="text-xs font-bold text-muted-foreground">{trip.Customer_Name}</p>
+                    <p className="font-semibold text-foreground text-sm">{trip.Route_Name || 'Unknown Route'}</p>
+                    <p className="text-xs font-medium text-muted-foreground">{trip.Customer_Name}</p>
                   </div>
                   <div className="text-right">
-                    <p className={`font-black ${trip.profit < 0 ? 'text-red-600' : 'text-amber-600'}`}>
+                    <p className={`font-semibold ${trip.profit < 0 ? 'text-red-600 dark:text-red-400' : 'text-amber-600 dark:text-amber-400'}`}>
                       {trip.profit_pct}% Margin
                     </p>
-                    <p className="text-[10px] font-bold text-gray-400">Loss: ฿{formatMoney(Math.abs(trip.profit))}</p>
+                    <p className="text-xs font-medium text-muted-foreground">Loss: ฿{formatMoney(Math.abs(trip.profit))}</p>
                   </div>
                 </div>
               ))}
               {trips.filter(t => t.profit_pct < 10).length === 0 && (
-                <p className="text-center py-6 text-gray-400 font-bold italic text-sm">Excellent! No loss-making trips found.</p>
+                <p className="text-center py-6 text-muted-foreground font-medium text-sm">ไม่พบเที่ยวรถที่ขาดทุนในช่วงนี้</p>
               )}
             </div>
           </div>
 
           {/* Most Profitable Customers */}
-          <div className="bg-white rounded-3xl border border-emerald-100 shadow-sm overflow-hidden">
-            <div className="px-6 py-4 bg-emerald-50 border-b border-emerald-100">
-              <h3 className="font-black text-emerald-700 flex items-center gap-2">
-                <TrendingUp size={18} /> ลูกค้าที่ทำกำไรสูงสุด (Star Accounts)
+          <div className="bg-card rounded-2xl border border-emerald-500/20 shadow-sm overflow-hidden">
+            <div className="px-6 py-4 bg-emerald-500/10 border-b border-emerald-500/20">
+              <h3 className="font-semibold text-emerald-600 dark:text-emerald-400 flex items-center gap-2">
+                <TrendingUp size={18} /> ลูกค้าที่ทำกำไรสูงสุด
               </h3>
             </div>
             <div className="p-4 space-y-3">
@@ -267,11 +271,11 @@ export default async function CostPerTripPage(props: PageProps) {
                   .sort((a: any, b: any) => b.profit - a.profit)
                   .slice(0, 5)
                   .map((cust: any) => (
-                    <div key={cust.name} className="flex items-center justify-between p-3 bg-gray-50 rounded-2xl">
-                      <p className="font-black text-gray-900 text-sm">{cust.name}</p>
+                    <div key={cust.name} className="flex items-center justify-between p-3 bg-muted/40 rounded-2xl border border-border">
+                      <p className="font-semibold text-foreground text-sm">{cust.name}</p>
                       <div className="text-right">
-                        <p className="font-black text-emerald-600">฿{formatMoney(cust.profit)}</p>
-                        <p className="text-[10px] font-bold text-gray-400">{cust.revenue > 0 ? Math.round((cust.profit / cust.revenue) * 100) : 0}% Average Margin</p>
+                        <p className="font-semibold text-emerald-600 dark:text-emerald-400">฿{formatMoney(cust.profit)}</p>
+                        <p className="text-xs font-medium text-muted-foreground">{cust.revenue > 0 ? Math.round((cust.profit / cust.revenue) * 100) : 0}% Average Margin</p>
                       </div>
                     </div>
                   ))

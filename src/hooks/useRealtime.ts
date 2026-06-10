@@ -5,7 +5,17 @@ import { createClient } from '@/utils/supabase/client';
 
 import { useIdle } from '@/components/providers/idle-provider';
 
-export function useRealtime(table: string, callback: (payload: any) => void) {
+type RealtimePayload = {
+  eventType: "INSERT" | "UPDATE" | "DELETE";
+  schema: string;
+  table: string;
+  commit_timestamp: string;
+  errors: string[] | null;
+  new: Record<string, unknown>;
+  old: Record<string, unknown>;
+};
+
+export function useRealtime(table: string, callback: (payload: RealtimePayload) => void) {
   const { isIdle } = useIdle();
   const callbackRef = useRef(callback);
 

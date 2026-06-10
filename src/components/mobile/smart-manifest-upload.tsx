@@ -45,17 +45,15 @@ export function SmartManifestUpload() {
 
   return (
     <div className="w-full max-w-md mx-auto space-y-4 p-4">
-      <Card className="p-6 border-dashed border-2 border-emerald-500/30 bg-emerald-50/50 rounded-3xl relative overflow-hidden group">
-        <div className="absolute inset-0 bg-gradient-to-br from-emerald-500/5 to-transparent pointer-events-none" />
-        
+      <Card className="p-6 border-dashed border-2 border-emerald-500/30 bg-card rounded-2xl relative overflow-hidden group">
         {!preview ? (
           <label className="flex flex-col items-center justify-center gap-4 cursor-pointer py-10">
-            <div className="w-16 h-16 bg-emerald-500 text-white rounded-full flex items-center justify-center shadow-lg shadow-emerald-500/20 group-hover:scale-110 transition-transform">
+            <div className="w-14 h-14 bg-emerald-500 text-white rounded-2xl flex items-center justify-center shadow-sm">
               <Camera size={32} />
             </div>
             <div className="text-center">
-              <p className="text-lg font-black text-foreground tracking-tight">Smart Manifest Scan</p>
-              <p className="text-lg font-bold font-bold text-muted-foreground uppercase tracking-widest mt-1">AI-Powered OCR Engine</p>
+              <p className="text-lg font-semibold text-foreground tracking-tight">อ่านเอกสาร Manifest</p>
+              <p className="text-sm font-medium text-muted-foreground mt-1">ถ่ายรูปหรืออัปโหลดเอกสารเพื่อดึงข้อมูลงาน</p>
             </div>
             <input type="file" accept="image/*" className="hidden" onChange={handleFileUpload} disabled={isScanning} />
           </label>
@@ -66,17 +64,17 @@ export function SmartManifestUpload() {
               {isScanning && (
                 <div className="absolute inset-0 flex flex-col items-center justify-center bg-emerald-950/40 backdrop-blur-sm text-white">
                   <Loader2 className="animate-spin mb-2" size={32} />
-                  <span className="text-lg font-bold font-black uppercase tracking-[0.2em] animate-pulse">AI is Thinking...</span>
+                  <span className="text-sm font-semibold animate-pulse">กำลังอ่านเอกสาร...</span>
                 </div>
               )}
             </div>
             {!isScanning && (
               <Button 
                 variant="outline" 
-                className="w-full rounded-xl border-slate-200 font-bold"
+                className="w-full rounded-xl border-border font-semibold"
                 onClick={() => { setPreview(null); setResult(null); }}
               >
-                Scan Another Document
+                เลือกเอกสารใหม่
               </Button>
             )}
           </div>
@@ -84,48 +82,48 @@ export function SmartManifestUpload() {
       </Card>
 
       {result && (
-        <Card className="p-6 border-emerald-500/20 bg-white rounded-3xl shadow-xl space-y-6">
+        <Card className="p-6 border-emerald-500/20 bg-card rounded-2xl shadow-sm space-y-6">
           <div className="flex items-center gap-3">
             <div className="p-2 bg-emerald-100 text-emerald-600 rounded-xl">
               <CheckCircle2 size={20} />
             </div>
             <div>
-              <h3 className="text-lg font-black text-foreground tracking-tight">Analysis Result</h3>
-              <p className="text-base font-bold font-bold text-muted-foreground uppercase tracking-widest">Extracted by Gemini 1.5 Flash</p>
+              <h3 className="text-lg font-semibold text-foreground tracking-tight">ผลการอ่านเอกสาร</h3>
+              <p className="text-sm font-medium text-muted-foreground">ตรวจสอบข้อมูลก่อนนำไปใช้กับงาน</p>
             </div>
           </div>
 
           <div className="grid gap-4">
-            <div className="bg-slate-50 p-4 rounded-2xl border border-slate-100">
-              <p className="text-base font-bold font-black text-muted-foreground uppercase tracking-widest mb-1">Job ID / Reference</p>
-              <p className="text-xl font-black text-foreground">{result.jobId || "Not detected"}</p>
+            <div className="bg-muted/30 p-4 rounded-2xl border border-border">
+              <p className="text-sm font-medium text-muted-foreground mb-1">Job ID / Reference</p>
+              <p className="text-xl font-semibold text-foreground">{result.jobId || "Not detected"}</p>
             </div>
 
-            <div className="bg-slate-50 p-4 rounded-2xl border border-slate-100">
-              <p className="text-base font-bold font-black text-muted-foreground uppercase tracking-widest mb-1">Customer Name</p>
-              <p className="text-xl font-black text-foreground">{result.customerName || "Not detected"}</p>
+            <div className="bg-muted/30 p-4 rounded-2xl border border-border">
+              <p className="text-sm font-medium text-muted-foreground mb-1">Customer Name</p>
+              <p className="text-xl font-semibold text-foreground">{result.customerName || "Not detected"}</p>
             </div>
 
-            <div className="bg-slate-50 p-4 rounded-2xl border border-slate-100">
-              <p className="text-base font-bold font-black text-muted-foreground uppercase tracking-widest mb-1">Items Detected</p>
+            <div className="bg-muted/30 p-4 rounded-2xl border border-border">
+              <p className="text-sm font-medium text-muted-foreground mb-1">Items Detected</p>
               <div className="mt-2 space-y-2">
                 {result.items?.map((item, idx) => (
-                  <div key={idx} className="flex items-center justify-between text-lg font-bold py-1 border-b border-slate-200 last:border-0">
-                    <span className="font-bold text-muted-foreground flex items-center gap-2">
+                  <div key={idx} className="flex items-center justify-between text-sm font-medium py-2 border-b border-border last:border-0">
+                    <span className="font-medium text-muted-foreground flex items-center gap-2">
                       <Package size={12} className="text-emerald-500" />
                       {item.name}
                     </span>
-                    <span className="bg-emerald-500 text-foreground font-bold">
+                    <span className="text-foreground font-semibold">
                       QTY: {item.quantity}
                     </span>
                   </div>
-                )) || <p className="text-lg font-bold italic text-muted-foreground">No items found</p>}
+                )) || <p className="text-sm font-medium text-muted-foreground">No items found</p>}
               </div>
             </div>
           </div>
 
-          <Button className="w-full h-12 bg-emerald-500 hover:bg-emerald-600 text-white rounded-2xl font-black shadow-lg shadow-emerald-500/20">
-            Link to Job Record
+          <Button className="w-full h-12 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-semibold shadow-sm">
+            นำข้อมูลไปใช้กับงาน
           </Button>
         </Card>
       )}

@@ -2,7 +2,7 @@
 import { useState } from 'react'
 
 export default function GeminiCheck() {
-    const [status, setStatus] = useState<any[]>([])
+    const [status, setStatus] = useState<{ msg: string; type: 'info' | 'err' | 'ok' }[]>([])
     const [loading, setLoading] = useState(false)
 
     const runTest = async () => {
@@ -31,8 +31,8 @@ export default function GeminiCheck() {
                 addLog(`API Response Error: ${res.status} ${res.statusText}`, 'err')
                 addLog(`Details: ${JSON.stringify(data)}`, 'err')
             }
-        } catch (e: any) {
-            addLog(`Test failed: ${e.message}`, 'err')
+        } catch (e: unknown) {
+            addLog(`Test failed: ${e instanceof Error ? e.message : String(e)}`, 'err')
         } finally {
             setLoading(false)
         }

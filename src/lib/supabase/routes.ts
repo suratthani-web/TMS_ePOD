@@ -230,7 +230,7 @@ export async function createBulkRoutes(routes: Record<string, unknown>[]) {
         const { data: branches } = await supabase.from('Master_Branches').select('Branch_ID, Branch_Name')
         const branchMap = new Map<string, string>()
         if (branches) {
-            branches.forEach((b: any) => {
+            branches.forEach((b: Branch) => {
                 branchMap.set(b.Branch_Name.trim(), b.Branch_ID)
                 branchMap.set(b.Branch_ID, b.Branch_ID)
             })
@@ -283,7 +283,7 @@ export async function createBulkRoutes(routes: Record<string, unknown>[]) {
                  if (branchMap.has(key)) {
                      branchId = branchMap.get(key) || 'HQ'
                  } else {
-                     const found = branches?.find((b: any) => {
+                     const found = branches?.find((b: Branch) => {
                          const bName = String(b.Branch_Name || '')
                          return bName && (bName.includes(key) || key.includes(bName))
                      })
@@ -318,7 +318,7 @@ export async function createBulkRoutes(routes: Record<string, unknown>[]) {
             .select('Route_Name')
             .in('Route_Name', namesToCheck)
 
-        const existingNames = new Set(existingRoutes?.map((r: any) => r.Route_Name) || [])
+        const existingNames = new Set(existingRoutes?.map((r: { Route_Name: string }) => r.Route_Name) || [])
         
         const toInsert: Route[] = []
         const toUpdate: Route[] = []
@@ -408,13 +408,13 @@ export async function getUniqueLocations() {
     const locationSet = new Set<string>()
     
     if (origins) {
-        origins.forEach((o: any) => {
+        origins.forEach((o: { Origin: string | null }) => {
             if (o.Origin) locationSet.add(o.Origin.trim())
         })
     }
     
     if (destinations) {
-        destinations.forEach((d: any) => {
+        destinations.forEach((d: { Destination: string | null }) => {
             if (d.Destination) locationSet.add(d.Destination.trim())
         })
     }
@@ -446,7 +446,9 @@ export async function getLocationDirectory() {
 
     const directory: Record<string, { lat: number | null, lon: number | null, phone: string | null }> = {}
 
-    data.forEach((r: any) => {
+    type LocationRow = { Origin: string | null, Origin_Lat: number | null, Origin_Lon: number | null, Origin_Phone: string | null, Destination: string | null, Dest_Lat: number | null, Dest_Lon: number | null, Dest_Phone: string | null }
+
+    data.forEach((r: LocationRow) => {
         if (r.Origin) {
             const name = r.Origin.trim()
             if (!directory[name] || (!directory[name].phone && r.Origin_Phone)) {

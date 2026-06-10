@@ -47,14 +47,13 @@ export function JobGrid({
     const { t } = useLanguage()
     
     return (
-        <PremiumCard dark={true} className="p-0 overflow-hidden shadow-xl border-none rounded-2xl">
-            <PremiumCardHeader className="p-5 border-b border-white/5 bg-background/40 relative overflow-hidden flex flex-row items-center justify-between">
-                <div className="absolute inset-0 bg-gradient-to-r from-primary/5 to-transparent pointer-events-none" />
+        <PremiumCard className="p-0 overflow-hidden shadow-sm border border-border rounded-2xl">
+            <PremiumCardHeader className="p-5 border-b border-border bg-muted/20 relative overflow-hidden flex flex-row items-center justify-between">
                 <div className="flex items-center gap-3 relative z-10 flex-1">
-                   <div className="p-2 bg-primary/20 rounded-lg">
+                   <div className="p-2 bg-primary/10 rounded-lg">
                       <Package className="text-primary" size={18} />
                    </div>
-                   <h2 className="text-lg font-black text-foreground tracking-tight uppercase italic premium-text-gradient">
+                   <h2 className="text-lg font-black text-foreground tracking-tight uppercase">
                       {view === 'requests' ? t('jobs.head_requests') : t('jobs.head_live_feed')}
                    </h2>
                 </div>
@@ -124,9 +123,9 @@ export function JobGrid({
                 )}
                 
                 {jobs.length > 0 && (
-                    <div className="p-4 bg-muted/30 text-center border-t border-border/5">
-                        <p className="text-[10px] font-black text-muted-foreground uppercase tracking-[0.4em] opacity-40 group-hover:text-muted-foreground transition-colors italic">
-                            Logistics Intelligence Engine • Global Synchronized Nodes
+                    <div className="p-4 bg-muted/20 text-center border-t border-border">
+                        <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-[0.2em] opacity-50">
+                            LOGIS-PRO 360 • Transport Management System
                         </p>
                     </div>
                 )}

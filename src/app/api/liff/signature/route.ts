@@ -3,6 +3,8 @@ import { createAdminClient } from '@/utils/supabase/server'
 import { uploadFileToSupabase } from '@/lib/actions/supabase-upload'
 import { pushToUser } from '@/lib/integrations/line'
 
+import { transitionJobStatus } from "@/services/job-status-machine"
+
 export async function POST(req: NextRequest) {
     try {
         const body = await req.json()
@@ -32,7 +34,7 @@ export async function POST(req: NextRequest) {
         // 3. Upload to Supabase Storage
         const uploadRes = await uploadFileToSupabase(buffer, fileName, 'image/png', 'POD_Photos')
 
-        // 4. Update job status to Delivered
+        // 4. Update job status to Delivered using Machine
         const newPhotos = job.Photo_Proof_Url
             ? `${job.Photo_Proof_Url},${uploadRes.directLink}`
             : uploadRes.directLink
@@ -41,17 +43,23 @@ export async function POST(req: NextRequest) {
         const timeString = now.toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false, timeZone: 'Asia/Bangkok' })
         const dateString = now.toLocaleDateString('en-CA', { timeZone: 'Asia/Bangkok' })
 
-        const { error: updateErr } = await supabase.from('Jobs_Main')
+        const { error: updateError } = await supabase.from('Jobs_Main')
             .update({
-                Job_Status: 'Delivered',
                 Photo_Proof_Url: newPhotos,
+                Signature_Url: uploadRes.directLink,
                 Actual_Delivery_Time: timeString,
                 Delivery_Date: dateString
             })
             .eq('Job_ID', jobId)
+        if (updateError) throw updateError
 
-        if (updateErr) {
-            return NextResponse.json({ success: false, error: `Failed to update job: ${updateErr.message}` }, { status: 500 })
+        const result = await transitionJobStatus(jobId, 'Delivered', {
+            userId: lineUserId || 'LIFF_USER',
+            reason: 'LIFF: Digital Signature Submitted'
+        })
+
+        if (!result.success) {
+            return NextResponse.json({ success: false, error: result.message }, { status: 500 })
         }
 
         // 5. Trigger Customer Satisfaction Survey (If customer has LINE bound)
@@ -72,8 +80,8 @@ export async function POST(req: NextRequest) {
 
         return NextResponse.json({ success: true, url: uploadRes.directLink })
 
-    } catch (err: any) {
+    } catch (err: unknown) {
         console.error('[LIFF Signature API Error]', err)
-        return NextResponse.json({ success: false, error: err.message }, { status: 500 })
+        return NextResponse.json({ success: false, error: err instanceof Error ? err.message : String(err) }, { status: 500 })
     }
 }

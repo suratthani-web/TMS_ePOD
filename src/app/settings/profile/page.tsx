@@ -92,13 +92,13 @@ export default function AdminProfilePage() {
         </Link>
 
         {/* Tactical Profile Header */}
-        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-10 bg-background/60 backdrop-blur-3xl p-10 rounded-[3.5rem] border border-border/5 shadow-2xl relative group overflow-hidden">
+        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-10 bg-background/60 backdrop-blur-3xl p-10 rounded-[3.5rem] border border-border shadow-2xl relative group overflow-hidden">
             <div className="absolute top-0 right-0 w-64 h-64 bg-primary/10 blur-[100px] pointer-events-none" />
             
             <div className="relative z-10 flex items-center gap-8">
                 <div className="relative">
                     <div className="w-32 h-32 rounded-[2.5rem] bg-gradient-to-br from-primary via-indigo-500 to-accent p-1 shadow-2xl shadow-primary/20 rotate-3 group-hover:rotate-6 transition-transform duration-700">
-                        <div className="w-full h-full rounded-[2.3rem] bg-background flex items-center justify-center text-foreground text-5xl font-black italic border-2 border-border/10 overflow-hidden relative">
+                        <div className="w-full h-full rounded-[2.3rem] bg-background flex items-center justify-center text-foreground text-5xl font-black italic border-2 border-border overflow-hidden relative">
                             <div className="absolute inset-0 bg-primary/5" />
                             {(formData.First_Name || "A").charAt(0)}
                         </div>
@@ -119,10 +119,10 @@ export default function AdminProfilePage() {
                 </div>
             </div>
 
-            <div className="flex items-center gap-4 bg-muted/50 p-4 rounded-2xl border border-border/10 backdrop-blur-md relative z-10">
+            <div className="flex items-center gap-4 bg-muted/50 p-4 rounded-2xl border border-border backdrop-blur-md relative z-10">
                 <div className="flex flex-col items-end">
                     <span className="text-base font-bold font-black text-muted-foreground uppercase tracking-widest">{t('settings_pages.profile.clearance_level')}</span>
-                    <span className="text-lg font-bold font-black text-primary uppercase tracking-tighter">{formData.Role || 'OPERATOR_ALPHA'}</span>
+                    <span className="text-lg font-bold font-black text-primary uppercase tracking-tighter">{formData.Role || 'USER'}</span>
                 </div>
                 <div className="p-3 bg-primary/20 rounded-xl">
                     <ShieldCheck className="text-primary" size={20} />
@@ -130,7 +130,7 @@ export default function AdminProfilePage() {
             </div>
         </div>
 
-        <PremiumCard className="bg-background/40 border-2 border-border/5 shadow-3xl p-12 rounded-[4rem] relative overflow-hidden group/card">
+        <PremiumCard className="bg-background/40 border-2 border-border shadow-3xl p-12 rounded-[4rem] relative overflow-hidden group/card">
             <div className="absolute inset-0 bg-gradient-to-b from-primary/[0.02] to-transparent pointer-events-none" />
             
             <div className="grid grid-cols-1 md:grid-cols-2 gap-10 relative z-10">
@@ -139,7 +139,7 @@ export default function AdminProfilePage() {
                     <Input 
                         value={formData.First_Name || ""}
                         onChange={(e) => setFormData({...formData, First_Name: e.target.value})}
-                        className="h-16 rounded-2xl bg-background border-border/5 text-foreground placeholder:text-muted-foreground px-8 focus-visible:ring-primary/40 focus:border-primary/50 transition-all text-xl font-black uppercase tracking-widest shadow-inner italic"
+                        className="h-16 rounded-2xl bg-background border-border text-foreground placeholder:text-muted-foreground px-8 focus-visible:ring-primary/40 focus:border-primary/50 transition-all text-xl font-black uppercase tracking-widest shadow-inner italic"
                         placeholder="FIRST_NAME"
                     />
                 </div>
@@ -148,7 +148,7 @@ export default function AdminProfilePage() {
                     <Input 
                         value={formData.Last_Name || ""}
                         onChange={(e) => setFormData({...formData, Last_Name: e.target.value})}
-                        className="h-16 rounded-2xl bg-background border-border/5 text-foreground placeholder:text-muted-foreground px-8 focus-visible:ring-primary/40 focus:border-primary/50 transition-all text-xl font-black uppercase tracking-widest shadow-inner italic"
+                        className="h-16 rounded-2xl bg-background border-border text-foreground placeholder:text-muted-foreground px-8 focus-visible:ring-primary/40 focus:border-primary/50 transition-all text-xl font-black uppercase tracking-widest shadow-inner italic"
                         placeholder="LAST_NAME"
                     />
                 </div>
@@ -160,7 +160,7 @@ export default function AdminProfilePage() {
                     <Input 
                         value={formData.Email || ""}
                         onChange={(e) => setFormData({...formData, Email: e.target.value})}
-                        className="h-16 rounded-2xl bg-background border-border/5 text-foreground placeholder:text-muted-foreground px-8 focus-visible:ring-primary/40 focus:border-primary/50 transition-all text-xl font-black uppercase tracking-widest shadow-inner italic"
+                        className="h-16 rounded-2xl bg-background border-border text-foreground placeholder:text-muted-foreground px-8 focus-visible:ring-primary/40 focus:border-primary/50 transition-all text-xl font-black uppercase tracking-widest shadow-inner italic"
                         placeholder="EMAIL_ADDRESS"
                     />
                     <div className="absolute right-6 top-1/2 -translate-y-1/2 flex items-center gap-2 pointer-events-none opacity-20">
@@ -175,7 +175,7 @@ export default function AdminProfilePage() {
                     <Input 
                         value={formData.Username || ""}
                         disabled
-                        className="h-16 rounded-2xl bg-black/40 border-border/5 text-muted-foreground px-8 cursor-not-allowed text-xl font-black uppercase tracking-widest italic"
+                        className="h-16 rounded-2xl bg-muted/25 border-border text-muted-foreground px-8 cursor-not-allowed text-xl font-black uppercase tracking-widest italic"
                     />
                 </div>
                 <div className="space-y-3 opacity-50">
@@ -183,7 +183,7 @@ export default function AdminProfilePage() {
                     <Input 
                         value={formData.Role || "Node Operator"}
                         disabled
-                        className="h-16 rounded-2xl bg-black/40 border-border/5 text-muted-foreground px-8 cursor-not-allowed text-xl font-black uppercase tracking-widest italic"
+                        className="h-16 rounded-2xl bg-muted/25 border-border text-muted-foreground px-8 cursor-not-allowed text-xl font-black uppercase tracking-widest italic"
                     />
                 </div>
             </div>
@@ -201,7 +201,7 @@ export default function AdminProfilePage() {
         </PremiumCard>
 
         <div className="text-center opacity-40 py-10">
-            <p className="inline-flex items-center gap-3 px-6 py-2 bg-muted/50 rounded-full border border-border/5 text-base font-bold font-black text-muted-foreground uppercase tracking-[0.6em]">
+            <p className="inline-flex items-center gap-3 px-6 py-2 bg-muted/50 rounded-full border border-border text-base font-bold font-black text-muted-foreground uppercase tracking-[0.6em]">
                 {t('settings_pages.profile.session_active')}
             </p>
         </div>

@@ -80,10 +80,25 @@ export type AggregatedItem = {
     isExtra: boolean;
 };
 
+export type BillingJobInput = {
+    Plan_Date?: string | Date | null;
+    Weight_Kg?: number | string | null;
+    Volume_Cbm?: number | string | null;
+    Loaded_Qty?: number | string | null;
+    Price_Cust_Total?: number | string | null;
+    Price_Per_Unit?: number | string | null;
+    Customer_ID?: string | null;
+    extra_costs_json?: unknown;
+    Price_Cust_Extra?: number | string | null;
+    Charge_Labor?: number | string | null;
+    Charge_Wait?: number | string | null;
+    Price_Cust_Other?: number | string | null;
+}
+
 /**
  * Aggregates job costs into a structured format for printing.
  */
-export function aggregateBillingJobs(jobs: any[], lang: 'th' | 'en' = 'th', customerName?: string): AggregatedItem[] {
+export function aggregateBillingJobs(jobs: BillingJobInput[], lang: 'th' | 'en' = 'th', customerName?: string): AggregatedItem[] {
     const aggregatedItems = new Map<string, AggregatedItem>();
 
     let minDate: Date | null = null;
@@ -140,7 +155,7 @@ export function aggregateBillingJobs(jobs: any[], lang: 'th' | 'en' = 'th', cust
         // 2. Standard Extra Expenses
         const standardExtras = ['Price_Cust_Extra', 'Charge_Labor', 'Charge_Wait', 'Price_Cust_Other'];
         standardExtras.forEach(col => {
-            const val = Number(job[col] || 0);
+            const val = Number((job as Record<string, unknown>)[col] || 0);
             if (val > 0) {
                 const key = `EXTRA-${col}`;
                 const existing = aggregatedItems.get(key);

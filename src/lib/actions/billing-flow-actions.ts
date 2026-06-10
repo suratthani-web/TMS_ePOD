@@ -4,9 +4,49 @@ import { createAdminClient } from "@/utils/supabase/server"
 import { getUserBranchId } from "@/lib/permissions"
 import { logActivity } from "@/lib/supabase/logs"
 import { revalidatePath } from "next/cache"
+import { transitionJobStatus } from "@/services/job-status-machine"
+import { requireAdmin } from "@/services/permission-guards"
+
+type InvoiceCustomerJoin = {
+    Customer_Name?: string | null
+}
+
+type InvoiceItemSnapshot = {
+    Job_ID?: string | null
+    Price_Cust_Total?: number | string | null
+    Weight_Kg?: number | string | null
+    Volume_Cbm?: number | string | null
+    Loaded_Qty?: number | string | null
+    Price_Per_Unit?: number | string | null
+    Price_Cust_Extra?: number | string | null
+    Charge_Labor?: number | string | null
+    Charge_Wait?: number | string | null
+    Price_Cust_Other?: number | string | null
+    extra_costs_json?: unknown
+    [key: string]: unknown
+}
+
+type InvoiceWithItems = {
+    Customer_Name?: string | null
+    Due_Date?: string | null
+    Grand_Total?: number | null
+    Subtotal?: number | null
+    Discount_Amount?: number | null
+    Discount_Percent?: number | null
+    Discount_Rate?: number | null
+    VAT_Amount?: number | null
+    VAT_Rate?: number | null
+    WHT_Amount?: number | null
+    WHT_Rate?: number | null
+    Items_JSON?: InvoiceItemSnapshot[] | null
+    Master_Customers?: InvoiceCustomerJoin | InvoiceCustomerJoin[] | null
+}
+
+const getErrorMessage = (error: unknown) => error instanceof Error ? error.message : String(error)
 
 export async function confirmInvoiceAndCreateBillingNote(invoiceId: string) {
     try {
+        await requireAdmin()
         const supabase = await createAdminClient()
 
         // 1. Get Invoice Data with Customer Name join
@@ -18,7 +58,11 @@ export async function confirmInvoiceAndCreateBillingNote(invoiceId: string) {
 
         if (invoiceError || !invoice) throw new Error("ไม่พบข้อมูลใบแจ้งหนี้")
         
-        const finalCustomerName = (invoice as any).Master_Customers?.Customer_Name || invoice.Customer_Name || "Unknown"
+        const typedInvoice = invoice as InvoiceWithItems
+        const joinedCustomer = Array.isArray(typedInvoice.Master_Customers)
+            ? typedInvoice.Master_Customers[0]
+            : typedInvoice.Master_Customers
+        const finalCustomerName = joinedCustomer?.Customer_Name || typedInvoice.Customer_Name || "Unknown"
 
         // 2. Use the same ID for Billing Note as the Invoice (As requested: "เลขชุดเดียวกัน")
         const billingNoteId = invoiceId
@@ -28,8 +72,6 @@ export async function confirmInvoiceAndCreateBillingNote(invoiceId: string) {
             .select('Billing_Note_ID')
             .eq('Billing_Note_ID', billingNoteId)
             .maybeSingle()
-
-        if (existingBN) throw new Error("ใบวางบิลนี้ถูกสร้างไปแล้ว")
 
         // 3. Get Branch ID from Jobs
         const { data: jobs, error: jobsError } = await supabase
@@ -41,45 +83,52 @@ export async function confirmInvoiceAndCreateBillingNote(invoiceId: string) {
         
         const branchId = jobs[0].Branch_ID || (await getUserBranchId()) || 'HQ'
 
-        // 4. Insert Billing Note
-        const { error: insertError } = await supabase
+        // 4. Upsert Billing Note (Idempotent)
+        const { error: upsertError } = await supabase
             .from('Billing_Notes')
-            .insert({
+            .upsert({
                 Billing_Note_ID: billingNoteId,
                 Customer_Name: finalCustomerName,
                 Billing_Date: new Date().toISOString(),
-                Due_Date: invoice.Due_Date,
-                Total_Amount: invoice.Grand_Total || invoice.Subtotal,
-                Discount_Amount: invoice.Discount_Amount || 0,
-                Discount_Percent: invoice.Discount_Percent || invoice.Discount_Rate || 0,
-                VAT_Amount: invoice.VAT_Amount || 0,
-                VAT_Rate: invoice.VAT_Rate || 0,
-                WHT_Amount: invoice.WHT_Amount || 0,
-                WHT_Rate: invoice.WHT_Rate || 0,
+                Due_Date: typedInvoice.Due_Date,
+                Total_Amount: typedInvoice.Grand_Total || typedInvoice.Subtotal,
+                Discount_Amount: typedInvoice.Discount_Amount || 0,
+                Discount_Percent: typedInvoice.Discount_Percent || typedInvoice.Discount_Rate || 0,
+                VAT_Amount: typedInvoice.VAT_Amount || 0,
+                VAT_Rate: typedInvoice.VAT_Rate || 0,
+                WHT_Amount: typedInvoice.WHT_Amount || 0,
+                WHT_Rate: typedInvoice.WHT_Rate || 0,
                 Status: 'Pending',
-                Created_At: new Date().toISOString(),
+                Created_At: existingBN ? undefined : new Date().toISOString(),
                 Updated_At: new Date().toISOString(),
                 Branch_ID: branchId
             })
 
-        if (insertError) throw insertError
+        if (upsertError) throw upsertError
 
-        // 5. Update Jobs with Billing Note ID
-        const { error: updateJobsError } = await supabase
-            .from('Jobs_Main')
-            .update({ Billing_Note_ID: billingNoteId })
-            .eq('Invoice_ID', invoiceId)
-
-        if (updateJobsError) throw updateJobsError
+        // 5. Update Jobs with Billing Note ID and Status (Billed)
+        for (const job of jobs) {
+            const transition = await transitionJobStatus(job.Job_ID, 'Billed', {
+                reason: `Invoice confirmed: ${invoiceId}`,
+                notes: `Linked to Billing Note: ${billingNoteId}`
+            })
+            if (!transition.success) {
+                throw new Error(transition.message || `Unable to mark job ${job.Job_ID} as billed`)
+            }
+            
+            const { error: linkError } = await supabase
+                .from('Jobs_Main')
+                .update({ Billing_Note_ID: billingNoteId })
+                .eq('Job_ID', job.Job_ID)
+            if (linkError) throw linkError
+        }
 
         // 5.5 Data Healing: Sync ALL validated prices and JSON back to Jobs_Main for analytical integrity
-        if (invoice.Items_JSON && Array.isArray(invoice.Items_JSON)) {
+        if (typedInvoice.Items_JSON && Array.isArray(typedInvoice.Items_JSON)) {
             try {
-                const syncPromises = invoice.Items_JSON.map((item: any) => {
+                const syncPromises = typedInvoice.Items_JSON.map((item) => {
                     if (!item.Job_ID) return null
                     
-                    // Comprehensive Sync: Update all price fields and the raw extra_costs_json
-                    // Fix: Fallback calculation if snapshot price is 0
                     let priceTotal = Number(item.Price_Cust_Total || 0)
                     if (priceTotal === 0) {
                         const qty = Number(item.Weight_Kg || item.Volume_Cbm || item.Loaded_Qty || 1)
@@ -139,9 +188,9 @@ export async function confirmInvoiceAndCreateBillingNote(invoiceId: string) {
 
         return { success: true, billingNoteId }
 
-    } catch (error: any) {
+    } catch (error: unknown) {
         console.error("Confirm Invoice Error:", error)
-        return { success: false, error: error.message }
+        return { success: false, error: getErrorMessage(error) }
     }
 }
 
@@ -186,8 +235,8 @@ export async function voidAndRejectInvoice(invoiceId: string) {
         revalidatePath('/billing/customer')
 
         return { success: true }
-    } catch (error: any) {
+    } catch (error: unknown) {
         console.error("Void Invoice Error:", error)
-        return { success: false, error: error.message }
+        return { success: false, error: getErrorMessage(error) }
     }
 }

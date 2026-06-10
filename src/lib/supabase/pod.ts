@@ -152,9 +152,9 @@ export async function getPODStats(dateFrom?: string, dateTo?: string) {
     const jobs = data || []
     return {
       total: jobs.length,
-      withPhoto: jobs.filter((j: any) => j.Photo_Proof_Url).length,
-      withSignature: jobs.filter((j: any) => j.Signature_Url).length,
-      complete: jobs.filter((j: any) => j.Job_Status === 'Delivered' || j.Job_Status === 'Complete' || j.Job_Status === 'Completed').length,
+      withPhoto: jobs.filter((j: { Photo_Proof_Url?: string | null, Signature_Url?: string | null, Job_Status?: string | null }) => j.Photo_Proof_Url).length,
+      withSignature: jobs.filter((j: { Photo_Proof_Url?: string | null, Signature_Url?: string | null, Job_Status?: string | null }) => j.Signature_Url).length,
+      complete: jobs.filter((j: { Photo_Proof_Url?: string | null, Signature_Url?: string | null, Job_Status?: string | null }) => j.Job_Status === 'Delivered' || j.Job_Status === 'Complete' || j.Job_Status === 'Completed').length,
     }
   } catch (err) {
     console.error("POD stats exception:", err)

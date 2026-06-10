@@ -32,22 +32,27 @@ interface BranchPerformance {
 
 interface ExportAllButtonProps {
     data: {
-        financials: any;
-        revenueTrend: any[];
-        topCustomers: any[];
-        statusDist: any[];
-        branchPerf: any[];
-        subPerf: any[];
-        billing: any;
-        fuel: any;
-        maintenance: any;
-        safety: any;
-        workforce: any;
-        routes: any;
-        driverLeaderboard?: any[];
-        vehicleProfitability?: any[];
-        esgStats?: any;
-        opStats?: any;
+        financials: {
+            revenue: number;
+            cost?: { driver?: number; fuel?: number; maintenance?: number; secondary?: number; };
+            netProfit?: number;
+            profitMargin?: number;
+        };
+        revenueTrend: unknown[];
+        topCustomers: { name?: string; revenue?: number; jobCount?: number; }[];
+        statusDist: { value: number; }[];
+        branchPerf: Record<string, unknown>[];
+        subPerf: unknown[];
+        billing: unknown;
+        fuel: { vehicleBreakdown?: { vehicle_plate?: string; totalLiters?: number; totalCost?: number; avgEfficiency?: number; logCount?: number; }[]; };
+        maintenance: unknown;
+        safety: { sos?: { recentAlerts?: { time?: string; vehicle?: string; driver?: string; reason?: string; id?: string; }[]; }; };
+        workforce: unknown;
+        routes: unknown;
+        driverLeaderboard?: { name?: string; completedJobs?: number; onTimeRate?: number; revenue?: number; avgMargin?: number; }[];
+        vehicleProfitability?: { plate?: string; revenue?: number; cost?: number; profit?: number; margin?: number; status?: string; }[];
+        esgStats?: { co2SavedKg?: number; };
+        opStats?: { fleet?: { onTimeDelivery?: number; utilization?: number; }; };
     }
 }
 
@@ -65,7 +70,7 @@ export function ExportAllButton({ data }: ExportAllButtonProps) {
             fuel_costs: data.financials.cost?.fuel || 0,
             maintenance_costs: data.financials.cost?.maintenance || 0,
             secondary_costs: data.financials.cost?.secondary || 0,
-            total_jobs: data.statusDist.reduce((sum: number, item: any) => sum + item.value, 0),
+            total_jobs: data.statusDist.reduce((sum: number, item: { value: number; }) => sum + item.value, 0),
             on_time_delivery_rate: `${data.opStats?.fleet?.onTimeDelivery?.toFixed(1) || 0}%`,
             fleet_utilization: `${data.opStats?.fleet?.utilization?.toFixed(1) || 0}%`,
             esg_co2_saved_kg: data.esgStats?.co2SavedKg || 0
@@ -80,10 +85,10 @@ export function ExportAllButton({ data }: ExportAllButtonProps) {
         // 3. Customer Performance
         if (data.topCustomers?.length) {
             const customerReport = data.topCustomers.map(c => ({
-                customer_name: c.Customer_Name || 'Unknown',
-                total_revenue: c.Revenue || 0,
-                job_count: c.JobCount || 0,
-                avg_revenue_per_job: c.JobCount > 0 ? (c.Revenue / c.JobCount).toFixed(2) : 0
+                customer_name: c.name || 'Unknown',
+                total_revenue: c.revenue || 0,
+                job_count: c.jobCount || 0,
+                avg_revenue_per_job: (c.jobCount && c.jobCount > 0 && c.revenue) ? (c.revenue / c.jobCount).toFixed(2) : 0
             }));
             exportToCSV(customerReport, "customer_revenue_ranking");
         }
@@ -95,7 +100,7 @@ export function ExportAllButton({ data }: ExportAllButtonProps) {
                 total_revenue: v.revenue,
                 total_cost: v.cost,
                 net_profit: v.profit,
-                margin: `${v.margin.toFixed(2)}%`,
+                margin: `${v.margin?.toFixed(2) || 0}%`,
                 status: v.status
             }));
             exportToCSV(fleetReport, "fleet_profitability_breakdown");
@@ -106,7 +111,7 @@ export function ExportAllButton({ data }: ExportAllButtonProps) {
             const driverReport = data.driverLeaderboard.map(d => ({
                 driver_name: d.name,
                 completed_jobs: d.completedJobs,
-                on_time_rate: `${d.onTimeRate.toFixed(1)}%`,
+                on_time_rate: `${d.onTimeRate?.toFixed(1) || 0}%`,
                 total_revenue: d.revenue,
                 avg_margin: `${d.avgMargin?.toFixed(2) || 0}%`
             }));
@@ -115,7 +120,7 @@ export function ExportAllButton({ data }: ExportAllButtonProps) {
 
         // 6. Fuel Analytics Detailed
         if (data.fuel?.vehicleBreakdown?.length) {
-            const fuelReport = data.fuel.vehicleBreakdown.map((f: any) => ({
+            const fuelReport = data.fuel.vehicleBreakdown.map((f: { vehicle_plate?: string; totalLiters?: number; totalCost?: number; avgEfficiency?: number; logCount?: number; }) => ({
                 vehicle_plate: f.vehicle_plate,
                 total_liters: f.totalLiters,
                 total_cost: f.totalCost,
@@ -127,7 +132,7 @@ export function ExportAllButton({ data }: ExportAllButtonProps) {
 
         // 7. Safety & Incidents
         if (data.safety?.sos?.recentAlerts?.length) {
-            const safetyReport = data.safety.sos.recentAlerts.map((s: any) => ({
+            const safetyReport = data.safety.sos.recentAlerts.map((s: { time?: string; vehicle?: string; driver?: string; reason?: string; id?: string; }) => ({
                 date_time: s.time,
                 vehicle: s.vehicle,
                 driver: s.driver,

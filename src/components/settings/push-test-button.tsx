@@ -12,13 +12,20 @@ interface Props {
   userId?: string | null
 }
 
+type PushDebug = {
+  vapidConfigured?: boolean
+  firebaseInitialized?: boolean
+  envVapidPublic?: boolean
+  envVapidPrivate?: boolean
+}
+
 export function PushTestButton({ driverId: initialDriverId, userId: initialUserId }: Props) {
   const [loading, setLoading] = useState(false)
   const [identifying, setIdentifying] = useState(!initialDriverId && !initialUserId)
   const [registering, setRegistering] = useState(false)
   const [userId, setUserId] = useState<string | null>(initialUserId || null)
   const [driverId, setDriverId] = useState<string | null>(initialDriverId || null)
-  const [lastResult, setLastResult] = useState<{ success: boolean; reason?: string; debug?: any } | null>(null)
+  const [lastResult, setLastResult] = useState<{ success: boolean; reason?: string; debug?: PushDebug } | null>(null)
 
   // Helper for manual reg
   const urlBase64ToUint8Array = (base64String: string) => {

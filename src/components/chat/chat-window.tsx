@@ -385,8 +385,8 @@ export function ChatWindow({ initialContacts, initialDrivers, forcedDriverId }: 
                                   
                                   return (
                                       <div className={cn(
-                                          "absolute bottom-0 right-0 w-3 h-3 rounded-full border-2 border-white",
-                                          isOnline ? "bg-emerald-500" : "bg-slate-300"
+                                          "absolute bottom-0 right-0 w-3 h-3 rounded-full border-2 border-background",
+                                          isOnline ? "bg-emerald-500" : "bg-muted"
                                       )} />
                                   )
                               })()}
@@ -438,7 +438,7 @@ export function ChatWindow({ initialContacts, initialDrivers, forcedDriverId }: 
                         </div>
                     </div>
 
-                    <div className="flex-1 overflow-y-auto p-6 space-y-6 bg-slate-50/50">
+                    <div className="flex-1 overflow-y-auto p-6 space-y-6 bg-muted/10">
                         {messageGroups.map((group, gi) => (
                             <div key={gi} className="space-y-4">
                                 <div className="flex justify-center">
@@ -450,7 +450,7 @@ export function ChatWindow({ initialContacts, initialDrivers, forcedDriverId }: 
                                         <div key={msg.id} className={cn("flex", isMe ? "justify-end" : "justify-start")}>
                                             <div className={cn(
                                                 "max-w-[70%] p-3 rounded-2xl text-sm shadow-sm",
-                                                isMe ? "bg-primary text-primary-foreground rounded-tr-none" : "bg-white border rounded-tl-none"
+                                                isMe ? "bg-primary text-primary-foreground rounded-tr-none" : "bg-muted text-foreground border border-border rounded-tl-none"
                                             )}>
                                                 {msg.message.startsWith('[IMAGE] ') ? (
                                                     <div className="relative w-48 h-48 rounded-lg overflow-hidden">

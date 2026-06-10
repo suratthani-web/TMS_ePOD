@@ -6,6 +6,14 @@ import { BillingNote } from "./billing"
 import { sendBillingEmail } from "../actions/email-actions"
 import { Job } from "@/types/database"
 
+type BillingAutomationJob = Partial<Job> & {
+    Customer_Name?: string
+    Job_No?: string
+    Billing_Status?: string
+    Date?: string
+    Master_Customers?: { Credit_Term_Days?: number }
+}
+
 /**
  * GENERATION PHASE (31st 23:00)
  * Automatically groups successful jobs by customer and creates billing notes.
@@ -25,8 +33,8 @@ export async function generateMonthlyBillingNotes() {
         if (!jobs || jobs.length === 0) return { success: true, count: 0, message: "No jobs to bill" }
 
         // 2. Group jobs by Customer_Name
-        const customerGroups: Record<string, any[]> = {}
-        jobs.forEach((job: any) => {
+        const customerGroups: Record<string, BillingAutomationJob[]> = {}
+        jobs.forEach((job: BillingAutomationJob) => {
             const customer = job.Customer_Name || 'Unknown'
             if (!customerGroups[customer]) customerGroups[customer] = []
             customerGroups[customer].push(job)
@@ -46,7 +54,7 @@ export async function generateMonthlyBillingNotes() {
                             ? JSON.parse(job.extra_costs_json) 
                             : job.extra_costs_json
                         if (Array.isArray(costs)) {
-                            extra = costs.reduce((s: number, c: any) => s + (Number(c.charge_cust) || 0), 0)
+                            extra = costs.reduce((s: number, c: { charge_cust?: string | number }) => s + (Number(c.charge_cust) || 0), 0)
                         }
                     } catch {}
                 }
@@ -54,7 +62,7 @@ export async function generateMonthlyBillingNotes() {
             }, 0)
 
             // Generate Structured ID: INV_[Branch]-[YYYYMM]-[Counter] (Consistent with Manual)
-            const billingNoteId = await getNextInvoiceId(customerJobs[0].Branch_ID)
+            const billingNoteId = await getNextInvoiceId(customerJobs[0].Branch_ID ?? null)
 
             // Insert Billing Note
             const { error: insertError } = await supabase
@@ -82,7 +90,7 @@ export async function generateMonthlyBillingNotes() {
         }
 
         return { success: true, count: createdNotes.length, notes: createdNotes }
-    } catch (e: any) {
+    } catch (err) { const e = err as Error;
         console.error("[Automation Error]", e)
         return { success: false, error: e.message }
     }
@@ -111,7 +119,7 @@ export async function sendScheduledBillingEmails() {
         if (!notes || notes.length === 0) return { success: true, count: 0, message: "No notes to send" }
 
         // Fetch customer emails separately to avoid relationship errors
-        const customerNames = Array.from(new Set(notes.map((n: any) => n.Customer_Name))).filter(Boolean)
+        const customerNames = Array.from(new Set(notes.map((n: { Customer_Name?: string }) => n.Customer_Name))).filter(Boolean)
         let emailMap = new Map()
         
         if (customerNames.length > 0) {
@@ -121,7 +129,7 @@ export async function sendScheduledBillingEmails() {
                 .in('Customer_Name', customerNames)
             
             if (customers) {
-                emailMap = new Map(customers.map((c: any) => [c.Customer_Name, c.Email]))
+                emailMap = new Map(customers.map((c: { Customer_Name: string, Email: string }) => [c.Customer_Name, c.Email]))
             }
         }
 
@@ -167,7 +175,7 @@ export async function sendScheduledBillingEmails() {
 
         return { success: true, count: sentCount.length, notes: sentCount }
 
-    } catch (e: any) {
+    } catch (err) { const e = err as Error;
         console.error("[Dispatch Error]", e)
         return { success: false, error: e.message }
     }

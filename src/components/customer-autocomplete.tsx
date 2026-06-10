@@ -7,10 +7,12 @@ import { cn } from "@/lib/utils"
 
 import { Customer } from "@/lib/supabase/customers"
 
+type CustomerOption = Pick<Customer, "Customer_ID" | "Customer_Name"> & Partial<Customer>
+
 interface CustomerAutocompleteProps {
   value: string
   onChange: (value: string) => void
-  customers: Customer[]
+  customers: CustomerOption[]
   onSelect: (customer: Customer) => void
   className?: string
 }
@@ -58,9 +60,9 @@ export function CustomerAutocomplete({
     }
   }, [value])
 
-  const handleSelect = (customer: Customer) => {
+  const handleSelect = (customer: CustomerOption) => {
     onChange(customer.Customer_Name)
-    onSelect(customer)
+    onSelect(customer as Customer)
     setQuery(customer.Customer_Name)
     setOpen(false)
   }

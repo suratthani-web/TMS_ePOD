@@ -3,6 +3,7 @@
 import { jsPDF } from "jspdf"
 import autoTable from "jspdf-autotable"
 import { createAdminClient } from "@/utils/supabase/server"
+import { requireAdmin } from "@/services/permission-guards"
 import { uploadFileToSupabase } from "@/lib/actions/supabase-upload"
 import { THAI_FONT_LEELAWADEE } from "@/lib/fonts/thai-font"
 
@@ -23,6 +24,7 @@ export async function generateJobPDF(jobId: string) {
     // PDF generation started
     
     try {
+        await requireAdmin()
         const supabase = createAdminClient()
         
         // 1. Fetch comprehensive job data using admin client
@@ -78,8 +80,7 @@ export async function generateJobPDF(jobId: string) {
             body: detailsData,
             theme: 'striped',
             headStyles: { 
-                // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                fillColor: accentColor as any,
+                fillColor: accentColor as [number, number, number],
                 font: 'Leelawadee'
             },
             styles: { 
@@ -93,8 +94,7 @@ export async function generateJobPDF(jobId: string) {
         // Since fetching and converting all images might be heavy, for now we will 
         // provide links in metadata but let's try to embed at least the signature.
         
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const finalYFromTable = (doc as any).lastAutoTable.finalY || 150
+        const finalYFromTable = (doc as jsPDF & { lastAutoTable?: { finalY?: number } }).lastAutoTable?.finalY || 150
         let finalY = finalYFromTable + 20
 
         // Signatures (Embedded Images)

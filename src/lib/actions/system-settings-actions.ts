@@ -1,6 +1,7 @@
 'use server'
 
 import { createAdminClient } from "@/utils/supabase/server"
+import { requireAdmin } from "@/services/permission-guards"
 import { revalidatePath } from "next/cache"
 
 /**
@@ -29,8 +30,9 @@ export async function getSystemSetting<T>(key: string, defaultValue: T): Promise
 /**
  * Save a system setting using Admin Client to bypass RLS
  */
-export async function saveSystemSetting(key: string, value: any, description: string = '') {
+export async function saveSystemSetting(key: string, value: unknown, description: string = '') {
     try {
+        await requireAdmin()
         const supabase = createAdminClient()
         
         const { error } = await supabase
@@ -48,8 +50,8 @@ export async function saveSystemSetting(key: string, value: any, description: st
 
         revalidatePath('/settings')
         return { success: true }
-    } catch (err: any) {
+    } catch (err: unknown) {
         console.error(`Exception saving setting [${key}]:`, err)
-        return { success: false, error: err.message || 'Internal Server Error' }
+        return { success: false, error: err instanceof Error ? err.message : 'Internal Server Error' }
     }
 }

@@ -69,7 +69,7 @@ export function VehicleDialog({
     Sub_ID: vehicle?.Sub_ID || '',
     Max_Weight_kg: vehicle?.Max_Weight_kg || '',
     Max_Volume_cbm: vehicle?.Max_Volume_cbm || '',
-    is_chassis: (vehicle as any)?.is_chassis || false,
+    is_chassis: (vehicle as { is_chassis?: boolean } | null)?.is_chassis || false,
     Tax_Expiry: vehicle?.Tax_Expiry || '',
     Insurance_Expiry: vehicle?.Insurance_Expiry || '',
     Act_Expiry: vehicle?.Act_Expiry || ''
@@ -134,8 +134,8 @@ export function VehicleDialog({
   return (
     <Dialog open={show} onOpenChange={setShow}>
       {trigger && <DialogTrigger asChild>{trigger}</DialogTrigger>}
-      <DialogContent className="max-w-[95vw] sm:max-w-xl max-h-[95vh] flex flex-col bg-card/95 backdrop-blur-2xl border-border/5 text-foreground p-0 rounded-[2.5rem] overflow-hidden shadow-[0_0_80px_rgba(0,0,0,0.5)]">
-        <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-primary via-accent to-purple-500" />
+      <DialogContent className="max-w-[95vw] sm:max-w-2xl max-h-[95vh] flex flex-col bg-card border border-border text-foreground p-0 rounded-2xl overflow-hidden shadow-lg">
+        <div className="absolute top-0 left-0 w-full h-1 bg-primary" />
         
         <DialogHeader className="p-8 pb-0 flex-shrink-0">
           <div className="flex items-center gap-4 mb-2">
@@ -143,10 +143,10 @@ export function VehicleDialog({
                   <Car className="text-primary" size={24} />
               </div>
               <div>
-                  <DialogTitle className="text-3xl font-black tracking-tighter uppercase whitespace-nowrap">
+                  <DialogTitle className="text-2xl font-semibold tracking-tight whitespace-nowrap">
                       {mode === 'create' ? t('vehicles.dialog.title_add') : t('vehicles.dialog.title_edit')}
                   </DialogTitle>
-                  <p className="text-muted-foreground text-base font-bold font-black uppercase tracking-normal">{t('vehicles.dialog.subtitle')}</p>
+                  <p className="text-muted-foreground text-sm font-medium">{t('vehicles.dialog.subtitle')}</p>
               </div>
           </div>
         </DialogHeader>
@@ -155,9 +155,9 @@ export function VehicleDialog({
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               {branches.length > 0 && (
                 <div className="space-y-2">
-                    <Label htmlFor="Branch_ID" className="text-xs font-black uppercase tracking-tight text-muted-foreground ml-1">Branch HQ</Label>
+                    <Label htmlFor="Branch_ID" className="text-xs font-medium text-muted-foreground ml-1">Branch</Label>
                     <Select value={formData.Branch_ID || undefined} onValueChange={(val) => setFormData({ ...formData, Branch_ID: val })}>
-                        <SelectTrigger className="h-10 rounded-xl bg-muted/50 border-border/10 text-foreground">
+                        <SelectTrigger className="h-10 rounded-xl bg-muted/50 border-border text-foreground">
                             <SelectValue placeholder={t('common.all')} />
                         </SelectTrigger>
                         <SelectContent className="bg-card border-border/10 text-foreground">
@@ -173,9 +173,9 @@ export function VehicleDialog({
 
               {subcontractors && subcontractors.length > 0 && (
                 <div className="space-y-2">
-                    <Label htmlFor="Sub_ID" className="text-xs font-black uppercase tracking-tight text-muted-foreground ml-1">{t('jobs.dialog.carrier')}</Label>
+                    <Label htmlFor="Sub_ID" className="text-xs font-medium text-muted-foreground ml-1">{t('jobs.dialog.carrier')}</Label>
                     <Select value={formData.Sub_ID || "__company__"} onValueChange={(val) => setFormData({ ...formData, Sub_ID: val === "__company__" ? "" : val })}>
-                        <SelectTrigger className="h-10 rounded-xl bg-muted/50 border-border/10 text-foreground">
+                        <SelectTrigger className="h-10 rounded-xl bg-muted/50 border-border text-foreground">
                             <SelectValue placeholder={t('jobs.dialog.internal')} />
                         </SelectTrigger>
                         <SelectContent className="bg-card border-border/10 text-foreground">
@@ -190,10 +190,10 @@ export function VehicleDialog({
             </div>
           )}
 
-          <div className="h-px bg-muted/50 mx-[-2rem]" />
+          <div className="h-px bg-border mx-[-2rem]" />
 
           <div className="space-y-2">
-            <Label htmlFor="Vehicle_Plate" className="text-base font-bold font-black uppercase tracking-tight text-muted-foreground ml-1">{t('vehicles.dialog.plate')}</Label>
+            <Label htmlFor="Vehicle_Plate" className="text-sm font-medium text-muted-foreground ml-1">{t('vehicles.dialog.plate')}</Label>
             <Input
               id="Vehicle_Plate"
               value={formData.Vehicle_Plate}
@@ -201,59 +201,59 @@ export function VehicleDialog({
               placeholder="1กข-1234"
               required
               disabled={mode === 'edit'}
-              className="h-12 px-6 rounded-xl bg-muted/50 border-border/10 text-foreground placeholder:text-muted-foreground focus:ring-primary/40"
+              className="h-12 px-4 rounded-xl bg-muted/50 border-border text-foreground placeholder:text-muted-foreground focus:ring-primary/40"
             />
           </div>
           
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
-                <Label htmlFor="Brand" className="text-base font-bold font-black uppercase tracking-tight text-muted-foreground ml-1">{t('vehicles.dialog.brand')}</Label>
+                <Label htmlFor="Brand" className="text-sm font-medium text-muted-foreground ml-1">{t('vehicles.dialog.brand')}</Label>
                 <Input
                 id="Brand"
                 value={formData.Brand}
                 onChange={(e) => setFormData({ ...formData, Brand: e.target.value })}
                 placeholder="Toyota"
-                className="h-12 px-6 rounded-xl bg-muted/50 border-border/10 text-foreground placeholder:text-muted-foreground focus:ring-primary/40"
+                className="h-12 px-4 rounded-xl bg-muted/50 border-border text-foreground placeholder:text-muted-foreground focus:ring-primary/40"
                 />
             </div>
             <div className="space-y-2">
-                <Label htmlFor="Model" className="text-base font-bold font-black uppercase tracking-tight text-muted-foreground ml-1">{t('vehicles.dialog.model')}</Label>
+                <Label htmlFor="Model" className="text-sm font-medium text-muted-foreground ml-1">{t('vehicles.dialog.model')}</Label>
                 <Input
                 id="Model"
                 value={formData.Model}
                 onChange={(e) => setFormData({ ...formData, Model: e.target.value })}
                 placeholder="Hilux Revo"
-                className="h-12 px-6 rounded-xl bg-muted/50 border-border/10 text-foreground placeholder:text-muted-foreground focus:ring-primary/40"
+                className="h-12 px-4 rounded-xl bg-muted/50 border-border text-foreground placeholder:text-muted-foreground focus:ring-primary/40"
                 />
             </div>
           </div>
 
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
-                <Label htmlFor="Current_Mileage" className="text-base font-bold font-black uppercase tracking-tight text-muted-foreground ml-1">{t('vehicles.dialog.mileage')}</Label>
+                <Label htmlFor="Current_Mileage" className="text-sm font-medium text-muted-foreground ml-1">{t('vehicles.dialog.mileage')}</Label>
                 <Input
                 id="Current_Mileage"
                 type="number"
                 value={formData.Current_Mileage || ""}
                 onChange={(e) => setFormData({ ...formData, Current_Mileage: e.target.value === "" ? "" : Number(e.target.value) })}
-                className="h-12 px-6 rounded-xl bg-muted/50 border-border/10 text-foreground focus:ring-primary/40"
+                className="h-12 px-4 rounded-xl bg-muted/50 border-border text-foreground focus:ring-primary/40"
                 />
             </div>
             <div className="space-y-2">
-                <Label htmlFor="Next_Service_Mileage" className="text-base font-bold font-black uppercase tracking-tight text-muted-foreground ml-1">{t('vehicles.dialog.next_service')}</Label>
+                <Label htmlFor="Next_Service_Mileage" className="text-sm font-medium text-muted-foreground ml-1">{t('vehicles.dialog.next_service')}</Label>
                 <Input
                 id="Next_Service_Mileage"
                 type="number"
                 value={formData.Next_Service_Mileage || ""}
                 onChange={(e) => setFormData({ ...formData, Next_Service_Mileage: e.target.value === "" ? "" : Number(e.target.value) })}
-                className="h-12 px-6 rounded-xl bg-muted/50 border-border/10 text-foreground focus:ring-primary/40"
+                className="h-12 px-4 rounded-xl bg-muted/50 border-border text-foreground focus:ring-primary/40"
                 />
             </div>
           </div>
 
-          <div className="grid grid-cols-2 gap-4 border-t border-border/5 pt-6">
+          <div className="grid grid-cols-2 gap-4 border-t border-border pt-6">
              <div className="space-y-2">
-                <Label htmlFor="Max_Weight_kg" className="text-base font-bold font-black uppercase tracking-tight text-emerald-500/80 ml-1">{t('vehicles.dialog.max_weight')}</Label>
+                <Label htmlFor="Max_Weight_kg" className="text-sm font-medium text-emerald-600 ml-1">{t('vehicles.dialog.max_weight')}</Label>
                 <div className="relative">
                     <Scale className="absolute left-4 top-1/2 -translate-y-1/2 text-emerald-500/40" size={16} />
                     <Input
@@ -262,12 +262,12 @@ export function VehicleDialog({
                         value={formData.Max_Weight_kg || ""}
                         onChange={(e) => setFormData({ ...formData, Max_Weight_kg: e.target.value === "" ? "" : Number(e.target.value) })}
                         placeholder="e.g. 1500"
-                        className="h-12 pl-12 rounded-xl bg-emerald-500/5 border-emerald-500/10 text-emerald-400 placeholder:text-emerald-900/40"
+                        className="h-12 pl-12 rounded-xl bg-emerald-500/5 border-emerald-500/20 text-foreground placeholder:text-muted-foreground"
                     />
                 </div>
             </div>
             <div className="space-y-2">
-                <Label htmlFor="Max_Volume_cbm" className="text-base font-bold font-black uppercase tracking-tight text-emerald-500/80 ml-1">{t('vehicles.dialog.max_volume')}</Label>
+                <Label htmlFor="Max_Volume_cbm" className="text-sm font-medium text-emerald-600 ml-1">{t('vehicles.dialog.max_volume')}</Label>
                 <div className="relative">
                     <Box className="absolute left-4 top-1/2 -translate-y-1/2 text-emerald-500/40" size={16} />
                     <Input
@@ -277,23 +277,23 @@ export function VehicleDialog({
                         onChange={(e) => setFormData({ ...formData, Max_Volume_cbm: e.target.value === "" ? "" : Number(e.target.value) })}
                         placeholder="e.g. 2.5"
                         step="0.1"
-                        className="h-12 pl-12 rounded-xl bg-emerald-500/5 border-emerald-500/10 text-emerald-400 placeholder:text-emerald-900/40"
+                        className="h-12 pl-12 rounded-xl bg-emerald-500/5 border-emerald-500/20 text-foreground placeholder:text-muted-foreground"
                     />
                 </div>
             </div>
           </div>
 
-          <div className="p-6 rounded-3xl bg-muted/50 border border-border/10 space-y-6">
+          <div className="p-6 rounded-2xl bg-muted/30 border border-border space-y-6">
             <div className="flex items-center gap-3">
                  <div className="p-2 bg-blue-500/20 rounded-xl">
-                    <Shield size={18} className="text-blue-400" /> 
+                    <Shield size={18} className="text-primary" /> 
                  </div>
-                 <h4 className="text-base font-bold font-black text-blue-400 uppercase tracking-normal">{t('vehicles.dialog.compliance_section')}</h4>
+                 <h4 className="text-base font-semibold text-foreground">{t('vehicles.dialog.compliance_section')}</h4>
             </div>
             
             <div className="grid grid-cols-1 gap-4">
                 <div className="grid grid-cols-2 items-center gap-4">
-                    <Label htmlFor="Tax_Expiry" className="text-xs font-black uppercase tracking-tight text-muted-foreground">{t('vehicles.dialog.tax_expiry')}</Label>
+                    <Label htmlFor="Tax_Expiry" className="text-xs font-medium text-muted-foreground">{t('vehicles.dialog.tax_expiry')}</Label>
                     <div className="relative">
                         <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" size={14} />
                         <Input
@@ -301,13 +301,13 @@ export function VehicleDialog({
                             type="date"
                             value={formData.Tax_Expiry}
                             onChange={(e) => setFormData({ ...formData, Tax_Expiry: e.target.value })}
-                            className="h-10 pl-10 border-border/10 bg-black/20 text-foreground focus:ring-primary/40 invert-[0.9] dark:invert-0"
+                            className="h-10 pl-10 bg-background border-border text-foreground focus:ring-primary/40"
                         />
                     </div>
                 </div>
                 
                 <div className="grid grid-cols-2 items-center gap-4">
-                    <Label htmlFor="Insurance_Expiry" className="text-xs font-black uppercase tracking-tight text-muted-foreground">{t('vehicles.dialog.insurance_expiry')}</Label>
+                    <Label htmlFor="Insurance_Expiry" className="text-xs font-medium text-muted-foreground">{t('vehicles.dialog.insurance_expiry')}</Label>
                     <div className="relative">
                         <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" size={14} />
                         <Input
@@ -315,13 +315,13 @@ export function VehicleDialog({
                             type="date"
                             value={formData.Insurance_Expiry}
                             onChange={(e) => setFormData({ ...formData, Insurance_Expiry: e.target.value })}
-                            className="h-10 pl-10 border-border/10 bg-black/20 text-foreground focus:ring-primary/40 invert-[0.9] dark:invert-0"
+                            className="h-10 pl-10 bg-background border-border text-foreground focus:ring-primary/40"
                         />
                     </div>
                 </div>
 
                 <div className="grid grid-cols-2 items-center gap-4">
-                    <Label htmlFor="Act_Expiry" className="text-xs font-black uppercase tracking-tight text-muted-foreground">{t('vehicles.dialog.act_expiry')}</Label>
+                    <Label htmlFor="Act_Expiry" className="text-xs font-medium text-muted-foreground">{t('vehicles.dialog.act_expiry')}</Label>
                     <div className="relative">
                         <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" size={14} />
                         <Input
@@ -329,7 +329,7 @@ export function VehicleDialog({
                             type="date"
                             value={formData.Act_Expiry}
                             onChange={(e) => setFormData({ ...formData, Act_Expiry: e.target.value })}
-                            className="h-10 pl-10 border-border/10 bg-black/20 text-foreground focus:ring-primary/40 invert-[0.9] dark:invert-0"
+                            className="h-10 pl-10 bg-background border-border text-foreground focus:ring-primary/40"
                         />
                     </div>
                 </div>
@@ -341,9 +341,9 @@ export function VehicleDialog({
 
 
           <div className="space-y-2">
-            <Label htmlFor="Vehicle_Type" className="text-base font-bold font-black uppercase tracking-tight text-muted-foreground ml-1">{t('vehicles.dialog.type')}</Label>
+            <Label htmlFor="Vehicle_Type" className="text-sm font-medium text-muted-foreground ml-1">{t('vehicles.dialog.type')}</Label>
             <Select value={formData.Vehicle_Type} onValueChange={(val) => setFormData({ ...formData, Vehicle_Type: val })}>
-                <SelectTrigger className="h-10 rounded-xl bg-muted/50 border-border/10 text-foreground">
+                <SelectTrigger className="h-10 rounded-xl bg-muted/50 border-border text-foreground">
                     <SelectValue placeholder={t('vehicles.type')} />
                 </SelectTrigger>
                 <SelectContent className="bg-card border-border/10 text-foreground">
@@ -364,10 +364,10 @@ export function VehicleDialog({
             </Select>
           </div>
 
-          <div className="flex items-center justify-between p-4 bg-muted/30 rounded-2xl border border-border/10">
+          <div className="flex items-center justify-between p-4 bg-muted/30 rounded-2xl border border-border">
                 <div className="space-y-0.5">
-                    <Label className="text-base font-black uppercase tracking-tight">หางลาก (Chassis)</Label>
-                    <p className="text-xs text-muted-foreground font-bold">ระบุว่าเป็นหางลากสำหรับงานตู้คอนเทนเนอร์</p>
+                    <Label className="text-base font-semibold">หางลาก (Chassis)</Label>
+                    <p className="text-xs text-muted-foreground font-medium">ระบุว่าเป็นหางลากสำหรับงานตู้คอนเทนเนอร์</p>
                 </div>
                 <button
                     type="button"
@@ -386,9 +386,9 @@ export function VehicleDialog({
 
           {mode === 'edit' && (
              <div className="space-y-2">
-              <Label htmlFor="Active_Status" className="text-base font-bold font-black uppercase tracking-tight text-muted-foreground ml-1">{t('common.status')}</Label>
+              <Label htmlFor="Active_Status" className="text-sm font-medium text-muted-foreground ml-1">{t('common.status')}</Label>
               <Select value={formData.Active_Status} onValueChange={(val) => setFormData({ ...formData, Active_Status: val })}>
-                <SelectTrigger className="h-10 rounded-xl bg-muted/50 border-border/10 text-foreground">
+                <SelectTrigger className="h-10 rounded-xl bg-muted/50 border-border text-foreground">
                     <SelectValue placeholder={t('common.status')} />
                 </SelectTrigger>
                 <SelectContent className="bg-card border-border/10 text-foreground">
@@ -405,14 +405,14 @@ export function VehicleDialog({
                 type="button" 
                 variant="ghost" 
                 onClick={() => setShow(false)}
-                className="h-14 px-8 rounded-2xl text-muted-foreground font-black uppercase tracking-tight text-base font-bold hover:text-foreground"
+                className="h-12 px-6 rounded-xl text-muted-foreground font-semibold text-sm hover:text-foreground"
             >
               {t('vehicles.dialog.abort')}
             </Button>
             <Button 
                 type="submit" 
                 disabled={loading} 
-                className="h-14 px-12 rounded-2xl bg-primary hover:brightness-110 text-foreground font-black uppercase tracking-tight text-base font-bold shadow-xl shadow-primary/20 gap-3"
+                className="h-12 px-8 rounded-xl bg-primary hover:brightness-110 text-primary-foreground font-semibold text-sm shadow-sm gap-3"
             >
               {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save size={18} />}
               {mode === 'create' ? t('vehicles.dialog.execute') : t('vehicles.dialog.sync')}

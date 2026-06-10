@@ -138,16 +138,16 @@ export default function BranchSettingsPage() {
     <DashboardLayout>
       <div className="space-y-12 pb-20 p-4 lg:p-10">
         {/* Tactical Elite Header */}
-        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-10 bg-background/60 backdrop-blur-3xl p-10 rounded-br-[6rem] rounded-tl-[3rem] border border-border/5 shadow-2xl relative overflow-hidden group">
+        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-10 bg-background/60 backdrop-blur-3xl p-10 rounded-br-[6rem] rounded-tl-[3rem] border border-border shadow-2xl relative overflow-hidden group">
             <div className="absolute top-0 right-0 w-80 h-80 bg-primary/10 blur-[120px] rounded-full -mr-40 -mt-40 pointer-events-none" />
             
             <div className="relative z-10 space-y-8">
                 <button onClick={() => router.back()} className="inline-flex items-center gap-2 text-muted-foreground hover:text-primary transition-all font-black uppercase tracking-[0.1em] text-base font-bold group/back italic">
                     <ArrowLeft className="w-4 h-4 group-hover/back:-translate-x-1 transition-transform" /> 
-                    Command Control
+                    {t('common.back')}
                 </button>
                 <div className="flex items-center gap-6">
-                    <div className="p-4 bg-primary/20 rounded-[2.5rem] border-2 border-primary/30 shadow-[0_0_40px_rgba(255,30,133,0.2)] text-primary group-hover:scale-110 transition-all duration-500">
+                    <div className="p-4 bg-primary/20 rounded-[2.5rem] border-2 border-primary/30 shadow-[0_0_40px_rgba(0,39,156,0.2)] text-primary group-hover:scale-110 transition-all duration-500">
                         <Building size={42} strokeWidth={2.5} />
                     </div>
                     <div>
@@ -160,9 +160,9 @@ export default function BranchSettingsPage() {
             </div>
 
             <div className="flex flex-col items-end gap-6 relative z-10">
-                <div className="bg-muted/50 border border-border/10 px-6 py-3 rounded-2xl flex items-center gap-3 backdrop-blur-md">
-                    <div className="w-2 h-2 rounded-full bg-primary animate-pulse shadow-[0_0_10px_rgba(255,30,133,1)]" />
-                    <span className="text-base font-bold font-black text-muted-foreground uppercase tracking-widest italic">Signal Protocol: SECURE</span>
+                <div className="bg-muted/50 border border-border px-6 py-3 rounded-2xl flex items-center gap-3 backdrop-blur-md">
+                    <div className="w-2 h-2 rounded-full bg-primary animate-pulse shadow-[0_0_10px_rgba(0,39,156,1)]" />
+                    <span className="text-base font-bold font-black text-muted-foreground uppercase tracking-widest italic">{t('common.status')}: {t('common.success')}</span>
                 </div>
                 <PremiumButton 
                     onClick={() => setIsCreateDialogOpen(true)}
@@ -190,7 +190,7 @@ export default function BranchSettingsPage() {
               {t('settings_pages.branches.ui.advisory_desc')}
             </p>
           </div>
-          <PremiumButton variant="outline" className="h-14 px-10 rounded-2xl border-border/10 text-foreground gap-3 uppercase font-black text-base font-bold tracking-[0.3em] ml-auto italic">
+          <PremiumButton variant="outline" className="h-14 px-10 rounded-2xl border-border text-foreground gap-3 uppercase font-black text-base font-bold tracking-[0.3em] ml-auto italic">
             <Target size={18} /> {t('settings_pages.branches.ui.sync_all')}
           </PremiumButton>
         </motion.div>
@@ -210,8 +210,8 @@ export default function BranchSettingsPage() {
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ delay: index * 0.1 }}
                 >
-                  <PremiumCard className="bg-background/40 border-2 border-border/5 shadow-3xl rounded-[4rem] overflow-hidden group/branch">
-                    <div className="bg-black/40 p-10 border-b border-border/5 flex items-center justify-between relative overflow-hidden">
+                  <PremiumCard className="bg-background/40 border-2 border-border shadow-3xl rounded-[4rem] overflow-hidden group/branch">
+                    <div className="bg-muted/25 p-10 border-b border-border flex items-center justify-between relative overflow-hidden">
                       <div className="absolute top-0 right-0 w-64 h-64 bg-primary/5 blur-[80px] pointer-events-none" />
                       <div className="flex items-center gap-6 relative z-10">
                         <div className="p-4 rounded-[2rem] bg-primary/10 text-primary border border-primary/20 shadow-inner group-hover/branch:rotate-6 transition-transform duration-500">
@@ -271,7 +271,7 @@ export default function BranchSettingsPage() {
                                 <Input 
                                   value={editState[branch.Branch_ID]?.Branch_Name || ""}
                                   onChange={(e) => handleInputChange(branch.Branch_ID, 'Branch_Name', e.target.value)}
-                                  className="h-16 bg-black/40 border-border/5 rounded-[1.5rem] focus:border-primary/50 transition-all text-foreground font-black italic tracking-normal pl-8 shadow-inner"
+                                  className="h-16 bg-muted/25 border-border rounded-[1.5rem] focus:border-primary/50 transition-all text-foreground font-black italic tracking-normal pl-8 shadow-inner"
                                 />
                              </div>
                              <div className="space-y-4">
@@ -280,7 +280,7 @@ export default function BranchSettingsPage() {
                                   value={editState[branch.Branch_ID]?.Address || ""}
                                   onChange={(e) => handleInputChange(branch.Branch_ID, 'Address', e.target.value)}
                                   placeholder="Address protocol..."
-                                  className="h-16 bg-black/40 border-border/5 rounded-[1.5rem] focus:border-primary/50 transition-all text-foreground font-black italic tracking-normal pl-8 shadow-inner"
+                                  className="h-16 bg-muted/25 border-border rounded-[1.5rem] focus:border-primary/50 transition-all text-foreground font-black italic tracking-normal pl-8 shadow-inner"
                                 />
                              </div>
                              <div className="space-y-4">
@@ -289,7 +289,7 @@ export default function BranchSettingsPage() {
                                   value={editState[branch.Branch_ID]?.Phone || ""}
                                   onChange={(e) => handleInputChange(branch.Branch_ID, 'Phone', e.target.value)}
                                   placeholder="Voice uplink..."
-                                  className="h-16 bg-black/40 border-border/5 rounded-[1.5rem] focus:border-primary/50 transition-all text-foreground font-black italic tracking-normal pl-8 shadow-inner"
+                                  className="h-16 bg-muted/25 border-border rounded-[1.5rem] focus:border-primary/50 transition-all text-foreground font-black italic tracking-normal pl-8 shadow-inner"
                                 />
                              </div>
                           </div>
@@ -311,7 +311,7 @@ export default function BranchSettingsPage() {
                                   value={editState[branch.Branch_ID]?.Email || ""}
                                   onChange={(e) => handleInputChange(branch.Branch_ID, 'Email', e.target.value)}
                                   placeholder="node@logispro.io"
-                                  className="h-16 bg-black/40 border-border/5 rounded-[1.5rem] focus:border-emerald-500/50 transition-all text-foreground font-black italic tracking-normal pl-8 shadow-inner"
+                                  className="h-16 bg-muted/25 border-border rounded-[1.5rem] focus:border-emerald-500/50 transition-all text-foreground font-black italic tracking-normal pl-8 shadow-inner"
                                 />
                              </div>
                              <div className="space-y-4">
@@ -320,7 +320,7 @@ export default function BranchSettingsPage() {
                                   value={editState[branch.Branch_ID]?.Sender_Name || ""}
                                   onChange={(e) => handleInputChange(branch.Branch_ID, 'Sender_Name', e.target.value)}
                                   placeholder="LOGISPRO_COMMAND_UNIT"
-                                  className="h-16 bg-black/40 border-border/5 rounded-[1.5rem] focus:border-emerald-500/50 transition-all text-foreground font-black italic tracking-normal pl-8 shadow-inner"
+                                  className="h-16 bg-muted/25 border-border rounded-[1.5rem] focus:border-emerald-500/50 transition-all text-foreground font-black italic tracking-normal pl-8 shadow-inner"
                                 />
                              </div>
                           </div>
@@ -362,20 +362,19 @@ export default function BranchSettingsPage() {
             <CheckCircle2 size={32} />
           </div>
           <div className="space-y-4 text-center md:text-left">
-            <p className="text-xl font-black text-primary italic uppercase tracking-widest">TACTICAL HUB ADVISORY</p>
+            <p className="text-xl font-black text-primary italic uppercase tracking-widest">{t('settings_pages.branches.ui.tactical_advisory')}</p>
             <p className="text-xl font-bold text-muted-foreground leading-relaxed uppercase tracking-wider italic">
-              Branch-specific signal overrides allow for granular client targeting. If a node is unconfigured, the system resorts to Global Command protocols for document emission. <br />
-              Ensure all node identifiers (IDs) are unique to prevent signal interference.
+              {t('settings_pages.branches.ui.advisory_desc')}
             </p>
           </div>
-          <PremiumButton variant="outline" className="h-14 px-10 rounded-2xl border-border/10 text-foreground gap-3 uppercase font-black text-base font-bold tracking-[0.3em] ml-auto italic">
-            <Target size={18} /> SYNC_ALL_NODES
+          <PremiumButton variant="outline" className="h-14 px-10 rounded-2xl border-border text-foreground gap-3 uppercase font-black text-base font-bold tracking-[0.3em] ml-auto italic">
+            <Target size={18} /> {t('settings_pages.branches.ui.sync_all')}
           </PremiumButton>
         </motion.div>
       </div>
 
         <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
-                <DialogContent className="bg-background border-border/10 text-foreground max-w-2xl max-h-[85vh] overflow-hidden flex flex-col p-0 shadow-[0_40px_100px_rgba(0,0,0,1)] rounded-[3rem] sm:rounded-[4rem] backdrop-blur-3xl relative">
+                <DialogContent className="bg-background border-border text-foreground max-w-2xl max-h-[85vh] overflow-hidden flex flex-col p-0 shadow-[0_40px_100px_rgba(0,0,0,1)] rounded-[3rem] sm:rounded-[4rem] backdrop-blur-3xl relative">
                     <div className="absolute top-0 left-0 w-full h-1 bg-primary animate-pulse shadow-[0_0_20px_rgba(255,30,133,1)]" />
                     
                     <div className="flex-1 min-h-0 overflow-y-auto p-6 sm:p-10 space-y-6 custom-scrollbar">
@@ -399,7 +398,7 @@ export default function BranchSettingsPage() {
                     value={newBranch.Branch_ID || ""}
                     onChange={(e) => setNewBranch(prev => ({ ...prev, Branch_ID: e.target.value }))}
                     placeholder="e.g. ALPHA_01"
-                    className="h-16 bg-black/40 border-border/5 rounded-[1.5rem] text-foreground font-black italic tracking-normal pl-8 shadow-inner"
+                    className="h-16 bg-muted/25 border-border rounded-[1.5rem] text-foreground font-black italic tracking-normal pl-8 shadow-inner"
                   />
                 </div>
                 <div className="space-y-3">
@@ -408,7 +407,7 @@ export default function BranchSettingsPage() {
                     value={newBranch.Branch_Name || ""}
                     onChange={(e) => setNewBranch(prev => ({ ...prev, Branch_Name: e.target.value }))}
                     placeholder="Hub name..."
-                    className="h-14 bg-black/40 border-border/5 rounded-[1.5rem] text-foreground font-black italic tracking-normal pl-8 shadow-inner"
+                    className="h-14 bg-muted/25 border-border rounded-[1.5rem] text-foreground font-black italic tracking-normal pl-8 shadow-inner"
                   />
                 </div>
               </div>
@@ -419,7 +418,7 @@ export default function BranchSettingsPage() {
                   value={newBranch.Address || ""}
                   onChange={(e) => setNewBranch(prev => ({ ...prev, Address: e.target.value }))}
                   placeholder="Physical deployment site..."
-                  className="h-14 bg-black/40 border-border/5 rounded-[1.5rem] text-foreground font-black italic tracking-normal pl-8 shadow-inner"
+                  className="h-14 bg-muted/25 border-border rounded-[1.5rem] text-foreground font-black italic tracking-normal pl-8 shadow-inner"
                 />
               </div>
 
@@ -429,17 +428,17 @@ export default function BranchSettingsPage() {
                   value={newBranch.Phone || ""}
                   onChange={(e) => setNewBranch(prev => ({ ...prev, Phone: e.target.value }))}
                   placeholder="+T-PH-NODE-XXXX"
-                  className="h-14 bg-black/40 border-border/5 rounded-[1.5rem] text-foreground font-black italic tracking-normal pl-8 shadow-inner"
+                  className="h-14 bg-muted/25 border-border rounded-[1.5rem] text-foreground font-black italic tracking-normal pl-8 shadow-inner"
                 />
               </div>
             </div>
           </div>
 
-            <DialogFooter className="p-6 sm:p-10 border-t border-border/5 bg-black/40 flex gap-4 sm:gap-6 shrink-0">
+            <DialogFooter className="p-6 sm:p-10 border-t border-border bg-muted/25 flex gap-4 sm:gap-6 shrink-0">
               <PremiumButton 
                 variant="outline" 
                 onClick={() => setIsCreateDialogOpen(false)}
-                className="flex-1 h-14 sm:h-16 rounded-[1.2rem] sm:rounded-[1.5rem] border-border/5 text-muted-foreground hover:text-foreground font-black uppercase tracking-widest italic"
+                className="flex-1 h-14 sm:h-16 rounded-[1.2rem] sm:rounded-[1.5rem] border-border text-muted-foreground hover:text-foreground font-black uppercase tracking-widest italic"
               >
                 {t('common.abort')}
               </PremiumButton>

@@ -19,7 +19,7 @@ export function ThemeWatcher() {
     metaTag.setAttribute('content', themeColor)
 
     // Update apple-mobile-web-app-status-bar-style if needed
-    let appleMeta = document.querySelector('meta[name="apple-mobile-web-app-status-bar-style"]')
+    const appleMeta = document.querySelector('meta[name="apple-mobile-web-app-status-bar-style"]')
     if (appleMeta) {
       appleMeta.setAttribute('content', resolvedTheme === "dark" ? "black-translucent" : "default")
     }

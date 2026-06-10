@@ -22,7 +22,9 @@ import {
     User,
     Database,
     Shield,
-    ShieldCheck
+    ShieldCheck,
+    HeartPulse,
+    Siren
 } from "lucide-react"
 
 export const MODULE_GROUPS = [
@@ -30,6 +32,8 @@ export const MODULE_GROUPS = [
     title: "Ops Command",
     items: [
       { key: "navigation.dashboard", label: "แดชบอร์ด", icon: LayoutDashboard },
+      { key: "navigation.exception_center", label: "ศูนย์สั่งการฉุกเฉิน (Exception Center)", icon: Siren },
+      { key: "navigation.operations_health", label: "ตรวจสอบคุณภาพข้อมูล (Ops Health)", icon: HeartPulse },
     ]
   },
   {
@@ -45,7 +49,6 @@ export const MODULE_GROUPS = [
       { key: "navigation.tracking_hub", label: "ศูนย์ติดตามงานสด (Admin)", icon: Activity },
       { key: "navigation.customer_tracking_hub", label: "ศูนย์ติดตามงานลูกค้า (Customer Tracking)", icon: Activity },
       { key: "navigation.pod", label: "หลักฐานการส่งสินค้า (POD)", icon: FileText },
-      { key: "navigation.notifications", label: "แจ้งเตือน & SOS", icon: AlertTriangle },
       { key: "navigation.chat", label: "แชท", icon: MessageSquare },
     ]
   },
@@ -57,6 +60,7 @@ export const MODULE_GROUPS = [
       { key: "navigation.driver_leaves", label: "จัดการการลา", icon: CalendarDays },
       { key: "navigation.customers", label: "ข้อมูลลูกค้า", icon: Building },
       { key: "navigation.fleet", label: "ยานพาหนะ", icon: Truck },
+      { key: "navigation.notifications", label: "สถานะต่อสัญญา (Compliance)", icon: ShieldCheck },
       { key: "navigation.checks", label: "ตรวจสภาพรถ", icon: CheckCircle2 },
       { key: "navigation.maintenance", label: "บันทึกซ่อมบำรุง", icon: Wrench },
       { key: "navigation.fuel", label: "บันทึกน้ำมัน", icon: Fuel },

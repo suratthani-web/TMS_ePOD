@@ -9,10 +9,10 @@ import { ProfitabilityHeatmap, ProfitPoint } from './profitability-heatmap'
 import { cn } from '@/lib/utils'
 
 // Fix for default marker icons in Next.js - Move inside component or initialize lazily
-let defaultIcon: any;
-let redIcon: any;
-let goldIcon: any;
-let greenIcon: any;
+let defaultIcon: L.Icon | undefined;
+let redIcon: L.Icon | undefined;
+let goldIcon: L.Icon | undefined;
+let greenIcon: L.Icon | undefined;
 
 const missionIconsCache: Record<string, L.DivIcon> = {};
 const getMissionIcon = (type: 'origin' | 'destination', status?: string) => {
@@ -76,7 +76,9 @@ const initIcons = () => {
         shadowSize: [41, 41]
     })
 
-    L.Marker.prototype.options.icon = defaultIcon
+    if (defaultIcon) {
+        L.Marker.prototype.options.icon = defaultIcon as L.Icon<L.IconOptions>
+    }
 }
 
 export type DriverLocation = {
@@ -250,14 +252,14 @@ export default function LeafletMap({
                                         <div className="w-1.5 h-1.5 rounded-full bg-purple-500 mt-1" />
                                         <div className="flex-1">
                                             <p className="text-[8px] font-black uppercase text-muted-foreground tracking-tighter leading-none mb-0.5">ต้นทาง (Origin)</p>
-                                            <p className="text-[10px] font-bold leading-tight text-foreground/80">{(mission as any).originName || 'ไม่ระบุ'}</p>
+                                            <p className="text-[10px] font-bold leading-tight text-foreground/80">{(mission as Record<string, unknown>).originName as string || 'ไม่ระบุ'}</p>
                                         </div>
                                     </div>
                                     <div className="flex items-start gap-2">
                                         <div className="w-1.5 h-1.5 rounded-full bg-rose-500 mt-1" />
                                         <div className="flex-1">
                                             <p className="text-[8px] font-black uppercase text-muted-foreground tracking-tighter leading-none mb-0.5">ปลายทาง (Destination)</p>
-                                            <p className="text-[10px] font-bold leading-tight text-foreground/80">{(mission as any).destName || 'ไม่ระบุ'}</p>
+                                            <p className="text-[10px] font-bold leading-tight text-foreground/80">{(mission as Record<string, unknown>).destName as string || 'ไม่ระบุ'}</p>
                                         </div>
                                     </div>
                                 </div>

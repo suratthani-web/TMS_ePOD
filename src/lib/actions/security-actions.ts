@@ -1,6 +1,7 @@
 'use server'
 
 import { createAdminClient } from "@/utils/supabase/server"
+import { requireAdmin } from "@/services/permission-guards"
 import { revalidatePath } from "next/cache"
 import { logActivity } from "@/lib/supabase/logs"
 import { getAdminSession } from "./auth-actions"
@@ -12,6 +13,7 @@ export async function getCurrentUserSession() {
 }
 
 export async function getPendingIPs() {
+    await requireAdmin()
     const supabase = createAdminClient()
     const { data, error } = await supabase
         .from('user_approved_ips')
@@ -27,6 +29,7 @@ export async function approveIP(id: string, username: string, ip: string) {
     const adminSession = await getAdminSession()
     if (!adminSession) return { success: false, error: 'Unauthorized' }
 
+    await requireAdmin()
     const supabase = createAdminClient()
     const { error } = await supabase
         .from('user_approved_ips')
@@ -55,6 +58,7 @@ export async function blockIP(id: string, username: string, ip: string) {
     const adminSession = await getAdminSession()
     if (!adminSession) return { success: false, error: 'Unauthorized' }
 
+    await requireAdmin()
     const supabase = createAdminClient()
     const { error } = await supabase
         .from('user_approved_ips')
@@ -83,6 +87,7 @@ export async function deleteIPRecord(id: string) {
     const adminSession = await getAdminSession()
     if (!adminSession) return { success: false, error: 'Unauthorized' }
 
+    await requireAdmin()
     const supabase = createAdminClient()
     const { error } = await supabase
         .from('user_approved_ips')

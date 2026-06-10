@@ -146,24 +146,24 @@ async function exportToPDF(elementId: string, fileName: string) {
 // Status badge component
 function StatusBadge({ status }: { status: string }) {
   const styles: Record<string, string> = {
-    'Completed': 'bg-emerald-500/20 text-emerald-700 font-bold',
-    'Delivered': 'bg-emerald-500/20 text-emerald-700 font-bold',
-    'completed': 'bg-emerald-500/20 text-emerald-700 font-bold',
-    'Active': 'bg-emerald-500/15 text-emerald-700 font-bold',
-    'In Transit': 'bg-cyan-500/20 text-cyan-700 font-bold',
-    'New': 'bg-emerald-500/20 text-emerald-700 font-bold',
-    'Assigned': 'bg-violet-500/20 text-violet-700 font-bold',
-    'OnJob': 'bg-cyan-500/20 text-cyan-700 font-bold',
-    'Failed': 'bg-red-500/20 text-red-700 font-bold',
-    'Cancelled': 'bg-red-500/20 text-red-700 font-bold',
-    'cancelled': 'bg-red-500/20 text-red-700 font-bold',
-    'Inactive': 'bg-slate-500/20 text-gray-700 font-bold',
-    'Maintenance': 'bg-amber-500/20 text-amber-700 font-bold',
-    'pending': 'bg-amber-500/20 text-amber-700 font-bold',
-    'in_progress': 'bg-emerald-500/15 text-emerald-700 font-bold',
+    'Completed': 'bg-emerald-500/20 text-emerald-700 dark:text-emerald-300',
+    'Delivered': 'bg-emerald-500/20 text-emerald-700 dark:text-emerald-300',
+    'completed': 'bg-emerald-500/20 text-emerald-700 dark:text-emerald-300',
+    'Active': 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-300',
+    'In Transit': 'bg-cyan-500/20 text-cyan-700 dark:text-cyan-300',
+    'New': 'bg-emerald-500/20 text-emerald-700 dark:text-emerald-300',
+    'Assigned': 'bg-primary/20 text-primary',
+    'OnJob': 'bg-cyan-500/20 text-cyan-700 dark:text-cyan-300',
+    'Failed': 'bg-red-500/20 text-red-700 dark:text-red-300',
+    'Cancelled': 'bg-red-500/20 text-red-700 dark:text-red-300',
+    'cancelled': 'bg-red-500/20 text-red-700 dark:text-red-300',
+    'Inactive': 'bg-muted text-muted-foreground',
+    'Maintenance': 'bg-amber-500/20 text-amber-700 dark:text-amber-300',
+    'pending': 'bg-amber-500/20 text-amber-700 dark:text-amber-300',
+    'in_progress': 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-300',
   }
   return (
-    <span className={`px-2 py-0.5 rounded-full text-lg font-bold font-medium ${styles[status] || 'bg-slate-500/20 text-muted-foreground'}`}>
+    <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${styles[status] || 'bg-muted text-muted-foreground'}`}>
       {status}
     </span>
   )
@@ -206,8 +206,8 @@ export function ReportBuilder() {
           setGenerated(true)
           setSortCol(null)
       }
-    } catch (e: any) {
-      setError(e.message || 'Error generating report')
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : 'Error generating report')
       setData([])
       setColumns([])
     } finally {
@@ -255,12 +255,12 @@ export function ReportBuilder() {
               onClick={() => { setSelectedType(rt.key); setGenerated(false); setStatus('all') }}
               className={`relative p-4 rounded-xl border transition-all text-left ${
                 isActive
-                  ? 'bg-blue-500/20 border-blue-400/50 ring-2 ring-blue-500/20'
-                  : 'bg-muted/50 border-slate-700 hover:border-slate-500 hover:bg-muted/80'
+                  ? 'bg-primary/10 border-primary/50 ring-2 ring-primary/20'
+                  : 'bg-muted/40 border-border hover:border-primary/30 hover:bg-muted/70'
               }`}
             >
-              <Icon size={20} className={isActive ? 'text-blue-400' : 'text-muted-foreground'} />
-              <p className={`mt-2 text-xl font-black ${isActive ? 'text-white' : 'text-muted-foreground'}`}>
+              <Icon size={20} className={isActive ? 'text-primary' : 'text-muted-foreground'} />
+              <p className={`mt-2 text-base font-semibold ${isActive ? 'text-foreground' : 'text-muted-foreground'}`}>
                 {rt.label}
               </p>
               {isActive && (
@@ -272,7 +272,7 @@ export function ReportBuilder() {
       </div>
 
       {/* Filters */}
-      <Card className="bg-card/50 border-slate-800 backdrop-blur-md">
+      <Card className="bg-card border-border shadow-sm">
         <CardHeader className="pb-3">
           <div className="flex items-center justify-between">
             <CardTitle className="text-foreground">
@@ -297,7 +297,7 @@ export function ReportBuilder() {
                   {activeReport.hasDate && (
                     <>
                       <div className="space-y-1.5">
-                        <Label className="text-lg font-bold text-muted-foreground font-black">จากวันที่</Label>
+                        <Label className="text-sm font-medium text-muted-foreground">จากวันที่</Label>
                         <Input
                           type="date"
                           value={dateFrom}
@@ -306,7 +306,7 @@ export function ReportBuilder() {
                         />
                       </div>
                       <div className="space-y-1.5">
-                        <Label className="text-lg font-bold text-muted-foreground font-black">ถึงวันที่</Label>
+                        <Label className="text-sm font-medium text-muted-foreground">ถึงวันที่</Label>
                         <Input
                           type="date"
                           value={dateTo}
@@ -320,7 +320,7 @@ export function ReportBuilder() {
                   {/* Status */}
                   {activeReport.hasStatus && statusOptions[selectedType] && (
                     <div className="space-y-1.5">
-                      <Label className="text-lg font-bold text-muted-foreground font-black">สถานะ</Label>
+                      <Label className="text-sm font-medium text-muted-foreground">สถานะ</Label>
                       <Select value={status} onValueChange={setStatus}>
                         <SelectTrigger className="bg-background border-input">
                           <SelectValue />
@@ -363,7 +363,7 @@ export function ReportBuilder() {
                       <button
                         key={preset.label}
                         onClick={() => { setDateFrom(preset.from); setDateTo(preset.to) }}
-                        className="px-3 py-1 text-lg font-bold rounded-full bg-muted/50 hover:bg-muted text-gray-700 font-bold hover:text-foreground transition-colors border border-border"
+                        className="px-3 py-1 text-sm font-medium rounded-full bg-muted/50 hover:bg-muted text-muted-foreground hover:text-foreground transition-colors border border-border"
                       >
                         {preset.label}
                       </button>
@@ -386,7 +386,7 @@ export function ReportBuilder() {
             exit={{ opacity: 0, y: -20 }}
           >
             <div id="report-to-pdf">
-              <Card className="bg-card/50 border-slate-800 backdrop-blur-md">
+              <Card className="bg-card border-border shadow-sm">
                 <CardHeader>
                   <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
                     <CardTitle className="text-foreground">
@@ -402,7 +402,7 @@ export function ReportBuilder() {
                           placeholder="ค้นหาในผลลัพธ์..."
                           value={searchTerm}
                           onChange={(e) => setSearchTerm(e.target.value)}
-                          className="pl-8 h-9 w-48 bg-background text-xl border-slate-800"
+                          className="pl-8 h-9 w-48 bg-background text-sm border-border"
                         />
                         {searchTerm && (
                           <button onClick={() => setSearchTerm('')} className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground">
@@ -416,7 +416,7 @@ export function ReportBuilder() {
                           variant="ghost"
                           size="sm"
                           onClick={() => exportToExcel(filteredData, columns, activeReport.label)}
-                          className="h-8 px-2 text-lg font-bold gap-1.5 hover:bg-emerald-500/10 hover:text-emerald-400"
+                          className="h-8 px-2 text-sm font-medium gap-1.5 hover:bg-emerald-500/10 hover:text-emerald-600"
                         >
                           <FileSpreadsheet size={14} />
                           Excel
@@ -425,7 +425,7 @@ export function ReportBuilder() {
                           variant="ghost"
                           size="sm"
                           onClick={() => exportToCSV(filteredData, columns, activeReport.label)}
-                          className="h-8 px-2 text-lg font-bold gap-1.5 hover:bg-blue-500/10 hover:text-emerald-500"
+                          className="h-8 px-2 text-sm font-medium gap-1.5 hover:bg-primary/10 hover:text-primary"
                         >
                           <Download size={14} />
                           CSV
@@ -434,7 +434,7 @@ export function ReportBuilder() {
                           variant="ghost"
                           size="sm"
                           onClick={() => exportToPDF('report-to-pdf', activeReport.label)}
-                          className="h-8 px-2 text-lg font-bold gap-1.5 hover:bg-rose-500/10 hover:text-rose-400"
+                          className="h-8 px-2 text-sm font-medium gap-1.5 hover:bg-rose-500/10 hover:text-rose-500"
                         >
                           <Download size={14} />
                           PDF
@@ -445,22 +445,22 @@ export function ReportBuilder() {
                 </CardHeader>
                 <CardContent className="p-0">
                   {filteredData.length === 0 ? (
-                    <div className="py-16 text-center text-muted-foreground font-bold">
+                    <div className="py-16 text-center text-muted-foreground font-medium">
                       <BarChart3 size={40} className="mx-auto mb-3 opacity-30" />
                       <p className="text-muted-foreground">ไม่พบข้อมูล</p>
-                      <p className="text-lg font-bold mt-1 text-muted-foreground">ลองปรับเงื่อนไขการค้นหา</p>
+                      <p className="text-sm font-medium mt-1 text-muted-foreground">ลองปรับเงื่อนไขการค้นหา</p>
                     </div>
                   ) : (
                     <div className="overflow-x-auto">
-                      <table className="w-full text-xl">
+                      <table className="w-full text-sm">
                         <thead>
                           <tr className="border-b border-border/10 bg-muted/50">
-                            <th className="px-4 py-3 text-left text-lg font-bold font-black text-muted-foreground w-10">#</th>
+                            <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground w-10">#</th>
                             {columns.map(col => (
                               <th
                                 key={col}
                                 onClick={() => handleSort(col)}
-                                className="px-4 py-3 text-left text-foreground transition-colors group"
+                              className="px-4 py-3 text-left text-xs font-medium text-foreground transition-colors group"
                               >
                                 <span className="flex items-center gap-1">
                                   {columnLabels[col] || (col.startsWith('Extra_') ? col.replace('Extra_', '') : col)}
@@ -471,11 +471,11 @@ export function ReportBuilder() {
                           </tr>
                         </thead>
                         <tbody className="divide-y divide-border/50">
-                          {filteredData.slice(0, 500).map((row: any, i) => (
+                          {filteredData.slice(0, 500).map((row: Record<string, unknown>, i) => (
                             <tr key={i} className="hover:bg-muted/20 transition-colors">
-                              <td className="px-4 py-2.5 text-lg font-bold text-muted-foreground">{i + 1}</td>
+                              <td className="px-4 py-2.5 text-xs font-medium text-muted-foreground">{i + 1}</td>
                               {columns.map(col => (
-                                <td key={col} className="px-4 py-2.5 text-muted-foreground">
+                                <td key={col} className="px-4 py-2.5 text-muted-foreground text-sm">
                                   {(col === 'Status' || col === 'status' || col === 'Job_Status' || col === 'priority') && row[col] ? (
                                     <StatusBadge status={String(row[col])} />
                                   ) : (col.toLowerCase().includes('cost') || col === 'amount' || col === 'Price_Cust_Total' || col.startsWith('Extra_')) ? (
@@ -490,7 +490,7 @@ export function ReportBuilder() {
                         </tbody>
                         <tfoot className="border-t-2 border-border bg-muted/40 font-bold">
                             <tr>
-                                <td className="px-4 py-3 text-lg font-bold text-gray-700 font-black">รวม</td>
+                                <td className="px-4 py-3 text-sm font-semibold text-foreground">รวม</td>
                                 {columns.map(col => {
                                     const isNumeric = col.toLowerCase().includes('cost') || col === 'amount' || col === 'Price_Cust_Total' || col.startsWith('Extra_') || col === 'Liters';
                                     if (!isNumeric) return <td key={col} className="px-4 py-3"></td>;
@@ -507,7 +507,7 @@ export function ReportBuilder() {
                       </table>
                       {filteredData.length > 500 && (
                         <div className="px-4 py-3 border-t border-border bg-muted/20 text-center">
-                          <p className="text-lg font-bold text-gray-700 font-bold">
+                          <p className="text-sm font-medium text-muted-foreground">
                             แสดง 500 จาก {filteredData.length.toLocaleString()} รายการ — ดาวน์โหลด CSV เพื่อดูทั้งหมด
                           </p>
                         </div>

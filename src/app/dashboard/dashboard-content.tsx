@@ -11,6 +11,9 @@ import { getESGStats } from "@/lib/supabase/esg-analytics"
 import { getAllCustomers } from "@/lib/supabase/customers"
 import { cookies } from "next/headers"
 import { AlertTriangle } from "lucide-react"
+import type { ComponentProps } from "react"
+
+type DashboardClientProps = ComponentProps<typeof DashboardClient>
 
 interface DashboardContentProps {
   searchParams: { 
@@ -20,6 +23,10 @@ interface DashboardContentProps {
     customers?: string; // Comma separated names
     customer?: string; // Selected customer ID
   }
+}
+
+type CustomerListResult = {
+  data?: unknown[]
 }
 
 export async function DashboardContent({ searchParams }: DashboardContentProps) {
@@ -52,7 +59,7 @@ export async function DashboardContent({ searchParams }: DashboardContentProps) 
   const isAdminUser = await isAdmin()
   
   // Parallel Fetching - Server Side (Ultra Fast)
-  let unified, sosIds, marketplaceJobs: any[], heatmapJobs, activeJobs, customerMode = false, custId: string | null = null, dailyStats, driverStats, fleetAlerts, esgResult, allCustomers;
+  let unified, sosIds, marketplaceJobs: DashboardClientProps["marketplaceJobs"], heatmapJobs: DashboardClientProps["heatmapJobs"], activeJobs: DashboardClientProps["activeJobs"], customerMode = false, custId: string | null = null, dailyStats, driverStats, fleetAlerts, esgResult, allCustomers;
 
   try {
     customerMode = await isCustomer()
@@ -82,16 +89,16 @@ export async function DashboardContent({ searchParams }: DashboardContentProps) 
         esg: { fuelSaved: 0, co2Saved: 0, treesSaved: 0 }
     };
     sosIds = results[1].status === 'fulfilled' ? results[1].value : [];
-    marketplaceJobs = results[2].status === 'fulfilled' ? results[2].value : [];
+    marketplaceJobs = results[2].status === 'fulfilled' ? results[2].value as DashboardClientProps["marketplaceJobs"] : [];
     customerMode = results[3].status === 'fulfilled' ? results[3].value : false;
     custId = (results[4].status === 'fulfilled' ? results[4].value : null) ?? null;
     dailyStats = results[5].status === 'fulfilled' ? results[5].value : { total: 0, delivered: 0, inProgress: 0, pending: 0, sos: 0 };
     driverStats = results[6].status === 'fulfilled' ? results[6].value : { total: 0, active: 0, onJob: 0 };
     esgResult = results[7].status === 'fulfilled' ? results[7].value : null;
     fleetAlerts = results[8].status === 'fulfilled' ? results[8].value : [];
-    heatmapJobs = results[9].status === 'fulfilled' ? results[9].value : [];
-    allCustomers = results[10].status === 'fulfilled' ? (results[10].value as any).data : [];
-    activeJobs = results[11].status === 'fulfilled' ? (results[11].value as any) : [];
+    heatmapJobs = results[9].status === 'fulfilled' ? results[9].value as DashboardClientProps["heatmapJobs"] : [];
+    allCustomers = results[10].status === 'fulfilled' ? (results[10].value as CustomerListResult).data : [];
+    activeJobs = results[11].status === 'fulfilled' ? results[11].value as DashboardClientProps["activeJobs"] : [];
 
   } catch (error) {
     console.error("[Dashboard] Critical data fetch error:", error);
@@ -116,9 +123,19 @@ export async function DashboardContent({ searchParams }: DashboardContentProps) 
   }
 
   // Fetch Live Fleet GPS Status
-  let fleetStatus = [];
+  let fleetStatus: DashboardClientProps["fleetStatus"] = [];
   try {
-    fleetStatus = await getActiveFleetStatus(currentBranchId, customerMode ? custId : (selectedCustomerId && selectedCustomerId !== 'All' ? selectedCustomerId : null))
+    const rawFleetStatus = await getActiveFleetStatus(currentBranchId, customerMode ? custId : (selectedCustomerId && selectedCustomerId !== 'All' ? selectedCustomerId : null))
+    fleetStatus = rawFleetStatus
+      .filter((driver): driver is typeof driver & { Driver_ID: string } => Boolean(driver.Driver_ID))
+      .map((driver) => ({
+        Driver_ID: driver.Driver_ID,
+        Driver_Name: driver.Driver_Name,
+        Vehicle_Plate: driver.Vehicle_Plate,
+        Last_Update: driver.Last_Update,
+        Latitude: driver.Latitude,
+        Longitude: driver.Longitude,
+      }))
   } catch (e) {
     console.warn("[Dashboard] GPS Status fetch failed", e);
   }

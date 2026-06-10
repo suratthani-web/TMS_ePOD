@@ -9,13 +9,13 @@ export function LanguageSwitcher({ className }: { className?: string }) {
   const { language, setLanguage } = useLanguage();
 
   return (
-    <div className={cn("flex items-center gap-1 bg-background/50 p-1 rounded-xl border border-border/5", className)}>
+    <div className={cn("flex items-center gap-1 bg-background/50 p-1 rounded-xl border border-border", className)}>
       <button
         onClick={() => setLanguage('th')}
         className={cn(
           "px-3 py-1.5 rounded-lg text-base font-bold font-black transition-all",
           language === 'th' 
-            ? "bg-primary text-white shadow-[0_0_15px_rgba(255,30,133,0.3)]" 
+            ? "bg-primary text-white shadow-sm" 
             : "text-muted-foreground hover:text-muted-foreground"
         )}
       >
@@ -26,7 +26,7 @@ export function LanguageSwitcher({ className }: { className?: string }) {
         className={cn(
           "px-3 py-1.5 rounded-lg text-base font-bold font-black transition-all",
           language === 'en' 
-            ? "bg-primary text-white shadow-[0_0_15px_rgba(255,30,133,0.3)]" 
+            ? "bg-primary text-white shadow-sm" 
             : "text-muted-foreground hover:text-muted-foreground"
         )}
       >

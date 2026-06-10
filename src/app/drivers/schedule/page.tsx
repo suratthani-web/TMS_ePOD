@@ -61,8 +61,8 @@ export default async function DriverSchedulePage() {
         </div>
 
         {/* Leave List Registry */}
-        <PremiumCard className="bg-background/40 border border-border/5 shadow-xl rounded-3xl overflow-hidden group/registry">
-          <div className="p-6 border-b border-border/5 bg-black/40 flex items-center justify-between relative overflow-hidden">
+        <PremiumCard className="bg-background/40 border border-border shadow-xl rounded-3xl overflow-hidden group/registry">
+          <div className="p-6 border-b border-border bg-muted/30 flex items-center justify-between relative overflow-hidden">
             <div className="absolute top-0 right-0 w-64 h-64 bg-primary/5 blur-[80px] pointer-events-none" />
             <h2 className="text-lg font-black text-foreground tracking-tight uppercase italic relative z-10 flex items-center gap-2">
                 <div className="w-1 h-6 bg-primary rounded-full" />

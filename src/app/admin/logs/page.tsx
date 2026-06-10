@@ -14,6 +14,18 @@ import { cn } from '@/lib/utils'
 
 export const dynamic = 'force-dynamic'
 
+type SystemLogRow = {
+  id: string | number
+  created_at: string
+  module: string
+  action_type: string
+  user_name?: string | null
+  role?: string | null
+  branch_id?: string | null
+  target_id?: string | null
+  details?: unknown
+}
+
 export default async function LogsPage(props: {
   searchParams: Promise<{ [key: string]: string | string[] | undefined }>
 }) {
@@ -21,7 +33,7 @@ export default async function LogsPage(props: {
   const branchId = typeof searchParams.branchId === 'string' ? searchParams.branchId : undefined
   const moduleFilter = typeof searchParams.module === 'string' ? searchParams.module : undefined
   
-  let logs: any[] = []
+  let logs: SystemLogRow[] = []
   let branches: { Branch_ID: string; Branch_Name: string }[] = []
 
   try {

@@ -46,7 +46,7 @@ export interface JobContainer {
     target_temperature?: number | null;
     eir_gate_in_url?: string | null;
     eir_gate_out_url?: string | null;
-    container_condition_json?: any;
+    container_condition_json?: unknown;
     created_at?: string;
     updated_at?: string;
 }

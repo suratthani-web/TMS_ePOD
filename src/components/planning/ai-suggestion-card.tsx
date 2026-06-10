@@ -51,15 +51,15 @@ export function AiSuggestionCard({ jobData, onSelect }: AiSuggestionCardProps) {
   }
 
   const getScoreBg = (score: number) => {
-    if (score >= 80) return "from-emerald-100/80 to-emerald-50/40 border-emerald-500/20 dark:from-emerald-500/20 dark:to-emerald-600/5 dark:border-emerald-500/30"
-    if (score >= 60) return "from-amber-100/80 to-amber-50/40 border-amber-500/20 dark:from-amber-500/20 dark:to-amber-600/5 dark:border-amber-500/30"
-    return "from-red-100/80 to-red-50/40 border-red-500/20 dark:from-red-500/20 dark:to-red-600/5 dark:border-red-500/30"
+    if (score >= 80) return "bg-emerald-500/10 border-emerald-500/20"
+    if (score >= 60) return "bg-amber-500/10 border-amber-500/20"
+    return "bg-rose-500/10 border-rose-500/20"
   }
 
   const getScoreRing = (score: number) => {
     if (score >= 80) return "ring-emerald-500/20"
     if (score >= 60) return "ring-amber-500/20"
-    return "ring-red-500/20"
+    return "ring-rose-500/20"
   }
 
   return (
@@ -70,7 +70,7 @@ export function AiSuggestionCard({ jobData, onSelect }: AiSuggestionCardProps) {
           type="button"
           onClick={handleSearch}
           disabled={loading}
-          className="w-full bg-gradient-to-r from-violet-600 to-indigo-600 hover:from-violet-700 hover:to-indigo-700 text-white font-bold py-3 rounded-xl shadow-lg shadow-violet-500/20 transition-all hover:shadow-violet-500/40"
+          className="w-full bg-primary hover:bg-primary/90 text-primary-foreground font-bold py-3 rounded-xl transition-all"
         >
           {loading ? (
             <Loader2 className="w-4 h-4 mr-2 animate-spin" />
@@ -84,9 +84,9 @@ export function AiSuggestionCard({ jobData, onSelect }: AiSuggestionCardProps) {
       {/* Loading State */}
       {loading && (
         <div className="p-8 text-center">
-          <div className="inline-flex items-center gap-3 px-6 py-3 rounded-2xl bg-violet-500/10 border border-violet-500/20">
-            <Loader2 className="w-5 h-5 text-violet-500 animate-spin" />
-            <span className="text-violet-700 dark:text-violet-300 font-bold">กำลังวิเคราะห์คนขับ...</span>
+          <div className="inline-flex items-center gap-3 px-6 py-3 rounded-2xl bg-primary/10 border border-primary/20">
+            <Loader2 className="w-5 h-5 text-primary animate-spin" />
+            <span className="text-primary dark:text-primary-foreground font-bold">กำลังวิเคราะห์คนขับ...</span>
           </div>
         </div>
       )}
@@ -108,8 +108,8 @@ export function AiSuggestionCard({ jobData, onSelect }: AiSuggestionCardProps) {
         <div className="space-y-4">
           <div className="flex items-center justify-between px-1">
             <div className="flex items-center gap-2">
-              <Sparkles className="w-5 h-5 text-violet-600" />
-              <span className="text-lg font-black text-violet-700 dark:text-violet-300 uppercase tracking-tight">
+              <Sparkles className="w-5 h-5 text-primary" />
+              <span className="text-lg font-black text-primary dark:text-primary-foreground uppercase tracking-tight">
                 AI RECOMMENDATIONS (50)
               </span>
             </div>
@@ -127,7 +127,7 @@ export function AiSuggestionCard({ jobData, onSelect }: AiSuggestionCardProps) {
           {suggestions.map((driver, index) => (
             <div
               key={driver.Driver_ID}
-              className={`bg-gradient-to-r ${getScoreBg(driver.match_score)} border rounded-2xl cursor-pointer hover:shadow-md transition-all duration-200 group relative overflow-hidden`}
+              className={`${getScoreBg(driver.match_score)} border rounded-2xl cursor-pointer hover:shadow-md transition-all duration-200 group relative overflow-hidden`}
               onClick={() => onSelect(driver)}
             >
               <div className="p-5">
@@ -136,7 +136,7 @@ export function AiSuggestionCard({ jobData, onSelect }: AiSuggestionCardProps) {
                   <div className="flex items-center gap-4 flex-1">
                     {/* Rank Badge */}
                     <div className={`w-12 h-12 rounded-2xl flex items-center justify-center font-black text-xl ${
-                      index === 0 ? 'bg-amber-500 text-white shadow-lg shadow-amber-500/20' :
+                      index === 0 ? 'bg-amber-500 text-white' :
                       index === 1 ? 'bg-slate-200 text-slate-600' :
                       'bg-slate-100 text-slate-500'
                     }`}>
@@ -147,7 +147,7 @@ export function AiSuggestionCard({ jobData, onSelect }: AiSuggestionCardProps) {
                       <div className="flex items-center flex-wrap gap-2">
                         <p className="text-slate-900 dark:text-white font-black text-2xl truncate tracking-tight">{driver.Driver_Name}</p>
                         {index === 0 && (
-                          <span className="px-3 py-1 text-xs font-black rounded-lg bg-indigo-600 text-white uppercase tracking-wider shadow-sm">
+                          <span className="px-3 py-1 text-xs font-black rounded-lg bg-primary text-white uppercase tracking-wider shadow-sm">
                             Best Match
                           </span>
                         )}
@@ -178,7 +178,7 @@ export function AiSuggestionCard({ jobData, onSelect }: AiSuggestionCardProps) {
                   </div>
 
                   {/* Right: Match Score */}
-                  <div className={`text-center ml-4 ring-4 ${getScoreRing(driver.match_score)} rounded-[2rem] p-4 bg-white/60 dark:bg-black/40 backdrop-blur-md min-w-[90px] shadow-sm`}>
+                  <div className={`text-center ml-4 ring-4 ${getScoreRing(driver.match_score)} rounded-[2rem] p-4 bg-card min-w-[90px] shadow-sm`}>
                     <p className={`text-4xl font-black ${getScoreColor(driver.match_score)} leading-tight`}>
                       {driver.match_score}
                     </p>

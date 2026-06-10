@@ -24,9 +24,6 @@ const nextConfig: NextConfig = {
   output: "standalone",
   outputFileTracingRoot: path.resolve(__dirname),
   productionBrowserSourceMaps: false,
-  typescript: {
-    ignoreBuildErrors: true,
-  },
   images: {
     remotePatterns: [
         {

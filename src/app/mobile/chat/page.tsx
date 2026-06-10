@@ -96,15 +96,14 @@ export default function MobileChatPage() {
                     filter: `${receiverCol}=eq.${driverId}`
                 },
                 (payload) => {
-                    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                    const rawMsg = payload.new as any
+                    const rawMsg = payload.new as Record<string, unknown>
                     const newMsg: ChatMessage = {
-                        id: rawMsg[idCol] || rawMsg.id || rawMsg.Id || rawMsg.ID,
-                        sender_id: rawMsg.sender_id || rawMsg.Sender_ID,
-                        receiver_id: rawMsg.receiver_id || rawMsg.Receiver_ID,
-                        message: rawMsg.message || rawMsg.Message,
-                        created_at: rawMsg.created_at || rawMsg.Created_At,
-                        is_read: rawMsg.is_read || rawMsg.Is_Read || false
+                        id: Number(rawMsg[idCol] ?? rawMsg['id'] ?? rawMsg['Id'] ?? rawMsg['ID'] ?? 0),
+                        sender_id: String(rawMsg['sender_id'] ?? rawMsg['Sender_ID'] ?? ''),
+                        receiver_id: String(rawMsg['receiver_id'] ?? rawMsg['Receiver_ID'] ?? ''),
+                        message: String(rawMsg['message'] ?? rawMsg['Message'] ?? ''),
+                        created_at: String(rawMsg['created_at'] ?? rawMsg['Created_At'] ?? ''),
+                        is_read: Boolean(rawMsg['is_read'] ?? rawMsg['Is_Read'] ?? false)
                     }
                     setMessages(prev => {
                         if (prev.find(m => m.id === newMsg.id)) return prev

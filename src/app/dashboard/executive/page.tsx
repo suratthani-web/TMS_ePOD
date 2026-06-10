@@ -40,13 +40,13 @@ async function ExecutiveContent({ branch }: { branch: string }) {
     ])
 
     // Process compliance for the UI format
-    const expiredCount = complianceMetrics.filter((m: any) => m.status === 'expiredSoon').length
-    const expiringCount = complianceMetrics.filter((m: any) => m.status === 'expiring').length
+    const expiredCount = complianceMetrics.filter((m: { status: string }) => m.status === 'expiredSoon').length
+    const expiringCount = complianceMetrics.filter((m: { status: string }) => m.status === 'expiring').length
     
     const compliance = { 
         score: expiredCount > 0 ? 60 : expiringCount > 0 ? 85 : 100, 
         status: expiredCount > 0 ? 'Critical' : expiringCount > 0 ? 'Warning' : 'Excellent', 
-        details: complianceMetrics.map((m: any) => ({ label: m.name.split(' ')[0], value: m.daysLeft > 0 ? 100 : 0 }))
+        details: complianceMetrics.map((m: { name: string; daysLeft: number }) => ({ label: m.name.split(' ')[0], value: m.daysLeft > 0 ? 100 : 0 }))
     }
 
     const health = { 

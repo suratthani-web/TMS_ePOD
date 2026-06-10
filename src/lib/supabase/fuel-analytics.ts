@@ -82,8 +82,8 @@ export async function getFuelAnalytics(dateFrom?: string, dateTo?: string): Prom
 
   // 1. Efficiency Enhancement: Fetch the last log BEFORE the range for vehicles in the current set
   // This allows KM/L calculation even if a vehicle has only 1 log in the selected range
-  const platesInRange = Array.from(new Set(logs.map((l: any) => l.Vehicle_Plate).filter(Boolean)))
-  let previousLogsMap = new Map<string, number>()
+  const platesInRange = Array.from(new Set(logs.map((l: { Vehicle_Plate: string }) => l.Vehicle_Plate).filter(Boolean)))
+  const previousLogsMap = new Map<string, number>()
 
   if (platesInRange.length > 0) {
     // Fetch the most recent log before our 'from' date for each plate
@@ -96,7 +96,7 @@ export async function getFuelAnalytics(dateFrom?: string, dateTo?: string): Prom
 
     if (prevLogs) {
       // Since order is descending, the first occurrence for each plate is its most recent
-      prevLogs.forEach((pl: any) => {
+      prevLogs.forEach((pl: { Vehicle_Plate: string, Liters?: number, Price_Total?: number, Odometer?: number }) => {
         if (pl.Vehicle_Plate && pl.Odometer && !previousLogsMap.has(pl.Vehicle_Plate)) {
           previousLogsMap.set(pl.Vehicle_Plate, pl.Odometer)
         }
@@ -108,11 +108,11 @@ export async function getFuelAnalytics(dateFrom?: string, dateTo?: string): Prom
   const { data: vehicles } = await supabase
     .from('Master_Vehicles')
     .select('Vehicle_Plate, Tank_Capacity')
-  const tankMap = new Map<string, number>(vehicles?.map((v: any) => [v.Vehicle_Plate, Number(v.Tank_Capacity) || 50]) || [])
+  const tankMap = new Map<string, number>(vehicles?.map((v: { Vehicle_Plate: string, Tank_Capacity?: number }) => [v.Vehicle_Plate, Number(v.Tank_Capacity) || 50]) || [])
 
   // Calculate totals
-  const totalLiters = logs.reduce((s: number, l: any) => s + (l.Liters || 0), 0)
-  const totalCost = logs.reduce((s: number, l: any) => s + (l.Price_Total || 0), 0)
+  const totalLiters = logs.reduce((s: number, l: { Liters?: number }) => s + (l.Liters || 0), 0)
+  const totalCost = logs.reduce((s: number, l: { Price_Total?: number }) => s + (l.Price_Total || 0), 0)
   const avgCostPerLiter = totalLiters > 0 ? totalCost / totalLiters : 0
 
   // Per-vehicle breakdown

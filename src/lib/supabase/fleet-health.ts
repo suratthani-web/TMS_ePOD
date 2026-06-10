@@ -49,12 +49,12 @@ export async function getFleetHealthAlerts(): Promise<HealthAlert[]> {
 
         // 2. Fetch driver names and maintenance standards
         const { data: drivers } = await supabase.from('Master_Drivers').select('Driver_ID, Driver_Name')
-        const driverMap = new Map<string, string>(drivers?.map((d: any) => [d.Driver_ID, d.Driver_Name]) || [])
+        const driverMap = new Map<string, string>(drivers?.map((d: { Driver_ID: string, Driver_Name: string }) => [d.Driver_ID, d.Driver_Name]) || [])
 
         const { data: standards } = await supabase.from('Fleet_Maintenance_Standards').select('*')
         
         // 3. Fetch all completed repair tickets for these vehicles to calculate component health
-        const vehiclePlates = vehicles.map((v: any) => v.Vehicle_Plate)
+        const vehiclePlates = vehicles.map((v: { Vehicle_Plate: string }) => v.Vehicle_Plate)
         const { data: completedRepairs } = await supabase
             .from('Repair_Tickets')
             .select('Vehicle_Plate, Issue_Type, Date_Finish, Date_Report, Odometer')
@@ -77,7 +77,7 @@ export async function getFleetHealthAlerts(): Promise<HealthAlert[]> {
         const now = new Date()
         const thirtyDaysAhead = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000)
 
-        vehicles.forEach((v: any) => {
+        vehicles.forEach((v: { Driver_ID?: string | null, Vehicle_Plate: string, Active_Status?: string | null, Next_Service_Mileage?: number | null, Current_Mileage?: number | null, Insurance_Expiry?: string | null, Tax_Expiry?: string | null, Act_Expiry?: string | null }) => {
             const driverName = v.Driver_ID ? driverMap.get(v.Driver_ID) : undefined
 
             // --- A. Compliance Checks ---
@@ -92,7 +92,7 @@ export async function getFleetHealthAlerts(): Promise<HealthAlert[]> {
                     if (expiry < now) {
                         alerts.push({
                             vehicle_plate: v.Vehicle_Plate,
-                            driver_id: v.Driver_ID,
+                            driver_id: v.Driver_ID || null,
                             driver_name: driverName,
                             issue_type: 'compliance',
                             description: `${check.type} หมดอายุ`,
@@ -102,7 +102,7 @@ export async function getFleetHealthAlerts(): Promise<HealthAlert[]> {
                     } else if (expiry < thirtyDaysAhead) {
                         alerts.push({
                             vehicle_plate: v.Vehicle_Plate,
-                            driver_id: v.Driver_ID,
+                            driver_id: v.Driver_ID || null,
                             driver_name: driverName,
                             issue_type: 'compliance',
                             description: `${check.type} ใกล้หมดอายุ`,
@@ -115,11 +115,11 @@ export async function getFleetHealthAlerts(): Promise<HealthAlert[]> {
 
             // --- B. Per-Component Maintenance Tracking ---
             if (standards && completedRepairs) {
-                standards.forEach((std: any) => {
+                standards.forEach((std: { maintenance_type: string, interval_km: number, interval_months: number, Standard_KM?: number, Alert_Before_KM?: number, Component_Name?: string, Standard_Months?: number }) => {
                     // Find latest repair for this component on this vehicle
-                    const latestRepair = completedRepairs.find((r: any) => 
+                    const latestRepair = completedRepairs.find((r: { Vehicle_Plate?: string, Issue_Type?: string | null, Date_Finish?: string | null, Date_Report?: string | null, Odometer?: number | null }) => 
                         r.Vehicle_Plate === v.Vehicle_Plate && 
-                        r.Issue_Type?.toLowerCase().includes(std.Component_Name.toLowerCase())
+                        r.Issue_Type?.toLowerCase().includes((std.Component_Name || '').toLowerCase())
                     )
 
                     if (latestRepair) {
@@ -136,7 +136,7 @@ export async function getFleetHealthAlerts(): Promise<HealthAlert[]> {
                             if (kmRemaining <= 0) {
                                 alerts.push({
                                     vehicle_plate: v.Vehicle_Plate,
-                                    driver_id: v.Driver_ID,
+                                    driver_id: v.Driver_ID || null,
                                     driver_name: driverName,
                                     issue_type: 'service',
                                     description: `รอบเปลี่ยน${std.Component_Name} (เกินกำหนด ${Math.abs(kmRemaining).toLocaleString()} กม.)`,
@@ -146,7 +146,7 @@ export async function getFleetHealthAlerts(): Promise<HealthAlert[]> {
                             } else if (kmRemaining <= alertThreshold) {
                                 alerts.push({
                                     vehicle_plate: v.Vehicle_Plate,
-                                    driver_id: v.Driver_ID,
+                                    driver_id: v.Driver_ID || null,
                                     driver_name: driverName,
                                     issue_type: 'service',
                                     description: `ใกล้ถึงรอบเปลี่ยน${std.Component_Name} (เหลือ ${kmRemaining.toLocaleString()} กม.)`,
@@ -164,7 +164,7 @@ export async function getFleetHealthAlerts(): Promise<HealthAlert[]> {
                             if (monthsRemaining <= 0) {
                                 alerts.push({
                                     vehicle_plate: v.Vehicle_Plate,
-                                    driver_id: v.Driver_ID,
+                                    driver_id: v.Driver_ID || null,
                                     driver_name: driverName,
                                     issue_type: 'service',
                                     description: `รอบเปลี่ยน${std.Component_Name} (เกินกำหนด ${Math.abs(Math.round(monthsRemaining))} เดือน)`,
@@ -177,11 +177,11 @@ export async function getFleetHealthAlerts(): Promise<HealthAlert[]> {
             }
 
             // --- C. Active Repair Tickets ---
-            const vehicleRepairs = activeRepairs?.filter((r: any) => r.Vehicle_Plate === v.Vehicle_Plate) || []
-            vehicleRepairs.forEach((r: any) => {
+            const vehicleRepairs = activeRepairs?.filter((r: { Vehicle_Plate: string, Status: string, Estimated_Cost?: number, Issue_Type?: string, Priority?: string }) => r.Vehicle_Plate === v.Vehicle_Plate) || []
+            vehicleRepairs.forEach((r: { Vehicle_Plate: string, Status: string, Estimated_Cost?: number, Issue_Type?: string, Priority?: string }) => {
                 alerts.push({
                     vehicle_plate: v.Vehicle_Plate,
-                    driver_id: v.Driver_ID,
+                    driver_id: v.Driver_ID || null,
                     driver_name: driverName,
                     issue_type: 'maintenance',
                     description: `แจ้งซ่อม: ${r.Issue_Type || 'ไม่ระบุอาการ'}`,

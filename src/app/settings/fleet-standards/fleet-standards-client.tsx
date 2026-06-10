@@ -38,12 +38,12 @@ export function FleetStandardsClient({
     initialMaintenance,
     masterVehicleTypes = [] 
 }: { 
-    initialFuel: any[], 
-    initialMaintenance: any[],
-    masterVehicleTypes?: any[]
+    initialFuel: (Record<string, unknown> & { Vehicle_Type?: string, Standard_KM_L?: number, Warning_Threshold_Percent?: number })[], 
+    initialMaintenance: (Record<string, unknown> & { Component_Name?: string, Standard_KM?: number | null, Standard_Months?: number | null, Alert_Before_KM?: number, Alert_Before_Days?: number })[],
+    masterVehicleTypes?: (Record<string, unknown> & { type_id?: string | number, type_name?: string })[]
 }) {
-    const [fuelData, setFuelData] = useState<any[]>(Array.isArray(initialFuel) ? initialFuel : [])
-    const [maintData, setMaintData] = useState<any[]>(Array.isArray(initialMaintenance) ? initialMaintenance : [])
+    const [fuelData, setFuelData] = useState<typeof initialFuel>(Array.isArray(initialFuel) ? initialFuel : [])
+    const [maintData, setMaintData] = useState<typeof initialMaintenance>(Array.isArray(initialMaintenance) ? initialMaintenance : [])
     const [saving, setSaving] = useState(false)
 
     useEffect(() => {
@@ -52,9 +52,9 @@ export function FleetStandardsClient({
     }, [initialFuel, initialMaintenance])
 
     // Fuel Actions
-    const updateFuel = (index: number, field: string, value: any) => {
+    const updateFuel = (index: number, field: string, value: unknown) => {
         const next = [...fuelData]
-        next[index] = { ...next[index], [field]: field === 'Vehicle_Type' ? value : (parseFloat(value) || 0) }
+        next[index] = { ...next[index], [field]: field === 'Vehicle_Type' ? value : (parseFloat(value as string) || 0) }
         setFuelData(next)
     }
 
@@ -63,7 +63,11 @@ export function FleetStandardsClient({
         if (!record.Vehicle_Type || record.Vehicle_Type === 'none') return toast.warning("โปรดเลือกประเภทรถ")
         
         setSaving(true)
-        const result = await saveFuelStandard(record)
+        const result = await saveFuelStandard({
+            Vehicle_Type: record.Vehicle_Type,
+            Standard_KM_L: Number(record.Standard_KM_L) || 0,
+            Warning_Threshold_Percent: Number(record.Warning_Threshold_Percent) || 0,
+        })
         if (result.success) {
             toast.success("บันทึกเกณฑ์น้ำมันเรียบร้อย")
             if (result.data) {
@@ -85,15 +89,21 @@ export function FleetStandardsClient({
     }
 
     // Maintenance Actions
-    const updateMaint = (index: number, field: string, value: any) => {
+    const updateMaint = (index: number, field: string, value: unknown) => {
         const next = [...maintData]
-        next[index] = { ...next[index], [field]: field.includes('Name') ? value : (parseFloat(value) || null) }
+        next[index] = { ...next[index], [field]: field.includes('Name') ? value : (parseFloat(value as string) || null) }
         setMaintData(next)
     }
 
     const handleSaveMaint = async (index: number) => {
+        const record = maintData[index]
+        if (!record.Component_Name) return toast.warning("Missing maintenance component name")
         setSaving(true)
-        const result = await saveMaintenanceStandard(maintData[index])
+        const result = await saveMaintenanceStandard({
+            Component_Name: record.Component_Name,
+            Standard_KM: record.Standard_KM ?? null,
+            Standard_Months: record.Standard_Months ?? null,
+        })
         if (result.success) toast.success("บันทึกเกณฑ์การบำรุงรักษาเรียบร้อย")
         else toast.error("ล้มเหลว: " + result.error)
         setSaving(false)
@@ -106,7 +116,7 @@ export function FleetStandardsClient({
     return (
         <div className="space-y-8 pb-10 font-sans">
             {/* Tactical Header */}
-            <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6 bg-background/60 backdrop-blur-xl p-8 rounded-[2rem] border border-border/5 shadow-xl relative group ring-1 ring-border/5">
+            <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6 bg-background/60 backdrop-blur-xl p-8 rounded-[2rem] border border-border shadow-xl relative group ring-1 ring-border/5">
                 <div className="absolute top-0 right-0 w-64 h-64 bg-primary/10 blur-[100px] pointer-events-none" />
                 <div className="relative z-10 space-y-4">
                     <button onClick={() => window.history.back()} className="inline-flex items-center gap-2 text-muted-foreground hover:text-primary transition-all font-black uppercase tracking-[0.4em] text-base font-bold group/back italic">
@@ -130,7 +140,7 @@ export function FleetStandardsClient({
 
             <Tabs defaultValue="fuel" className="w-full">
                 <div className="flex justify-center mb-8">
-                    <TabsList className="bg-muted/50 p-2 rounded-[1.5rem] border border-border/5 h-auto flex gap-1">
+                    <TabsList className="bg-muted/50 p-2 rounded-[1.5rem] border border-border h-auto flex gap-1">
                         <TabsTrigger value="fuel" className="px-8 py-3 rounded-[1rem] text-base font-black uppercase tracking-wider data-[state=active]:bg-primary data-[state=active]:text-white shadow-lg transition-all flex items-center gap-2">
                             <Fuel size={18} /> เกณฑ์น้ำมัน (Fuel)
                         </TabsTrigger>
@@ -159,7 +169,7 @@ export function FleetStandardsClient({
                     </div>
 
                     {fuelData.length === 0 ? (
-                        <div className="py-40 text-center glass-panel rounded-[4rem] border-dashed border-border/5 opacity-30 flex flex-col items-center gap-6">
+                        <div className="py-40 text-center glass-panel rounded-[4rem] border-dashed border-border opacity-30 flex flex-col items-center gap-6">
                             <Fuel size={80} className="text-muted-foreground" />
                             <p className="text-2xl font-black uppercase tracking-tighter">ยังไม่มีข้อมูลเกณฑ์น้ำมัน</p>
                             <button onClick={addFuelRow} className="text-primary font-black uppercase tracking-widest underline underline-offset-8 decoration-2">กดเพื่อเริ่มเพิ่มรายการ</button>
@@ -167,7 +177,7 @@ export function FleetStandardsClient({
                     ) : (
                         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-10">
                             {fuelData.map((std, idx) => (
-                                <Card key={idx} className="bg-card border border-border/10 rounded-[2.5rem] shadow-xl overflow-hidden hover:scale-[1.01] transition-all duration-500 relative hover:ring-1 hover:ring-primary/20">
+                                <Card key={idx} className="bg-card border border-border rounded-[2.5rem] shadow-xl overflow-hidden hover:scale-[1.01] transition-all duration-500 relative hover:ring-1 hover:ring-primary/20">
                                     <div className="absolute top-0 right-0 w-48 h-48 bg-primary/5 blur-[80px] pointer-events-none" />
                                     <CardContent className="p-8 space-y-8">
                                         <div className="flex items-center justify-between">
@@ -188,14 +198,14 @@ export function FleetStandardsClient({
                                                 value={std.Vehicle_Type} 
                                                 onValueChange={(val) => updateFuel(idx, 'Vehicle_Type', val)}
                                             >
-                                                <SelectTrigger className="h-14 bg-muted/20 border-border/5 text-xl font-black rounded-xl px-5 uppercase tracking-tight hover:bg-muted/40 transition-all">
+                                                <SelectTrigger className="h-14 bg-muted/20 border-border text-xl font-black rounded-xl px-5 uppercase tracking-tight hover:bg-muted/40 transition-all">
                                                     <SelectValue placeholder="เลือกประเภทรถ..." />
                                                 </SelectTrigger>
-                                                <SelectContent className="bg-card border-border/10">
+                                                <SelectContent className="bg-card border-border">
                                                     <SelectItem value="none" disabled className="font-bold opacity-50">-- เลือกประเภทรถ --</SelectItem>
                                                     {masterVehicleTypes.map(vt => (
-                                                        <SelectItem key={vt.type_id} value={vt.type_name} className="py-4 font-black uppercase tracking-tight focus:bg-primary/10">
-                                                            {vt.type_name}
+                                                        <SelectItem key={vt.type_id as string | number} value={(vt.type_name || "") as string} className="py-4 font-black uppercase tracking-tight focus:bg-primary/10">
+                                                            {vt.type_name as string}
                                                         </SelectItem>
                                                     ))}
                                                 </SelectContent>
@@ -247,10 +257,10 @@ export function FleetStandardsClient({
 
                 {/* MAINTENANCE TAB */}
                 <TabsContent value="maintenance" className="animate-in fade-in zoom-in-95 duration-500">
-                    <div className="bg-card border border-border/10 rounded-[4rem] shadow-2xl overflow-hidden overflow-x-auto">
+                    <div className="bg-card border border-border rounded-[4rem] shadow-2xl overflow-hidden overflow-x-auto">
                         <table className="w-full text-left border-collapse min-w-[1000px]">
                             <thead>
-                                <tr className="bg-muted/30 border-b border-border/5">
+                                <tr className="bg-muted/30 border-b border-border">
                                     <th className="px-8 py-8 text-xs font-black uppercase tracking-wider text-muted-foreground">รายการอะไหล่ / บริการ</th>
                                     <th className="px-6 py-8 text-xs font-black uppercase tracking-wider text-muted-foreground">ระยะมาตรฐาน (KM)</th>
                                     <th className="px-6 py-8 text-xs font-black uppercase tracking-wider text-muted-foreground">เวลามาตรฐาน (เดือน)</th>
@@ -304,7 +314,7 @@ export function FleetStandardsClient({
                                                     type="button"
                                                     onClick={async () => {
                                                         if (confirm("ยืนยันการลบรายการนี้?")) {
-                                                            const result = await deleteMaintenanceStandard(std.Component_Name)
+                                                            const result = await deleteMaintenanceStandard(std.Component_Name || "")
                                                             if (result.success) {
                                                                 toast.success("ลบรายการเรียบร้อย")
                                                                 setMaintData(maintData.filter((_, i) => i !== idx))
@@ -321,7 +331,7 @@ export function FleetStandardsClient({
                                 ))}
                             </tbody>
                         </table>
-                        <div className="p-8 bg-muted/20 flex justify-between items-center border-t border-border/5">
+                        <div className="p-8 bg-muted/20 flex justify-between items-center border-t border-border">
                             <div className="flex items-center gap-3">
                                 <ShieldCheck className="text-primary" size={24} />
                                 <p className="text-muted-foreground text-sm font-bold uppercase tracking-wider leading-relaxed">
@@ -360,7 +370,7 @@ export function FleetStandardsClient({
                     </div>
                 </div>
 
-                <div className="p-12 bg-card border border-border/10 rounded-[4rem] shadow-2xl flex flex-col justify-center gap-8 relative overflow-hidden">
+                <div className="p-12 bg-card border border-border rounded-[4rem] shadow-2xl flex flex-col justify-center gap-8 relative overflow-hidden">
                     <div className="absolute -bottom-10 -right-10 w-40 h-40 bg-amber-500/5 blur-3xl rounded-full" />
                     <div className="flex items-center gap-5">
                         <div className="p-4 bg-amber-500/20 rounded-2xl text-amber-500 shadow-inner">
@@ -369,11 +379,11 @@ export function FleetStandardsClient({
                         <h4 className="text-2xl font-black text-foreground uppercase tracking-tight leading-none">Global Standards</h4>
                     </div>
                     <div className="space-y-6">
-                        <div className="p-6 bg-muted/30 rounded-3xl border border-border/5 space-y-1 group hover:bg-muted/50 transition-colors">
+                        <div className="p-6 bg-muted/30 rounded-3xl border border-border space-y-1 group hover:bg-muted/50 transition-colors">
                             <p className="text-muted-foreground text-[10px] font-black uppercase tracking-[0.2em]">ยางรถบรรทุก (Truck Tires)</p>
                             <p className="text-xl font-black text-foreground tracking-tight uppercase italic">50,000 - 80,000 KM</p>
                         </div>
-                        <div className="p-6 bg-muted/30 rounded-3xl border border-border/5 space-y-1 group hover:bg-muted/50 transition-colors">
+                        <div className="p-6 bg-muted/30 rounded-3xl border border-border space-y-1 group hover:bg-muted/50 transition-colors">
                             <p className="text-muted-foreground text-[10px] font-black uppercase tracking-[0.2em]">น้ำมันเครื่อง (Synthetic Oil)</p>
                             <p className="text-xl font-black text-foreground tracking-tight uppercase italic">10,000 - 15,000 KM</p>
                         </div>

@@ -105,7 +105,8 @@ export async function createBulkVehicles(vehicles: Record<string, unknown>[]) {
     normalized.Sub_ID = getValue(['sub_id', 'subcontractor_id', 'รหัสผู้รับเหมา', 'รหัสรถร่วม', 'Sub_ID']) as string
     
     // Chassis Flag
-    normalized.is_chassis = getValue(['is_chassis', 'chassis', 'หางลาก', 'เป็นหางลาก']) as any
+    const chassisValue = getValue(['is_chassis', 'chassis', 'หางลาก', 'เป็นหางลาก'])
+    normalized.is_chassis = chassisValue === true || String(chassisValue).toLowerCase() === 'true' || String(chassisValue).toLowerCase() === 'yes'
     
     // Keep internal fields
     const rowAsRecord = row as unknown as Record<string, unknown>
@@ -131,7 +132,7 @@ export async function createBulkVehicles(vehicles: Record<string, unknown>[]) {
       Max_Weight_kg: Number(data.Max_Weight_kg) || null,
       Max_Volume_cbm: Number(data.Max_Volume_cbm) || null,
       Sub_ID: data.Sub_ID || null,
-      is_chassis: data.is_chassis === true || (data.is_chassis as any) === 'true' || (data.is_chassis as any) === 'Yes',
+      is_chassis: data.is_chassis === true || String(data.is_chassis).toLowerCase() === 'true' || String(data.is_chassis).toLowerCase() === 'yes',
       Branch_ID: branchId
     }
   }).filter(v => v.Vehicle_Plate) // Filter out rows without active_status or vehicle_plate

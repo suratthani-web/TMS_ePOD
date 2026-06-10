@@ -34,7 +34,7 @@ export function SidebarProfile({ collapsed }: { collapsed: boolean }) {
     ? `${profile.First_Name || ""} ${profile.Last_Name || ""}`.trim() || profile.Username 
     : "User"
   
-  const role = profile?.Role || "Command Staff"
+  const role = profile?.Role || "Staff"
   const avatarUrl = profile?.Avatar_Url
 
   return (
@@ -58,7 +58,7 @@ export function SidebarProfile({ collapsed }: { collapsed: boolean }) {
       {!collapsed && (
         <div className="flex-1 min-w-0">
           <p className="text-xl font-black text-foreground truncate tracking-tight">{displayName}</p>
-          <p className="text-base font-bold text-primary font-black truncate uppercase tracking-[0.3em] mt-0.5">{role}</p>
+          <p className="text-sm font-bold text-primary truncate mt-0.5">{role}</p>
         </div>
       )}
 

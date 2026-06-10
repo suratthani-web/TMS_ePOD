@@ -9,6 +9,11 @@ interface ChartContainerProps {
   height?: number
 }
 
+type ChartElementProps = {
+  width?: number
+  height?: number
+}
+
 /**
  * A drop-in replacement for ResponsiveContainer.
  * Measures the container width via ResizeObserver and passes
@@ -49,7 +54,7 @@ export function ChartContainer({ children, className, height = 350 }: ChartConta
       {width > 0
         ? React.Children.map(children, (child) => {
             if (React.isValidElement(child) && typeof child.type !== "string") {
-              return React.cloneElement(child as React.ReactElement<any>, { width, height })
+              return React.cloneElement(child as React.ReactElement<ChartElementProps>, { width, height })
             }
             return child
           })

@@ -16,23 +16,24 @@ import { useLanguage } from "@/components/providers/language-provider"
 
 interface Driver {
   Driver_ID: string;
-  Driver_Name: string;
+  Driver_Name: string | null;
 }
 
 interface Vehicle {
-  Vehicle_Plate: string;
+  Vehicle_Plate: string | null;
+  Vehicle_Type?: string | null;
 }
 
 export interface FuelLog {
   Log_ID: string
-  Date_Time: string
-  Driver_ID: string
-  Vehicle_Plate: string
-  Liters: number
-  Price_Total: number
-  Odometer: number
-  Station_Name: string
-  Photo_Url: string
+  Date_Time: string | null
+  Driver_ID: string | null
+  Vehicle_Plate: string | null
+  Liters: number | null
+  Price_Total: number | null
+  Odometer: number | null
+  Station_Name: string | null
+  Photo_Url: string | null
 }
 
 type FuelDialogProps = {
@@ -252,8 +253,8 @@ export function FuelDialog({
                         <SelectValue placeholder={t('fuel.placeholder_vehicle')} />
                     </SelectTrigger>
                     <SelectContent className="bg-card border-border/10 text-foreground">
-                        {vehicles.map((v) => (
-                            <SelectItem key={v.Vehicle_Plate} value={v.Vehicle_Plate}>{v.Vehicle_Plate}</SelectItem>
+                        {vehicles.filter((v) => Boolean(v.Vehicle_Plate)).map((v) => (
+                            <SelectItem key={v.Vehicle_Plate || ''} value={v.Vehicle_Plate || ''}>{v.Vehicle_Plate}</SelectItem>
                         ))}
                     </SelectContent>
                 </Select>

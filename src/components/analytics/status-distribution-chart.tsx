@@ -64,7 +64,7 @@ export function StatusDistributionChart({ data }: StatusDistributionChartProps) 
             height={36}
             content={({ payload }) => (
                 <div className="flex flex-wrap justify-center gap-x-4 gap-y-1 mt-4">
-                    {payload?.map((entry: any, index: number) => (
+                    {payload?.map((entry: { color?: string; value?: string | number }, index: number) => (
                         <div key={`item-${index}`} className="flex items-center gap-1.5">
                             <div className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: entry.color }} />
                             <span className="text-[9px] font-black text-muted-foreground uppercase tracking-wider italic">

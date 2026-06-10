@@ -43,6 +43,18 @@ interface InvoiceFormProps {
     onSuccess?: () => void
 }
 
+type BillableJob = {
+  Job_ID: string
+  Route_Name?: string | null
+  Plan_Date?: string | number | Date | null
+  Weight_Kg?: number | string | null
+  Volume_Cbm?: number | string | null
+  Loaded_Qty?: number | string | null
+  Price_Per_Unit?: number | string | null
+  Price_Cust_Total?: number | string | null
+  [key: string]: unknown
+}
+
 export function InvoiceForm({ customers, initialData, onSuccess }: InvoiceFormProps) {
   const searchParams = useSearchParams()
   const initialCustomerId = initialData?.customerId || searchParams.get('customer') || ""
@@ -52,7 +64,7 @@ export function InvoiceForm({ customers, initialData, onSuccess }: InvoiceFormPr
   const router = useRouter()
 
   const [customerId, setCustomerId] = useState(initialCustomerId)
-  const [availableJobs, setAvailableJobs] = useState<(Record<string, any>)[]>([])
+  const [availableJobs, setAvailableJobs] = useState<BillableJob[]>([])
   const [selectedJobIds, setSelectedJobIds] = useState<string[]>(initialJobIds)
   
   const [issueDate, setIssueDate] = useState<Date>(new Date())
@@ -69,38 +81,7 @@ export function InvoiceForm({ customers, initialData, onSuccess }: InvoiceFormPr
     if (customerId) {
         setFetchingJobs(true)
         getBillableJobsAction(customerId).then(jobs => {
-            // Recalculate Price_Cust_Total for jobs where it's 0 OR where we want to trust the dynamic Price_Per_Unit
-            const enriched = (jobs || []).map(j => {
-                const qty = Number(j.Weight_Kg || j.Volume_Cbm || j.Loaded_Qty || 0)
-                let unitPrice = Number(j.Price_Per_Unit || 0)
-                const storedTotal = Number(j.Price_Cust_Total || 0)
-                
-                // EXTRA FAIL-SAFE: Force 17 for 21-23 April 2026
-                const dateStr = String(j.Plan_Date || "")
-                const jobDate = j.Plan_Date ? new Date(j.Plan_Date) : null
-                const isApril21_23 = (jobDate && jobDate.getFullYear() === 2026 && jobDate.getMonth() === 3 && [21, 22, 23].includes(jobDate.getDate())) ||
-                                     dateStr.includes("-04-21") || dateStr.includes("-04-22") || dateStr.includes("-04-23")
-
-                if (isApril21_23) {
-                    unitPrice = 17
-                }
-
-                let finalTotal = storedTotal
-                if (unitPrice > 0 && qty > 0) {
-                    const expectedTotal = Number((qty * unitPrice).toFixed(2))
-                    if (storedTotal === 0 || Math.abs(storedTotal - expectedTotal) > 0.5) {
-                        finalTotal = expectedTotal
-                    }
-                }
-
-                return {
-                    ...j,
-                    Price_Per_Unit: unitPrice,
-                    Price_Cust_Total: finalTotal
-                }
-            })
-
-            setAvailableJobs(enriched)
+            setAvailableJobs(jobs || [])
             setFetchingJobs(false)
             
             // SYNC SELECTION: If we have initial IDs, apply them to the selection
@@ -199,34 +180,34 @@ export function InvoiceForm({ customers, initialData, onSuccess }: InvoiceFormPr
 
   return (
     <div className="space-y-6">
-        <Card className="relative z-20 bg-card/50 border-border/10 shadow-xl backdrop-blur-xl rounded-2xl">
+        <Card className="relative z-20 bg-card border-border shadow-sm rounded-2xl">
             <CardContent className="p-6 grid grid-cols-1 md:grid-cols-3 gap-6">
                 <div className="space-y-2">
-                    <Label className="text-muted-foreground font-black uppercase tracking-widest text-[10px] font-bold ml-1">ลูกค้า (Customer)</Label>
+                    <Label className="text-muted-foreground font-medium text-sm ml-1">ลูกค้า</Label>
                     <CustomerAutocomplete 
                         value={customerId}
                         onChange={setCustomerId}
-                        customers={customers as any}
+                        customers={customers}
                         onSelect={(c) => setCustomerId(c.Customer_ID)}
-                        className="bg-muted/50 border-border/10 rounded-xl h-11 text-xs font-bold text-muted-foreground placeholder:text-muted-foreground focus:ring-purple-500/20"
+                        className="bg-muted/50 border-border rounded-xl h-11 text-sm font-medium text-foreground placeholder:text-muted-foreground focus:ring-primary/20"
                     />
                 </div>
                 <div className="space-y-2">
-                    <Label className="text-muted-foreground font-black uppercase tracking-widest text-[10px] font-bold ml-1">วันที่ออกเอกสาร (Issue Date)</Label>
+                    <Label className="text-muted-foreground font-medium text-sm ml-1">วันที่ออกเอกสาร</Label>
                     <DateCallbackSelect date={issueDate} setDate={(d) => d && setIssueDate(d)} />
                 </div>
                 <div className="space-y-2">
-                    <Label className="text-muted-foreground font-black uppercase tracking-widest text-[10px] font-bold ml-1">วันครบกำหนด (Due Date)</Label>
+                    <Label className="text-muted-foreground font-medium text-sm ml-1">วันครบกำหนด</Label>
                     <DateCallbackSelect date={dueDate} setDate={(d) => d && setDueDate(d)} />
                 </div>
             </CardContent>
         </Card>
 
-        <Card className="bg-card/50 border-border/10 shadow-xl overflow-hidden rounded-2xl">
+        <Card className="bg-card border-border shadow-sm overflow-hidden rounded-2xl">
             <CardContent className="p-0">
-                <div className="p-4 border-b border-border/5 flex justify-between items-center bg-muted/50">
-                    <h3 className="font-black text-muted-foreground flex items-center gap-2 uppercase tracking-widest text-sm font-bold">
-                        <Calculator className="w-4 h-4 text-purple-400" />
+                <div className="p-4 border-b border-border flex flex-col md:flex-row md:justify-between md:items-center gap-3 bg-muted/30">
+                    <h3 className="text-foreground flex items-center gap-2 text-base font-semibold">
+                        <Calculator className="w-4 h-4 text-primary" />
                         รายการงานที่วางบิลได้ ({availableJobs.length})
                     </h3>
                     <div className="flex items-center gap-3">
@@ -250,12 +231,12 @@ export function InvoiceForm({ customers, initialData, onSuccess }: InvoiceFormPr
                                     toast.success("ปรับปรุงราคาตามเรทน้ำมันเรียบร้อย")
                                 }
                             }}
-                            className="bg-amber-500/10 text-amber-500 px-4 py-1.5 rounded-lg text-[9px] font-black uppercase tracking-widest border border-amber-500/20 hover:bg-amber-500/20 transition-all flex items-center gap-1.5 group"
+                            className="bg-amber-500/10 text-amber-600 px-3 py-1.5 rounded-lg text-xs font-semibold border border-amber-500/20 hover:bg-amber-500/20 transition-all flex items-center gap-1.5 group"
                         >
                             <RefreshCw size={12} className="group-hover:rotate-180 transition-transform duration-700" />
-                            Sync Item Prices
+                            ปรับราคาตามเรท
                         </button>
-                        <div className="text-[10px] font-bold font-black text-muted-foreground uppercase tracking-widest bg-muted p-1.5 rounded-md border border-border/5">
+                        <div className="text-xs font-medium text-muted-foreground bg-muted p-1.5 rounded-md border border-border">
                             เลือก {selectedJobIds.length} รายการ
                         </div>
                     </div>
@@ -263,14 +244,14 @@ export function InvoiceForm({ customers, initialData, onSuccess }: InvoiceFormPr
                 
                 {fetchingJobs ? (
                     <div className="p-10 flex flex-col items-center justify-center text-muted-foreground gap-2">
-                        <Loader2 className="animate-spin w-6 h-6 text-purple-500" />
-                        <span className="font-bold uppercase tracking-widest text-xs">กำลังโหลดข้อมูลงาน...</span>
+                        <Loader2 className="animate-spin w-6 h-6 text-primary" />
+                        <span className="font-medium text-sm">กำลังโหลดข้อมูลงาน...</span>
                     </div>
                 ) : (
                     <div className="p-0 overflow-auto max-h-[400px] custom-scrollbar">
                         <Table>
                             <TableHeader className="bg-muted/30">
-                                <TableRow className="border-border/5 hover:bg-transparent">
+                                <TableRow className="border-border hover:bg-transparent">
                                     <TableHead className="w-12 pl-4">
                                             <Checkbox 
                                                 checked={selectedJobIds.length === availableJobs.length && availableJobs.length > 0}
@@ -281,14 +262,14 @@ export function InvoiceForm({ customers, initialData, onSuccess }: InvoiceFormPr
                                                         setSelectedJobIds([])
                                                     }
                                                 }}
-                                                className="border-border/20 scale-90 data-[state=checked]:bg-purple-600 data-[state=checked]:border-purple-600"
+                                                className="border-border scale-90 data-[state=checked]:bg-primary data-[state=checked]:border-primary"
                                             />
                                         </TableHead>
-                                        <TableHead className="text-muted-foreground font-black uppercase tracking-widest text-[10px] py-3">Job ID</TableHead>
-                                        <TableHead className="text-muted-foreground font-black uppercase tracking-widest text-[10px] py-3">วันที่</TableHead>
-                                        <TableHead className="text-muted-foreground font-black uppercase tracking-widest text-[10px] py-3 text-center">จำนวน</TableHead>
-                                        <TableHead className="text-muted-foreground font-black uppercase tracking-widest text-[10px] py-3 text-right">ราคา/หน่วย</TableHead>
-                                        <TableHead className="text-right text-muted-foreground font-black uppercase tracking-widest text-[10px] py-3 pr-6">ราคารวม</TableHead>
+                                        <TableHead className="text-muted-foreground font-medium text-xs py-3">Job ID</TableHead>
+                                        <TableHead className="text-muted-foreground font-medium text-xs py-3">วันที่</TableHead>
+                                        <TableHead className="text-muted-foreground font-medium text-xs py-3 text-center">จำนวน</TableHead>
+                                        <TableHead className="text-muted-foreground font-medium text-xs py-3 text-right">ราคา/หน่วย</TableHead>
+                                        <TableHead className="text-right text-muted-foreground font-medium text-xs py-3 pr-6">ราคารวม</TableHead>
                                     </TableRow>
                                 </TableHeader>
                                 <TableBody>
@@ -311,8 +292,8 @@ export function InvoiceForm({ customers, initialData, onSuccess }: InvoiceFormPr
                                             <TableRow 
                                                 key={job.Job_ID} 
                                                 className={cn(
-                                                    "border-border/5 hover:bg-muted/50 transition-colors group cursor-pointer",
-                                                    isSelected && "bg-purple-500/5 hover:bg-purple-500/10"
+                                                    "border-border hover:bg-muted/50 transition-colors group cursor-pointer",
+                                                    isSelected && "bg-primary/5 hover:bg-primary/10"
                                                 )}
                                                 onClick={toggleSelection}
                                             >
@@ -320,27 +301,27 @@ export function InvoiceForm({ customers, initialData, onSuccess }: InvoiceFormPr
                                                     <Checkbox 
                                                         checked={isSelected}
                                                         onCheckedChange={toggleSelection}
-                                                        className="border-border/20 scale-90 data-[state=checked]:bg-purple-600 data-[state=checked]:border-purple-600"
+                                                        className="border-border scale-90 data-[state=checked]:bg-primary data-[state=checked]:border-primary"
                                                     />
                                                 </TableCell>
-                                                <TableCell className="font-black text-muted-foreground text-xs py-1.5">
+                                                <TableCell className="font-semibold text-muted-foreground text-xs py-1.5">
                                                     <div className="flex flex-col">
                                                         <span>{job.Job_ID}</span>
-                                                        <span className="text-[8px] uppercase opacity-50 truncate max-w-[120px]">{job.Route_Name}</span>
+                                                        <span className="text-[10px] opacity-60 truncate max-w-[120px]">{job.Route_Name}</span>
                                                     </div>
                                                 </TableCell>
-                                                <TableCell className="text-muted-foreground font-bold text-[10px] py-1.5">{new Date(job.Plan_Date).toLocaleDateString('th-TH')}</TableCell>
-                                                <TableCell className="text-center font-bold text-muted-foreground text-[10px] py-1.5">
+                                                <TableCell className="text-muted-foreground font-medium text-xs py-1.5">{job.Plan_Date ? new Date(job.Plan_Date).toLocaleDateString('th-TH') : '-'}</TableCell>
+                                                <TableCell className="text-center font-medium text-muted-foreground text-xs py-1.5">
                                                     {isPerItem ? qty.toLocaleString() : '1 (เที่ยว)'}
                                                 </TableCell>
-                                                <TableCell className="text-right font-bold text-muted-foreground text-[10px] py-1.5">
+                                                <TableCell className="text-right font-medium text-muted-foreground text-xs py-1.5">
                                                     {isPerItem ? unitPrice.toLocaleString(undefined, { minimumFractionDigits: 2 }) : '-'}
                                                 </TableCell>
-                                                <TableCell className="text-right font-black text-muted-foreground pr-6 py-1.5">
+                                                <TableCell className="text-right font-semibold text-muted-foreground pr-6 py-1.5">
                                                     <div className="flex flex-col items-end">
                                                         <div className="flex items-center gap-1.5">
                                                             {storedPrice === 0 && isPerItem && (
-                                                                <div className="p-0.5 px-1 bg-amber-500/20 text-amber-500 rounded-[2px] text-[7px] font-black animate-pulse flex items-center gap-0.5 uppercase tracking-tight">
+                                                                <div className="p-0.5 px-1 bg-amber-500/20 text-amber-600 rounded text-[9px] font-medium flex items-center gap-0.5">
                                                                     <Zap size={8} /> Auto
                                                                 </div>
                                                             )}
@@ -364,12 +345,12 @@ export function InvoiceForm({ customers, initialData, onSuccess }: InvoiceFormPr
             <div className="md:col-span-2 space-y-4">
                  <div className="grid grid-cols-3 gap-4">
                     <div className="space-y-2">
-                        <Label className="text-muted-foreground font-black uppercase tracking-widest text-[10px] font-bold ml-1">ภาษี (%)</Label>
+                        <Label className="text-muted-foreground font-medium text-sm ml-1">ภาษี (%)</Label>
                         <Select
                             value={String(vatRate)}
                             onValueChange={(v: string) => setVatRate(Number(v))}
                         >
-                            <SelectTrigger className="bg-card/50 border-border/10 rounded-xl h-11 text-xs font-bold text-muted-foreground focus:ring-purple-500/20">
+                            <SelectTrigger className="bg-card border-border rounded-xl h-11 text-sm font-medium text-foreground focus:ring-primary/20">
                                 <SelectValue placeholder="เลือกอัตราภาษี" />
                             </SelectTrigger>
                             <SelectContent className="bg-card border-border/10">
@@ -379,22 +360,22 @@ export function InvoiceForm({ customers, initialData, onSuccess }: InvoiceFormPr
                         </Select>
                     </div>
                     <div className="space-y-2">
-                        <Label className="text-muted-foreground font-black uppercase tracking-widest text-[10px] font-bold ml-1">ส่วนลด (Discount %)</Label>
+                        <Label className="text-muted-foreground font-medium text-sm ml-1">ส่วนลด (%)</Label>
                         <Input 
                             type="number"
                             value={discountRate} 
                             onChange={(e) => setDiscountRate(Number(e.target.value) || 0)} 
-                            className="bg-card/50 border-border/10 rounded-xl h-11 text-xs font-bold text-muted-foreground focus:ring-purple-500/20" 
+                            className="bg-card border-border rounded-xl h-11 text-sm font-medium text-foreground focus:ring-primary/20" 
                             placeholder="0%"
                         />
                     </div>
                     <div className="space-y-2">
-                        <Label className="text-muted-foreground font-black uppercase tracking-widest text-[10px] font-bold ml-1">หัก ณ ที่จ่าย (%)</Label>
+                        <Label className="text-muted-foreground font-medium text-sm ml-1">หัก ณ ที่จ่าย (%)</Label>
                         <Select
                             value={String(whtRate)}
                             onValueChange={(v: string) => setWhtRate(Number(v))}
                         >
-                            <SelectTrigger className="bg-card/50 border-border/10 rounded-xl h-11 text-xs font-bold text-muted-foreground focus:ring-purple-500/20">
+                            <SelectTrigger className="bg-card border-border rounded-xl h-11 text-sm font-medium text-foreground focus:ring-primary/20">
                                 <SelectValue placeholder="WHT %" />
                             </SelectTrigger>
                             <SelectContent className="bg-card border-border/10">
@@ -407,55 +388,55 @@ export function InvoiceForm({ customers, initialData, onSuccess }: InvoiceFormPr
                  </div>
 
                  <div className="space-y-2">
-                    <Label className="text-muted-foreground font-black uppercase tracking-widest text-[10px] font-bold ml-1">หมายเหตุ (Notes)</Label>
+                    <Label className="text-muted-foreground font-medium text-sm ml-1">หมายเหตุ</Label>
                     <Input 
                         value={notes} 
                         onChange={(e) => setNotes(e.target.value)} 
-                        className="bg-card/50 border-border/10 rounded-xl h-11 text-xs font-bold text-muted-foreground placeholder:text-muted-foreground focus:ring-purple-500/20" 
+                        className="bg-card border-border rounded-xl h-11 text-sm font-medium text-foreground placeholder:text-muted-foreground focus:ring-primary/20" 
                         placeholder="ระบุหมายเหตุ..."
                     />
                  </div>
             </div>
-            <Card className="bg-card border-border/10 shadow-xl overflow-hidden rounded-2xl border-t-emerald-500/30 border-t-2">
+            <Card className="bg-card border-border shadow-sm overflow-hidden rounded-2xl border-t-emerald-500/30 border-t-2">
                 <CardContent className="p-6 space-y-4">
                      <div className="space-y-1.5 pb-3">
-                        <div className="flex justify-between text-[10px] font-black text-muted-foreground uppercase tracking-widest">
+                        <div className="flex justify-between text-sm font-medium text-muted-foreground">
                             <span>ราคารับจ้างขนส่ง</span>
                             <span>฿{subtotal.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
                         </div>
                         {Number(discountRate) > 0 && (
-                            <div className="flex justify-between text-[10px] font-black text-amber-500 uppercase tracking-widest">
+                            <div className="flex justify-between text-sm font-medium text-amber-600">
                                 <span>ส่วนลด ({discountRate}%)</span>
                                 <span>-฿{discountAmount.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
                             </div>
                         )}
                         {vatRate > 0 && (
-                            <div className="flex justify-between text-[10px] font-black text-muted-foreground uppercase tracking-widest">
+                            <div className="flex justify-between text-sm font-medium text-muted-foreground">
                                 <span>ภาษีมูลค่าเพิ่ม ({vatRate}%)</span>
                                 <span>฿{vatAmount.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
                             </div>
                         )}
                         {whtRate > 0 && (
-                            <div className="flex justify-between text-[10px] font-black text-rose-500 uppercase tracking-widest">
+                            <div className="flex justify-between text-sm font-medium text-rose-500">
                                 <span>หัก ณ ที่จ่าย ({whtRate}%)</span>
                                 <span>-฿{whtAmount.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
                             </div>
                         )}
                     </div>
 
-                    <div className="flex justify-between text-xl font-black text-muted-foreground uppercase tracking-widest pt-3 border-t border-border/10">
-                        <span className="text-xs">ยอดรวมสุทธิ</span>
-                        <span className="text-foreground italic">฿{grandTotal.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
+                    <div className="flex justify-between text-xl font-semibold text-muted-foreground pt-3 border-t border-border">
+                        <span className="text-sm">ยอดรวมสุทธิ</span>
+                        <span className="text-foreground">฿{grandTotal.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
                     </div>
 
                     <div className="border-t border-border/5 pt-4">
                         <Button 
                             onClick={handleSubmit} 
                             disabled={loading || selectedJobs.length === 0}
-                            className="w-full h-11 bg-emerald-600 hover:bg-emerald-500 text-white font-black text-xs uppercase tracking-widest rounded-xl shadow-lg transition-all active:scale-[0.98]"
+                            className="w-full h-11 bg-emerald-600 hover:bg-emerald-500 text-white font-semibold text-sm rounded-xl shadow-sm transition-all active:scale-[0.98]"
                         >
                             {loading && <Loader2 className="mr-2 h-3 w-3 animate-spin" />}
-                            สร้างใบแจ้งหนี้ (CREATE)
+                            สร้างใบแจ้งหนี้
                         </Button>
                     </div>
                 </CardContent>
@@ -473,11 +454,11 @@ function DateCallbackSelect({ date, setDate }: { date: Date | undefined, setDate
           <Button
             variant={"outline"}
             className={cn(
-              "w-full h-11 justify-start text-left font-black text-xs bg-muted/50 border-border/10 hover:bg-muted/80 rounded-xl text-muted-foreground transition-all uppercase tracking-widest",
+              "w-full h-11 justify-start text-left font-medium text-sm bg-muted/50 border-border hover:bg-muted/80 rounded-xl text-muted-foreground transition-all",
               !date && "text-muted-foreground"
             )}
           >
-            <CalendarIcon className="mr-2 h-4 w-4 text-purple-400" />
+            <CalendarIcon className="mr-2 h-4 w-4 text-primary" />
             {date ? format(date, "PPP", { locale: th }) : <span>เลือกวันที่</span>}
           </Button>
         </PopoverTrigger>

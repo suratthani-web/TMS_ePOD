@@ -21,7 +21,25 @@ interface ActivityFeedProps {
     delivered: number
   }
   sosCount: number
-  logs?: any[]
+  logs?: Record<string, unknown>[]
+}
+
+type ActivityItem = {
+  icon: React.ElementType
+  label: string
+  time: string
+  color: string
+  bgColor: string
+  borderColor: string
+  timestamp?: string
+}
+
+function getDetailsDescription(details: unknown) {
+  if (details && typeof details === 'object' && 'description' in details) {
+    const description = (details as { description?: unknown }).description
+    return typeof description === 'string' ? description : undefined
+  }
+  return undefined
 }
 
 export function ActivityFeed({ jobStats, sosCount, logs = [] }: ActivityFeedProps) {
@@ -42,7 +60,7 @@ export function ActivityFeed({ jobStats, sosCount, logs = [] }: ActivityFeedProp
   }
 
   // Combine real logs with summary items
-  const activities = [
+  const activities: ActivityItem[] = [
     ...(sCount > 0 ? [{
       icon: AlertTriangle,
       label: t('dashboard.activity.sos_active', { count: sCount }),
@@ -54,12 +72,12 @@ export function ActivityFeed({ jobStats, sosCount, logs = [] }: ActivityFeedProp
     // Real system logs mapping
     ...(logs.map(log => ({
       icon: log.action_type === 'CREATE' ? Package : log.action_type === 'APPROVE' ? CheckCircle2 : Activity,
-      label: `${log.module}: ${log.details?.description || log.action_type}`,
-      time: log.username || 'System',
+      label: `${String(log.module || 'System')}: ${getDetailsDescription(log.details) || String(log.action_type || '')}`,
+      time: typeof log.username === 'string' ? log.username : 'System',
       color: log.action_type === 'CREATE' ? 'text-primary' : 'text-accent',
       bgColor: log.action_type === 'CREATE' ? 'bg-primary/10' : 'bg-accent/10',
       borderColor: log.action_type === 'CREATE' ? 'border-primary/20' : 'border-accent/20',
-      timestamp: log.created_at
+      timestamp: typeof log.created_at === 'string' ? log.created_at : undefined
     }))),
     ...(stats.total > 0 && logs.length === 0 ? [{
       icon: Package,
@@ -105,7 +123,7 @@ export function ActivityFeed({ jobStats, sosCount, logs = [] }: ActivityFeedProp
     >
       {hasActivities ? (
         activities.map((rawActivity, index) => {
-          const activity = rawActivity as any
+          const activity = rawActivity
           const Icon = activity.icon
           return (
             <motion.div

@@ -6,15 +6,23 @@ import { UserData } from "@/lib/actions/user-actions"
 
 interface PresenceState {
     user: UserData | null
-    onlineUsers: any[]
+    onlineUsers: PresenceUser[]
 }
 
 const PresenceContext = createContext<PresenceState>({ user: null, onlineUsers: [] })
 
+type PresenceUser = {
+    username?: string
+    name?: string
+    role?: string
+    branch?: string | null
+    online_at?: string
+    session_id?: string
+}
 
 
 export function PresenceProvider({ children, user }: { children: React.ReactNode, user: UserData | null }) {
-    const [onlineUsers, setOnlineUsers] = useState<any[]>([])
+    const [onlineUsers, setOnlineUsers] = useState<PresenceUser[]>([])
     const supabase = useMemo(() => createClient(), [])
 
     useEffect(() => {
@@ -36,7 +44,7 @@ export function PresenceProvider({ children, user }: { children: React.ReactNode
         channel
             .on('presence', { event: 'sync' }, () => {
                 const state = channel.presenceState()
-                const users = Object.values(state).flat()
+                const users = Object.values(state).flat() as PresenceUser[]
                 console.log(`[Presence] Sync: ${users.length} users online`)
                 setOnlineUsers(users)
             })

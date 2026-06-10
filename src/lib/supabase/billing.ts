@@ -29,11 +29,17 @@ export interface BillingNote {
   WHT_Amount?: number
 }
 
-function getErrorMessage(e: any): string {
+function getErrorMessage(e: unknown): string {
     if (!e) return "Unknown error"
     if (typeof e === 'string') return e
-    if (e.message) return e.message
-    if (e.error?.message) return e.error.message
+    if (typeof e === 'object') {
+        const obj = e as Record<string, unknown>;
+        if (obj.message) return String(obj.message);
+        if (obj.error && typeof obj.error === 'object') {
+            const errObj = obj.error as Record<string, unknown>;
+            if (errObj.message) return String(errObj.message);
+        }
+    }
     return JSON.stringify(e)
 }
 
@@ -55,7 +61,7 @@ export async function createBillingNote(
 
         if (jobsError) throw new Error("Failed to fetch jobs for calculation")
         
-        const totalAmount = jobs?.reduce((sum: number, job: any) => {
+        const totalAmount = jobs?.reduce((sum: number, job: { Price_Cust_Total?: number, Cost_Driver_Total?: number, charge_cust?: number, extra_costs_json?: string | null }) => {
              const basePrice = job.Price_Cust_Total || 0
              let extra = 0
              
@@ -198,7 +204,7 @@ export async function createDriverPayment(
 
         if (jobsError) throw new Error("Failed to fetch jobs for calculation")
         
-        const totalAmount = jobs?.reduce((sum: number, job: any) => sum + (job.Cost_Driver_Total || 0), 0) || 0
+        const totalAmount = jobs?.reduce((sum: number, job: { Price_Cust_Total?: number, Cost_Driver_Total?: number, charge_cust?: number }) => sum + (job.Cost_Driver_Total || 0), 0) || 0
 
         // 2. Generate Driver Payment ID (DP-YYYYMM-XXXX)
         const dateObj = new Date()
@@ -322,7 +328,7 @@ export async function getBillingNotes(filters?: { dateFrom?: string, dateTo?: st
                 .in('Customer_Name', customerNames)
             
             if (customers) {
-                const emailMap = new Map<string, string>(customers.map((c: any) => [c.Customer_Name, c.Email]))
+                const emailMap = new Map<string, string>(customers.map((c: { Customer_Name: string, Email: string }) => [c.Customer_Name, c.Email]))
                 notes.forEach(n => {
                     n.Customer_Email = emailMap.get(n.Customer_Name) || ""
                 })
@@ -340,8 +346,8 @@ export async function getBillingNoteByIdWithJobs(id: string) {
         const admin = await isAdmin()
         const supabase = admin ? await createAdminClient() : await createClient()
         
-        let note: any = null
-        let jobs: any[] = []
+        let note: Partial<BillingNote> | null = null
+        let jobs: Job[] = []
 
         // 1. Detect Type and Get Data
         if (id.startsWith('INV')) {
@@ -374,7 +380,7 @@ export async function getBillingNoteByIdWithJobs(id: string) {
             }
 
             if (inv.Items_JSON && Array.isArray(inv.Items_JSON)) {
-                jobs = inv.Items_JSON
+                jobs = inv.Items_JSON as Job[]
             }
         } else {
             // It's a Billing Note ID (or fallback)
@@ -396,7 +402,7 @@ export async function getBillingNoteByIdWithJobs(id: string) {
                 .or(`Billing_Note_ID.eq."${id}",Invoice_ID.eq."${id}"`)
             
             if (jobsError) throw jobsError
-            jobs = dbJobs || []
+            jobs = (dbJobs as Job[]) || []
 
             // Enrich with Unit Prices from Master_Customers
             try {
@@ -408,10 +414,10 @@ export async function getBillingNoteByIdWithJobs(id: string) {
                         .in('Customer_ID', uniqueCustomerIds)
 
                     if (customerPrices) {
-                        const priceMap = new Map<string, number>(customerPrices.map((c: any) => [c.Customer_ID, c.Price_Per_Unit]))
+                        const priceMap = new Map<string, number>(customerPrices.map((c: { Customer_ID: string, Price_Per_Unit: number }) => [c.Customer_ID, c.Price_Per_Unit]))
                         jobs = jobs.map(job => ({
                             ...job,
-                            Price_Per_Unit: job.Price_Per_Unit || priceMap.get(job.Customer_ID) || 0
+                            Price_Per_Unit: job.Price_Per_Unit || priceMap.get(String(job.Customer_ID)) || 0
                         }))
                     }
                 }
@@ -463,7 +469,7 @@ export async function getBillingNoteByIdWithJobs(id: string) {
                 query = query.eq('Customer_ID', customerId)
             } else {
                 // Fallback to name with trimming to handle potential trailing spaces
-                query = query.eq('Customer_Name', note.Customer_Name.trim())
+                query = query.eq('Customer_Name', note.Customer_Name ? String(note.Customer_Name).trim() : '')
             }
 
             const { data: customer, error: custError } = await query
@@ -482,10 +488,10 @@ export async function getBillingNoteByIdWithJobs(id: string) {
         }
 
         const billingNoteWithDetails: BillingNote = {
-            ...note as BillingNote,
-            Customer_Email: customerEmail || (note as any).Customer_Email,
-            Customer_Address: customerAddress || (note as any).Customer_Address,
-            Customer_Tax_ID: customerTaxId || (note as any).Customer_Tax_ID
+            ...(note as BillingNote),
+            Customer_Email: customerEmail || (note as Record<string, string>)?.Customer_Email,
+            Customer_Address: customerAddress || (note as Record<string, string>)?.Customer_Address,
+            Customer_Tax_ID: customerTaxId || (note as Record<string, string>)?.Customer_Tax_ID
         }
 
         return { note: billingNoteWithDetails, jobs: jobs || [], company: companyProfile }
@@ -782,8 +788,8 @@ export async function getPublicBillingNoteById(id: string) {
         // Use admin client to bypass RLS for public invoice view
         const supabase = await createAdminClient()
         
-        let note: any = null
-        let jobs: any[] = []
+        let note: Partial<BillingNote> | null = null
+        let jobs: Job[] = []
 
         // 1. Detect Type and Get Data
         if (id.startsWith('INV')) {
@@ -815,7 +821,7 @@ export async function getPublicBillingNoteById(id: string) {
             }
 
             if (inv.Items_JSON && Array.isArray(inv.Items_JSON)) {
-                jobs = inv.Items_JSON
+                jobs = inv.Items_JSON as Job[]
             }
         } else {
             // It's a Billing Note ID
@@ -837,7 +843,7 @@ export async function getPublicBillingNoteById(id: string) {
                 .or(`Billing_Note_ID.eq."${id}",Invoice_ID.eq."${id}"`)
             
             if (jobsError) throw jobsError
-            jobs = dbJobs || []
+            jobs = (dbJobs as Job[]) || []
         }
 
         // Enrich with Unit Prices from Master_Customers
@@ -850,10 +856,10 @@ export async function getPublicBillingNoteById(id: string) {
                     .in('Customer_ID', uniqueCustomerIds)
 
                 if (customerPrices) {
-                    const priceMap = new Map<string, number>(customerPrices.map((c: any) => [c.Customer_ID, c.Price_Per_Unit]))
+                    const priceMap = new Map<string, number>(customerPrices.map((c: { Customer_ID: string, Price_Per_Unit: number }) => [c.Customer_ID, c.Price_Per_Unit]))
                     jobs = jobs.map(job => ({
                         ...job,
-                        Price_Per_Unit: job.Price_Per_Unit || priceMap.get(job.Customer_ID) || 0
+                        Price_Per_Unit: job.Price_Per_Unit || priceMap.get(String(job.Customer_ID)) || 0
                     }))
                 }
             }
@@ -902,7 +908,7 @@ export async function getPublicBillingNoteById(id: string) {
             if (customerId) {
                 query = query.eq('Customer_ID', customerId)
             } else {
-                query = query.eq('Customer_Name', note.Customer_Name.trim())
+                query = query.eq('Customer_Name', note.Customer_Name ? String(note.Customer_Name).trim() : '')
             }
 
             const { data: customer } = await query
@@ -917,10 +923,10 @@ export async function getPublicBillingNoteById(id: string) {
         }
 
         const billingNoteWithDetails: BillingNote = {
-            ...note as BillingNote,
-            Customer_Email: customerEmail || (note as any).Customer_Email,
-            Customer_Address: customerAddress || (note as any).Customer_Address,
-            Customer_Tax_ID: customerTaxId || (note as any).Customer_Tax_ID
+            ...(note as BillingNote),
+            Customer_Email: customerEmail || (note as Record<string, string>)?.Customer_Email,
+            Customer_Address: customerAddress || (note as Record<string, string>)?.Customer_Address,
+            Customer_Tax_ID: customerTaxId || (note as Record<string, string>)?.Customer_Tax_ID
         }
 
         return { note: billingNoteWithDetails, jobs: jobs || [], company: companyProfile }

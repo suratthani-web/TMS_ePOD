@@ -73,7 +73,7 @@ export function BillingSection({ data }: { data: BillingAnalytics }) {
                 {accountsReceivable.invoiceCount} {t('billing.active_entities')}
               </span>
             </div>
-            <div className="flex items-center gap-1.5 pt-0.5 border-t border-border/5">
+            <div className="flex items-center gap-1.5 pt-0.5 border-t border-border">
               <div className="w-1.5 h-1.5 rounded-full bg-blue-500 shrink-0" />
               <p className="text-[9px] text-blue-400 font-semibold uppercase truncate opacity-70">{t('billing.active_entities')}</p>
             </div>
@@ -101,7 +101,7 @@ export function BillingSection({ data }: { data: BillingAnalytics }) {
                 {accountsPayable.paymentCount} {t('billing.pending_disbursements')}
               </span>
             </div>
-            <div className="flex items-center gap-1.5 pt-0.5 border-t border-border/5">
+            <div className="flex items-center gap-1.5 pt-0.5 border-t border-border">
               <div className="w-1.5 h-1.5 rounded-full bg-indigo-500 shrink-0" />
               <p className="text-[9px] text-indigo-400 font-semibold uppercase truncate opacity-70">{t('billing.pending_disbursements')}</p>
             </div>
@@ -202,7 +202,7 @@ export function BillingSection({ data }: { data: BillingAnalytics }) {
             </div>
             <div className={cn(
               "text-[9px] uppercase font-semibold tracking-wide pt-0.5 border-t",
-              isCritical ? 'text-rose-400 border-rose-500/20' : isWarning ? 'text-amber-400 border-amber-500/20' : 'text-muted-foreground/40 border-border/5'
+              isCritical ? 'text-rose-400 border-rose-500/20' : isWarning ? 'text-amber-400 border-amber-500/20' : 'text-muted-foreground/40 border-border'
             )}>
               {isCritical ? '⚠ ต้องดำเนินการทันที' : isWarning ? '⚡ ติดตามหนี้ด่วน' : '✓ ไม่มีหนี้เกินกำหนด'}
             </div>
@@ -215,7 +215,7 @@ export function BillingSection({ data }: { data: BillingAnalytics }) {
 
         {/* AR Aging Timeline */}
         <PremiumCard className="bg-muted/30 border border-border/10 p-0 overflow-hidden rounded-2xl">
-          <div className="px-5 py-4 border-b border-border/5 bg-black/20 flex items-center gap-3">
+          <div className="px-5 py-4 border-b border-border bg-muted/20 flex items-center gap-3">
             <div className="p-1.5 bg-blue-600 rounded-lg text-white shrink-0">
               <Clock size={13} />
             </div>
@@ -256,7 +256,7 @@ export function BillingSection({ data }: { data: BillingAnalytics }) {
 
         {/* Recent Unpaid */}
         <PremiumCard className="bg-muted/30 border border-border/10 p-0 overflow-hidden rounded-2xl">
-          <div className="px-5 py-4 border-b border-border/5 bg-black/20 flex items-center gap-3">
+          <div className="px-5 py-4 border-b border-border bg-muted/20 flex items-center gap-3">
             <div className="p-1.5 bg-rose-600 rounded-lg text-white shrink-0">
               <AlertCircle size={13} />
             </div>

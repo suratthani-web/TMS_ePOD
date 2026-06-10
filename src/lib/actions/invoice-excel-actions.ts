@@ -34,6 +34,12 @@ const normalizeVehicleType = (v: string) => {
     return v
 }
 
+const asString = (value: unknown) => typeof value === 'string' ? value : value == null ? '' : String(value)
+const asDateInput = (value: unknown): string | number | Date | null => {
+    if (typeof value === 'string' || typeof value === 'number' || value instanceof Date) return value
+    return null
+}
+
 export async function exportInvoiceExcel(invoiceId: string) {
     try {
         const supabase = createAdminClient()
@@ -44,7 +50,7 @@ export async function exportInvoiceExcel(invoiceId: string) {
         const finalDoc = invoice || bn
         if (!finalDoc) throw new Error("ไม่พบข้อมูลเอกสาร")
 
-        let jobs: any[] = []
+        let jobs: Record<string, unknown>[] = []
         if (invoice?.Items_JSON && Array.isArray(invoice.Items_JSON)) {
             jobs = invoice.Items_JSON
         } else {
@@ -55,8 +61,10 @@ export async function exportInvoiceExcel(invoiceId: string) {
 
         // 1.2 Sort Jobs by Date (Oldest to Newest)
         jobs.sort((a, b) => {
-            const dateA = a.Plan_Date ? new Date(a.Plan_Date).getTime() : 0
-            const dateB = b.Plan_Date ? new Date(b.Plan_Date).getTime() : 0
+            const planDateA = asDateInput(a.Plan_Date)
+            const planDateB = asDateInput(b.Plan_Date)
+            const dateA = planDateA ? new Date(planDateA).getTime() : 0
+            const dateB = planDateB ? new Date(planDateB).getTime() : 0
             return dateA - dateB
         })
 
@@ -78,7 +86,7 @@ export async function exportInvoiceExcel(invoiceId: string) {
         // 2. Load Template (Vercel Fix: Embedded Base64)
         const workbook = new ExcelJS.Workbook()
         const templateBuffer = Buffer.from(templateBase64, 'base64')
-        await workbook.xlsx.load(templateBuffer as any)
+        await workbook.xlsx.load(templateBuffer as unknown as ArrayBuffer)
         const worksheet = workbook.getWorksheet(1)
         if (!worksheet) throw new Error("Worksheet not found")
 
@@ -105,7 +113,7 @@ export async function exportInvoiceExcel(invoiceId: string) {
         const summaryBaseRow = jobsCount <= templateRows ? 27 : 10 + jobsCount
         const extraRowsNeeded = jobsCount > templateRows ? jobsCount - templateRows : 0
         
-        const shiftMerges = (ws: any, insertRowIndex: number, numRows: number) => {
+        const shiftMerges = (ws: ExcelJS.Worksheet, insertRowIndex: number, numRows: number) => {
             if (!ws.model.merges || ws.model.merges.length === 0) return
             
             const newMerges: string[] = []
@@ -227,7 +235,7 @@ export async function exportInvoiceExcel(invoiceId: string) {
         }
 
         // 6. Fill Job Data
-        const summaryTotals: any = { 8: 0, 9: 0, 10: 0, 11: 0, 12: 0, 13: 0 }
+        const summaryTotals: Record<number, number> = { 8: 0, 9: 0, 10: 0, 11: 0, 12: 0, 13: 0 }
         let totalQuantity = 0
         let totalCO2 = 0
 
@@ -237,22 +245,23 @@ export async function exportInvoiceExcel(invoiceId: string) {
             const row = worksheet.getRow(r)
 
             row.getCell(1).value = index + 1
-            row.getCell(2).value = job.Plan_Date ? new Date(job.Plan_Date).toLocaleDateString('th-TH') : '-'
-            row.getCell(3).value = normalizeVehicleType(job.Vehicle_Type)
+            const planDate = asDateInput(job.Plan_Date)
+            row.getCell(2).value = planDate ? new Date(planDate).toLocaleDateString('th-TH') : '-'
+            row.getCell(3).value = normalizeVehicleType(asString(job.Vehicle_Type))
             row.getCell(4).value = Number(job.Total_Drop || 1)
             
             // Origin / Destination
-            let origin = (job.Origin_Location || '').trim()
-            let dest = (job.Dest_Location || '').trim()
+            let origin = asString(job.Origin_Location).trim()
+            let dest = asString(job.Dest_Location).trim()
             if ((!origin || !dest) && job.Route_Name) {
-                const parts = job.Route_Name.split(/[-→/]/)
+                const parts = asString(job.Route_Name).split(/[-→/]/)
                 if (parts.length >= 2) {
                     if (!origin) origin = parts[0].trim()
                     if (!dest) dest = parts.slice(1).join(' - ').trim()
                 }
             }
             row.getCell(5).value = origin || ''
-            row.getCell(6).value = dest || job.Route_Name || ''
+            row.getCell(6).value = dest || asString(job.Route_Name)
             
             // Carbon Footprint
             const effectiveDist = Number(job.Est_Distance_KM) || 12.5
@@ -282,7 +291,7 @@ export async function exportInvoiceExcel(invoiceId: string) {
                 summaryTotals[13] += lineTotal
             } else {
                 // Lump Sum Mapping
-                let basePrice = Number(job.Price_Cust_Total || 0)
+                const basePrice = Number(job.Price_Cust_Total || 0)
                 row.getCell(8).value = basePrice
                 summaryTotals[8] += basePrice
 
@@ -563,8 +572,8 @@ export async function exportInvoiceExcel(invoiceId: string) {
         const buffer = await workbook.xlsx.writeBuffer()
         return { success: true, data: Buffer.from(buffer).toString('base64'), fileName: `Invoice_${invoiceId}.xlsx` }
 
-    } catch (error: any) {
+    } catch (error: unknown) {
         console.error("Excel Export Error:", error)
-        return { success: false, error: error.message }
+        return { success: false, error: error instanceof Error ? error.message : 'Unknown error' }
     }
 }

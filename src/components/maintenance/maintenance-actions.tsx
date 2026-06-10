@@ -48,7 +48,7 @@ export function MaintenanceActions({ ticket, drivers, vehicles }: MaintenanceAct
   const handleStatusUpdate = async (status: string) => {
     setLoading(true)
     try {
-      const result = await updateRepairTicket(ticket.Ticket_ID, { ...ticket, Status: status } as any)
+      const result = await updateRepairTicket(ticket.Ticket_ID, { ...ticket, Status: status } as unknown as import('@/app/maintenance/actions').TicketUpdateData)
       if (result.success) {
         toast.success(`อัปเดตสถานะเป็น ${status} เรียบร้อยแล้ว`)
       } else {
@@ -73,7 +73,7 @@ export function MaintenanceActions({ ticket, drivers, vehicles }: MaintenanceAct
                 <Button 
                     disabled={loading}
                     onClick={() => handleStatusUpdate('In Progress')}
-                    className="bg-emerald-600 hover:bg-emerald-700 text-white font-black text-xs uppercase tracking-widest h-10 px-4 rounded-xl shadow-lg shadow-emerald-600/20 active:scale-95 transition-all"
+                    className="bg-emerald-600 hover:bg-emerald-700 text-white font-semibold text-xs h-10 px-4 rounded-xl shadow-sm active:scale-95 transition-all"
                 >
                     {loading ? <Loader2 className="animate-spin h-3 w-3" /> : 'อนุมัติ'}
                 </Button>
@@ -81,7 +81,7 @@ export function MaintenanceActions({ ticket, drivers, vehicles }: MaintenanceAct
                     disabled={loading}
                     variant="outline"
                     onClick={() => handleStatusUpdate('Rejected')}
-                    className="border-2 border-red-200 text-red-600 hover:bg-red-50 font-black text-xs uppercase tracking-widest h-10 px-4 rounded-xl active:scale-95 transition-all"
+                    className="border border-destructive/30 text-destructive hover:bg-destructive/10 font-semibold text-xs h-10 px-4 rounded-xl active:scale-95 transition-all"
                 >
                     {loading ? <Loader2 className="animate-spin h-3 w-3" /> : 'ปฏิเสธ'}
                 </Button>
@@ -90,7 +90,7 @@ export function MaintenanceActions({ ticket, drivers, vehicles }: MaintenanceAct
               <Button 
                   disabled={loading}
                   onClick={() => handleStatusUpdate('Completed')}
-                  className="bg-emerald-500 hover:bg-emerald-600 text-white font-black text-xs uppercase tracking-widest h-10 px-4 rounded-xl shadow-lg shadow-emerald-500/20 active:scale-95 transition-all"
+                  className="bg-emerald-600 hover:bg-emerald-700 text-white font-semibold text-xs h-10 px-4 rounded-xl shadow-sm active:scale-95 transition-all"
               >
                   {loading ? <Loader2 className="animate-spin h-3 w-3" /> : (
                     <div className="flex items-center gap-2">
@@ -107,7 +107,7 @@ export function MaintenanceActions({ ticket, drivers, vehicles }: MaintenanceAct
                         <MoreVertical className="h-4 w-4" />
                     </Button>
                 </DropdownMenuTrigger>
-                <DropdownMenuContent align="end" className="bg-white border-gray-200 text-gray-800">
+                <DropdownMenuContent align="end" className="bg-card border-border text-foreground">
                     <DropdownMenuItem onClick={() => setShowEditDialog(true)} className="cursor-pointer">
                         <Pencil className="mr-2 h-4 w-4" /> แก้ไข
                     </DropdownMenuItem>
@@ -120,9 +120,9 @@ export function MaintenanceActions({ ticket, drivers, vehicles }: MaintenanceAct
             <MaintenanceDialog 
                 open={showEditDialog} 
                 onOpenChange={setShowEditDialog}
-                drivers={drivers as any}
-                vehicles={vehicles as any}
-                initialData={ticket as any}
+                drivers={drivers as unknown as import('@/lib/supabase/drivers').Driver[]}
+                vehicles={vehicles as { Vehicle_Plate: string }[]}
+                initialData={ticket as unknown as import('./maintenance-dialog').MaintenanceTicket}
             />
         </div>
     )
@@ -132,15 +132,15 @@ export function MaintenanceActions({ ticket, drivers, vehicles }: MaintenanceAct
     <>
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
-          <Button variant="ghost" className="h-8 w-8 p-0 text-muted-foreground hover:text-white">
+          <Button variant="ghost" className="h-8 w-8 p-0 text-muted-foreground hover:text-foreground hover:bg-muted">
             <span className="sr-only">Open menu</span>
             {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <MoreVertical className="h-4 w-4" />}
           </Button>
         </DropdownMenuTrigger>
-        <DropdownMenuContent align="end" className="bg-white border-gray-200 text-gray-800">
+        <DropdownMenuContent align="end" className="bg-card border-border text-foreground">
           <DropdownMenuLabel>การจัดการ</DropdownMenuLabel>
           <DropdownMenuItem 
-            className="cursor-pointer hover:bg-gray-100"
+            className="cursor-pointer hover:bg-muted"
             onClick={() => setShowEditDialog(true)}
           >
             <Pencil className="mr-2 h-4 w-4" />
@@ -148,31 +148,31 @@ export function MaintenanceActions({ ticket, drivers, vehicles }: MaintenanceAct
           </DropdownMenuItem>
           
           <DropdownMenuSub>
-            <DropdownMenuSubTrigger className="hover:bg-gray-100 cursor-pointer">
+            <DropdownMenuSubTrigger className="hover:bg-muted cursor-pointer">
               <CheckCircle2 className="mr-2 h-4 w-4" />
               อัปเดตสถานะ
             </DropdownMenuSubTrigger>
-            <DropdownMenuSubContent className="bg-white border-gray-200 text-gray-800">
-              <DropdownMenuItem onClick={() => handleStatusUpdate('Pending')} className="cursor-pointer hover:bg-gray-100">
+            <DropdownMenuSubContent className="bg-card border-border text-foreground">
+              <DropdownMenuItem onClick={() => handleStatusUpdate('Pending')} className="cursor-pointer hover:bg-muted">
                 รอดำเนินการ
               </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => handleStatusUpdate('In Progress')} className="cursor-pointer hover:bg-gray-100 text-emerald-500">
+              <DropdownMenuItem onClick={() => handleStatusUpdate('In Progress')} className="cursor-pointer hover:bg-muted text-emerald-500">
                 อนุมัติ / กำลังซ่อม
               </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => handleStatusUpdate('Rejected')} className="cursor-pointer hover:bg-gray-100 text-red-400">
+              <DropdownMenuItem onClick={() => handleStatusUpdate('Rejected')} className="cursor-pointer hover:bg-muted text-destructive">
                 ไม่อนุมัติ / ปฏิเสธ
               </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => handleStatusUpdate('Completed')} className="cursor-pointer hover:bg-gray-100 text-emerald-400">
+              <DropdownMenuItem onClick={() => handleStatusUpdate('Completed')} className="cursor-pointer hover:bg-muted text-emerald-500">
                 เสร็จสิ้น
               </DropdownMenuItem>
             </DropdownMenuSubContent>
           </DropdownMenuSub>
 
-          <DropdownMenuSeparator className="bg-gray-100" />
+          <DropdownMenuSeparator className="bg-border" />
           
           <DropdownMenuItem 
             onClick={handleDelete}
-            className="text-red-400 focus:text-red-400 cursor-pointer hover:bg-red-50"
+            className="text-destructive focus:text-destructive cursor-pointer hover:bg-destructive/10"
           >
             <Trash2 className="mr-2 h-4 w-4" />
             ลบรายการ
@@ -183,9 +183,9 @@ export function MaintenanceActions({ ticket, drivers, vehicles }: MaintenanceAct
       <MaintenanceDialog 
         open={showEditDialog} 
         onOpenChange={setShowEditDialog}
-        drivers={drivers as any}
-        vehicles={vehicles as any}
-        initialData={ticket as any}
+        drivers={drivers as unknown as import('@/lib/supabase/drivers').Driver[]}
+        vehicles={vehicles as { Vehicle_Plate: string }[]}
+        initialData={ticket as unknown as import('./maintenance-dialog').MaintenanceTicket}
       />
     </>
   )

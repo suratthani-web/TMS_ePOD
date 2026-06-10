@@ -15,7 +15,7 @@ import {
 } from "@/components/ui/sheet"
 import { Filter, Calendar } from "lucide-react"
 
-export function MobileJobFilter({ searchParams }: { searchParams: any }) {
+export function MobileJobFilter({ searchParams }: { searchParams: { dateFrom?: string; dateTo?: string; status?: string } }) {
   const router = useRouter()
   const pathname = usePathname()
  
@@ -52,22 +52,22 @@ export function MobileJobFilter({ searchParams }: { searchParams: any }) {
         <Button 
             variant="outline" 
             size="sm" 
-            className={`gap-2 border-gray-200 bg-white text-gray-700 hover:text-white ${
-                activeFilterCount > 0 ? 'border-blue-500 text-emerald-500' : ''
+            className={`gap-2 border-border bg-card text-foreground hover:bg-muted ${
+                activeFilterCount > 0 ? 'border-primary text-primary' : ''
             }`}
         >
           <Filter size={14} />
           ตัวกรอง
           {activeFilterCount > 0 && (
-              <span className="flex items-center justify-center w-5 h-5 ml-1 text-foreground bg-emerald-600 rounded-full">
+              <span className="flex items-center justify-center w-5 h-5 ml-1 text-primary-foreground bg-primary rounded-full text-xs">
                   {activeFilterCount}
               </span>
           )}
         </Button>
       </SheetTrigger>
-      <SheetContent side="bottom" className="h-auto rounded-t-[2.5rem] border-t border-border bg-card text-foreground px-6 py-8">
+      <SheetContent side="bottom" className="h-auto rounded-t-2xl border-t border-border bg-card text-foreground px-6 py-8">
         <SheetHeader className="mb-6 text-left">
-          <SheetTitle className="text-foreground flex justify-between items-center text-xl font-black italic uppercase tracking-wider">
+          <SheetTitle className="text-foreground flex justify-between items-center text-xl font-semibold">
             <span>ตัวกรองงาน</span>
             {activeFilterCount > 0 && (
                 <Button variant="ghost" size="sm" onClick={handleClear} className="h-8 text-muted-foreground hover:text-foreground">
@@ -81,7 +81,7 @@ export function MobileJobFilter({ searchParams }: { searchParams: any }) {
             {/* Date Filter & Presets */}
             <div className="space-y-4">
                 <div className="flex justify-between items-end">
-                    <Label className="text-muted-foreground font-black text-xs uppercase tracking-widest">ช่วงวันที่</Label>
+                    <Label className="text-muted-foreground font-medium text-sm">ช่วงวันที่</Label>
                     <div className="flex gap-2">
                         <button 
                             type="button" 
@@ -90,7 +90,7 @@ export function MobileJobFilter({ searchParams }: { searchParams: any }) {
                                 setDateFrom(todayStr)
                                 setDateTo(todayStr)
                             }}
-                            className="text-[10px] px-2 py-1 bg-muted hover:bg-muted/80 text-foreground rounded-md font-bold uppercase transition-colors"
+                            className="text-xs px-2 py-1 bg-muted hover:bg-muted/80 text-foreground rounded-md font-medium transition-colors"
                         >วันนี้</button>
                         <button 
                             type="button" 
@@ -100,7 +100,7 @@ export function MobileJobFilter({ searchParams }: { searchParams: any }) {
                                 setDateFrom(tomStr)
                                 setDateTo(tomStr)
                             }}
-                            className="text-[10px] px-2 py-1 bg-muted hover:bg-muted/80 text-foreground rounded-md font-bold uppercase transition-colors"
+                            className="text-xs px-2 py-1 bg-muted hover:bg-muted/80 text-foreground rounded-md font-medium transition-colors"
                         >พรุ่งนี้</button>
                         <button 
                             type="button" 
@@ -108,35 +108,35 @@ export function MobileJobFilter({ searchParams }: { searchParams: any }) {
                                 setDateFrom("")
                                 setDateTo("")
                             }}
-                            className="text-[10px] px-2 py-1 bg-primary/10 text-primary rounded-md font-bold uppercase hover:bg-primary/20 transition-colors"
+                            className="text-xs px-2 py-1 bg-primary/10 text-primary rounded-md font-medium hover:bg-primary/20 transition-colors"
                         >ทั้งหมด</button>
                     </div>
                 </div>
                 
                 <div className="grid grid-cols-2 gap-4">
                     <div className="space-y-2">
-                        <Label htmlFor="dateFrom" className="text-muted-foreground text-[10px] font-bold uppercase tracking-wider">เริ่มต้น</Label>
+                        <Label htmlFor="dateFrom" className="text-muted-foreground text-xs font-medium">เริ่มต้น</Label>
                         <div className="relative">
                             <Input 
                                 id="dateFrom" 
                                 type="date" 
                                 value={dateFrom}
                                 onChange={(e) => setDateFrom(e.target.value)}
-                                className="bg-muted/50 border-border text-foreground pl-10 h-12 rounded-xl focus-visible:ring-primary/20 text-xs font-bold"
+                                className="bg-muted/50 border-border text-foreground pl-10 h-12 rounded-xl focus-visible:ring-primary/20 text-sm font-medium"
                             />
                             <Calendar className="absolute left-3 top-3.5 text-muted-foreground" size={14} />
                         </div>
                     </div>
                     
                     <div className="space-y-2">
-                        <Label htmlFor="dateTo" className="text-muted-foreground text-[10px] font-bold uppercase tracking-wider">สิ้นสุด</Label>
+                        <Label htmlFor="dateTo" className="text-muted-foreground text-xs font-medium">สิ้นสุด</Label>
                         <div className="relative">
                             <Input 
                                 id="dateTo" 
                                 type="date" 
                                 value={dateTo}
                                 onChange={(e) => setDateTo(e.target.value)}
-                                className="bg-muted/50 border-border text-foreground pl-10 h-12 rounded-xl focus-visible:ring-primary/20 text-xs font-bold"
+                                className="bg-muted/50 border-border text-foreground pl-10 h-12 rounded-xl focus-visible:ring-primary/20 text-sm font-medium"
                             />
                             <Calendar className="absolute left-3 top-3.5 text-muted-foreground" size={14} />
                         </div>
@@ -146,7 +146,7 @@ export function MobileJobFilter({ searchParams }: { searchParams: any }) {
  
             {/* Status Filter */}
             <div className="space-y-2">
-                <Label className="text-muted-foreground font-black text-xs uppercase tracking-widest">สถานะงาน</Label>
+                <Label className="text-muted-foreground font-medium text-sm">สถานะงาน</Label>
                 <div className="flex flex-wrap gap-2">
                     {['All', 'Assigned', 'In Transit', 'Completed', 'Cancelled'].map((s) => (
                         <button
@@ -154,7 +154,7 @@ export function MobileJobFilter({ searchParams }: { searchParams: any }) {
                             onClick={() => setStatus(s)}
                             className={`px-4 py-2 rounded-full text-xs font-bold transition-all border ${
                                 status === s 
-                                    ? 'bg-primary border-primary text-white shadow-lg shadow-primary/20' 
+                                    ? 'bg-primary border-primary text-primary-foreground shadow-sm' 
                                     : 'bg-transparent border-border text-muted-foreground hover:border-muted'
                             }`}
                         >
@@ -169,7 +169,7 @@ export function MobileJobFilter({ searchParams }: { searchParams: any }) {
         </div>
  
         <SheetFooter>
-             <Button onClick={handleApply} className="w-full h-14 rounded-2xl text-xs font-black uppercase tracking-widest italic bg-primary hover:bg-primary/95 text-white transition-all shadow-xl shadow-primary/20 mb-2">
+             <Button onClick={handleApply} className="w-full h-14 rounded-xl text-sm font-semibold bg-primary hover:bg-primary/95 text-primary-foreground transition-all shadow-sm mb-2">
                 ดูผลลัพธ์
              </Button>
         </SheetFooter>

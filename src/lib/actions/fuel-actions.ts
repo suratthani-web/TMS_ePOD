@@ -2,6 +2,7 @@
 
 import { createAdminClient } from "@/utils/supabase/server"
 import { logActivity } from "@/lib/supabase/logs"
+import { requireAdmin, requireCustomerAccess } from "@/services/permission-guards"
 
 export type DailyFuelPrice = {
     Date: string
@@ -47,8 +48,9 @@ async function fetchFromBangchak() {
         const data = await response.json()
         const oilList = data.data?.items || []
         
-        const standardDiesel = oilList.find((oil: any) => oil.OilName === 'ไฮดีเซล S') 
-            || oilList.find((oil: any) => oil.OilName.includes('ดีเซล') && !oil.OilName.includes('พรีเมียม') && !oil.OilName.includes('B20'))
+        type BangchakOil = { OilName: string; PriceToday: string; PriceTomorrow: string }
+        const standardDiesel = oilList.find((oil: BangchakOil) => oil.OilName === 'ไฮดีเซล S') 
+            || oilList.find((oil: BangchakOil) => oil.OilName.includes('ดีเซล') && !oil.OilName.includes('พรีเมียม') && !oil.OilName.includes('B20'))
 
         if (!standardDiesel) throw new Error("Diesel not found in JSON")
 
@@ -56,8 +58,8 @@ async function fetchFromBangchak() {
             today: parseFloat(standardDiesel.PriceToday),
             tomorrow: parseFloat(standardDiesel.PriceTomorrow)
         }
-    } catch (err: any) {
-        log(`Bangchak Attempt Failed: ${err.message}`)
+    } catch (err: unknown) {
+        log(`Bangchak Attempt Failed: ${(err as Error).message}`)
         return null
     }
 }
@@ -119,26 +121,33 @@ async function fetchFromKapook() {
             today: price,
             tomorrow: null
         }
-    } catch (err: any) {
-        log(`Kapook Attempt Failed: ${err.message}`)
+    } catch (err: unknown) {
+        log(`Kapook Attempt Failed: ${(err as Error).message}`)
         return null
     }
 }
 
-// Add a simple in-memory sync lock (last sync timestamp)
+// Add a simple in-memory sync lock and cache
 let lastSyncTimestamp = 0
 const SYNC_COOLDOWN = 60 * 60 * 1000 // 1 hour
+const fuelCache = new Map<string, { price: number; priceTomorrow: number | null; timestamp: number }>()
+const CACHE_TTL = 5 * 60 * 1000 // 5 minutes cache for DB results
 
 /**
  * Sync daily fuel prices from multiple sources
  */
 export async function syncDailyFuelPrices() {
+    await requireAdmin()
     const now = Date.now()
     if (now - lastSyncTimestamp < SYNC_COOLDOWN) {
-        log('Sync skipped: Cooldown active (1 hour)')
+        // Only log if it's been at least 10 seconds since last "skipped" log to prevent spam
+        if (now - lastSyncTimestamp > 10000) {
+            log('Sync skipped: Cooldown active (1 hour)')
+        }
         return { success: true, message: 'Already synced recently' }
     }
     
+    // Set timestamp immediately to act as a lock for concurrent calls
     lastSyncTimestamp = now
     log('Starting multi-source fuel synchronization...')
     
@@ -157,6 +166,8 @@ export async function syncDailyFuelPrices() {
         }
 
         if (!result || !result.today) {
+            // Reset lock on failure so it can retry sooner if needed (or keep it if we want to avoid hammering failing APIs)
+            // lastSyncTimestamp = 0 
             throw new Error("All fuel sources failed or returned empty data")
         }
 
@@ -193,6 +204,13 @@ export async function syncDailyFuelPrices() {
             }
         }
 
+        // Update cache
+        fuelCache.set(syncDate, { 
+            price: dieselPrice, 
+            priceTomorrow: dieselPriceTomorrow, 
+            timestamp: Date.now() 
+        })
+
         await logActivity({
             module: 'Fuel',
             action_type: 'UPDATE',
@@ -202,9 +220,9 @@ export async function syncDailyFuelPrices() {
 
         return { success: true, price: dieselPrice, priceTomorrow: dieselPriceTomorrow }
 
-    } catch (error: any) {
-        log(`Sync failed: ${error.message}`)
-        return { success: false, error: error.message }
+    } catch (error: unknown) {
+        log(`Sync failed: ${(error as Error).message}`)
+        return { success: false, error: (error as Error).message }
     }
 }
 
@@ -213,8 +231,19 @@ export async function syncDailyFuelPrices() {
  * Returns null if no price is available
  */
 export async function getFuelPrice(date?: string) {
-    const supabase = createAdminClient()
     const targetDate = date || new Date().toISOString().split('T')[0]
+    const now = Date.now()
+
+    // 0. Try Memory Cache first
+    const cached = fuelCache.get(targetDate)
+    if (cached && (now - cached.timestamp < CACHE_TTL)) {
+        return { 
+            price: cached.price, 
+            priceTomorrow: cached.priceTomorrow 
+        }
+    }
+
+    const supabase = createAdminClient()
 
     // 1. Try DB first for the exact date
     const { data, error } = await supabase
@@ -228,19 +257,25 @@ export async function getFuelPrice(date?: string) {
     }
     
     if (data?.Price) {
-        console.log(`[FUEL_ACTION] Found price in DB for ${targetDate}: ${data.Price}`)
+        // Update cache
+        fuelCache.set(targetDate, { 
+            price: data.Price, 
+            priceTomorrow: data.Price_Tomorrow || null, 
+            timestamp: now 
+        })
+
         return { 
             price: data.Price, 
             priceTomorrow: data.Price_Tomorrow || null 
         }
     }
 
-    console.log(`[FUEL_ACTION] No price in DB for ${targetDate}, triggering sync...`)
-    const syncResult = await syncDailyFuelPrices()
-    if (syncResult.success) {
-        // If the date we wanted was today, return the newly synced prices
-        const todayStr = new Date().toISOString().split('T')[0]
-        if (targetDate === todayStr) {
+    // 2. If it's today and missing, attempt sync
+    const todayStr = new Date().toISOString().split('T')[0]
+    if (targetDate === todayStr) {
+        console.log(`[FUEL_ACTION] No price in DB for today (${targetDate}), triggering sync...`)
+        const syncResult = await syncDailyFuelPrices()
+        if (syncResult.success && syncResult.price) {
             return { 
                 price: syncResult.price, 
                 priceTomorrow: syncResult.priceTomorrow || null 
@@ -248,20 +283,37 @@ export async function getFuelPrice(date?: string) {
         }
     }
 
-    // 3. Last Fallback: Get the latest *real* price ever saved in the DB
-    const { data: latest, error: lastError } = await supabase
+    // 3. SMART FALLBACK for Historical Data:
+    // A) Try to find the most recent price ANNOUNCED BEFORE this date
+    const { data: before, error: errorBefore } = await supabase
         .from('daily_fuel_prices')
-        .select('Price, Price_Tomorrow')
+        .select('Price, Price_Tomorrow, Date')
+        .lt('Date', targetDate)
         .order('Date', { ascending: false })
         .limit(1)
         .maybeSingle()
     
-    if (lastError) console.error('[FUEL_ACTION] getFuelPrice Fallback Error:', lastError)
-    
-    return {
-        price: (latest?.Price as number) || null, // NO FALLBACK to fake values. If null, UI shows 0/Error.
-        priceTomorrow: (latest?.Price_Tomorrow as number) || null
+    if (before?.Price) {
+        console.log(`[FUEL_ACTION] Using price from ${before.Date} as fallback for ${targetDate}`)
+        return { price: before.Price, priceTomorrow: before.Price_Tomorrow || null }
     }
+
+    // B) If still nothing (target is before our records started), 
+    // find the EARLIEST price we ever recorded (the start of our data)
+    const { data: earliest, error: errorEarliest } = await supabase
+        .from('daily_fuel_prices')
+        .select('Price, Price_Tomorrow, Date')
+        .order('Date', { ascending: true })
+        .limit(1)
+        .maybeSingle()
+    
+    if (earliest?.Price) {
+        console.log(`[FUEL_ACTION] Using earliest available price from ${earliest.Date} for ${targetDate}`)
+        return { price: earliest.Price, priceTomorrow: earliest.Price_Tomorrow || null }
+    }
+
+    // C) Absolute last resort (should not happen if DB has data)
+    return { price: null, priceTomorrow: null }
 }
 
 /**
@@ -335,6 +387,7 @@ export async function getSuggestedRate(
  * Get all matrices for a customer
  */
 export async function getCustomerMatrices(customerId: string) {
+    await requireCustomerAccess(customerId)
     const supabase = createAdminClient()
     const { data, error } = await supabase
         .from('Customer_Route_Rates')
@@ -351,8 +404,9 @@ export async function getCustomerMatrices(customerId: string) {
 /**
  * Save or update a matrix for [Customer + Route + Vehicle_Type]
  */
-export async function saveCustomerMatrix(customerId: string, routeName: string, vehicleType: string, matrix: any[]) {
+export async function saveCustomerMatrix(customerId: string, routeName: string, vehicleType: string, matrix: { min: number | string; max: number | string; price: number | string }[]) {
     try {
+        await requireAdmin()
         const supabase = createAdminClient()
         
         // Clean matrix data: ensure no NaN and proper types
@@ -386,9 +440,9 @@ export async function saveCustomerMatrix(customerId: string, routeName: string, 
             return { success: false, error: error.message }
         }
         return { success: true, data }
-    } catch (e: any) {
+    } catch (e: unknown) {
         console.error('[FUEL_ACTION] Exception:', e)
-        return { success: false, error: e.message }
+        return { success: false, error: (e as Error).message }
     }
 }
 
@@ -396,6 +450,7 @@ export async function saveCustomerMatrix(customerId: string, routeName: string, 
  * Delete a matrix
  */
 export async function deleteCustomerMatrix(id: string) {
+    await requireAdmin()
     const supabase = createAdminClient()
     const { error } = await supabase
         .from('Customer_Route_Rates')

@@ -80,13 +80,13 @@ export async function getAllRepairTickets(
     }
 
     // Map the joined data to include Driver_Name at the top level
-    const data = (rawData || []).map((ticket: any) => ({
+    const data = (rawData || []).map((ticket: Partial<RepairTicket> & { Master_Drivers?: { Driver_Name: string } }) => ({
       ...ticket,
       Driver_Name: ticket.Master_Drivers?.Driver_Name || 'Unknown'
     }))
   
-    return { data, count: count || 0 }
-  } catch (e) {
+    return { data: data as RepairTicket[], count: count || 0 }
+  } catch (_e) {
     return { data: [], count: 0 }
   }
 }
@@ -119,7 +119,7 @@ export async function getPendingRepairTickets(): Promise<RepairTicket[]> {
     }
     
     return data || []
-  } catch (e) {
+  } catch (_e) {
     return []
   }
 }
@@ -155,11 +155,11 @@ export async function getRepairTicketStats() {
     const tickets = data || []
     return {
       total: tickets.length,
-      pending: tickets.filter((t: any) => t.Status === 'Pending' || t.Status === 'รอดำเนินการ').length,
-      inProgress: tickets.filter((t: any) => t.Status === 'In Progress' || t.Status === 'กำลังซ่อม').length,
-      completed: tickets.filter((t: any) => t.Status === 'Completed' || t.Status === 'เสร็จสิ้น').length,
+      pending: tickets.filter((t: { Status: string }) => t.Status === 'Pending' || t.Status === 'รอการตรวจสอบ').length,
+      inProgress: tickets.filter((t: { Status: string }) => t.Status === 'In Progress' || t.Status === 'กำลังซ่อม').length,
+      completed: tickets.filter((t: { Status: string }) => t.Status === 'Completed' || t.Status === 'ซ่อมเสร็จ').length,
     }
-  } catch (e) {
+  } catch (_e) {
     return { total: 0, pending: 0, inProgress: 0, completed: 0 }
   }
 }

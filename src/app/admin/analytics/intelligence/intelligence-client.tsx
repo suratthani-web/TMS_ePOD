@@ -1,5 +1,6 @@
 "use client"
 
+import type { ComponentProps } from "react"
 import Link from "next/link"
 import { ArrowLeft, BrainCircuit, Cpu, Target, Gauge } from "lucide-react"
 import { PredictiveMaintenance } from "@/components/analytics/predictive-maintenance"
@@ -7,8 +8,8 @@ import { RouteRiskAnalysis } from "@/components/analytics/route-risk"
 import { BranchFilter } from "@/components/dashboard/branch-filter"
 
 interface IntelligenceClientProps {
-  vehicleRisks: any[]
-  routeRisks: any[]
+  vehicleRisks: ComponentProps<typeof PredictiveMaintenance>["risks"]
+  routeRisks: ComponentProps<typeof RouteRiskAnalysis>["risks"]
   branchId: string
   superAdmin: boolean
 }

@@ -40,7 +40,7 @@ export function ChecksClient({ checks }: ChecksClientProps) {
     return (
         <div className="space-y-8 pb-20 p-4 lg:p-10">
             {/* Tactical Elite Header */}
-            <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6 bg-background/60 backdrop-blur-3xl p-8 rounded-3xl border border-border/5 shadow-xl relative overflow-hidden group">
+            <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6 bg-card p-8 rounded-3xl border border-border shadow-md relative overflow-hidden group">
                 <div className="absolute top-0 right-0 w-80 h-80 bg-primary/10 blur-[120px] rounded-full -mr-40 -mt-40 pointer-events-none" />
                 
                 <div className="relative z-10 space-y-4">
@@ -49,7 +49,7 @@ export function ChecksClient({ checks }: ChecksClientProps) {
                         ศูนย์ควบคุม
                     </Link>
                     <div className="flex items-center gap-4">
-                        <div className="p-2 bg-primary/20 rounded-xl border-2 border-primary/30 shadow-[0_0_20px_rgba(255,30,133,0.3)] text-primary group-hover:scale-110 transition-all duration-500">
+                        <div className="p-2 bg-primary/10 rounded-xl border border-border text-primary group-hover:scale-110 transition-all duration-500">
                             <Truck size={24} strokeWidth={2.5} />
                         </div>
                         <div>
@@ -62,13 +62,13 @@ export function ChecksClient({ checks }: ChecksClientProps) {
                 </div>
 
                 <div className="flex flex-col items-end gap-3 relative z-10">
-                    <div className="bg-muted/50 border border-border/10 px-4 py-1.5 rounded-xl flex items-center gap-2 backdrop-blur-md shadow-lg">
-                        <div className="w-1.5 h-1.5 rounded-full bg-primary animate-pulse shadow-[0_0_10px_rgba(255,30,133,1)]" />
+                    <div className="bg-muted border border-border px-4 py-1.5 rounded-xl flex items-center gap-2 shadow-sm">
+                        <div className="w-1.5 h-1.5 rounded-full bg-primary animate-pulse" />
                         <span className="text-[10px] font-black text-muted-foreground uppercase tracking-widest">{t('dashboard.system_integrity')}</span>
                     </div>
                     <div className="flex items-center gap-2 px-4 py-2 bg-primary/10 border border-primary/20 rounded-xl">
                         <Activity className="text-primary" size={14} />
-                        <span className="text-xs font-black text-white uppercase tracking-tighter italic">{t('notifications.status')}: ปกติ (NOMINAL)</span>
+                        <span className="text-xs font-black text-primary uppercase tracking-tighter italic">{t('notifications.status')}: ปกติ (NOMINAL)</span>
                     </div>
                 </div>
             </div>
@@ -80,23 +80,23 @@ export function ChecksClient({ checks }: ChecksClientProps) {
                   { label: "พบปัญหา", value: "02", icon: Target, color: "rose" },
                   { label: t('navigation.fleet'), value: "86", icon: Truck, color: "blue" },
                 ].map((stat, i) => (
-                   <PremiumCard key={i} className="p-5 group hover:border-primary/40 transition-all duration-500 border-border/5 bg-background/40 backdrop-blur-xl rounded-xl">
+                   <PremiumCard key={i} className="p-5 group hover:border-primary/40 transition-all duration-500 border-border bg-card rounded-xl">
                        <div className="flex justify-between items-start mb-3">
                           <span className="text-[10px] font-black text-muted-foreground uppercase tracking-widest leading-none">{stat.label}</span>
                           <stat.icon className="text-primary opacity-20 group-hover:opacity-100 transition-opacity" size={14} />
                        </div>
                        <p className="text-2xl font-black text-foreground italic tracking-tighter mb-1">{stat.value}</p>
-                       <div className="h-0.5 w-8 bg-primary rounded-full shadow-lg shadow-primary/20" />
+                       <div className="h-0.5 w-8 bg-primary rounded-full" />
                    </PremiumCard>
                 ))}
             </div>
 
             {/* Registry Table */}
-            <PremiumCard className="bg-background/40 border border-border/5 shadow-xl rounded-3xl overflow-hidden group/table">
-                <div className="p-6 border-b border-border/5 bg-black/40 relative overflow-hidden flex flex-col md:flex-row md:items-center justify-between gap-6">
+            <PremiumCard className="bg-card border border-border shadow-md rounded-3xl overflow-hidden group/table">
+                <div className="p-6 border-b border-border bg-muted/30 relative overflow-hidden flex flex-col md:flex-row md:items-center justify-between gap-6">
                     <div className="absolute top-0 right-0 w-64 h-64 bg-primary/5 blur-[80px] pointer-events-none" />
                     <div className="flex items-center gap-4 relative z-10">
-                        <div className="p-2.5 bg-muted/50 rounded-xl text-primary border border-border/10 shadow-inner group-hover/table:rotate-12 transition-transform duration-500">
+                        <div className="p-2.5 bg-muted rounded-xl text-primary border border-border shadow-inner group-hover/table:rotate-12 transition-transform duration-500">
                             <FileText size={20} />
                         </div>
                         <div>
@@ -108,7 +108,7 @@ export function ChecksClient({ checks }: ChecksClientProps) {
                     <div className="relative z-10 w-full md:w-72 group/search">
                         <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-muted-foreground group-focus-within/search:text-primary transition-colors" size={16} />
                         <input 
-                            className="w-full h-11 bg-background border border-border/5 rounded-xl pl-11 pr-4 text-xs font-black uppercase tracking-widest focus:border-primary/50 transition-all text-foreground placeholder:text-muted-foreground italic outline-none"
+                            className="w-full h-11 bg-background border border-border rounded-xl pl-11 pr-4 text-xs font-black uppercase tracking-widest focus:border-primary/50 transition-all text-foreground placeholder:text-muted-foreground italic outline-none"
                             placeholder={t('common.search')}
                         />
                     </div>
@@ -117,7 +117,7 @@ export function ChecksClient({ checks }: ChecksClientProps) {
                 <div className="overflow-x-auto custom-scrollbar">
                     <table className="w-full border-collapse">
                         <thead>
-                            <tr className="bg-black/20 text-[10px] font-black uppercase tracking-[0.3em] text-muted-foreground border-b border-border/5 italic">
+                            <tr className="bg-muted/50 text-[10px] font-black uppercase tracking-[0.3em] text-muted-foreground border-b border-border italic">
                                 <th className="text-left px-8 py-4">{t('common.date')} Node</th>
                                 <th className="text-left px-6 py-4">{t('navigation.fleet')} Plate</th>
                                 <th className="text-left px-6 py-4">{t('navigation.drivers')} Operator</th>
@@ -125,7 +125,7 @@ export function ChecksClient({ checks }: ChecksClientProps) {
                                 <th className="text-right px-8 py-4">{t('checks.visual')}</th>
                             </tr>
                         </thead>
-                        <tbody className="divide-y divide-white/[0.02]">
+                        <tbody className="divide-y divide-border/50">
                             {checks?.map((check) => {
                                 const items = (check.Passed_Items || {}) as Record<string, boolean>
                                 const failedItems = STANDARD_CHECKLIST.filter(item => !items[item.dbKey])
@@ -135,7 +135,7 @@ export function ChecksClient({ checks }: ChecksClientProps) {
                                     <tr key={check.id} className="group/row hover:bg-muted/40 transition-all duration-300">
                                         <td className="px-8 py-4">
                                             <div className="flex flex-col">
-                                                <span className="text-white font-black tracking-tight text-sm uppercase italic group-hover/row:text-primary transition-colors">
+                                                <span className="text-foreground font-black tracking-tight text-sm uppercase italic group-hover/row:text-primary transition-colors">
                                                     {new Date(check.Check_Date).toLocaleDateString(t('common.loading') === 'กำลังประมวลผล...' ? 'th-TH' : 'en-US')}
                                                 </span>
                                                 <span className="text-[10px] font-black text-muted-foreground uppercase tracking-widest mt-0.5 opacity-60">
@@ -145,15 +145,15 @@ export function ChecksClient({ checks }: ChecksClientProps) {
                                         </td>
                                         <td className="px-6 py-4">
                                             <div className="flex items-center gap-3">
-                                                <div className="w-8 h-8 rounded-lg bg-muted/50 flex items-center justify-center text-primary group-hover/row:scale-110 group-hover/row:bg-primary/20 transition-all duration-500 border border-border/5">
+                                                <div className="w-8 h-8 rounded-lg bg-muted/50 flex items-center justify-center text-primary group-hover/row:scale-110 group-hover/row:bg-primary/20 transition-all duration-500 border border-border">
                                                     <Truck size={14} />
                                                 </div>
-                                                <span className="font-black text-white text-sm tracking-widest uppercase italic border-b border-primary/20">{check.Vehicle_Plate}</span>
+                                                <span className="font-black text-foreground text-sm tracking-widest uppercase italic border-b border-primary/20">{check.Vehicle_Plate}</span>
                                             </div>
                                         </td>
                                         <td className="px-6 py-4">
                                             <div className="flex items-center gap-3">
-                                                <div className="w-8 h-8 rounded-full bg-gradient-to-br from-primary/20 to-accent/20 flex items-center justify-center text-foreground font-black italic shadow-lg border border-border/10 text-xs overflow-hidden relative">
+                                                <div className="w-8 h-8 rounded-full bg-gradient-to-br from-primary/20 to-accent/20 flex items-center justify-center text-foreground font-black italic border border-border text-xs overflow-hidden relative">
                                                     <div className="absolute inset-0 bg-primary/10" />
                                                     {(check.Driver_Name || "A").charAt(0)}
                                                 </div>
@@ -194,7 +194,7 @@ export function ChecksClient({ checks }: ChecksClientProps) {
                                                         href={check.Photo_Urls.split(',')[0]}
                                                         target="_blank"
                                                         rel="noreferrer"
-                                                        className="h-9 px-4 rounded-xl bg-muted/50 hover:bg-primary hover:text-black text-foreground text-[10px] font-black uppercase tracking-widest flex items-center justify-center transition-all border border-border/10 shadow-lg active:scale-95 group/intel"
+                                                        className="h-9 px-4 rounded-xl bg-muted/50 hover:bg-primary hover:text-white text-foreground text-[10px] font-black uppercase tracking-widest flex items-center justify-center transition-all border border-border shadow-md active:scale-95 group/intel"
                                                     >
                                                         <ImageIcon size={12} className="mr-2 group-hover/intel:scale-110 transition-transform" />
                                                         {t('notifications.visual') || 'VISUAL'}
@@ -205,7 +205,7 @@ export function ChecksClient({ checks }: ChecksClientProps) {
                                                         href={check.Signature_Url}
                                                         target="_blank"
                                                         rel="noreferrer"
-                                                        className="w-9 h-9 rounded-xl bg-muted/50 hover:bg-emerald-500 text-foreground flex items-center justify-center transition-all border border-border/10 shadow-lg active:scale-95 group/sig"
+                                                        className="w-9 h-9 rounded-xl bg-muted/50 hover:bg-emerald-500 hover:text-white text-foreground flex items-center justify-center transition-all border border-border shadow-md active:scale-95 group/sig"
                                                     >
                                                         <PenTool size={14} className="group-hover/sig:rotate-12 transition-transform" />
                                                     </a>

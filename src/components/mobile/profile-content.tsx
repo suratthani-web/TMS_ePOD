@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button"
 import Link from "next/link"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { logoutDriver } from "@/lib/actions/auth-actions"
+import { cn } from "@/lib/utils"
 
 interface ProfileContentProps {
   session: {
@@ -23,13 +24,32 @@ interface ProfileContentProps {
   unreadChatCount?: number
 }
 
-export function ProfileContent({ session, score, unreadChatCount = 0 }: ProfileContentProps) {
+type CapacitorWindow = Window & {
+  Capacitor?: {
+    isNativePlatform: () => boolean
+  }
+}
 
+type PushTestResult = {
+  subCount: number
+  subType: string
+}
+
+type ProfileMenuItem = {
+  icon: typeof Bell
+  label: string
+  href?: string
+  action?: () => void | Promise<void>
+  color?: string
+  badge?: number
+}
+
+export function ProfileContent({ session, score, unreadChatCount = 0 }: ProfileContentProps) {
 
   const handleSubscribePush = async () => {
     try {
       // 1. Check for Capacitor (Native APK)
-      const isCapacitor = (window as any).Capacitor?.isNativePlatform();
+      const isCapacitor = (window as CapacitorWindow).Capacitor?.isNativePlatform();
       
       if (isCapacitor) {
           const { PushNotifications } = await import('@capacitor/push-notifications');
@@ -134,11 +154,14 @@ export function ProfileContent({ session, score, unreadChatCount = 0 }: ProfileC
         const { testPushNotification } = await import('@/lib/actions/push-actions')
         const result = await testPushNotification({ driverId: session.driverId })
         if (!result.success) throw new Error(result.reason || 'Failed')
-        return result
+        return {
+          subCount: result.subCount ?? 0,
+          subType: result.subType ?? 'unknown',
+        }
       },
       {
         loading: 'กำลังส่งสัญญาณทดสอบ...',
-        success: (result: any) => {
+        success: (result: PushTestResult) => {
           if (result.subCount === 0) return '❌ ไม่พบการลงทะเบียนแจ้งเตือน'
           return `ส่งสัญญาณแล้ว! พบ ${result.subCount} อุปกรณ์ (${result.subType})`
         },
@@ -147,12 +170,12 @@ export function ProfileContent({ session, score, unreadChatCount = 0 }: ProfileC
     )
   }
 
-  const menuGroups = [
+  const menuGroups: { title: string; items: ProfileMenuItem[] }[] = [
     {
       title: "การสื่อสารและการแจ้งเตือน",
       items: [
-        { icon: Bell, label: "เปิดรับการแจ้งเตือนงาน", action: handleSubscribePush, color: 'text-blue-500' },
-        { icon: Bell, label: "🧪 ทดสอบระบบแจ้งเตือน", action: handleTestPush, color: 'text-emerald-500' },
+        { icon: Bell, label: "เปิดรับการแจ้งเตือนงาน", action: handleSubscribePush, color: 'text-primary' },
+        { icon: Bell, label: "🧪 ทดสอบระบบแจ้งเตือน", action: handleTestPush, color: 'text-emerald-600 dark:text-emerald-400' },
         { icon: Bell, label: "ประวัติการแจ้งเตือน", href: "/mobile/notifications" },
         { icon: User, label: "แชทกับแอดมิน", href: "/mobile/chat", badge: unreadChatCount },
       ]
@@ -173,7 +196,7 @@ export function ProfileContent({ session, score, unreadChatCount = 0 }: ProfileC
       items: [
         { icon: ShieldAlert, label: "แจ้งสินค้าเสียหาย", href: "/mobile/damage-report" },
         { icon: Calendar, label: "แจ้งลางาน", href: "/mobile/leave" },
-        { icon: AlertTriangle, label: "แจ้งเหตุฉุกเฉิน (SOS)", href: "/mobile/sos", color: 'text-red-500' },
+        { icon: AlertTriangle, label: "แจ้งเหตุฉุกเฉิน (SOS)", href: "/mobile/sos", color: 'text-red-600 dark:text-red-400' },
       ]
     },
     {
@@ -199,81 +222,80 @@ export function ProfileContent({ session, score, unreadChatCount = 0 }: ProfileC
   }
 
   return (
-    <>
-      <Card className="bg-gradient-to-br from-blue-600 to-indigo-700 border-0 mb-4">
-        <CardContent className="pt-6 pb-6">
+    <div className="px-4 py-2 space-y-4">
+      <Card className="bg-card border border-border shadow-sm">
+        <CardContent className="py-4">
           <div className="flex items-center gap-4">
-            <Avatar className="h-16 w-16 border-2 border-border/20">
+            <Avatar className="h-14 w-14 border border-border shadow-sm">
               <AvatarImage src={`https://api.dicebear.com/7.x/avataaars/svg?seed=${session.driverName}`} />
-              <AvatarFallback className="bg-blue-800 text-white text-xl">
+              <AvatarFallback className="bg-primary/10 text-primary font-bold">
                 {session?.driverName?.charAt(0)}
               </AvatarFallback>
             </Avatar>
-            <div className="text-foreground">
-              <h1 className="text-xl font-bold">{session.driverName}</h1>
-              <p className="text-blue-200 text-xl italic font-black uppercase tracking-tighter">รหัสพนักงาน: {session.driverId}</p>
+            <div className="flex-1 min-w-0">
+              <h1 className="text-base font-bold text-foreground truncate">{session.driverName}</h1>
+              <p className="text-xs text-primary font-semibold">รหัสพนักงาน: {session.driverId}</p>
             </div>
           </div>
         </CardContent>
       </Card>
 
-      <Card className="glass-panel border-border/5 mb-4 overflow-hidden">
-        <div className="absolute top-0 right-0 p-2 opacity-10">
-            <ClipboardCheck size={100} className="text-foreground transform rotate-12" />
-        </div>
-        <CardContent className="pt-6 relative z-10">
-            <div className="flex justify-between items-start mb-6">
+      <Card className="bg-card border border-border shadow-sm overflow-hidden">
+        <CardContent className="py-4">
+            <div className="flex justify-between items-center mb-4">
                 <div>
-                    <h2 className="text-lg font-bold text-foreground mb-1">ผลการทำงาน</h2>
-                    <p className="text-muted-foreground text-lg font-bold">สรุปในรอบ 30 วันที่ผ่านมา</p>
+                    <h2 className="text-sm font-bold text-foreground">ผลการทำงาน</h2>
+                    <p className="text-muted-foreground text-[10px]">สรุปในรอบ 30 วันที่ผ่านมา</p>
                 </div>
-                <div className={`w-16 h-16 rounded-full flex flex-col items-center justify-center border-4 ${
-                    (score?.totalScore || 0) >= 80 ? 'border-emerald-500 text-emerald-400 bg-emerald-500/10' :
-                    (score?.totalScore || 0) >= 60 ? 'border-amber-500 text-amber-400 bg-amber-500/10' :
-                    'border-red-500 text-red-400 bg-red-500/10'
+                <div className={`w-12 h-12 rounded-full flex flex-col items-center justify-center border-2 ${
+                    (score?.totalScore || 0) >= 80 ? 'border-emerald-500 text-emerald-600 dark:text-emerald-400 bg-emerald-500/10' :
+                    (score?.totalScore || 0) >= 60 ? 'border-amber-500 text-amber-600 dark:text-amber-400 bg-amber-500/10' :
+                    'border-red-500 text-red-600 dark:text-red-400 bg-red-500/10'
                 }`}>
-                    <span className="text-xl font-bold">{score?.totalScore || 0}</span>
+                    <span className="text-sm font-bold">{score?.totalScore || 0}</span>
                 </div>
             </div>
 
-            <div className="grid grid-cols-3 gap-2 text-center divide-x divide-border/10">
-                <div>
-                   <span className="text-base font-bold text-muted-foreground uppercase tracking-wider">ส่งตรงเวลา</span>
-                   <p className={`text-lg font-bold mt-1 ${
-                       (score?.onTimeScore || 0) >= 90 ? 'text-emerald-400' : 'text-foreground'
-                   }`}>{score?.onTimeScore || 0}%</p>
+            <div className="grid grid-cols-3 gap-2 text-center divide-x divide-border">
+                <div className="px-1">
+                   <span className="text-[9px] font-semibold text-muted-foreground uppercase tracking-wider block">ส่งตรงเวลา</span>
+                   <p className={cn(
+                       "text-xs font-bold mt-0.5",
+                       (score?.onTimeScore || 0) >= 90 ? 'text-emerald-600 dark:text-emerald-400' : 'text-foreground'
+                   )}>{score?.onTimeScore || 0}%</p>
                 </div>
-                <div>
-                   <span className="text-base font-bold text-muted-foreground uppercase tracking-wider">ขับขี่ปลอดภัย</span>
-                   <p className="text-foreground">{score?.safetyScore || 0}%</p>
+                <div className="px-1">
+                   <span className="text-[9px] font-semibold text-muted-foreground uppercase tracking-wider block">ขับขี่ปลอดภัย</span>
+                   <p className="text-xs font-bold mt-0.5 text-foreground">{score?.safetyScore || 0}%</p>
                 </div>
-                <div>
-                   <span className="text-base font-bold text-muted-foreground uppercase tracking-wider">อัตราการรับงาน</span>
-                   <p className={`text-lg font-bold mt-1 ${
-                       (score?.acceptanceScore || 0) >= 90 ? 'text-emerald-400' : 'text-foreground'
-                   }`}>{score?.acceptanceScore || 0}%</p>
+                <div className="px-1">
+                   <span className="text-[9px] font-semibold text-muted-foreground uppercase tracking-wider block">อัตราการรับงาน</span>
+                   <p className={cn(
+                       "text-xs font-bold mt-0.5",
+                       (score?.acceptanceScore || 0) >= 90 ? 'text-emerald-600 dark:text-emerald-400' : 'text-foreground'
+                   )}>{score?.acceptanceScore || 0}%</p>
                 </div>
             </div>
         </CardContent>
       </Card>
 
-      <div className="space-y-4 mb-8">
+      <div className="space-y-4">
         {menuGroups.map((group, groupIndex) => (
-          <div key={groupIndex}>
-            <h3 className="text-sm font-bold text-muted-foreground uppercase tracking-widest pl-2 mb-2">{group.title}</h3>
-            <Card className="glass-panel border-border/5">
-              <CardContent className="py-2">
+          <div key={groupIndex} className="space-y-1.5">
+            <h3 className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider pl-1">{group.title}</h3>
+            <Card className="bg-card border border-border shadow-sm">
+              <CardContent className="py-1 px-3">
                 {group.items.map((rawItem, index) => {
-                  const item = rawItem as any
+                  const item = rawItem
                   const Content = (
-                    <div className="flex items-center justify-between py-4 border-b border-border/5 last:border-0 active:bg-muted/50 transition-colors w-full text-left">
+                    <div className="flex items-center justify-between py-3 border-b border-border last:border-0 active:bg-muted/50 transition-colors w-full text-left">
                       <div className="flex items-center gap-3 text-foreground">
-                        <item.icon className={`w-5 h-5 ${item.color || 'text-muted-foreground'}`} />
-                        <span className="font-medium">{item.label}</span>
+                        <item.icon className={`w-4 h-4 ${item.color || 'text-muted-foreground'}`} />
+                        <span className="text-xs font-medium">{item.label}</span>
                       </div>
                       <div className="flex items-center gap-2">
                         {item.badge && item.badge > 0 && (
-                          <span className="bg-primary text-foreground font-bold font-black px-2 py-0.5 rounded-full min-w-[20px] text-center shadow-lg shadow-primary/20">
+                          <span className="bg-primary text-primary-foreground font-semibold px-2 py-0.5 rounded-full min-w-[18px] text-[9px] text-center shadow-sm">
                             {item.badge}
                           </span>
                         )}
@@ -299,6 +321,7 @@ export function ProfileContent({ session, score, unreadChatCount = 0 }: ProfileC
                       key={index} 
                       href={item.href || "#"}
                       onClick={(e) => handleItemClick(e, item.href || "#")}
+                      className="block w-full"
                     >
                       {Content}
                     </Link>
@@ -310,17 +333,16 @@ export function ProfileContent({ session, score, unreadChatCount = 0 }: ProfileC
         ))}
       </div>
 
-      <div className="pb-8">
+      <div className="pt-4 pb-12">
         <Button 
           variant="outline" 
           onClick={handleLogout}
-          className="w-full border-red-500/30 text-red-400 hover:bg-red-500/10 hover:text-red-300"
+          className="w-full border-red-500/30 text-red-500 hover:bg-red-500/10 hover:text-red-600 transition-colors h-11"
         >
           <LogOut className="w-4 h-4 mr-2" />
           ออกจากระบบ
         </Button>
       </div>
-    </>
+    </div>
   )
 }
-

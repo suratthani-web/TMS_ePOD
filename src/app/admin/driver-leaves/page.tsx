@@ -7,6 +7,7 @@ import { getAdminSession } from "@/lib/actions/auth-actions"
 import { cn } from "@/lib/utils"
 import { LeaveActionsClient } from "./leave-actions-client"
 import Link from "next/link"
+import type { DriverLeave } from "@/lib/supabase/driver-leaves"
 
 export const dynamic = 'force-dynamic'
 
@@ -57,7 +58,7 @@ export default async function AdminLeavesPage() {
             <div className="flex flex-col items-end gap-3 relative z-10">
                 <div className="bg-primary/10 border border-primary/20 px-5 py-2 rounded-xl flex items-center gap-3 backdrop-blur-md shadow-lg">
                     <div className="w-1.5 h-1.5 rounded-full bg-primary animate-pulse shadow-[0_0_10px_rgba(255,30,133,1)]" />
-                    <span className="text-primary font-black uppercase tracking-widest italic text-xs">{leaves?.filter((l: any) => l.Status === 'Pending').length || 0} รายการรอตรวจ</span>
+                    <span className="text-primary font-black uppercase tracking-widest italic text-xs">{leaves?.filter((l: { Status?: string | null }) => l.Status === 'Pending').length || 0} รายการรอตรวจ</span>
                 </div>
             </div>
         </div>
@@ -69,7 +70,7 @@ export default async function AdminLeavesPage() {
                       <p className="text-muted-foreground font-black text-sm uppercase tracking-widest">ไม่มีคำขอลาในขณะนี้</p>
                   </div>
               ) : (
-                  leaves.map((leave: any) => (
+                  leaves.map((leave: DriverLeave) => (
                       <Card key={leave.id} className="rounded-2xl border border-border/5 shadow-lg overflow-hidden group hover:border-primary/20 transition-all">
                           <div className={cn(
                               "h-1.5",

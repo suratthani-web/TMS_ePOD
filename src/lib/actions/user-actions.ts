@@ -21,6 +21,7 @@ export interface UserData {
 }
 
 import { getUserBranchId, isSuperAdmin, isAdmin as checkIsAdmin } from "@/lib/permissions"
+import { requireAdmin } from "@/services/permission-guards"
 
 export async function getUsers(providedBranchId?: string) {
     const isSuper = await isSuperAdmin()
@@ -70,6 +71,7 @@ const ROLE_MAP: Record<string, number> = {
 }
 
 export async function createUser(user: UserData) {
+    await requireAdmin()
     const { createAdminClient } = await import("@/utils/supabase/server")
     const supabase = createAdminClient()
     
@@ -118,6 +120,7 @@ export async function createUser(user: UserData) {
 }
 
 export async function updateUser(username: string, updates: Partial<UserData>) {
+    await requireAdmin()
     const { createAdminClient } = await import("@/utils/supabase/server")
     const supabase = createAdminClient()
     
@@ -191,6 +194,7 @@ export async function getCurrentUserRole() {
 }
 
 export async function deleteUser(username: string) {
+    await requireAdmin()
     const { createAdminClient } = await import("@/utils/supabase/server")
     const supabase = createAdminClient()
     
@@ -226,6 +230,7 @@ export async function deleteUser(username: string) {
 }
 
 export async function createBulkUsers(users: Record<string, unknown>[]) {
+    await requireAdmin()
     const isSuper = await isSuperAdmin()
     const isAdminUser = await checkIsAdmin()
     const { createAdminClient } = await import("@/utils/supabase/server")

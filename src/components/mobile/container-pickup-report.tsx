@@ -3,8 +3,12 @@
 import { Job, JobContainer } from "@/types/database"
 import { forwardRef } from "react"
 
+type ContainerJob = Job & {
+  container?: Partial<JobContainer> | null
+}
+
 type Props = {
-  job: any
+  job: ContainerJob
   photos: string[]
   conditionPhotos: Record<string, string> // key e.g. "front", "back", "left", "right", "top", "floor", "seal"
 }

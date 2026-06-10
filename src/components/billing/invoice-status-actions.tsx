@@ -44,7 +44,7 @@ export function InvoiceStatusActions({ id, type, label }: InvoiceStatusActionsPr
       disabled={loading}
     >
       {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <CheckCircle2 className="h-4 w-4" />}
-      <span className="text-base font-bold font-black uppercase tracking-widest">{label}</span>
+      <span className="text-sm font-medium">{label}</span>
     </DropdownMenuItem>
   )
 }

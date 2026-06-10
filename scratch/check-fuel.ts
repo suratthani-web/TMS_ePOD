@@ -1,29 +1,27 @@
+
 import { createClient } from '@supabase/supabase-js'
-import dotenv from 'dotenv'
-dotenv.config()
+import * as dotenv from 'dotenv'
+import path from 'path'
+import { fileURLToPath } from 'url'
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
-const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY
+const __filename = fileURLToPath(import.meta.url)
+const __dirname = path.dirname(__filename)
 
-if (!supabaseUrl || !supabaseKey) {
-  console.error('Missing environment variables')
-  process.exit(1)
-}
+dotenv.config({ path: path.join(__dirname, '../.env.local') })
 
-const supabase = createClient(supabaseUrl, supabaseKey)
+async function checkJob() {
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL
+  const key = process.env.SUPABASE_SERVICE_ROLE_KEY
 
-async function checkFuelPrices() {
+  const supabase = createClient(url!, key!)
+  
   const { data, error } = await supabase
     .from('daily_fuel_prices')
     .select('*')
     .order('Date', { ascending: false })
     .limit(10)
 
-  if (error) {
-    console.error('Error fetching fuel prices:', error)
-  } else {
-    console.log('Fuel Prices:', data)
-  }
+  console.log(data)
 }
 
-checkFuelPrices()
+checkJob()

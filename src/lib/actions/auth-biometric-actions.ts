@@ -4,7 +4,9 @@ import {
   generateRegistrationOptions, 
   verifyRegistrationResponse,
   generateAuthenticationOptions,
-  verifyAuthenticationResponse
+  verifyAuthenticationResponse,
+  RegistrationResponseJSON,
+  AuthenticationResponseJSON
 } from '@simplewebauthn/server'
 import { createAdminClient } from "@/utils/supabase/server"
 import { cookies, headers } from "next/headers"
@@ -36,7 +38,7 @@ export async function getPasskeyRegistrationOptions() {
     userID: session.driverId,
     userName: session.driverName,
     attestationType: 'none',
-    excludeCredentials: credentials?.map((c: any) => ({
+    excludeCredentials: credentials?.map((c: { credential_id: string }) => ({
       id: c.credential_id,
       type: 'public-key',
     })),
@@ -65,7 +67,7 @@ export async function getPasskeyRegistrationOptions() {
 /**
  * REGISTRATION PHASE 2: Verify the response and save to DB
  */
-export async function verifyPasskeyRegistration(body: any) {
+export async function verifyPasskeyRegistration(body: RegistrationResponseJSON) {
   const session = await getDriverSession()
   if (!session) throw new Error('Unauthorized')
 
@@ -82,7 +84,7 @@ export async function verifyPasskeyRegistration(body: any) {
   })
 
   if (verification.verified && verification.registrationInfo) {
-    const { credentialPublicKey, credentialID, counter } = verification.registrationInfo as any
+    const { credentialPublicKey, credentialID, counter } = verification.registrationInfo as unknown as { credentialPublicKey: Uint8Array; credentialID: Uint8Array; counter: number }
     
     const supabase = createAdminClient()
     await supabase.from('Driver_Passkeys').insert({
@@ -125,7 +127,7 @@ export async function getPasskeyAuthenticationOptions(identifier: string) {
 
   const options = await generateAuthenticationOptions({
     rpID: RP_ID,
-    allowCredentials: credentials.map((c: any) => ({
+    allowCredentials: credentials.map((c: { credential_id: string }) => ({
       id: c.credential_id,
       type: 'public-key',
     })),
@@ -150,7 +152,7 @@ export async function getPasskeyAuthenticationOptions(identifier: string) {
 /**
  * AUTHENTICATION PHASE 2: Verify and Log In
  */
-export async function verifyPasskeyLogin(body: any) {
+export async function verifyPasskeyLogin(body: AuthenticationResponseJSON) {
   const cookieStore = await cookies()
   const expectedChallenge = cookieStore.get('auth_challenge')?.value
   const driverId = cookieStore.get('auth_driver_id')?.value
@@ -178,7 +180,7 @@ export async function verifyPasskeyLogin(body: any) {
       credentialPublicKey: Buffer.from(passkey.public_key, 'base64'),
       counter: passkey.counter,
     },
-  } as any)
+  } as unknown as Parameters<typeof verifyAuthenticationResponse>[0])
 
   if (verification.verified) {
     // Update counter

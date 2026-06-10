@@ -26,9 +26,9 @@ export async function getContainerJobs() {
     }
 
     // Process to get only the latest temp log for each job
-    const processed = data.map((job: any) => {
+    const processed = data.map((job: ContainerJob & { temp_logs?: { temperature: number, recorded_at: string }[] }) => {
         const latestTemp = job.temp_logs && job.temp_logs.length > 0
-            ? job.temp_logs.sort((a: any, b: any) => 
+            ? job.temp_logs.sort((a: { recorded_at: string }, b: { recorded_at: string }) => 
                 new Date(b.recorded_at).getTime() - new Date(a.recorded_at).getTime()
               )[0]
             : null
@@ -53,20 +53,26 @@ export async function getContainerStats() {
             container_id,
             lfd_detention,
             lfd_demurrage,
-            Jobs_Main!inner(Job_Status)
         `)
 
     if (error) return { total: 0, active: 0, nearLfd: 0, overdue: 0 }
 
-    const total = data.length
-    const active = data.filter((d: any) => d.Jobs_Main.Job_Status !== 'Completed').length
+    type ContainerData = { lfd_detention?: string | null; lfd_demurrage?: string | null; Jobs_Main: { Job_Status: string } | { Job_Status: string }[] | null }
     
-    const nearLfd = data.filter((d: any) => {
+    const typedData = data as unknown as ContainerData[]
+
+    const total = typedData.length
+    const active = typedData.filter((d: ContainerData) => {
+        const status = Array.isArray(d.Jobs_Main) ? d.Jobs_Main[0]?.Job_Status : d.Jobs_Main?.Job_Status
+        return status !== 'Completed'
+    }).length
+    
+    const nearLfd = typedData.filter((d: ContainerData) => {
         const lfd = d.lfd_detention || d.lfd_demurrage
         return lfd && lfd >= today && lfd <= threeDaysLater
     }).length
 
-    const overdue = data.filter((d: any) => {
+    const overdue = typedData.filter((d: ContainerData) => {
         const lfd = d.lfd_detention || d.lfd_demurrage
         return lfd && lfd < today
     }).length

@@ -12,6 +12,7 @@ export type VehicleType = {
 }
 
 import { isAdmin } from '@/lib/permissions'
+import { requireAdmin } from '@/services/permission-guards'
 
 export async function getVehicleTypes() {
   const adminStatus = await isAdmin()
@@ -30,6 +31,7 @@ export async function getVehicleTypes() {
 }
 
 export async function createVehicleType(data: { type_name: string; description?: string }) {
+  await requireAdmin()
   const supabase = createAdminClient()
 
   // Removed duplicate name check to allow variants in the description as requested.
@@ -52,6 +54,7 @@ export async function createVehicleType(data: { type_name: string; description?:
 }
 
 export async function updateVehicleType(id: number, data: { type_name: string; description?: string; active_status?: string }) {
+  await requireAdmin()
   const supabase = createAdminClient()
 
   const { error } = await supabase
@@ -73,6 +76,7 @@ export async function updateVehicleType(id: number, data: { type_name: string; d
 }
 
 export async function deleteVehicleType(id: number) {
+  await requireAdmin()
   const supabase = createAdminClient()
 
   const { error } = await supabase
@@ -94,11 +98,11 @@ export async function deleteVehicleType(id: number) {
  */
 export async function createBulkVehicleTypes(types: Partial<VehicleType>[]) {
     try {
-        const adminStatus = await isAdmin()
-        const supabase = adminStatus ? createAdminClient() : await createClient()
+        await requireAdmin()
+        const supabase = createAdminClient()
 
-        const normalizeData = (row: any) => {
-            const normalized: Record<string, any> = {}
+        const normalizeData = (row: Record<string, unknown>) => {
+            const normalized: Record<string, unknown> = {}
             const getValue = (keys: string[]) => {
                 const rowKeys = Object.keys(row)
                 for (const key of keys) {

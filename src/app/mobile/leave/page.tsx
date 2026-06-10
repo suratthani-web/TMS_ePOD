@@ -1,6 +1,6 @@
 import { getDriverSession } from "@/lib/actions/auth-actions"
 import { redirect } from "next/navigation"
-import { getMyLeaves } from "@/lib/supabase/driver-leaves"
+import { getMyLeaves, type DriverLeave } from "@/lib/supabase/driver-leaves"
 import { MobileLeaveClient } from "./leave-client"
 import { Suspense } from "react"
 import { MobileHeader } from "@/components/mobile/mobile-header"
@@ -11,7 +11,7 @@ async function LeavePageContent() {
   const session = await getDriverSession()
   if (!session) redirect("/mobile/login")
 
-  let leaves: any[] = []
+  let leaves: DriverLeave[] = []
   try {
     leaves = await getMyLeaves(session.driverId)
   } catch (err) {

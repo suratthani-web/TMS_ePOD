@@ -147,7 +147,7 @@ export default function UserMonitorPage() {
                                         <td className="px-6 py-4">
                                             <div className="flex items-center gap-2 text-muted-foreground font-black uppercase text-xs">
                                                 <Clock size={12} />
-                                                {new Date(session.online_at).toLocaleTimeString('th-TH')}
+                                                {session.online_at ? new Date(session.online_at).toLocaleTimeString('th-TH') : '-'}
                                             </div>
                                         </td>
                                         <td className="px-8 py-4 text-right">

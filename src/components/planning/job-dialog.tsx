@@ -738,13 +738,18 @@ export function JobDialog({
     // 2. Master Route Lookup - Only auto-fill if coordinates are empty to avoid overwriting existing data
     const currentOrigin = origins[index];
     if (routes && routes.length > 0 && (!currentOrigin.lat || !currentOrigin.lng)) {
-        // Find if this name matches an Origin in our master list
-        const masterMatch = routes.find(r => r.Origin && r.Origin.trim() === name);
+        // Find if this name matches an Origin, Destination, or Route_Name in our master list
+        const masterMatch = routes.find(r => 
+            (r.Origin && r.Origin.trim() === name) ||
+            (r.Destination && r.Destination.trim() === name) ||
+            (r.Route_Name && r.Route_Name.trim() === name)
+        );
 
         if (masterMatch) {
-            const lat = masterMatch.Origin_Lat;
-            const lng = masterMatch.Origin_Lon;
-            const link = masterMatch.Map_Link_Origin;
+            const isOriginMatch = masterMatch.Origin && masterMatch.Origin.trim() === name;
+            const lat = isOriginMatch ? masterMatch.Origin_Lat : masterMatch.Dest_Lat;
+            const lng = isOriginMatch ? masterMatch.Origin_Lon : masterMatch.Dest_Lon;
+            const link = isOriginMatch ? masterMatch.Map_Link_Origin : masterMatch.Map_Link_Destination;
 
             if (lat && lng) {
                 updateOrigin(index, 'lat', lat.toString());
@@ -792,13 +797,18 @@ export function JobDialog({
     // 2. Master Route Lookup - Only auto-fill if coordinates are empty
     const currentDest = destinations[index];
     if (routes && routes.length > 0 && (!currentDest.lat || !currentDest.lng)) {
-        // Find if this name matches a Destination in our master list
-        const masterMatch = routes.find(r => r.Destination && r.Destination.trim() === name);
+        // Find if this name matches an Origin, Destination, or Route_Name in our master list
+        const masterMatch = routes.find(r => 
+            (r.Origin && r.Origin.trim() === name) ||
+            (r.Destination && r.Destination.trim() === name) ||
+            (r.Route_Name && r.Route_Name.trim() === name)
+        );
 
         if (masterMatch) {
-            const lat = masterMatch.Dest_Lat;
-            const lng = masterMatch.Dest_Lon;
-            const link = masterMatch.Map_Link_Destination;
+            const isDestMatch = masterMatch.Destination && masterMatch.Destination.trim() === name;
+            const lat = isDestMatch ? masterMatch.Dest_Lat : masterMatch.Origin_Lat;
+            const lng = isDestMatch ? masterMatch.Dest_Lon : masterMatch.Origin_Lon;
+            const link = isDestMatch ? masterMatch.Map_Link_Destination : masterMatch.Map_Link_Origin;
 
             if (lat && lng) {
                 updateDestination(index, 'lat', lat.toString());
@@ -1595,14 +1605,11 @@ export function JobDialog({
               
               {/* Derive Unique Locations for Autocomplete */}
               {(() => {
-                 // Separate lists for Origin and Destination as requested
-                 const originLocations = Array.from(new Set(
-                    routes.map((r) => r.Origin).filter(Boolean)
-                 )) as string[]
-
-                 const destinationLocations = Array.from(new Set(
-                    routes.map((r) => r.Destination).filter(Boolean)
-                 )) as string[]
+                 // Consolidated list of all saved locations across Origin and Destination fields
+                 const allLocations = Array.from(new Set([
+                    ...routes.map((r) => r.Origin).filter(Boolean),
+                    ...routes.map((r) => r.Destination).filter(Boolean)
+                 ])) as string[]
                  
                  return (
                    <>
@@ -1626,7 +1633,7 @@ export function JobDialog({
                                     placeholder={t('jobs.dialog.location_placeholder')}
                                     value={origin.name}
                                     onChange={(val) => handleOriginNameChange(index, val)}
-                                    locations={originLocations}
+                                    locations={allLocations}
                                     className="bg-background border-input text-xl h-14"
                                 />
                                 <div className="flex flex-wrap gap-4">
@@ -1708,7 +1715,7 @@ export function JobDialog({
                                     placeholder={t('jobs.dialog.location_placeholder')}
                                     value={dest.name}
                                     onChange={(val) => handleDestinationNameChange(index, val)}
-                                    locations={destinationLocations}
+                                    locations={allLocations}
                                     className="bg-background border-input text-xl h-14"
                                 />
                                 <div className="flex flex-wrap gap-4">

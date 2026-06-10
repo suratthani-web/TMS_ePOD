@@ -30,6 +30,17 @@ export type Invoice = {
   Customer_Name?: string
 }
 
+type UnifiedInvoiceRow = {
+  Invoice_ID: string
+  Customer_Name: string
+  Issue_Date?: string | null
+  Due_Date?: string | null
+  Grand_Total?: number
+  Status?: string
+  Created_At: string
+  Type: 'Invoice' | 'BillingNote'
+}
+
 export async function getInvoices(page = 1, limit = 20, query = '') {
   try {
     const branchId = await getUserBranchId()
@@ -75,26 +86,28 @@ export async function getInvoices(page = 1, limit = 20, query = '') {
     ])
 
     // 3. Merge and Map
-    const mappedInvoices = (invRes.data || []).map((inv: any) => ({
+    const mappedInvoices: UnifiedInvoiceRow[] = (invRes.data || []).map((inv: Partial<{ Invoice_ID: string, Issue_Date: string, Due_Date: string | null, Created_At: string, Grand_Total: number, Status: string, Master_Customers?: { Customer_Name?: string } }>) => ({
         ...inv,
+        Invoice_ID: inv.Invoice_ID || '',
         Customer_Name: inv.Master_Customers?.Customer_Name || 'Unknown Customer',
+        Created_At: inv.Created_At || '',
         Type: 'Invoice'
     }))
 
-    const mappedBN = (bnRes.data || []).map((bn: any) => ({
-        Invoice_ID: bn.Billing_Note_ID,
-        Customer_Name: bn.Customer_Name,
+    const mappedBN: UnifiedInvoiceRow[] = (bnRes.data || []).map((bn: Partial<{ Billing_No: string, Billing_Note_ID?: string, Document_Date: string, Billing_Date?: string, Due_Date?: string, Created_At?: string, Customer_Name: string, Total_Amount: number, Status: string }>) => ({
+        Invoice_ID: bn.Billing_Note_ID || '',
+        Customer_Name: bn.Customer_Name || 'Unknown Customer',
         Issue_Date: bn.Billing_Date,
         Due_Date: bn.Due_Date,
         Grand_Total: bn.Total_Amount,
         Status: bn.Status,
-        Created_At: bn.Created_At,
+        Created_At: bn.Created_At || '',
         Type: 'BillingNote'
     }))
 
     // 4. Deduplicate by Invoice_ID (Prefer Invoice over BillingNote if IDs match)
-    const seenIds = new Set(mappedInvoices.map((i: { Invoice_ID: string }) => i.Invoice_ID))
-    const uniqueBN = mappedBN.filter((bn: { Invoice_ID: string }) => !seenIds.has(bn.Invoice_ID))
+    const seenIds = new Set(mappedInvoices.map((i) => i.Invoice_ID))
+    const uniqueBN = mappedBN.filter((bn) => !seenIds.has(bn.Invoice_ID))
 
     const todayNum = new Date().setHours(0,0,0,0)
 

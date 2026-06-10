@@ -3,6 +3,7 @@
 import { useEffect, useRef } from "react"
 import { recoverDriverSession } from "@/lib/actions/auth-actions"
 import { useRouter } from "next/navigation"
+import type { PluginListenerHandle } from "@capacitor/core"
 
 const STORAGE_KEY = "logis_driver_session_v1"
 const REFRESH_THROTTLE = 5000 // 5 seconds
@@ -12,7 +13,7 @@ interface Session {
   driverName: string;
   branchId?: string;
   role: string;
-  permissions?: any;
+  permissions?: unknown;
 }
 
 export function SessionStabilizer({ session }: { session: Session | null }) {
@@ -72,7 +73,7 @@ export function SessionStabilizer({ session }: { session: Session | null }) {
     document.addEventListener("visibilitychange", handleVisibilityChange)
     
     // Capacitor App State handling
-    let appStateListener: any = null
+    let appStateListener: PluginListenerHandle | null = null
     
     import('@capacitor/core').then(({ Capacitor }) => {
         if (Capacitor.isNativePlatform()) {

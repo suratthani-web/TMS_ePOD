@@ -173,7 +173,7 @@ export async function loginDriver(formData: FormData) {
   */
 
   // 4. Create Session (Cookie)
-  const userPermissions = (userData as Record<string, any>)?.Permissions || (userData as Record<string, any>)?.permissions || { show_income: true }
+  const userPermissions = (userData as { Permissions?: unknown; permissions?: unknown })?.Permissions || (userData as { Permissions?: unknown; permissions?: unknown })?.permissions || { show_income: true }
 
   const sessionData = {
     driverId: driver.Driver_ID,

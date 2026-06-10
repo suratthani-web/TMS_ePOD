@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button"
 
 declare global {
   interface Window {
-    MSStream?: any
+    MSStream?: unknown
   }
   interface Navigator {
     standalone?: boolean

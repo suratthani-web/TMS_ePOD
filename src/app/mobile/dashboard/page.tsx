@@ -26,7 +26,7 @@ async function DashboardContent() {
       currentJob={currentJob}
       activeJobs={activeJobs}
       gamification={gamification}
-      todayIncome={todayIncome}
+      todayIncome={todayIncome ?? 0}
     />
   )
 }

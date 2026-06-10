@@ -6,23 +6,30 @@ import { useLanguage } from "@/components/providers/language-provider"
 import { Button } from "@/components/ui/button"
 import { Image as ImageIcon, ExternalLink } from "lucide-react"
 import Image from "next/image"
+import type { Job } from "@/types/database"
+
+type PODJob = Job & {
+  Delivery_Date?: string | null
+  photo_proof_url?: string | null
+  signature_url?: string | null
+}
 
 type PODDialogProps = {
   open: boolean
   onOpenChange: (open: boolean) => void
-  job: any
+  job: PODJob
 }
 
 export function PODDialog({ open, onOpenChange, job }: PODDialogProps) {
   const { t } = useLanguage()
 
 
-  const photos = (job.Photo_Proof_Url || (job as any).photo_proof_url || "").split(',').filter(Boolean)
-  const signature = job.Signature_Url || (job as any).signature_url
+  const photos = (job.Photo_Proof_Url || job.photo_proof_url || "").split(',').filter(Boolean)
+  const signature = job.Signature_Url || job.signature_url
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto bg-background border-border text-foreground">
+      <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto bg-card border-border text-foreground">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <ImageIcon className="w-5 h-5 text-primary" />
@@ -55,7 +62,7 @@ export function PODDialog({ open, onOpenChange, job }: PODDialogProps) {
                 ))}
               </div>
             ) : (
-              <div className="text-center py-8 bg-muted/50 rounded-lg border border-dashed border-border text-muted-foreground">
+              <div className="text-center py-8 bg-muted rounded-lg border border-dashed border-border text-muted-foreground">
                 {t('reports.no_photos')}
               </div>
             )}
@@ -65,7 +72,7 @@ export function PODDialog({ open, onOpenChange, job }: PODDialogProps) {
           <div>
              <h3 className="text-xl font-medium text-muted-foreground mb-3">{t('reports.dropoff_signature')}</h3>
              {signature ? (
-               <div className="relative h-40 w-full md:w-80 border border-border rounded-lg bg-muted/50 mx-auto md:mx-0">
+               <div className="relative h-40 w-full md:w-80 border border-border rounded-lg bg-muted mx-auto md:mx-0">
                   <Image 
                       src={signature} 
                       alt="Signature" 
@@ -74,14 +81,14 @@ export function PODDialog({ open, onOpenChange, job }: PODDialogProps) {
                   />
                </div>
              ) : (
-                <div className="text-center py-8 bg-muted/50 rounded-lg border border-dashed border-border text-muted-foreground w-full md:w-80">
+                <div className="text-center py-8 bg-muted rounded-lg border border-dashed border-border text-muted-foreground w-full md:w-80">
                   {t('reports.no_signature')}
                 </div>
              )}
           </div>
 
           {/* Metadata */}
-          <div className="grid grid-cols-2 gap-4 p-4 bg-muted/50 rounded-lg text-xl">
+          <div className="grid grid-cols-2 gap-4 p-4 bg-muted rounded-lg text-xl">
              <div>
                 <p className="text-muted-foreground">{t('jobs.dialog.driver')}</p>
                 <p className="text-foreground font-medium">{job.Driver_Name || '-'}</p>
@@ -118,4 +125,3 @@ export function PODDialog({ open, onOpenChange, job }: PODDialogProps) {
     </Dialog>
   )
 }
-

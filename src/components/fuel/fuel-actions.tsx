@@ -18,8 +18,8 @@ import { CheckCircle2, XCircle } from "lucide-react"
 
 interface FuelActionsProps {
   log: FuelLog
-  drivers: { Driver_ID: string; Driver_Name: string }[]
-  vehicles: { Vehicle_Plate: string; Vehicle_Type: string }[]
+  drivers: { Driver_ID: string; Driver_Name: string | null }[]
+  vehicles: { Vehicle_Plate: string | null; Vehicle_Type: string | null }[]
 }
 
 export function FuelActions({ log, drivers, vehicles }: FuelActionsProps) {
@@ -101,7 +101,7 @@ export function FuelActions({ log, drivers, vehicles }: FuelActionsProps) {
                 onOpenChange={setShowEditDialog}
                 drivers={drivers}
                 vehicles={vehicles}
-                initialData={log as any}
+                initialData={log}
             />
         </div>
     )
@@ -157,7 +157,7 @@ export function FuelActions({ log, drivers, vehicles }: FuelActionsProps) {
         onOpenChange={setShowEditDialog}
         drivers={drivers}
         vehicles={vehicles}
-        initialData={log as any}
+        initialData={log}
       />
     </>
   )

@@ -3,6 +3,7 @@
 
 import { createAdminClient } from "@/utils/supabase/server"
 import { logActivity } from "@/lib/supabase/logs"
+import { requireAdmin, requireBranchAccess, requireCustomerAccess } from "@/services/permission-guards"
 
 import { getVehicleTypes } from "./vehicle-type-actions"
 
@@ -10,6 +11,7 @@ import { getVehicleTypes } from "./vehicle-type-actions"
  * FUEL STANDARDS
  */
 export async function getFuelStandards() {
+    await requireAdmin()
     const supabase = createAdminClient()
     
     // Auto-sync with Vehicle_Types table first
@@ -28,6 +30,8 @@ export async function getFuelStandards() {
  * Ensure every entry in Vehicle_Types has a record in Fleet_Fuel_Standards
  */
 export async function syncWithVehicleTypes() {
+    // This is often called from other server actions that already have guards, 
+    // but adding a safety check won't hurt.
     const supabase = createAdminClient()
     try {
         const vehicleTypes = await getVehicleTypes()
@@ -37,7 +41,7 @@ export async function syncWithVehicleTypes() {
             .from('Fleet_Fuel_Standards')
             .select('Vehicle_Type')
         
-        const existingNames = new Set(existingStandards?.map((s: any) => s.Vehicle_Type) || [])
+        const existingNames = new Set(existingStandards?.map((s: { Vehicle_Type: string }) => s.Vehicle_Type) || [])
         
         const toInsert = vehicleTypes
             .filter(t => !existingNames.has(t.type_name))
@@ -57,7 +61,14 @@ export async function syncWithVehicleTypes() {
 }
 
 
-export async function saveFuelStandard(standard: any) {
+interface FuelStandardInput {
+    Vehicle_Type: string;
+    Standard_KM_L: number;
+    Warning_Threshold_Percent: number;
+}
+
+export async function saveFuelStandard(standard: FuelStandardInput) {
+    await requireAdmin()
     const supabase = createAdminClient()
     const { data, error } = await supabase
         .from('Fleet_Fuel_Standards')
@@ -76,6 +87,7 @@ export async function saveFuelStandard(standard: any) {
  * MAINTENANCE STANDARDS
  */
 export async function getMaintenanceStandards() {
+    await requireAdmin()
     const supabase = createAdminClient()
     const { data, error } = await supabase
         .from('Fleet_Maintenance_Standards')
@@ -86,7 +98,14 @@ export async function getMaintenanceStandards() {
     return data
 }
 
-export async function saveMaintenanceStandard(standard: any) {
+interface MaintenanceStandardInput {
+    Component_Name: string;
+    Standard_KM?: number | null;
+    Standard_Months?: number | null;
+}
+
+export async function saveMaintenanceStandard(standard: MaintenanceStandardInput) {
+    await requireAdmin()
     const supabase = createAdminClient()
     const { data, error } = await supabase
         .from('Fleet_Maintenance_Standards')
@@ -102,6 +121,7 @@ export async function saveMaintenanceStandard(standard: any) {
 }
 
 export async function deleteMaintenanceStandard(name: string) {
+    await requireAdmin()
     const supabase = createAdminClient()
     const { error } = await supabase
         .from('Fleet_Maintenance_Standards')
@@ -116,10 +136,14 @@ export async function deleteMaintenanceStandard(name: string) {
  * ALERTS
  */
 export async function getActiveFleetAlerts(vehiclePlate?: string, branchId?: string, customerId?: string | null) {
+    // 1. Verify access
+    await requireBranchAccess(branchId)
+    if (customerId) await requireCustomerAccess(customerId)
+    
     const supabase = createAdminClient()
     let query = supabase
         .from('Fleet_Intelligence_Alerts')
-        .select('*, master_vehicles(brand, model, Customer_ID)')
+        .select('*, master_vehicles!inner(brand, model, branch_id)')
         .eq('Status', 'ACTIVE')
         .order('Created_At', { ascending: false })
     
@@ -128,28 +152,45 @@ export async function getActiveFleetAlerts(vehiclePlate?: string, branchId?: str
     }
 
     if (branchId && branchId !== 'All') {
-        query = query.eq('master_vehicles.Branch_ID', branchId)
+        query = query.eq('master_vehicles.branch_id', branchId)
     }
 
     if (customerId) {
-        query = query.eq('master_vehicles.Customer_ID', customerId)
+        // Vehicles don't belong to customers directly. 
+        // Find active jobs for this customer to get the vehicles currently serving them.
+        const { data: activeJobs } = await supabase
+            .from('Jobs_Main')
+            .select('Vehicle_Plate')
+            .eq('Customer_ID', customerId)
+            .not('Vehicle_Plate', 'is', null)
+            .not('Job_Status', 'in', '("Complete", "Completed", "Cancelled", "Delivered")')
+            
+        const activePlates = Array.from(new Set(activeJobs?.map((j: any) => j.Vehicle_Plate).filter(Boolean) || []))
+        
+        if (activePlates.length === 0) {
+            return [] // Customer has no active vehicles, so no alerts
+        }
+        query = query.in('Vehicle_Plate', activePlates)
     }
 
     const { data, error } = await query
-    if (error) return []
+    if (error) {
+        console.error('[FLEET_INTEL] getActiveFleetAlerts error:', JSON.stringify(error, null, 2))
+        return []
+    }
     return data
 }
 
 export async function resolveAlert(alertId: string, status: 'RESOLVED' | 'IGNORED' = 'RESOLVED', note?: string) {
+    await requireAdmin()
     const supabase = createAdminClient()
     const { data, error } = await supabase
         .from('Fleet_Intelligence_Alerts')
         .update({
             Status: status,
             Resolved_At: new Date().toISOString(),
-            // @ts-ignore
             Resolved_Note: note
-        })
+        } as Record<string, unknown>)
         .eq('Alert_ID', alertId)
         .select()
     
@@ -230,9 +271,10 @@ export async function analyzeFuelLog(logId: string) {
         }
 
         return { success: true }
-    } catch (e: any) {
-        console.error("[FLEET_INTEL] Analysis failed:", e.message)
-        return { success: false, error: e.message }
+    } catch (e: unknown) {
+        const msg = e instanceof Error ? e.message : 'Unknown error'
+        console.error("[FLEET_INTEL] Analysis failed:", msg)
+        return { success: false, error: msg }
     }
 }
 
@@ -320,7 +362,7 @@ export async function analyzeMaintenanceLog(ticketId: string) {
         }
 
         return { success: true }
-    } catch (e: any) {
-        return { success: false, error: e.message }
+    } catch (e: unknown) {
+        return { success: false, error: e instanceof Error ? e.message : 'Unknown error' }
     }
 }

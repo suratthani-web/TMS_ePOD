@@ -47,11 +47,11 @@ export default function RolesPage() {
         let fetchedData: RolePermission[] = []
         
         if (result.success && result.data) {
-             fetchedData = result.data.map((item: any) => ({
+             fetchedData = result.data.map((item) => ({
                  ...item,
                  Permissions: typeof item.Permissions === 'string' 
                      ? JSON.parse(item.Permissions) 
-                     : (item.Permissions || {})
+                     : (item.Permissions && typeof item.Permissions === 'object' ? item.Permissions as Record<string, boolean> : {})
              }))
         }
 
@@ -122,7 +122,7 @@ export default function RolesPage() {
         <DashboardLayout>
             <div className="space-y-12 pb-20 p-4 lg:p-10">
                 {/* Enterprise Security Header */}
-                <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-10 bg-background/60 backdrop-blur-3xl p-10 rounded-br-[6rem] rounded-tl-[3rem] border border-border/5 shadow-2xl relative overflow-hidden group">
+                <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-10 bg-background/60 backdrop-blur-3xl p-10 rounded-br-[6rem] rounded-tl-[3rem] border border-border shadow-2xl relative overflow-hidden group">
                     <div className="absolute top-0 right-0 w-80 h-80 bg-primary/10 blur-[120px] rounded-full -mr-40 -mt-40 pointer-events-none" />
                     
                     <div className="relative z-10 space-y-8">
@@ -144,7 +144,7 @@ export default function RolesPage() {
                     </div>
 
                     <div className="flex flex-col items-end gap-6 relative z-10">
-                        <div className="bg-muted/50 border border-border/10 px-6 py-3 rounded-2xl flex items-center gap-3 backdrop-blur-md">
+                        <div className="bg-muted/50 border border-border px-6 py-3 rounded-2xl flex items-center gap-3 backdrop-blur-md">
                             <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse shadow-[0_0_10px_rgba(16,185,129,1)]" />
                             <span className="text-base font-bold font-black text-muted-foreground uppercase tracking-widest italic">{t('settings_pages.roles.protocol_sync')}</span>
                         </div>
@@ -179,7 +179,7 @@ export default function RolesPage() {
                                         "w-12 h-12 rounded-2xl flex items-center justify-center transition-all duration-500 shadow-xl",
                                         selectedRoleIndex === idx 
                                         ? "bg-primary text-foreground rotate-6 scale-110" 
-                                        : "bg-black/40 text-muted-foreground group-hover/role-btn:text-foreground group-hover/role-btn:bg-primary/20"
+                                        : "bg-muted/25 text-muted-foreground group-hover/role-btn:text-foreground group-hover/role-btn:bg-primary/20"
                                     )}>
                                         {role.Role === 'Super Admin' ? <Lock size={22} /> : <Users size={22} />}
                                     </div>
@@ -187,14 +187,14 @@ export default function RolesPage() {
                                         "font-black text-[13px] uppercase tracking-widest italic transition-colors",
                                         selectedRoleIndex === idx ? "text-foreground" : "text-muted-foreground group-hover/role-btn:text-muted-foreground"
                                     )}>
-                                        {t(`settings.roles_list.${role.Role}` as any) || role.Role}
+                                        {t(`settings.roles_list.${role.Role}`) || role.Role}
                                     </span>
                                 </div>
                                 {selectedRoleIndex === idx && <Zap size={16} className="text-primary animate-pulse" />}
                             </button>
                         ))}
                         
-                        <div className="mt-10 p-8 rounded-[2.5rem] bg-indigo-500/5 border border-border/5 shadow-inner">
+                        <div className="mt-10 p-8 rounded-[2.5rem] bg-indigo-500/5 border border-border shadow-inner">
                              <div className="flex items-center gap-3 mb-4 text-indigo-400">
                                 <AlertCircle size={14} strokeWidth={2.5} />
                                 <span className="text-base font-bold font-black uppercase tracking-[0.1em]">{t('settings_pages.roles.integrity_check')}</span>
@@ -235,17 +235,17 @@ export default function RolesPage() {
                                             initial={{ opacity: 0, x: 20 }}
                                             animate={{ opacity: 1, x: 0 }}
                                             transition={{ delay: catIdx * 0.1 }}
-                                            className="bg-background/40 rounded-[3rem] border-2 border-border/5 shadow-3xl overflow-hidden group/cat hover:border-primary/20 transition-all duration-500"
+                                            className="bg-background/40 rounded-[3rem] border-2 border-border shadow-3xl overflow-hidden group/cat hover:border-primary/20 transition-all duration-500"
                                         >
-                                            <div className="bg-black/40 px-10 py-8 border-b border-border/5 flex items-center justify-between relative overflow-hidden">
+                                            <div className="bg-muted/25 px-10 py-8 border-b border-border flex items-center justify-between relative overflow-hidden">
                                                 <div className="absolute top-0 right-0 w-64 h-full bg-primary/[0.02] pointer-events-none" />
                                                 <div className="flex items-center gap-5 relative z-10">
-                                                    <div className="p-3 bg-muted/50 rounded-2xl text-primary border border-border/10 group-hover/cat:scale-110 transition-transform">
+                                                    <div className="p-3 bg-muted/50 rounded-2xl text-primary border border-border group-hover/cat:scale-110 transition-transform">
                                                         <Icon size={24} />
                                                     </div>
-                                                    <h3 className="font-black text-foreground uppercase tracking-[0.3em] italic text-xl">{t(`settings_pages.roles.categories.${category.id}` as any)}</h3>
+                                                    <h3 className="font-black text-foreground uppercase tracking-[0.3em] italic text-xl">{t(`settings_pages.roles.categories.${category.id}`)}</h3>
                                                 </div>
-                                                <div className="text-base font-bold font-black text-muted-foreground bg-muted/50 px-5 py-2 rounded-full border border-border/5 uppercase tracking-widest italic">
+                                                <div className="text-base font-bold font-black text-muted-foreground bg-muted/50 px-5 py-2 rounded-full border border-border uppercase tracking-widest italic">
                                                     {catPerms.length} {t('settings_pages.roles.vector_points')}
                                                 </div>
                                             </div>
@@ -259,7 +259,7 @@ export default function RolesPage() {
                                                                 "flex items-center justify-between p-6 rounded-[2rem] transition-all cursor-pointer border-2 group/perm relative overflow-hidden",
                                                                 activeRole.Permissions?.[perm.id] 
                                                                 ? "bg-primary/5 border-primary/20 shadow-inner" 
-                                                                : "bg-transparent border-border/5 hover:border-border/10"
+                                                                : "bg-transparent border-border hover:border-border"
                                                             )}
                                                         >
                                                             <div className="flex flex-col gap-2 relative z-10">
@@ -267,13 +267,13 @@ export default function RolesPage() {
                                                                     "font-black text-[13px] uppercase tracking-widest italic transition-colors",
                                                                     activeRole.Permissions?.[perm.id] ? "text-primary shadow-[0_0_10px_rgba(255,30,133,0.3)]" : "text-muted-foreground group-hover/perm:text-foreground"
                                                                 )}>
-                                                                    {t(`settings_pages.roles.permissions.${perm.id}` as any)}
+                                                                    {t(`settings_pages.roles.permissions.${perm.id}`)}
                                                                 </span>
                                                                 <span className={cn(
                                                                     "text-base font-bold font-black leading-tight uppercase tracking-tight italic transition-colors",
                                                                     activeRole.Permissions?.[perm.id] ? "text-primary/60" : "text-muted-foreground"
                                                                 )}>
-                                                                    {t(`settings_pages.roles.descriptions.${perm.id}` as any)}
+                                                                    {t(`settings_pages.roles.descriptions.${perm.id}`)}
                                                                 </span>
                                                             </div>
                                                             <Switch 

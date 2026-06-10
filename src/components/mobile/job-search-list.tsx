@@ -4,8 +4,13 @@ import { useState } from "react"
 import Link from "next/link"
 import { Search, MapPin, ChevronRight, Calendar, Truck } from "lucide-react"
 import { cn } from "@/lib/utils"
+import type { Job } from "@/types/database"
 
-export function MobileJobSearchList({ jobs }: { jobs: any[] }) {
+type MobileJobListItem = Pick<Job, "Job_ID" | "Customer_Name" | "Dest_Location" | "Route_Name" | "Job_Status"> & {
+  Pickup_Date?: string | null
+}
+
+export function MobileJobSearchList({ jobs }: { jobs: MobileJobListItem[] }) {
   const [searchQuery, setSearchQuery] = useState("")
 
   const filteredJobs = jobs.filter(job => {
@@ -58,11 +63,11 @@ export function MobileJobSearchList({ jobs }: { jobs: any[] }) {
                 <div className={cn(
                   "px-3 py-1 rounded-lg text-[10px] font-bold uppercase",
                   job.Job_Status === 'Completed' ? 'bg-emerald-100 text-emerald-700' : 
-                  ['In Progress', 'In Transit', 'Arrived'].includes(job.Job_Status) ? 'bg-primary/10 text-primary' :
+                  ['In Progress', 'In Transit', 'Arrived'].includes(job.Job_Status || '') ? 'bg-primary/10 text-primary' :
                   'bg-muted text-muted-foreground'
                 )}>
                   {job.Job_Status === 'Completed' ? 'สำเร็จ' : 
-                   ['In Progress', 'In Transit', 'Arrived'].includes(job.Job_Status) ? 'กำลังดำเนินการ' : 
+                   ['In Progress', 'In Transit', 'Arrived'].includes(job.Job_Status || '') ? 'กำลังดำเนินการ' : 
                    'รอเริ่มงาน'}
                 </div>
               </div>

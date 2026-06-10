@@ -90,3 +90,42 @@ export async function pushToUser(to: string, text: string) {
     return { success: false, error };
   }
 }
+
+/**
+ * Sends an IP approval template message with buttons to a LINE user.
+ */
+export async function pushIPApprovalToUser(to: string, username: string, ip: string) {
+  try {
+    const client = getLineClient();
+    await client.pushMessage({
+      to,
+      messages: [
+        {
+          type: "template" as any,
+          altText: `🛡️ คำขออนุมัติ IP ของคุณ ${username}`,
+          template: {
+            type: "buttons",
+            title: "🛡️ อนุมัติ IP ใหม่",
+            text: `ผู้ใช้: ${username}\nIP: ${ip}\n\nกรุณาเลือกดำเนินการ:`,
+            actions: [
+              {
+                type: "message",
+                label: "อนุมัติ IP นี้",
+                text: `อนุมัติ IP ${username} ${ip}`
+              },
+              {
+                type: "message",
+                label: "บล็อก IP นี้",
+                text: `บล็อก IP ${username} ${ip}`
+              }
+            ]
+          } as any
+        }
+      ]
+    });
+    return { success: true };
+  } catch (error) {
+    console.error('Error sending LINE IP approval push:', error);
+    return { success: false, error };
+  }
+}

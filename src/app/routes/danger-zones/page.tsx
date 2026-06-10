@@ -98,8 +98,8 @@ export default function DangerZonesPage() {
             lat: c[0],
             lng: c[1],
             name: `Point ${i + 1}`,
-            type: i === 0 ? 'start' : (i === currentCoords.length - 1 ? 'end' : 'stop')
-        })) as any[]
+            type: (i === 0 ? 'start' : (i === currentCoords.length - 1 ? 'end' : 'stop')) as 'start' | 'stop' | 'end'
+        }))
     }, [currentCoords])
 
     return (

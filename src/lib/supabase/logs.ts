@@ -20,6 +20,7 @@ export type LogAction =
   | "DELETE"
   | "LOGIN"
   | "APPROVE"
+  | "REJECT"
   | "EXPORT"
   | "LOGOUT";
 
@@ -27,7 +28,7 @@ interface LogOptions {
   module: LogModule;
   action_type: LogAction;
   target_id?: string;
-  details?: any;
+  details?: Record<string, unknown> | null;
   branch_id?: string;
   user_id?: string;
   username?: string;
@@ -47,6 +48,8 @@ export async function logActivity(options: LogOptions) {
       username,
       role,
       branch_id,
+    } = options;
+    const {
       module,
       action_type,
       target_id,

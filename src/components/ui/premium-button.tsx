@@ -10,6 +10,7 @@ interface PremiumButtonProps extends HTMLMotionProps<"button"> {
   variant?: "primary" | "secondary" | "outline" | "ghost" | "danger"
   size?: "sm" | "md" | "lg" | "xl" | "icon"
   loading?: boolean
+  isLoading?: boolean
 }
 
 export function PremiumButton({ 
@@ -22,14 +23,14 @@ export function PremiumButton({
   ...props 
 }: PremiumButtonProps) {
   // Filter out custom props that shouldn't reach the DOM
-  const { isLoading, ...domProps } = props as any;
+  const { isLoading: _isLoading, ...domProps } = props;
   
   const variants = {
-    primary: "bg-primary text-white shadow-lg shadow-primary/25 hover:brightness-110",
-    secondary: "bg-secondary text-secondary-foreground border border-border shadow-lg shadow-lg hover:brightness-110",
+    primary: "bg-primary text-primary-foreground shadow-sm hover:brightness-105",
+    secondary: "bg-secondary text-secondary-foreground border border-border shadow-sm hover:bg-secondary/90",
     outline: "bg-transparent border-2 border-border text-muted-foreground hover:border-primary hover:text-primary hover:bg-primary/5",
     ghost: "bg-transparent text-muted-foreground hover:bg-muted hover:text-foreground",
-    danger: "bg-accent text-white shadow-lg shadow-accent/25 hover:brightness-110",
+    danger: "bg-destructive text-destructive-foreground shadow-sm hover:brightness-105",
   }
 
   const sizes = {
@@ -46,7 +47,7 @@ export function PremiumButton({
       whileTap={{ scale: 0.98 }}
       disabled={disabled || loading}
       className={cn(
-        "rounded-xl font-black uppercase tracking-wider flex items-center justify-center gap-2 transition-all duration-300 relative overflow-hidden group",
+        "rounded-xl font-semibold flex items-center justify-center gap-2 transition-all duration-200 relative overflow-hidden group",
         "antialiased [backface-visibility:hidden] [transform-style:preserve-3d]", // Force hardware acceleration for sharpness
         variants[variant],
         sizes[size],
@@ -55,9 +56,6 @@ export function PremiumButton({
       )}
       {...domProps}
     >
-      {/* Premium Shine Overlay */}
-      <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-1000 ease-in-out pointer-events-none" />
-      
       {loading && <Loader2 className="w-4 h-4 animate-spin shrink-0" />}
       <span className="relative z-10 flex items-center gap-2">
         {children}
