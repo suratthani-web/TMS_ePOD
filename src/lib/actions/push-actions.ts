@@ -867,21 +867,10 @@ export async function notifyMaintenanceApproval(driverId: string, status: string
     })
 }
 
-// ─────────────────────────────────────────────
-// Notify: IP Pending Approval → Push to Super Admins Only
-// ─────────────────────────────────────────────
 export async function notifyAdminIPPending(username: string, ip: string) {
     const supabase = await createAdminClient()
 
-    // 1. Fetch all admin subscriptions
-    const { data: subs } = await supabase
-        .from('Push_Subscriptions')
-        .select('*')
-        .not('User_ID', 'is', null)
-
-    if (!subs || subs.length === 0) return { success: false }
-
-    // 2. Fetch Super Admin profiles (selecting Line_User_ID)
+    // 1. Fetch Super Admin profiles (selecting Line_User_ID)
     const { data: profiles } = await supabase
         .from('Master_Users')
         .select('Username, User_ID, Role, Line_User_ID')
@@ -889,28 +878,36 @@ export async function notifyAdminIPPending(username: string, ip: string) {
 
     if (!profiles || profiles.length === 0) return { success: false }
 
-    // 3. Filter subscriptions for Super Admins (Web Push)
-    const recipients = subs.filter((sub: PushSubscriptionRow) => {
-        return profiles.some((p: {Username: string, User_ID: string, Role: string}) => p.Username === sub.User_ID || (p.User_ID && p.User_ID === sub.User_ID))
-    })
+    // 2. Fetch all admin subscriptions for Web Push
+    const { data: subs } = await supabase
+        .from('Push_Subscriptions')
+        .select('*')
+        .not('User_ID', 'is', null)
 
-    if (recipients.length > 0) {
-        console.log(`[PUSH] Sending IP pending alert to ${recipients.length} Super Admin(s)`)
-        await Promise.allSettled(
-            recipients.map(async (sub: PushSubscriptionRow) => {
-                const result = await sendWebPush(sub, {
-                    title: '🛡️ มีรายการรออนุมัติ IP ใหม่',
-                    body: `ผู้ใช้: ${username} | IP: ${ip}`,
-                    url: '/settings/security',
-                    type: 'system',
-                    tag: `ip_pending_${username}`
+    if (subs && subs.length > 0) {
+        // 3. Filter subscriptions for Super Admins (Web Push)
+        const recipients = subs.filter((sub: PushSubscriptionRow) => {
+            return profiles.some((p: {Username: string, User_ID: string, Role: string}) => p.Username === sub.User_ID || (p.User_ID && p.User_ID === sub.User_ID))
+        })
+
+        if (recipients.length > 0) {
+            console.log(`[PUSH] Sending IP pending alert to ${recipients.length} Super Admin(s)`)
+            await Promise.allSettled(
+                recipients.map(async (sub: PushSubscriptionRow) => {
+                    const result = await sendWebPush(sub, {
+                        title: '🛡️ มีรายการรออนุมัติ IP ใหม่',
+                        body: `ผู้ใช้: ${username} | IP: ${ip}`,
+                        url: '/settings/security',
+                        type: 'system',
+                        tag: `ip_pending_${username}`
+                    })
+                    // Clean up expired subscriptions
+                    if (!result.success && (result.statusCode === 404 || result.statusCode === 410)) {
+                        await supabase.from('Push_Subscriptions').delete().eq('Endpoint', sub.Endpoint)
+                    }
                 })
-                // Clean up expired subscriptions
-                if (!result.success && (result.statusCode === 404 || result.statusCode === 410)) {
-                    await supabase.from('Push_Subscriptions').delete().eq('Endpoint', sub.Endpoint)
-                }
-            })
-        )
+            )
+        }
     }
 
     // 4. Send LINE notifications to Super Admins with bound Line_User_ID
