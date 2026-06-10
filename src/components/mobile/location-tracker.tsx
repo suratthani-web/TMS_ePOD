@@ -3,9 +3,11 @@
 import { useEffect, useRef, useState } from "react"
 import { saveGPSLog } from "@/lib/supabase/gps"
 import { Geolocation } from '@capacitor/geolocation'
-import { BackgroundGeolocation } from '@capacitor-community/background-geolocation'
-import { Capacitor } from '@capacitor/core'
+import { registerPlugin, Capacitor } from '@capacitor/core'
 import { toast } from "sonner"
+import type { BackgroundGeolocationPlugin } from '@capacitor-community/background-geolocation'
+
+const BackgroundGeolocation = registerPlugin<BackgroundGeolocationPlugin>('BackgroundGeolocation')
 
 const UPDATE_INTERVAL = 300000 // Update every 5 minutes
 const MIN_DISTANCE = 0.0002 // Approx 20-30 meters
