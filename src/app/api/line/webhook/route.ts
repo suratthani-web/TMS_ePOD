@@ -411,7 +411,12 @@ export async function POST(req: NextRequest) {
 
                 // --- IP APPROVAL COMMAND FROM LINE ---
                 if (text.startsWith('อนุมัติ IP ') || text.startsWith('บล็อก IP ') || text.startsWith('APPROVE IP ') || text.startsWith('BLOCK IP ')) {
-                    if (!boundAdmin || (boundAdmin.Role_ID !== 1 && boundAdmin.Role !== 'Super Admin')) {
+                    const isSuperAdmin = boundAdmin && (
+                        Number(boundAdmin.Role_ID) === 1 || 
+                        String(boundAdmin.Role).trim().toLowerCase() === 'super admin'
+                    )
+                    
+                    if (!isSuperAdmin) {
                         await replyToUser(replyToken, '❌ ขออภัยครับ คุณไม่มีสิทธิ์ในการอนุมัติ/บล็อก IP (ต้องเป็นสิทธิ์ Super Admin เท่านั้น)')
                         continue
                     }
@@ -425,14 +430,14 @@ export async function POST(req: NextRequest) {
                         continue
                     }
 
-                    const targetUsername = parts[0]
-                    const targetIp = parts[1]
+                    const targetUsername = parts[0].trim()
+                    const targetIp = parts[1].trim()
 
-                    // Find pending IP record
+                    // Find pending IP record (case-insensitive username comparison)
                     const { data: ipRecord, error: fetchError } = await supabase
                         .from('user_approved_ips')
                         .select('*')
-                        .eq('username', targetUsername)
+                        .ilike('username', targetUsername)
                         .eq('ip_address', targetIp)
                         .maybeSingle()
 
