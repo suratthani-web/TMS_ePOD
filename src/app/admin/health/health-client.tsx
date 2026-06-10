@@ -237,18 +237,32 @@ export function HealthClient({ initialData }: { initialData: HealthData }) {
                     </div>
                     <div>
                       {issue.issueType === "PRICE_MISMATCH" || issue.issueType === "MISSING_PRICE" ? (
-                        <Button size="sm" variant="outline" onClick={() => handleSyncPrice(issue.jobId)} disabled={fixing === issue.jobId} className="text-[10px] font-black uppercase h-8">
+                        <Button 
+                          type="button"
+                          size="sm" 
+                          variant="outline" 
+                          onClick={(e) => { e.stopPropagation(); handleSyncPrice(issue.jobId); }} 
+                          disabled={fixing === issue.jobId} 
+                          className="text-[10px] font-black uppercase h-8"
+                        >
                           {fixing === issue.jobId ? <Loader2 className="w-3 h-3 animate-spin mr-1" /> : <RefreshCcw className="w-3 h-3 mr-1" />}
                           {t('dashboard.health.sync_price')}
                         </Button>
                       ) : (
                         <div className="flex gap-2">
-                          <Button size="sm" variant="outline" onClick={() => handleBypass(issue.jobId)} disabled={bypassing === issue.jobId} className="text-[10px] font-black uppercase h-8 border-green-500/50 text-green-600 hover:bg-green-50">
+                          <Button 
+                            type="button"
+                            size="sm" 
+                            variant="outline" 
+                            onClick={(e) => { e.stopPropagation(); handleBypass(issue.jobId); }} 
+                            disabled={bypassing === issue.jobId} 
+                            className="text-[10px] font-black uppercase h-8 border-green-500/50 text-green-600 hover:bg-green-50"
+                          >
                             {bypassing === issue.jobId ? <Loader2 className="w-3 h-3 animate-spin mr-1" /> : <Check className="w-3 h-3 mr-1" />}
                             {t('dashboard.health.bypass')}
                           </Button>
                           <Button size="sm" variant="ghost" asChild className="text-[10px] font-black uppercase h-8">
-                            <Link href={`/planning?date=${issue.planDate || ""}&query=${issue.jobId}`}>
+                            <Link href={`/planning?date=${issue.planDate || ""}&query=${issue.jobId}`} onClick={(e) => e.stopPropagation()}>
                               {t('dashboard.health.inspect')}
                             </Link>
                           </Button>

@@ -8,6 +8,8 @@ import { syncJobPrice } from "@/services/pricing-engine"
 import { verifyJob } from "@/lib/actions/job-actions"
 import { createAdminClient } from "@/utils/supabase/server"
 
+import { revalidatePath } from "next/cache"
+
 export async function getAdminHealthData(branchId?: string, customerId?: string) {
   await requireAdmin()
 
@@ -38,11 +40,15 @@ export async function getAdminHealthData(branchId?: string, customerId?: string)
 
 export async function syncHealthJobPrice(jobId: string) {
   await requireAdmin()
-  return syncJobPrice(jobId)
+  const res = await syncJobPrice(jobId)
+  if (res.success) revalidatePath('/admin/health')
+  return res
 }
 
 export async function bypassHealthIssueAction(jobId: string) {
   await requireAdmin()
   // Use 'Verified' status to effectively bypass and dismiss from health checks
-  return verifyJob(jobId, 'Verified', 'Bypassed from Health Dashboard')
+  const res = await verifyJob(jobId, 'Verified', 'Bypassed from Health Dashboard')
+  if (res.success) revalidatePath('/admin/health')
+  return res
 }

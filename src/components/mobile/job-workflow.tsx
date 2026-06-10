@@ -27,6 +27,7 @@ export function JobWorkflow({ currentStatus, totalDrop = 1, completedDrops = 0, 
   
   const getStepIndex = (status: string) => {
     if (status === 'Pending') return -1
+    if (status === 'Verified' || status === 'Rejected') return STEPS.length - 1
     return STEPS.findIndex(s => s.status === status)
   }
 
@@ -41,8 +42,8 @@ export function JobWorkflow({ currentStatus, totalDrop = 1, completedDrops = 0, 
         <div className="absolute left-6 top-0 bottom-0 w-0.5 bg-border/40" />
 
         {STEPS.map((step, index) => {
-          const isCompleted = index < currentIndex || normalizedStatus === 'Completed'
-          const isActive = index === currentIndex && normalizedStatus !== 'Completed'
+          const isCompleted = index < currentIndex || normalizedStatus === 'Completed' || normalizedStatus === 'Verified' || normalizedStatus === 'Rejected'
+          const isActive = index === currentIndex && !['Completed', 'Verified', 'Rejected'].includes(normalizedStatus)
           const StepIcon = step.icon
 
           let stepDescription = step.description

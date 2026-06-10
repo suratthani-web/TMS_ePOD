@@ -30,6 +30,7 @@
         "bierner.markdown-mermaid",
         // Config Files
         "redhat.vscode-yaml",
-        "mikestead.dotenv"
+        "mikestead.dotenv",
+        "jlcodes.antigravity-cockpit"
     ]
 }

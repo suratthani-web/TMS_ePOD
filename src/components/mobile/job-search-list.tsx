@@ -62,11 +62,14 @@ export function MobileJobSearchList({ jobs }: { jobs: MobileJobListItem[] }) {
                 </div>
                 <div className={cn(
                   "px-3 py-1 rounded-lg text-[10px] font-bold uppercase",
-                  job.Job_Status === 'Completed' ? 'bg-emerald-100 text-emerald-700' : 
+                  job.Job_Status === 'Completed' || job.Job_Status === 'Verified' ? 'bg-emerald-100 text-emerald-700' : 
+                  job.Job_Status === 'Rejected' ? 'bg-destructive/10 text-destructive' :
                   ['In Progress', 'In Transit', 'Arrived'].includes(job.Job_Status || '') ? 'bg-primary/10 text-primary' :
                   'bg-muted text-muted-foreground'
                 )}>
-                  {job.Job_Status === 'Completed' ? 'สำเร็จ' : 
+                  {job.Job_Status === 'Verified' ? 'สำเร็จ (ตรวจสอบแล้ว)' :
+                   job.Job_Status === 'Completed' ? 'สำเร็จ' : 
+                   job.Job_Status === 'Rejected' ? 'ถูกปฏิเสธ' :
                    ['In Progress', 'In Transit', 'Arrived'].includes(job.Job_Status || '') ? 'กำลังดำเนินการ' : 
                    'รอเริ่มงาน'}
                 </div>

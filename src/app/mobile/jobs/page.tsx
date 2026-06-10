@@ -32,7 +32,7 @@ async function JobsContent({ driverId, searchParams }: { driverId: string, searc
   if (!status || status === 'All') {
       displayJobs = jobs.filter(j => {
           // Keep active jobs regardless of date
-          if (j.Job_Status !== 'Completed' && j.Job_Status !== 'Cancelled') return true;
+          if (j.Job_Status !== 'Completed' && j.Job_Status !== 'Cancelled' && j.Job_Status !== 'Verified' && j.Job_Status !== 'Rejected') return true;
           // Keep completed jobs ONLY if a date filter was explicitly selected, or it's today/future
           if (dateFrom || dateTo) return true; 
           return j.Plan_Date && j.Plan_Date >= today

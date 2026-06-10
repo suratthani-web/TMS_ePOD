@@ -1138,7 +1138,7 @@ export async function getDriverDashboardStats(driverId: string) {
         j.Show_Price_To_Driver !== false
     ).reduce((sum: number, j: Partial<Job>) => sum + (j.Cost_Driver_Total || 0), 0) || 0) : 0
 
-    const activeJobs = jobs?.filter((j: Partial<Job>) => !['Completed', 'Delivered', 'Cancelled', 'Draft'].includes(j.Job_Status || '')) || []
+    const activeJobs = jobs?.filter((j: Partial<Job>) => !['Completed', 'Delivered', 'Cancelled', 'Draft', 'Verified', 'Rejected'].includes(j.Job_Status || '')) || []
     const currentJob = activeJobs.length > 0 ? activeJobs[0] : null
     const totalRemaining = activeJobs.length
 
