@@ -3,6 +3,7 @@
 import { createClient, createAdminClient } from '@/utils/supabase/server'
 import { revalidatePath } from 'next/cache'
 import { getUserBranchId, isSuperAdmin } from '@/lib/permissions'
+import { getSession } from '@/lib/session'
 
 import { type JobStatus, transitionJobStatus } from "@/services/job-status-machine"
 
@@ -84,6 +85,14 @@ export async function adminUpdateJobStatus(jobId: string, newStatus: string, not
   if (newStatus === 'Delivered' || newStatus === 'Completed') {
       updateData.Actual_Delivery_Time = timeString
       updateData.Delivery_Date = dateString
+  }
+
+  if (newStatus === 'Verified' || newStatus === 'Rejected') {
+      const session = await getSession()
+      updateData.Verification_Status = newStatus
+      updateData.Verification_Note = note || null
+      updateData.Verified_By = session?.username || session?.userId || 'admin'
+      updateData.Verified_At = now.toISOString()
   }
 
   if (Object.keys(updateData).length > 0) {

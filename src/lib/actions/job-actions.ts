@@ -22,7 +22,8 @@ export async function verifyJob(
     // 1. Transition main Job_Status
     const transition = await transitionJobStatus(jobId, status, {
         reason: `Admin Verification: ${status}`,
-        notes: note
+        notes: note,
+        force: true
     })
 
     if (!transition.success) {

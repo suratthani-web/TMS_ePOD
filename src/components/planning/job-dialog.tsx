@@ -1247,10 +1247,10 @@ export function JobDialog({
                           <SelectValue placeholder={t('jobs.dialog.status')} />
                       </SelectTrigger>
                       <SelectContent>
-                          <SelectItem value="New">{t('jobs.status_pending')} (New)</SelectItem>
+                          <SelectItem value="New">{t('jobs.status_new') || 'งานใหม่'} (New)</SelectItem>
                           <SelectItem value="Requested">{t('jobs.status_requested')} (Requested)</SelectItem>
-                          <SelectItem value="Assigned">{t('jobs.status_pending')} (Assigned)</SelectItem>
-                          <SelectItem value="Draft">Draft (ร่างแผน)</SelectItem>
+                          <SelectItem value="Assigned">{t('jobs.status_assigned') || 'มอบหมายงานแล้ว'} (Assigned)</SelectItem>
+                          <SelectItem value="Draft">{t('jobs.status_draft') || 'ร่างแผน'} (Draft)</SelectItem>
                           <SelectItem value="In Transit">{t('jobs.status_in_transit')} (In Transit)</SelectItem>
                           <SelectItem value="Delivered">{t('jobs.status_delivered')} (Delivered)</SelectItem>
                           <SelectItem value="Completed">{t('jobs.status_completed')} (Completed)</SelectItem>

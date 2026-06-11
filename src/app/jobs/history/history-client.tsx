@@ -378,13 +378,13 @@ export function HistoryClient({
 
                             {/* Section 4: Integrity Status */}
                             <div className="flex lg:flex-col items-center justify-center gap-1 min-w-[100px]">
-                                {job.Verification_Status ? (
+                                {(job.Verification_Status || (job.Job_Status === 'Verified' ? 'Verified' : job.Job_Status === 'Rejected' ? 'Rejected' : null)) ? (
                                     <Badge className={cn(
                                         "rounded-lg px-2 py-0.5 font-black text-[9px] border-none shadow-md tracking-widest uppercase shrink-0",
-                                        job.Verification_Status === 'Verified' ? "bg-primary text-foreground shadow-primary/20" :
-                                        job.Verification_Status === 'Rejected' ? "bg-rose-500 text-foreground shadow-rose-500/20" : "bg-accent text-foreground shadow-accent/20"
+                                        (job.Verification_Status === 'Verified' || job.Job_Status === 'Verified') ? "bg-primary text-foreground shadow-primary/20" :
+                                        (job.Verification_Status === 'Rejected' || job.Job_Status === 'Rejected') ? "bg-rose-500 text-foreground shadow-rose-500/20" : "bg-accent text-foreground shadow-accent/20"
                                     )}>
-                                        {job.Verification_Status === 'Verified' ? t('common.success') : job.Verification_Status === 'Rejected' ? t('common.error') : job.Verification_Status}
+                                        {(job.Verification_Status === 'Verified' || job.Job_Status === 'Verified') ? t('common.success') : (job.Verification_Status === 'Rejected' || job.Job_Status === 'Rejected') ? t('common.error') : (job.Verification_Status || job.Job_Status)}
                                     </Badge>
                                 ) : (
                                     <div className="flex items-center gap-1.5">

@@ -318,6 +318,9 @@ export const dictionaries = {
 
 
     jobs: {
+      status_draft: 'ร่างแผน',
+      status_new: 'งานใหม่',
+      status_assigned: 'มอบหมายงานแล้ว',
       status_requested: 'รอการตอบรับ',
       status_pending: 'รอเริ่มงาน',
       status_in_transit: 'อยู่ระหว่างจัดส่ง',
@@ -2294,6 +2297,9 @@ export const dictionaries = {
 
 
     jobs: {
+      status_draft: 'Draft',
+      status_new: 'New',
+      status_assigned: 'Assigned',
       status_requested: 'Requested',
       status_pending: 'Pending',
       status_in_transit: 'In Transit',

@@ -24,6 +24,7 @@ import { Settings, Loader2 } from "lucide-react" // Use Settings icon for manage
 import { adminUpdateJobStatus } from "@/app/admin/jobs/actions"
 import { toast } from "sonner"
 import { useRouter } from "next/navigation"
+import { useLanguage } from "@/components/providers/language-provider"
 
 type Props = {
   jobId: string
@@ -31,22 +32,67 @@ type Props = {
 }
 
 const JOB_STATUSES = [
+  "Draft",
+  "Requested",
   "New",
+  "Pending",
   "Assigned",
-  "In Progress", 
+  "Confirmed",
+  "Accepted",
+  "Picked Up",
+  "En Route",
   "In Transit",
-  "Delivered",
+  "In Progress",
+  "Arrived",
+  "Arrived Pickup",
+  "Arrived Dropoff",
   "Completed",
-  "Failed", 
-  "Cancelled"
+  "Delivered",
+  "Verified",
+  "Rejected",
+  "Billed",
+  "Paid",
+  "Cancelled",
+  "Failed",
+  "SOS"
 ]
 
 export function AdminJobActions({ jobId, currentStatus }: Props) {
+  const { t } = useLanguage()
   const [open, setOpen] = useState(false)
   const [status, setStatus] = useState(currentStatus)
   const [note, setNote] = useState("")
   const [loading, setLoading] = useState(false)
   const router = useRouter()
+
+  const getStatusLabel = (s: string) => {
+    switch (s) {
+      case "Draft": return `${t('jobs.status_draft') || 'ร่างแผน'} (Draft)`
+      case "Requested": return `${t('jobs.status_requested')} (Requested)`
+      case "New": return `${t('jobs.status_new') || 'งานใหม่'} (New)`
+      case "Pending": return `${t('jobs.status_pending')} (Pending)`
+      case "Assigned": return `${t('jobs.status_assigned') || 'มอบหมายงานแล้ว'} (Assigned)`
+      case "Confirmed": return `คนขับยืนยันแล้ว (Confirmed)`
+      case "Accepted": return `คนขับตอบรับงานแล้ว (Accepted)`
+      case "Picked Up": return `${t('jobs.status_picked_up')} (Picked Up)`
+      case "En Route": return `อยู่ระหว่างเดินทาง (En Route)`
+      case "In Transit": return `${t('jobs.status_in_transit')} (In Transit)`
+      case "In Progress": return `กำลังดำเนินการ (In Progress)`
+      case "Arrived": return `ถึงจุดหมายแล้ว (Arrived)`
+      case "Arrived Pickup": return `ถึงจุดรับสินค้า (Arrived Pickup)`
+      case "Arrived Dropoff": return `ถึงจุดส่งสินค้า (Arrived Dropoff)`
+      case "Completed": return `${t('jobs.status_completed')} (Completed)`
+      case "Delivered": return `${t('jobs.status_delivered')} (Delivered)`
+      case "Verified": return `${t('jobs.status_verified') || 'Verified'} (Verified)`
+      case "Rejected": return `${t('jobs.status_rejected') || 'Rejected'} (Rejected)`
+      case "Billed": return `${t('jobs.status_billed') || 'Billed'} (Billed)`
+      case "Paid": return `${t('jobs.status_paid') || 'Paid'} (Paid)`
+      case "Cancelled": return `${t('jobs.status_cancelled')} (Cancelled)`
+      case "Failed": return `ส่งสินค้าไม่สำเร็จ (Failed)`
+      case "SOS": return `${t('jobs.status_sos') || 'SOS'} (SOS)`
+      default: return s
+    }
+  }
 
   const handleUpdate = async () => {
     try {
@@ -95,7 +141,7 @@ export function AdminJobActions({ jobId, currentStatus }: Props) {
                 <SelectContent className="bg-white border-gray-200 text-gray-900">
                     {JOB_STATUSES.map((s) => (
                     <SelectItem key={s} value={s} className="text-gray-900 hover:bg-gray-100 focus:bg-gray-100 cursor-pointer">
-                        {s}
+                        {getStatusLabel(s)}
                     </SelectItem>
                     ))}
                 </SelectContent>
