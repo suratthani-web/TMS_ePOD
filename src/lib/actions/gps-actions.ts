@@ -2,6 +2,31 @@
 
 import { createClient, createAdminClient } from "@/utils/supabase/server"
 import { isAdmin } from "@/lib/permissions"
+import { ACTIVE_TRACKING_STATUSES } from "@/lib/tracking-state"
+
+/**
+ * Returns the driver's currently in-progress job id (between "เริ่มงาน" and
+ * delivery confirmation), or null if none. This is the authoritative source
+ * used by LocationTracker to decide whether GPS tracking should be running,
+ * so it self-corrects even if the app was killed or a status changed elsewhere.
+ */
+export async function getDriverActiveJob(driverId: string): Promise<string | null> {
+    if (!driverId) return null
+    try {
+        const supabase = createAdminClient()
+        const { data } = await supabase
+            .from("Jobs_Main")
+            .select("Job_ID, Job_Status, Plan_Date")
+            .eq("Driver_ID", driverId)
+            .in("Job_Status", ACTIVE_TRACKING_STATUSES)
+            .order("Plan_Date", { ascending: false })
+            .limit(1)
+            .maybeSingle()
+        return data?.Job_ID ?? null
+    } catch {
+        return null
+    }
+}
 
 export async function getJobGPSData(jobId: string, driverId: string, date: string) {
     const admin = await isAdmin()
