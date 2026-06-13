@@ -32,6 +32,7 @@ export default function JobPickupPage() {
   const [loadedQty, setLoadedQty] = useState<string>("")
   const [completed, setCompleted] = useState(false)
   const [loading, setLoading] = useState(false)
+  const [jobLoaded, setJobLoaded] = useState(false)
   
   // Container Fields overrides (Driver can update if needed)
   const [containerNo, setContainerNo] = useState("")
@@ -49,6 +50,8 @@ export default function JobPickupPage() {
                 setContainerNo(j.container.container_no || "")
                 setSealNo(j.container.seal_no || "")
             }
+        }).finally(() => {
+            setJobLoaded(true)
             // User requested to remove the default suggested number to prevent accidental submission
             // if (j?.Loaded_Qty) {
             //     setLoadedQty(j.Loaded_Qty.toString())
@@ -174,6 +177,26 @@ export default function JobPickupPage() {
             </div>
             <h1 className="text-3xl font-black text-foreground mb-2 italic">สำเร็จ!</h1>
             <p className="text-muted-foreground font-bold tracking-tight">บันทึกข้อมูลการรับตู้เรียบร้อยแล้ว</p>
+        </div>
+    )
+  }
+
+  // Loading / not-found guards — avoid flashing an empty form before data arrives.
+  if (!jobLoaded) {
+    return (
+        <div className="min-h-screen bg-background flex flex-col items-center justify-center p-6 text-center">
+            <Loader2 className="animate-spin text-primary mb-4" size={40} />
+            <p className="text-muted-foreground font-bold">กำลังโหลดข้อมูลงาน...</p>
+        </div>
+    )
+  }
+
+  if (!job) {
+    return (
+        <div className="min-h-screen bg-background flex flex-col items-center justify-center p-6 text-center space-y-4">
+            <Info className="text-muted-foreground/40" size={48} />
+            <p className="text-foreground font-bold">ไม่พบข้อมูลงานนี้</p>
+            <Button variant="outline" onClick={() => router.back()} className="rounded-xl">ย้อนกลับ</Button>
         </div>
     )
   }

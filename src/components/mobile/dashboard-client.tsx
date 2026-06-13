@@ -8,11 +8,12 @@ import {
     Bell, Clock, Banknote, 
     ChevronRight, ArrowUpRight, ShieldCheck
 } from "lucide-react"
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
+import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { createClient } from "@/utils/supabase/client"
 import { toast } from "sonner"
 import { cn } from "@/lib/utils"
 import Link from "next/link"
+import { useRouter } from "next/navigation"
 import { format, isToday, isTomorrow, parseISO } from "date-fns"
 import { th } from "date-fns/locale"
 
@@ -74,6 +75,7 @@ const item = {
 }
 
 export function DashboardClient({ session, currentJob, activeJobs = [], gamification, todayIncome }: Omit<DashboardClientProps, 'stats'>) {
+    const router = useRouter()
     const supabase = useMemo(() => createClient(), [])
     const [mounted, setMounted] = useState(false)
 
@@ -121,7 +123,7 @@ export function DashboardClient({ session, currentJob, activeJobs = [], gamifica
                             description: newMsg.message.startsWith('[IMAGE]') ? '📷 ส่งรูปภาพ' : newMsg.message,
                             action: {
                                 label: 'อ่านแชท',
-                                onClick: () => window.location.href = '/mobile/chat'
+                                onClick: () => router.push('/mobile/chat')
                             }
                         })
                         try { 
@@ -133,7 +135,7 @@ export function DashboardClient({ session, currentJob, activeJobs = [], gamifica
             ).subscribe()
         
         return () => { supabase.removeChannel(channel) }
-    }, [session.driverId, supabase])
+    }, [session.driverId, supabase, router])
 
     const secondaryJobs = activeJobs.filter(j => j.Job_ID !== currentJob?.Job_ID)
 
@@ -150,7 +152,6 @@ export function DashboardClient({ session, currentJob, activeJobs = [], gamifica
                     <div className="relative">
                         <Link href="/mobile/profile">
                             <Avatar className="h-12 w-12 border border-border shadow-sm active:scale-95 transition-transform">
-                                <AvatarImage src={`https://api.dicebear.com/7.x/avataaars/svg?seed=${session.driverName}`} />
                                 <AvatarFallback className="bg-primary/10 text-primary font-bold">{session.driverName?.charAt(0)}</AvatarFallback>
                             </Avatar>
                         </Link>
@@ -332,9 +333,9 @@ export function DashboardClient({ session, currentJob, activeJobs = [], gamifica
                     </div>
                 </div>
                 <div className="h-1.5 w-full bg-muted rounded-full overflow-hidden border border-border">
-                    <div 
-                        className="h-full bg-amber-500 rounded-full transition-all duration-1000" 
-                        style={{ width: `${(gamification.points / gamification.nextRankPoints) * 100}%` }} 
+                    <div
+                        className="h-full bg-amber-500 rounded-full transition-all duration-1000"
+                        style={{ width: `${Math.min(100, Math.max(0, gamification.nextRankPoints > 0 ? (gamification.points / gamification.nextRankPoints) * 100 : 0))}%` }}
                     />
                 </div>
             </motion.div>

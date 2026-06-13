@@ -1,12 +1,20 @@
 "use client"
 
-import { MapContainer, TileLayer, Marker, Popup, useMap, Polyline, CircleMarker, useMapEvents } from 'react-leaflet'
+import { MapContainer, TileLayer, Marker, Popup, useMap, Polyline, CircleMarker, Circle, Polygon, useMapEvents } from 'react-leaflet'
 import L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
 import { useEffect, useState, useRef, Fragment, useMemo } from 'react'
 import { Truck, MapPin } from 'lucide-react'
 import { ProfitabilityHeatmap, ProfitPoint } from './profitability-heatmap'
 import { cn } from '@/lib/utils'
+
+// Arrival geofence radii in real-world metres (rendered with <Circle>, which
+// scales with zoom — unlike <CircleMarker> whose radius is screen pixels).
+const ORIGIN_GEOFENCE_M = 150
+const DEST_GEOFENCE_M = 200
+
+// Polygon for a saved operational area / danger zone shown on the map.
+type MapDangerZone = { id?: string; name: string; coordinates: [number, number][] }
 
 // Fix for default marker icons in Next.js - Move inside component or initialize lazily
 let defaultIcon: L.Icon | undefined;
@@ -108,6 +116,10 @@ type LeafletMapProps = {
   showHeatmap?: boolean
   onShowRoute?: (plate: string) => void
   onMapClick?: (lat: number, lng: number) => void
+  // Saved danger zones / operational areas to draw as filled polygons.
+  dangerZones?: MapDangerZone[]
+  // In-progress polygon being drawn in the danger-zone editor.
+  drawingPolygon?: [number, number][]
 }
 
 function RecenterMap({ position, zoom }: { position: [number, number], zoom?: number }) {
@@ -151,7 +163,9 @@ export default function LeafletMap({
   profitPoints = [],
   showHeatmap = false,
   onShowRoute,
-  onMapClick
+  onMapClick,
+  dangerZones = [],
+  drawingPolygon = []
 }: LeafletMapProps) {
   const [isHydrated, setIsHydrated] = useState(false)
   const [showGeofences, setShowGeofences] = useState(true)
@@ -205,6 +219,44 @@ export default function LeafletMap({
         <ProfitabilityHeatmap data={profitPoints} />
       )}
 
+      {/* Danger zones / operational areas — filled polygons (drawn beneath markers) */}
+      {dangerZones.map((zone, idx) => (
+        zone.coordinates && zone.coordinates.length >= 3 ? (
+          <Polygon
+            key={zone.id || `zone-${idx}`}
+            positions={zone.coordinates}
+            pathOptions={{ color: '#f43f5e', fillColor: '#f43f5e', fillOpacity: 0.12, weight: 2 }}
+          >
+            <Popup>
+              <div className="p-1">
+                <p className="text-[10px] font-black uppercase tracking-widest text-rose-500 mb-0.5">เขตพื้นที่เฝ้าระวัง</p>
+                <p className="font-black text-sm text-foreground">{zone.name}</p>
+              </div>
+            </Popup>
+          </Polygon>
+        ) : null
+      ))}
+
+      {/* In-progress polygon being drawn in the danger-zone editor */}
+      {drawingPolygon.length >= 2 && (
+        <>
+          <Polygon
+            positions={drawingPolygon}
+            pathOptions={{ color: '#10b981', fillColor: '#10b981', fillOpacity: 0.15, weight: 2, dashArray: '6, 6' }}
+          />
+          {drawingPolygon.map((pt, idx) => (
+            <CircleMarker
+              key={`draw-vtx-${idx}`}
+              center={pt}
+              radius={5}
+              pathOptions={{ color: '#ffffff', fillColor: '#10b981', fillOpacity: 1, weight: 2 }}
+            >
+              <Popup>จุดที่ {idx + 1}</Popup>
+            </CircleMarker>
+          ))}
+        </>
+      )}
+
       {drivers.filter(d => isFinite(d.lat) && isFinite(d.lng)).map((driver) => (
         <MovingMarker key={driver.id} driver={driver} onShowRoute={onShowRoute} />
       ))}
@@ -214,23 +266,24 @@ export default function LeafletMap({
           <>
             {/* 1. Connecting Lines between Origin and Destination for each job */}
             {Array.from(new Set(jobMissions.map(m => m.jobId))).map(jobId => {
+                // Points are kept in route order (origin first, then each drop) so
+                // the line walks origin -> drop 1 -> drop 2 ... for multi-drop jobs.
                 const points = jobMissions.filter(m => m.jobId === jobId)
-                const origin = points.find(p => p.type === 'origin')
-                const destination = points.find(p => p.type === 'destination')
-                
-                if (origin && destination) {
-                    return (
-                        <Polyline 
-                            key={`job-link-${jobId}`}
-                            positions={[[origin.lat, origin.lng], [destination.lat, destination.lng]]}
-                            color={origin.status === 'Picked Up' || origin.status === 'In Transit' ? '#a855f7' : '#64748b'}
-                            dashArray="10, 10"
-                            weight={2}
-                            opacity={0.4}
-                        />
-                    )
-                }
-                return null
+                if (points.length < 2) return null
+
+                const status = points.find(p => p.type === 'origin')?.status
+                const positions = points.map(p => [p.lat, p.lng] as [number, number])
+
+                return (
+                    <Polyline
+                        key={`job-link-${jobId}`}
+                        positions={positions}
+                        color={status === 'Picked Up' || status === 'In Transit' ? '#a855f7' : '#64748b'}
+                        dashArray="10, 10"
+                        weight={2}
+                        opacity={0.4}
+                    />
+                )
             })}
 
             {/* 2. Mission Markers & Geofences */}
@@ -271,7 +324,7 @@ export default function LeafletMap({
                                     </div>
                                     <div className="flex items-center gap-2 text-[9px] font-black uppercase tracking-widest text-muted-foreground/50">
                                         <div className="w-1.5 h-1.5 rounded-full bg-border" />
-                                        <span>พื้นที่จำลอง: {mission.type === 'origin' ? '20ม.' : '35ม.'} (รัศมี)</span>
+                                        <span>เขตจุดหมาย: {mission.type === 'origin' ? ORIGIN_GEOFENCE_M : DEST_GEOFENCE_M} ม. (รัศมี)</span>
                                     </div>
                                 </div>
 
@@ -286,15 +339,15 @@ export default function LeafletMap({
                         </Popup>
                     </Marker>
                     
-                    {/* Visual Area Boundary (Geofence) */}
+                    {/* Arrival geofence — real-world radius in metres (scales with zoom) */}
                     {showGeofences && (
-                        <CircleMarker 
+                        <Circle
                             center={[mission.lat, mission.lng]}
-                            radius={mission.type === 'origin' ? 20 : 35}
-                            pathOptions={{ 
-                                color: mission.type === 'origin' ? '#a855f7' : '#f43f5e', 
-                                fillColor: mission.type === 'origin' ? '#a855f7' : '#f43f5e', 
-                                fillOpacity: 0.05,
+                            radius={mission.type === 'origin' ? ORIGIN_GEOFENCE_M : DEST_GEOFENCE_M}
+                            pathOptions={{
+                                color: mission.type === 'origin' ? '#a855f7' : '#f43f5e',
+                                fillColor: mission.type === 'origin' ? '#a855f7' : '#f43f5e',
+                                fillOpacity: 0.08,
                                 weight: 1,
                                 dashArray: '5, 5'
                             }}

@@ -1,0 +1,10 @@
+import { Loader2 } from "lucide-react"
+
+export default function JobPickupLoading() {
+  return (
+    <div className="min-h-screen bg-background flex flex-col items-center justify-center p-6 text-center">
+      <Loader2 className="animate-spin text-primary mb-4" size={40} />
+      <p className="text-muted-foreground font-bold">กำลังเตรียมหน้ารับสินค้า...</p>
+    </div>
+  )
+}

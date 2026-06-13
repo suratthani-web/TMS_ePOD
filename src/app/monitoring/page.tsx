@@ -6,6 +6,7 @@ import { getActiveFleetStatus } from '@/lib/supabase/gps'
 import { getChatContacts } from '@/lib/supabase/chat'
 import { getFleetHealthAlerts } from '@/lib/supabase/fleet-health'
 import { getProfitHeatmapData } from '@/lib/supabase/financial-analytics'
+import { getDangerZones } from '@/lib/supabase/danger-zones'
 import { MonitoringCommandCenter } from '@/components/monitoring/monitoring-command-center'
 import type { DriverWithGPS } from '@/components/monitoring/monitoring-command-center'
 import { getCustomerId, isCustomer } from '@/lib/permissions'
@@ -17,7 +18,7 @@ export default async function MonitoringPage() {
       getCustomerId()
   ])
 
-  const [pendingJobs, assignedJobs, confirmedJobs, acceptedJobs, pickedUpJobs, inProgressJobs, inTransitJobs, arrivedJobs, sosJobs, failedJobs, activeDrivers, chatContacts, healthAlerts, heatmapJobs] = await Promise.all([
+  const [pendingJobs, assignedJobs, confirmedJobs, acceptedJobs, pickedUpJobs, inProgressJobs, inTransitJobs, arrivedJobs, sosJobs, failedJobs, activeDrivers, chatContacts, healthAlerts, heatmapJobs, zones] = await Promise.all([
     getJobsByStatus('Pending'),
     getJobsByStatus('Assigned'),
     getJobsByStatus('Confirmed'),
@@ -31,8 +32,18 @@ export default async function MonitoringPage() {
     getActiveFleetStatus(undefined, customerId),
     getChatContacts(),
     getFleetHealthAlerts(),
-    getProfitHeatmapData()
+    getProfitHeatmapData(),
+    getDangerZones()
   ])
+
+  // Active zones only, shaped for the map (Coordinates are [lat, lng] polygons).
+  const dangerZones = (zones || [])
+    .filter((z: { Is_Active?: boolean }) => z.Is_Active)
+    .map((z: { Zone_ID?: string; Zone_Name: string; Coordinates: [number, number][] }) => ({
+      id: z.Zone_ID,
+      name: z.Zone_Name,
+      coordinates: z.Coordinates,
+    }))
 
   const activeJobs = [...pendingJobs, ...assignedJobs, ...confirmedJobs, ...acceptedJobs, ...pickedUpJobs, ...inProgressJobs, ...inTransitJobs, ...arrivedJobs, ...sosJobs, ...failedJobs].sort((a, b) => 
     new Date(b.Plan_Date || '').getTime() - new Date(a.Plan_Date || '').getTime()
@@ -52,6 +63,7 @@ export default async function MonitoringPage() {
             allDrivers={driversWithIds}
             initialHealthAlerts={healthAlerts}
             heatmapJobs={mapHeatmapJobs}
+            dangerZones={dangerZones}
         />
     </DashboardLayout>
   )

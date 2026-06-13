@@ -3,7 +3,7 @@
 import { MobileNotificationBadge } from "./notification-badge"
 import { ChevronLeft, RefreshCcw } from "lucide-react"
 import { useRouter, usePathname } from "next/navigation"
-import { useState } from "react"
+import { useEffect, useRef, useTransition } from "react"
 import { toast } from "sonner"
 
 type Props = {
@@ -15,24 +15,27 @@ type Props = {
 export function MobileHeader({ title, showBack, rightElement }: Props) {
   const router = useRouter()
   const pathname = usePathname()
-  const [isRefreshing, setIsRefreshing] = useState(false)
-  
+  const [isRefreshing, startRefresh] = useTransition()
+  const refreshRequestedRef = useRef(false)
+
   const handleRefresh = () => {
-    setIsRefreshing(true)
-    router.refresh()
-    setTimeout(() => {
-        setIsRefreshing(false)
-        toast.success("อัปเดตข้อมูลแล้ว", {
-            duration: 1500,
-            position: 'top-center'
-        })
-    }, 800)
+    // Stay pending until the server actually re-renders, so the toast is honest.
+    refreshRequestedRef.current = true
+    startRefresh(() => router.refresh())
   }
-  
+
+  useEffect(() => {
+    if (!isRefreshing && refreshRequestedRef.current) {
+      refreshRequestedRef.current = false
+      toast.success("อัปเดตข้อมูลแล้ว", { duration: 1500, position: 'top-center' })
+    }
+  }, [isRefreshing])
+
   const isMainTab = ['/mobile/dashboard', '/mobile/jobs', '/mobile/profile', '/mobile/login'].includes(pathname)
   const shouldShowBack = showBack !== undefined ? showBack : !isMainTab
-  
+
   const clearCache = () => {
+    if (!window.confirm("ล้างแคชแอปและโหลดใหม่? ใช้เมื่อแอปมีปัญหาเท่านั้น")) return
     if ('serviceWorker' in navigator) {
       navigator.serviceWorker.getRegistrations().then((registrations) => {
         for (const registration of registrations) {

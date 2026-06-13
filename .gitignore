@@ -44,3 +44,12 @@ next-env.d.ts
 
 .vercel
 service_account.json
+
+# local scratch / debug artifacts
+/scratch/
+/tmp/
+/brain/
+__pycache__/
+.pytest_cache/
+*.pyc
+*.bak

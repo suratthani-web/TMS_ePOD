@@ -10,57 +10,82 @@ import { PushNotifications } from '@capacitor/push-notifications'
 
 type Props = { driverId: string | null }
 
+// Bind native FCM listeners only once per app session — re-binding on every
+// render/registration leaks listeners and can double-register the token.
+let fcmListenersBound = false
+
+// Snooze the "enable notifications" prompt after the driver taps "ไว้ก่อน",
+// so it doesn't pop up again on every page navigation.
+const PROMPT_SNOOZE_KEY = 'tms_push_prompt_snooze_until'
+const PROMPT_SNOOZE_MS = 24 * 60 * 60 * 1000 // 24h
+
+function isPromptSnoozed(): boolean {
+  try {
+    const until = Number(localStorage.getItem(PROMPT_SNOOZE_KEY) || 0)
+    return Date.now() < until
+  } catch {
+    return false
+  }
+}
+
+function snoozePrompt(): void {
+  try {
+    localStorage.setItem(PROMPT_SNOOZE_KEY, String(Date.now() + PROMPT_SNOOZE_MS))
+  } catch {
+    // ignore storage failures
+  }
+}
+
+async function postFcmToken(driverId: string, token: string) {
+  try {
+    await fetch('/api/push/subscribe', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ driverId, subscription: { endpoint: token, isFCM: true } })
+    })
+  } catch {
+    // Silent: registration is best-effort.
+  }
+}
+
 export function PermissionRequester({ driverId }: Props) {
   const [showPrompt, setShowPrompt] = useState(false)
   const [showDeniedPrompt, setShowDeniedPrompt] = useState(false)
 
-  const registerNativeFCM = useCallback(async () => {
+  // Bind the FCM foreground + registration listeners exactly once, then
+  // trigger registration (which fires the 'registration' listener).
+  const bindAndRegisterFCM = useCallback(async () => {
     if (!driverId) return
 
-    let tokenReceived = false
-    
-    // Foreground handling: Show toast when app is open
-    await PushNotifications.addListener('pushNotificationReceived', (notification) => {
-      console.log("[APK] Push Received in Foreground:", notification);
-      toast.success(notification.title || "แจ้งเตือนใหม่", {
-        description: notification.body,
-        duration: 8000,
-      });
-      // Play local sound as fallback
-      try { 
-        const audio = new Audio('/sounds/notification.mp3');
-        audio.play().catch(() => {});
-      } catch (e) {
-        console.error("Sound play failed", e);
-      }
-    });
+    if (!fcmListenersBound) {
+      fcmListenersBound = true
 
-    await PushNotifications.addListener('registration', async (token) => {
-      if (tokenReceived) return
-      tokenReceived = true
-      
-      const baseUrl = '' // Use relative path for all environments
-      const apiUrl = `${baseUrl}/api/push/subscribe`
-      
-      try {
-        await fetch(apiUrl, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ driverId, subscription: { endpoint: token.value, isFCM: true } })
+      await PushNotifications.addListener('pushNotificationReceived', (notification) => {
+        toast.success(notification.title || "แจ้งเตือนใหม่", {
+          description: notification.body,
+          duration: 8000,
         })
-      } catch {
-        // Error handling ignored for silent registration
-      }
-    })
-    
-    await PushNotifications.addListener('registrationError', () => {
-      // Error handling ignored for silent registration
-    })
-    
+        try {
+          const audio = new Audio('/sounds/notification.mp3')
+          audio.play().catch(() => {})
+        } catch {
+          // ignore sound failures
+        }
+      })
+
+      await PushNotifications.addListener('registration', async (token) => {
+        if (driverId) await postFcmToken(driverId, token.value)
+      })
+
+      await PushNotifications.addListener('registrationError', () => {
+        // Silent: nothing to do on registration error.
+      })
+    }
+
     try {
-        await PushNotifications.register()
+      await PushNotifications.register()
     } catch {
-        // Error handling ignored for silent registration
+      // ignore — register may throw if called before permission is granted
     }
   }, [driverId])
 
@@ -71,29 +96,29 @@ export function PermissionRequester({ driverId }: Props) {
     if (Capacitor.isNativePlatform()) {
       // Create channel for Android 8.0+
       try {
-          PushNotifications.createChannel({
-              id: 'tms-notifications',
-              name: 'TMS Notifications',
-              description: 'General system notifications',
-              importance: 5, // Importance.HIGH
-              visibility: 1, // Visibility.PUBLIC
-              sound: 'default',
-              vibration: true,
-          }).catch(() => {})
+        PushNotifications.createChannel({
+          id: 'tms-notifications',
+          name: 'TMS Notifications',
+          description: 'General system notifications',
+          importance: 5, // Importance.HIGH
+          visibility: 1, // Visibility.PUBLIC
+          sound: 'default',
+          vibration: true,
+        }).catch(() => {})
       } catch {
-          // ignore
+        // ignore
       }
 
       PushNotifications.checkPermissions().then(async (status) => {
         if (status.receive === 'granted') {
           // Already granted → silently register FCM token immediately
-          await registerNativeFCM()
+          await bindAndRegisterFCM()
         } else if (status.receive === 'prompt') {
-          setTimeout(() => setShowPrompt(true), 2000)
+          if (!isPromptSnoozed()) setTimeout(() => setShowPrompt(true), 2000)
         } else if (status.receive === 'denied') {
           const hasReminded = localStorage.getItem('tms_reminded_denied_push')
           if (!hasReminded) {
-             setTimeout(() => setShowDeniedPrompt(true), 2000)
+            setTimeout(() => setShowDeniedPrompt(true), 2000)
           }
         }
       })
@@ -112,25 +137,25 @@ export function PermissionRequester({ driverId }: Props) {
           // Register the MAIN sw.js which now contains our push logic
           navigator.serviceWorker.register('/sw.js', { scope: '/' })
             .then((reg) => {
-                // Check if we need to update
-                reg.update();
+              // Check if we need to update
+              reg.update();
             })
             .catch((err) => console.error("SW Register Error:", err))
         }
       }
-      
+
       if ("Notification" in window) {
         if (Notification.permission === "default") {
-          setTimeout(() => setShowPrompt(true), 2000)
+          if (!isPromptSnoozed()) setTimeout(() => setShowPrompt(true), 2000)
         } else if (Notification.permission === "denied") {
           const hasReminded = localStorage.getItem('tms_reminded_denied_push')
           if (!hasReminded) {
-             setTimeout(() => setShowDeniedPrompt(true), 2000)
+            setTimeout(() => setShowDeniedPrompt(true), 2000)
           }
         }
       }
     }
-  }, [driverId, registerNativeFCM])
+  }, [driverId, bindAndRegisterFCM])
 
   const subscribeToPush = async () => {
     try {
@@ -140,49 +165,12 @@ export function PermissionRequester({ driverId }: Props) {
         // --- NATIVE PUSH LOGIC (FCM via Capacitor) ---
         const permStatus = await PushNotifications.requestPermissions()
         if (permStatus.receive === 'granted') {
-          // Register for native push
-          let tokenReceived = false;
-          
-          await PushNotifications.addListener('registration', async (token) => {
-             if (tokenReceived) return; // Prevent multiple calls
-             tokenReceived = true;
-             
-             const baseUrl = '' // Use relative path for all environments
-             const apiUrl = `${baseUrl}/api/push/subscribe`
-             
-             try {
-               await fetch(apiUrl, {
-                 method: 'POST',
-                 headers: { 'Content-Type': 'application/json' },
-                 body: JSON.stringify({
-                   driverId: driverId,
-                   subscription: {
-                     endpoint: token.value,
-                     isFCM: true
-                   }
-                 })
-               })
-             } catch {
-               // Error handling ignored
-             }
-             
-             setShowPrompt(false)
-          })
-
-          await PushNotifications.addListener('registrationError', () => {
-            setShowPrompt(false)
-          })
-
-          try {
-              await PushNotifications.register()
-          } catch {
-              // Error handling ignored
-          }
-          return; // Exit here properly mapped to native sequence
-        } else {
-           setShowPrompt(false)
-           return;
+          // Listeners are bound once inside bindAndRegisterFCM; the token POST
+          // happens in the shared 'registration' listener.
+          await bindAndRegisterFCM()
         }
+        setShowPrompt(false)
+        return
       } else {
         // --- WEB PUSH LOGIC ---
         const result = await Notification.requestPermission()
@@ -223,11 +211,11 @@ export function PermissionRequester({ driverId }: Props) {
           })
         })
 
-        if (res.ok) { 
-            toast.success("ลงทะเบียนรับแจ้งเตือนเรียบร้อยแล้ว")
-        } else { 
-            const errData = await res.json().catch(() => ({}));
-            toast.error(`ลงทะเบียนไม่สำเร็จ: ${errData.error || 'Unknown error'}`)
+        if (res.ok) {
+          toast.success("ลงทะเบียนรับแจ้งเตือนเรียบร้อยแล้ว")
+        } else {
+          const errData = await res.json().catch(() => ({}));
+          toast.error(`ลงทะเบียนไม่สำเร็จ: ${errData.error || 'Unknown error'}`)
         }
 
         setShowPrompt(false)
@@ -247,7 +235,7 @@ export function PermissionRequester({ driverId }: Props) {
               <div className="w-16 h-16 rounded-xl bg-red-500/10 text-red-600 flex items-center justify-center border border-red-500/20">
                   <X size={32} />
               </div>
-              
+
               <div className="space-y-1">
                   <h3 className="text-lg font-bold text-foreground">การแจ้งเตือนถูกปิดกั้น</h3>
                   <p className="text-muted-foreground text-xs leading-relaxed max-w-[240px]">
@@ -256,7 +244,7 @@ export function PermissionRequester({ driverId }: Props) {
               </div>
           </div>
 
-          <Button 
+          <Button
               className="w-full h-11 rounded-lg bg-red-600 hover:bg-red-700 text-white font-semibold active:scale-95 transition-all"
               onClick={() => {
                   localStorage.setItem('tms_reminded_denied_push', 'true')
@@ -282,7 +270,7 @@ export function PermissionRequester({ driverId }: Props) {
                     !
                 </div>
             </div>
-            
+
             <div className="space-y-1">
                 <h3 className="text-lg font-bold text-foreground">แจ้งเตือนงานใหม่</h3>
                 <p className="text-muted-foreground text-xs leading-relaxed max-w-[240px]">
@@ -292,14 +280,14 @@ export function PermissionRequester({ driverId }: Props) {
         </div>
 
         <div className="grid grid-cols-2 gap-4">
-            <Button 
-                variant="ghost" 
+            <Button
+                variant="ghost"
                 className="h-11 rounded-lg text-muted-foreground font-semibold hover:bg-muted/50 transition-all text-xs"
-                onClick={() => setShowPrompt(false)}
+                onClick={() => { snoozePrompt(); setShowPrompt(false) }}
             >
                 ไว้ก่อน
             </Button>
-            <Button 
+            <Button
                 className="h-11 rounded-lg bg-primary hover:bg-primary/90 text-primary-foreground font-semibold active:scale-95 transition-all text-xs"
                 onClick={subscribeToPush}
             >

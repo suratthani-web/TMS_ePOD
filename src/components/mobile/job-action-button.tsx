@@ -19,6 +19,7 @@ import { updateJobStatus } from "@/app/mobile/jobs/actions"
 import { useRouter } from "next/navigation"
 import { cn } from "@/lib/utils"
 import { toast } from "sonner"
+import { notifyTrackingStateChanged } from "@/lib/tracking-state"
 import { parseISO, isAfter, startOfDay } from "date-fns"
 
 interface Destination {
@@ -96,6 +97,9 @@ export function JobActionButton({ job }: JobActionButtonProps) {
             setOptimisticStatus(null)
         } else {
             toast.success("อัปเดตสถานะเรียบร้อย")
+            // Job entered/left an in-progress state — let LocationTracker
+            // re-check whether GPS tracking should start or stop.
+            notifyTrackingStateChanged()
         }
     } catch {
         toast.error("เกิดข้อผิดพลาดในการอัปเดตสถานะ")

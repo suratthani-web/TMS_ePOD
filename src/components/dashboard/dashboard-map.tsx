@@ -86,9 +86,10 @@ interface DashboardMapProps {
         distance?: string
     } | null
     sosDriverIds?: (string | null)[]
+    dangerZones?: { id?: string; name: string; coordinates: [number, number][] }[]
 }
 
-export function DashboardMap({ drivers, allJobs = [], activeJobs = [], focusPosition, plannedRoute, routeSummary, sosDriverIds = [] }: DashboardMapProps) {
+export function DashboardMap({ drivers, allJobs = [], activeJobs = [], focusPosition, plannedRoute, routeSummary, sosDriverIds = [], dangerZones = [] }: DashboardMapProps) {
     const { t } = useLanguage()
     const [currentTime, setCurrentTime] = useState<number>(0)
     
@@ -143,7 +144,7 @@ export function DashboardMap({ drivers, allJobs = [], activeJobs = [], focusPosi
             const dLat = Number(j.Delivery_Lat) || 0
             const dLng = Number(j.Delivery_Lon) || 0
 
-            // 1. Resolve Origin
+            // 1. Resolve Origin (root columns, then JSON fallback)
             let finalOLat = oLat
             let finalOLng = oLng
             let oName = j.Origin_Location
@@ -155,26 +156,32 @@ export function DashboardMap({ drivers, allJobs = [], activeJobs = [], focusPosi
                         finalOLat = Number(json[0].lat); finalOLng = Number(json[0].lng)
                         if (!oName) oName = json[0].name
                     }
-                } catch(e) {}
+                } catch { /* ignore parse errors */ }
             }
 
-            // 2. Resolve Destination
-            let finalDLat = dLat
-            let finalDLng = dLng
-            let dName = j.Dest_Location
+            // 2. Resolve Destinations — every drop in order (multi-drop aware)
+            const destinations: { lat: number; lng: number; name: string }[] = []
+            try {
+                const json = typeof j.original_destinations_json === 'string' ? JSON.parse(j.original_destinations_json) : j.original_destinations_json
+                if (Array.isArray(json)) {
+                    json.forEach((pt: RoutePoint) => {
+                        const lat = Number(pt?.lat); const lng = Number(pt?.lng)
+                        if (lat && lng) destinations.push({ lat, lng, name: (pt?.name as string) || 'จุดส่งสินค้า' })
+                    })
+                }
+            } catch { /* ignore parse errors */ }
 
-            if (!finalDLat || !finalDLng) {
-                try {
-                    const json = typeof j.original_destinations_json === 'string' ? JSON.parse(j.original_destinations_json) : j.original_destinations_json
-                    if (Array.isArray(json) && json.length > 0) {
-                        const last = json[json.length - 1]
-                        finalDLat = Number(last.lat); finalDLng = Number(last.lng)
-                        if (!dName) dName = last.name
-                    }
-                } catch(e) {}
+            // Fallback to the single root delivery column if JSON had no usable point
+            if (destinations.length === 0 && dLat && dLng) {
+                destinations.push({ lat: dLat, lng: dLng, name: j.Dest_Location || 'จุดส่งสินค้า' })
             }
 
-            // Push Origin if valid
+            const status = j.Job_Status || 'Unknown'
+            const lastDestName = destinations.length > 0
+                ? destinations[destinations.length - 1].name
+                : (j.Dest_Location || 'Delivery')
+
+            // Push Origin (route order: origin first so the connecting line starts here)
             if (finalOLat && finalOLng) {
                 missions.push({
                     id: `${j.Job_ID}-origin`,
@@ -183,29 +190,29 @@ export function DashboardMap({ drivers, allJobs = [], activeJobs = [], focusPosi
                     lat: finalOLat,
                     lng: finalOLng,
                     type: 'origin',
-                    status: j.Job_Status || 'Unknown',
+                    status,
                     originName: oName || 'Pickup',
-                    destName: dName || 'Delivery'
+                    destName: lastDestName
                 })
             }
 
-            // Push Destination if valid
-            if (finalDLat && finalDLng) {
+            // Push every destination (drop) in sequence
+            destinations.forEach((dest, idx) => {
                 missions.push({
-                    id: `${j.Job_ID}-destination`,
+                    id: `${j.Job_ID}-destination-${idx}`,
                     jobId: j.Job_ID,
-                    name: dName || 'Delivery',
-                    lat: finalDLat,
-                    lng: finalDLng,
+                    name: destinations.length > 1 ? `${dest.name} (จุดที่ ${idx + 1})` : dest.name,
+                    lat: dest.lat,
+                    lng: dest.lng,
                     type: 'destination',
-                    status: j.Job_Status || 'Unknown',
+                    status,
                     originName: oName || 'Pickup',
-                    destName: dName || 'Delivery'
+                    destName: lastDestName
                 })
-            }
+            })
         })
         return missions
-    }, [allJobs, activeJobs])
+    }, [activeJobs])
 
     // Generate Profit Points for Heatmap
     const profitPoints = useMemo(() => {
@@ -294,6 +301,7 @@ export function DashboardMap({ drivers, allJobs = [], activeJobs = [], focusPosi
                 showHeatmap={showHeatmap}
                 routeHistory={routeHistory}
                 onShowRoute={handleShowTodayRoute}
+                dangerZones={dangerZones}
             />
 
             {/* Map Mode Toggle */}

@@ -48,15 +48,17 @@ interface MonitoringCommandCenterProps {
     allDrivers?: any[]
     initialHealthAlerts?: any[]
     heatmapJobs?: any[]
+    dangerZones?: { id?: string; name: string; coordinates: [number, number][] }[]
 }
 
-export function MonitoringCommandCenter({ 
-    initialJobs, 
-    initialDrivers, 
-    initialContacts = [], 
+export function MonitoringCommandCenter({
+    initialJobs,
+    initialDrivers,
+    initialContacts = [],
     allDrivers = [],
     initialHealthAlerts = [],
-    heatmapJobs = []
+    heatmapJobs = [],
+    dangerZones = []
 }: MonitoringCommandCenterProps) {
     const { t } = useLanguage()
     const [searchQuery, setSearchQuery] = useState('')
@@ -471,11 +473,12 @@ export function MonitoringCommandCenter({
 
             {/* 2. Integrated Map */}
             <div className="flex-1 relative">
-                <DashboardMap 
-                    drivers={driversWithGPS as any} 
+                <DashboardMap
+                    drivers={driversWithGPS as any}
                     allJobs={heatmapJobs}
                     activeJobs={filteredJobs}
-                    focusPosition={focusPosition} 
+                    focusPosition={focusPosition}
+                    dangerZones={dangerZones}
                 />
             </div>
         </div>

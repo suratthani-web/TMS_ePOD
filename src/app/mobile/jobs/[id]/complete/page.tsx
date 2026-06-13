@@ -17,6 +17,7 @@ import html2canvas from "html2canvas"
 import { analyzePODImage, AIAnalysisResult } from "@/lib/utils/ai-verification"
 import { saveJobOffline, blobToB64 } from "@/lib/utils/offline-storage"
 import { QuantityStepper } from "@/components/mobile/quantity-stepper"
+import { notifyTrackingStateChanged } from "@/lib/tracking-state"
 
 export default function JobCompletePage() {
   const router = useRouter()
@@ -149,6 +150,8 @@ export default function JobCompletePage() {
         if (result.success) {
             toast.success("ส่งงานเรียบร้อยแล้ว", { id: "pod-upload" })
             setCompleted(true)
+            // Delivery confirmed — stop GPS tracking for this job.
+            notifyTrackingStateChanged()
         } else {
             throw new Error(String(result.error))
         }

@@ -65,41 +65,41 @@ export function SyncManager() {
     return (
         <div className="fixed top-2 left-1/2 -translate-x-1/2 z-[60] w-[90%] max-w-sm">
             <div className={`p-3 rounded-2xl shadow-2xl border backdrop-blur-md flex items-center justify-between gap-4 transition-all duration-500 ${
-                showSuccess ? 'bg-emerald-500/90 border-emerald-400/50 text-white' : 'bg-white/90 border-gray-200 text-white'
+                showSuccess ? 'bg-emerald-500/95 border-emerald-400/50 text-white' : 'bg-card/95 border-border text-foreground'
             }`}>
-                <div className="flex items-center gap-3">
+                <div className="flex items-center gap-3 min-w-0">
                     {showSuccess ? (
-                        <CheckCircle2 className="text-white animate-in zoom-in" size={20} />
+                        <CheckCircle2 className="text-white shrink-0 animate-in zoom-in" size={20} />
                     ) : isSyncing ? (
-                        <RefreshCw className="text-emerald-500 animate-spin" size={20} />
+                        <RefreshCw className="text-primary shrink-0 animate-spin" size={20} />
                     ) : (
-                        <CloudOff className="text-amber-500" size={20} />
+                        <CloudOff className="text-amber-500 shrink-0" size={20} />
                     )}
-                    
-                    <div className="flex flex-col">
-                        <span className="text-lg font-bold font-bold uppercase tracking-wider opacity-70">
+
+                    <div className="flex flex-col min-w-0">
+                        <span className={`text-[10px] font-bold uppercase tracking-wider ${showSuccess ? 'text-white/80' : 'text-muted-foreground'}`}>
                             {showSuccess ? 'Synced' : 'Offline Sync'}
                         </span>
-                        <span className="text-xl font-medium">
-                            {showSuccess ? 'ข้อมูลถูกส่งแล้ว' : 
-                             isSyncing ? `กำลังส่งข้อมูล (${pendingCount})...` : 
+                        <span className="text-sm font-bold truncate">
+                            {showSuccess ? 'ข้อมูลถูกส่งแล้ว' :
+                             isSyncing ? `กำลังส่งข้อมูล (${pendingCount})...` :
                              `ค้างส่ง ${pendingCount} รายการ`}
                         </span>
                     </div>
                 </div>
 
                 {!showSuccess && !isSyncing && navigator.onLine && (
-                    <button 
+                    <button
                         onClick={handleSync}
-                        className="bg-emerald-600 px-3 py-1.5 rounded-lg text-lg font-bold font-bold hover:bg-blue-700 transition-colors"
+                        className="shrink-0 bg-primary text-primary-foreground px-3 py-1.5 rounded-lg text-sm font-bold hover:bg-primary/90 transition-colors"
                     >
                         ส่งตอนนี้
                     </button>
                 )}
 
                 {!showSuccess && !navigator.onLine && (
-                    <div className="flex items-center gap-1 text-base font-bold text-gray-400">
-                        <AlertCircle size={10} />
+                    <div className="shrink-0 flex items-center gap-1 text-xs font-bold text-muted-foreground">
+                        <AlertCircle size={12} />
                         รอสัญญาณ
                     </div>
                 )}

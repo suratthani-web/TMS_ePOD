@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect, useMemo } from "react"
+import { useState, useEffect } from "react"
 import { DashboardLayout } from "@/components/layout/dashboard-layout"
 import { PremiumButton } from "@/components/ui/premium-button"
 import { Input } from "@/components/ui/input"
@@ -91,16 +91,6 @@ export default function DangerZonesPage() {
             toast.success("Zone removed")
         }
     }
-
-    // Planned route for the map to show the current polygon being drawn
-    const drawingPath = useMemo(() => {
-        return currentCoords.map((c, i) => ({
-            lat: c[0],
-            lng: c[1],
-            name: `Point ${i + 1}`,
-            type: (i === 0 ? 'start' : (i === currentCoords.length - 1 ? 'end' : 'stop')) as 'start' | 'stop' | 'end'
-        }))
-    }, [currentCoords])
 
     return (
         <DashboardLayout>
@@ -245,11 +235,12 @@ export default function DangerZonesPage() {
                 <div className="flex-1 bg-background/40 backdrop-blur-3xl rounded-[3rem] border border-border/5 shadow-2xl overflow-hidden relative group">
                     <div className="absolute inset-0 pointer-events-none ring-1 ring-white/5 z-10 rounded-[3rem]" />
                     <div className="h-full w-full">
-                        <LeafletMap 
+                        <LeafletMap
                             height="100%"
                             zoom={12}
                             center={[13.7563, 100.5018]}
-                            plannedRoute={isDrawing ? drawingPath : []}
+                            dangerZones={zones.map(z => ({ id: z.Zone_ID, name: z.Zone_Name, coordinates: z.Coordinates }))}
+                            drawingPolygon={isDrawing ? currentCoords : []}
                             onMapClick={(lat, lng) => {
                                 if (isDrawing) {
                                     setCurrentCoords(prev => [...prev, [lat, lng]])
