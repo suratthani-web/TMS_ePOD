@@ -11,6 +11,15 @@ import { type DangerZone } from "./danger-zones";
 const globalZoneCache: Record<string, { zones: DangerZone[], timestamp: number }> = {};
 const ZONE_CACHE_TTL = 300000; // 5 minutes cache
 
+// Only treat a driver's last position as "live" on the map if it was reported
+// within this window. Active drivers report at least every 5 minutes (see
+// LocationTracker UPDATE_INTERVAL), so a position older than this means the
+// driver has logged out / closed the app — we should not keep pinning them.
+const LIVE_LOCATION_WINDOW_MINUTES = 30;
+function liveLocationThreshold() {
+  return new Date(Date.now() - LIVE_LOCATION_WINDOW_MINUTES * 60 * 1000).toISOString();
+}
+
 // Type matching actual Supabase schema (ProperCase columns!)
 export type GPSLog = {
   Log_ID: string;
@@ -128,13 +137,16 @@ export async function getLatestDriverLocations() {
 
     const branchId = await getUserBranchId();
 
-    // Query from the optimized Latest Locations table
+    // Query from the optimized Latest Locations table.
+    // Only return positions reported recently, so drivers who logged out or
+    // closed the app stop appearing pinned at their last location forever.
     let query = supabase
       .from("driver_latest_locations")
       .select(`
         *,
         Master_Drivers!inner ( Driver_Name, Branch_ID )
-      `);
+      `)
+      .gte("timestamp", liveLocationThreshold());
 
     // Super Admin bypass: If 'All' or no branch selected, show all
     if (branchId && branchId !== "All" && !isSuper) {
@@ -263,13 +275,16 @@ export async function getActiveFleetStatus(branchId?: string | null, customerId?
     const isSuper = await isSuperAdmin();
     const supabase = await createAdminClient();
 
-    // 1. Fetch latest positions directly from optimized table
+    // 1. Fetch latest positions directly from optimized table.
+    // Only include drivers that reported recently, so logged-out / closed-app
+    // drivers stop showing pinned at a stale location on the live map.
     let query = supabase
       .from("driver_latest_locations")
       .select(`
         *,
         Master_Drivers!inner ( Driver_Name, Mobile_No, Branch_ID )
-      `);
+      `)
+      .gte("timestamp", liveLocationThreshold());
 
     // Context filtering
     const sessionBranchId = await getUserBranchId();

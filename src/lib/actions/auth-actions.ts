@@ -211,6 +211,33 @@ export async function loginDriver(formData: FormData) {
  * RESTORED/IMPLEMENTED: Driver Logout
  */
 export async function logoutDriver() {
+  // On logout, clean up device-linked state for this driver so they don't keep
+  // showing on the live map or keep receiving push notifications afterwards.
+  // Best-effort: never let a cleanup failure block logout.
+  try {
+    const driverSession = await getDriverSession()
+    const driverId = driverSession?.driverId
+    if (driverId) {
+      const supabase = createAdminClient()
+
+      // Remove the live map pin immediately (otherwise it lingers until the
+      // recency window expires).
+      await supabase
+        .from("driver_latest_locations")
+        .delete()
+        .eq("driver_id", driverId)
+
+      // Remove push subscriptions so the server stops sending notifications
+      // (e.g. job assignments) to a logged-out device. Re-subscribes on next login.
+      await supabase
+        .from("Push_Subscriptions")
+        .delete()
+        .eq("Driver_ID", driverId)
+    }
+  } catch (err) {
+    console.error("[AUTH] Failed to clear driver device state on logout:", err)
+  }
+
   const { cookies: cookieStore } = await getCookieStore()
 
   // Clear cookie with specific options to ensure it is deleted
