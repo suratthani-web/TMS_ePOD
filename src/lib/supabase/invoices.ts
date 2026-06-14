@@ -324,7 +324,12 @@ export async function deleteInvoice(id: string) {
 
 export async function confirmInvoicePayment(id: string, type: 'Invoice' | 'BillingNote') {
     try {
-        const supabase = await createClient()
+        // Use the admin client: the app uses a custom session (not Supabase
+        // Auth), so the regular client is anon and RLS blocks the update — the
+        // row update silently affects 0 rows and .single() then errors, which is
+        // why the button appeared to "do nothing". Matches the other billing
+        // write actions (confirmInvoiceAndCreateBillingNote, voidAndReject...).
+        const supabase = createAdminClient()
         const table = type === 'Invoice' ? 'invoices' : 'Billing_Notes'
         const idField = type === 'Invoice' ? 'Invoice_ID' : 'Billing_Note_ID'
 
