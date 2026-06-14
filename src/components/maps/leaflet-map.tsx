@@ -479,14 +479,19 @@ function MovingMarker({ driver, onShowRoute }: { driver: DriverLocation, onShowR
   }, [driver.lat, driver.lng])
 
   const isSpeeding = (driver.speed || 0) * 3.6 > 90;
+  // Live trucks are highlighted; trucks that haven't reported recently fade to
+  // grey so a "last seen here" position is still visible without looking live.
+  const isAlert = isSpeeding || driver.status === 'SOS';
+  const isOffline = !isAlert && driver.status !== 'Online';
+  const accent = isAlert ? '#ef4444' : (isOffline ? '#94a3b8' : '#10b981');
 
   const driverIcon = useMemo(() => {
     return L.divIcon({
         className: 'custom-div-icon',
         html: `
-            <div class="relative flex items-center justify-center" style="width: 60px; height: 60px;">
+            <div class="relative flex items-center justify-center" style="width: 60px; height: 60px; opacity: ${isOffline ? 0.6 : 1};">
                 <!-- Speeding / SOS Alert Background -->
-                ${isSpeeding || driver.status === 'SOS' ? `
+                ${isAlert ? `
                     <div class="absolute inset-0 bg-red-500/20 rounded-full animate-ping"></div>
                     <div class="absolute inset-0 border-4 border-red-500/50 rounded-full animate-pulse"></div>
                 ` : ''}
@@ -498,14 +503,14 @@ function MovingMarker({ driver, onShowRoute }: { driver: DriverLocation, onShowR
 
                 <!-- Direction indicator -->
                 <div class="absolute" style="transform: rotate(${heading}deg) translateY(-28px);">
-                    <div class="w-0 h-0 border-l-[6px] border-l-transparent border-r-[6px] border-r-transparent border-b-[10px] ${isSpeeding ? 'border-b-red-500 shadow-[0_0_10px_rgba(239,68,68,0.8)]' : 'border-b-emerald-500 shadow-[0_0_10px_rgba(16,185,129,0.8)]'}"></div>
+                    <div class="w-0 h-0 border-l-[6px] border-l-transparent border-r-[6px] border-r-transparent border-b-[10px]" style="border-bottom-color: ${accent};"></div>
                 </div>
 
                 <!-- Marker Body -->
                 <div class="relative flex items-center justify-center p-2.5 bg-background rounded-2xl shadow-2xl border border-border/20"
-                     style="transform: rotate(${heading}deg); border-bottom: 4px solid ${isSpeeding || driver.status === 'SOS' ? '#ef4444' : '#10b981'};">
-                    
-                    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" class="${isSpeeding || driver.status === 'SOS' ? 'text-red-500' : 'text-emerald-400'}">
+                     style="transform: rotate(${heading}deg); border-bottom: 4px solid ${accent};">
+
+                    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" style="color: ${accent};">
                         <path d="M1 14H17M1 14L2 7H14L17 14M1 14V18H3M17 14V18H15M17 14H23V18H21M17 11H21L23 14M7 18C7 19.1046 6.10457 20 5 20C3.89543 20 3 19.1046 3 18C3 16.8954 3.89543 16 5 18ZM7 18C7 16.8954 7.89543 16 9 16C10.1046 16 11 16.8954 11 18M11 18C11 19.1046 10.1046 20 9 20C7.89543 20 7 19.1046 7 18ZM19 18C19 19.1046 18.1046 20 17 20C15.8954 20 15 19.1046 15 18C15 16.8954 15.8954 16 17 16C18.1046 16 19 16.8954 19 18ZM21 18C21 19.1046 20.1046 20 19 20C17.8954 20 17 19.1046 17 18" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
                     </svg>
                 </div>
@@ -520,7 +525,7 @@ function MovingMarker({ driver, onShowRoute }: { driver: DriverLocation, onShowR
         iconAnchor: [30, 30],
         popupAnchor: [0, -20]
     });
-  }, [driver.vehiclePlate, driver.status, isSpeeding, heading]);
+  }, [driver.vehiclePlate, driver.status, driver.speed, isSpeeding, isAlert, isOffline, accent, heading]);
 
   return (
     <Marker 
@@ -534,6 +539,18 @@ function MovingMarker({ driver, onShowRoute }: { driver: DriverLocation, onShowR
       </Popup>
     </Marker>
   )
+}
+
+function timeAgo(iso?: string): string {
+  if (!iso) return ''
+  const diffMs = Date.now() - new Date(iso).getTime()
+  if (isNaN(diffMs) || diffMs < 0) return 'เมื่อสักครู่'
+  const min = Math.floor(diffMs / 60000)
+  if (min < 1) return 'เมื่อสักครู่'
+  if (min < 60) return `${min} นาทีที่แล้ว`
+  const hr = Math.floor(min / 60)
+  if (hr < 24) return `${hr} ชม.ที่แล้ว`
+  return `${Math.floor(hr / 24)} วันที่แล้ว`
 }
 
 function DriverPopup({ driver, onShowRoute }: { driver: DriverLocation, onShowRoute?: (plate: string) => void }) {
@@ -586,7 +603,15 @@ function DriverPopup({ driver, onShowRoute }: { driver: DriverLocation, onShowRo
                 {address}
             </p>
         </div>
-        {driver.lastUpdate && <p className="text-gray-400 text-base font-bold mt-1 text-right">Updated: {driver.lastUpdate}</p>}
+        <div className="flex items-center justify-between gap-2 pt-1.5 mt-1 border-t border-border/10">
+            <span className="flex items-center gap-1.5 text-sm font-bold">
+                <span className="inline-block w-2 h-2 rounded-full" style={{ backgroundColor: driver.status === 'Online' ? '#10b981' : '#94a3b8' }} />
+                {driver.status === 'Online' ? 'ออนไลน์' : 'ออฟไลน์'}
+            </span>
+            {driver.lastUpdate && (
+                <span className="text-gray-400 text-sm font-bold">เจอล่าสุด {timeAgo(driver.lastUpdate)}</span>
+            )}
+        </div>
         
         {onShowRoute && driver.vehiclePlate && (
             <div className="pt-2 border-t border-border/10 mt-2">

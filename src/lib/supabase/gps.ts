@@ -11,13 +11,15 @@ import { type DangerZone } from "./danger-zones";
 const globalZoneCache: Record<string, { zones: DangerZone[], timestamp: number }> = {};
 const ZONE_CACHE_TTL = 300000; // 5 minutes cache
 
-// Only treat a driver's last position as "live" on the map if it was reported
-// within this window. Active drivers report at least every 5 minutes (see
-// LocationTracker UPDATE_INTERVAL), so a position older than this means the
-// driver has logged out / closed the app — we should not keep pinning them.
-const LIVE_LOCATION_WINDOW_MINUTES = 30;
-function liveLocationThreshold() {
-  return new Date(Date.now() - LIVE_LOCATION_WINDOW_MINUTES * 60 * 1000).toISOString();
+// How far back a driver's last position is still shown on the map. PWA drivers
+// only report while the app is foreground, so a strict "live only" window would
+// blank the map most of the time. Instead we show positions for several hours
+// and let the client grey out anyone not reporting "live" (see the client-side
+// 10-min Online/Offline check) — recent trucks are highlighted, last-seen ones
+// fade. Logout still clears the row, so this won't pin drivers forever.
+const LOCATION_DISPLAY_WINDOW_MINUTES = 360; // 6 hours
+function locationDisplayThreshold() {
+  return new Date(Date.now() - LOCATION_DISPLAY_WINDOW_MINUTES * 60 * 1000).toISOString();
 }
 
 // Type matching actual Supabase schema (ProperCase columns!)
@@ -168,7 +170,7 @@ export async function getLatestDriverLocations() {
         *,
         Master_Drivers!inner ( Driver_Name, Branch_ID )
       `)
-      .gte("timestamp", liveLocationThreshold());
+      .gte("timestamp", locationDisplayThreshold());
 
     // Super Admin bypass: If 'All' or no branch selected, show all
     if (branchId && branchId !== "All" && !isSuper) {
@@ -306,7 +308,7 @@ export async function getActiveFleetStatus(branchId?: string | null, customerId?
         *,
         Master_Drivers!inner ( Driver_Name, Mobile_No, Branch_ID )
       `)
-      .gte("timestamp", liveLocationThreshold());
+      .gte("timestamp", locationDisplayThreshold());
 
     // Context filtering
     const sessionBranchId = await getUserBranchId();
