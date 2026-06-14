@@ -4,7 +4,6 @@ import { createAdminClient } from "@/utils/supabase/server"
 import { getUserBranchId } from "@/lib/permissions"
 import { logActivity } from "@/lib/supabase/logs"
 import { revalidatePath } from "next/cache"
-import { transitionJobStatus } from "@/services/job-status-machine"
 import { requireAdmin } from "@/services/permission-guards"
 
 type InvoiceCustomerJoin = {
@@ -106,22 +105,18 @@ export async function confirmInvoiceAndCreateBillingNote(invoiceId: string) {
 
         if (upsertError) throw upsertError
 
-        // 5. Update Jobs with Billing Note ID and Status (Billed)
-        for (const job of jobs) {
-            const transition = await transitionJobStatus(job.Job_ID, 'Billed', {
-                reason: `Invoice confirmed: ${invoiceId}`,
-                notes: `Linked to Billing Note: ${billingNoteId}`
-            })
-            if (!transition.success) {
-                throw new Error(transition.message || `Unable to mark job ${job.Job_ID} as billed`)
-            }
-            
-            const { error: linkError } = await supabase
-                .from('Jobs_Main')
-                .update({ Billing_Note_ID: billingNoteId })
-                .eq('Job_ID', job.Job_ID)
-            if (linkError) throw linkError
-        }
+        // 5. Mark all linked jobs as Billed and attach the Billing Note in ONE
+        // bulk update. This previously looped per job through the status machine
+        // (~5 DB round-trips + revalidatePath x3 each); for a large invoice —
+        // e.g. 158 jobs — that ran for minutes and timed out. The jobs are
+        // already validated and priced on the invoice, so a bulk transition is
+        // safe here (price sync still happens in the data-healing step below).
+        const { error: jobsUpdateError } = await supabase
+            .from('Jobs_Main')
+            .update({ Job_Status: 'Billed', Billing_Note_ID: billingNoteId })
+            .eq('Invoice_ID', invoiceId)
+
+        if (jobsUpdateError) throw jobsUpdateError
 
         // 5.5 Data Healing: Sync ALL validated prices and JSON back to Jobs_Main for analytical integrity
         if (typedInvoice.Items_JSON && Array.isArray(typedInvoice.Items_JSON)) {
