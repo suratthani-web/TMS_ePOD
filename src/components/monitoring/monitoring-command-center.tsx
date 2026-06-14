@@ -41,6 +41,18 @@ interface Vehicle {
     max_volume_cbm: number | null
 }
 
+function timeAgoTH(iso?: string | null): string {
+    if (!iso) return ''
+    const diffMs = Date.now() - new Date(iso).getTime()
+    if (isNaN(diffMs) || diffMs < 0) return 'เมื่อสักครู่'
+    const min = Math.floor(diffMs / 60000)
+    if (min < 1) return 'เมื่อสักครู่'
+    if (min < 60) return `${min} นาทีที่แล้ว`
+    const hr = Math.floor(min / 60)
+    if (hr < 24) return `${hr} ชม.ที่แล้ว`
+    return `${Math.floor(hr / 24)} วันที่แล้ว`
+}
+
 interface MonitoringCommandCenterProps {
     initialJobs: Job[]
     initialDrivers: DriverWithGPS[]
@@ -421,6 +433,9 @@ export function MonitoringCommandCenter({
                                             <div>
                                                 <p className="text-sm font-black text-foreground uppercase">{driver.Driver_Name}</p>
                                                 <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-tight italic">{driver.Vehicle_Plate || '-'}</p>
+                                                {driver.status !== 'Online' && (driver as { Last_Update?: string | null }).Last_Update && (
+                                                    <p className="text-[9px] font-bold text-amber-500/80 normal-case tracking-normal mt-0.5">เจอล่าสุด {timeAgoTH((driver as { Last_Update?: string | null }).Last_Update)}</p>
+                                                )}
                                             </div>
                                         </div>
                                         <div className="flex flex-col items-end gap-1.5 scale-90 origin-right">
