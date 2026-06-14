@@ -72,6 +72,28 @@ export async function saveGPSLog(data: {
       return { success: false, error };
     }
 
+    // Keep the map's optimized "latest position" table in sync directly,
+    // instead of relying on the DB trigger (which silently stopped firing and
+    // froze the live map). Best-effort: never let this fail the GPS log save.
+    {
+      const nowIso = new Date().toISOString()
+      const { error: latestErr } = await supabase
+        .from("driver_latest_locations")
+        .upsert({
+          driver_id: data.driverId,
+          vehicle_plate: plate,
+          latitude: data.lat,
+          longitude: data.lng,
+          speed: data.speed,
+          job_id: data.jobId,
+          timestamp: nowIso,
+          updated_at: nowIso,
+        }, { onConflict: "driver_id" })
+      if (latestErr) {
+        console.error('[GPS] driver_latest_locations upsert failed:', latestErr.message)
+      }
+    }
+
     // --- DANGER ZONE CHECK ---
     try {
         const branchId = await getUserBranchId() || 'All';
