@@ -20,6 +20,7 @@ import { useRouter } from "next/navigation"
 import { cn } from "@/lib/utils"
 import { toast } from "sonner"
 import { notifyTrackingStateChanged } from "@/lib/tracking-state"
+import { saveJobOffline } from "@/lib/utils/offline-storage"
 import { parseISO, isAfter, startOfDay } from "date-fns"
 
 interface Destination {
@@ -89,9 +90,22 @@ export function JobActionButton({ job }: JobActionButtonProps) {
 
     setLoading(true)
     setOptimisticStatus(newStatus)
+
+    // Offline: queue the change and keep the optimistic state so the driver can
+    // keep working in dead zones; SyncManager replays it when back online.
+    if (typeof navigator !== 'undefined' && !navigator.onLine) {
+        await saveJobOffline(job.Job_ID, { status: newStatus }, 'STATUS')
+        toast.info("บันทึกแบบออฟไลน์", {
+            description: "ไม่มีสัญญาณ — ระบบจะอัปเดตสถานะให้อัตโนมัติเมื่อกลับมาออนไลน์",
+            duration: 4000
+        })
+        setLoading(false)
+        return
+    }
+
     try {
         const result = await updateJobStatus(job.Job_ID, newStatus)
-            
+
         if (!result.success) {
             toast.error(result.message)
             setOptimisticStatus(null)
@@ -102,8 +116,12 @@ export function JobActionButton({ job }: JobActionButtonProps) {
             notifyTrackingStateChanged()
         }
     } catch {
-        toast.error("เกิดข้อผิดพลาดในการอัปเดตสถานะ")
-        setOptimisticStatus(null)
+        // Network dropped mid-request → queue offline, keep the optimistic state.
+        await saveJobOffline(job.Job_ID, { status: newStatus }, 'STATUS')
+        toast.info("เน็ตไม่เสถียร บันทึกแบบออฟไลน์", {
+            description: "ระบบจะอัปเดตสถานะให้อัตโนมัติเมื่อสัญญาณกลับมา",
+            duration: 4000
+        })
     } finally {
         setLoading(false)
     }
