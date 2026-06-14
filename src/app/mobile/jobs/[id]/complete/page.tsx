@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useRef, useEffect } from "react"
+import { useState, useRef, useEffect, useMemo } from "react"
 import { useRouter, useParams } from "next/navigation"
 import { MobileHeader } from "@/components/mobile/mobile-header"
 import { Button } from "@/components/ui/button"
@@ -57,6 +57,14 @@ export default function JobCompletePage() {
           setVerificationResult(null)
       }
   }, [photos])
+
+  // Stable object URLs for the off-screen report — recreating these on every
+  // render leaks image memory and helps crash the page on iOS. Revoke on
+  // change/unmount.
+  const photoUrls = useMemo(() => photos.map(f => URL.createObjectURL(f)), [photos])
+  const signatureUrl = useMemo(() => (signature ? URL.createObjectURL(signature) : null), [signature])
+  useEffect(() => () => { photoUrls.forEach(URL.revokeObjectURL) }, [photoUrls])
+  useEffect(() => () => { if (signatureUrl) URL.revokeObjectURL(signatureUrl) }, [signatureUrl])
 
   const verifyPhoto = async (file: File) => {
       setVerifying(true)
@@ -241,15 +249,15 @@ export default function JobCompletePage() {
                  <ContainerDeliveryReport
                      ref={reportRef}
                      job={job}
-                     photos={photos.map(f => URL.createObjectURL(f))}
-                     signature={signature ? URL.createObjectURL(signature) : null}
+                     photos={photoUrls}
+                     signature={signatureUrl}
                  />
              ) : (
                  <PodReport 
                     ref={reportRef} 
                     job={job} 
-                    photos={photos.map(f => URL.createObjectURL(f))} 
-                    signature={signature ? URL.createObjectURL(signature) : null} 
+                    photos={photoUrls}
+                    signature={signatureUrl} 
                  />
              )}
           </div>
