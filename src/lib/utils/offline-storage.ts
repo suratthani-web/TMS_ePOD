@@ -1,13 +1,15 @@
 "use client"
 
 import { submitJobPOD, submitJobPickup } from "@/lib/actions/pod-actions"
+import { updateJobStatus } from "@/app/mobile/jobs/actions"
+import { notifyTrackingStateChanged } from "@/lib/tracking-state"
 
 export interface OfflineJob {
     id: string
     jobId: string
     data: Record<string, unknown>
     timestamp: number
-    type: 'POD' | 'PICKUP'
+    type: 'POD' | 'PICKUP' | 'STATUS'
     retryCount?: number
     lastError?: string
 }
@@ -41,9 +43,19 @@ const notifyQueueChange = () => {
     }
 }
 
-export const saveJobOffline = async (jobId: string, data: Record<string, unknown>, type: 'POD' | 'PICKUP' = 'POD') => {
+export const saveJobOffline = async (jobId: string, data: Record<string, unknown>, type: 'POD' | 'PICKUP' | 'STATUS' = 'POD') => {
     if (typeof window === 'undefined') return
-    
+
+    // De-dupe identical pending status transitions for the same job (e.g. the
+    // driver re-taps the same button offline after navigating away). Distinct
+    // transitions (Accepted, then Arrived Pickup) are still kept in order.
+    if (type === 'STATUS') {
+        const existing = await getOfflineJobs()
+        if (existing.some(j => j.type === 'STATUS' && j.jobId === jobId && j.data?.status === data.status)) {
+            return
+        }
+    }
+
     const enrichedData = {
         ...data,
         actualCompletionTime: new Date().toISOString()
@@ -134,11 +146,46 @@ export const removeOfflineJob = async (id: string) => {
 export const syncOfflineJobs = async () => {
     if (typeof window === 'undefined' || !navigator.onLine) return
     
-    const jobs = await getOfflineJobs()
+    // Replay in the order the driver performed them — important for stacked
+    // status transitions on the same job (e.g. Accepted before Arrived Pickup).
+    const jobs = (await getOfflineJobs()).sort((a, b) => a.timestamp - b.timestamp)
     if (jobs.length === 0) return
 
     for (const job of jobs) {
-        if ((job.retryCount || 0) >= MAX_RETRIES) continue
+        if ((job.retryCount || 0) >= MAX_RETRIES) {
+            // Status waypoints are low-stakes — give up cleanly so the queue
+            // doesn't stay stuck forever. Proof (POD/PICKUP) is kept for review.
+            if (job.type === 'STATUS') await removeOfflineJob(job.id)
+            continue
+        }
+
+        // Simple status transition (เริ่มงาน / ถึงจุดรับ / ถึงจุดส่ง)
+        if (job.type === 'STATUS') {
+            try {
+                const result = await updateJobStatus(
+                    job.jobId,
+                    String(job.data.status),
+                    job.data.driverId ? String(job.data.driverId) : undefined
+                )
+                if (result.success) {
+                    await removeOfflineJob(job.id)
+                    notifyTrackingStateChanged()
+                } else {
+                    await updateOfflineJob({
+                        ...job,
+                        retryCount: (job.retryCount || 0) + 1,
+                        lastError: result.message || 'Server rejected transition'
+                    })
+                }
+            } catch (error) {
+                await updateOfflineJob({
+                    ...job,
+                    retryCount: (job.retryCount || 0) + 1,
+                    lastError: error instanceof Error ? error.message : 'Unknown exception'
+                })
+            }
+            continue
+        }
 
         try {
             const formData = new FormData()
