@@ -34,18 +34,22 @@ export function MobileHeader({ title, showBack, rightElement }: Props) {
   const isMainTab = ['/mobile/dashboard', '/mobile/jobs', '/mobile/profile', '/mobile/login'].includes(pathname)
   const shouldShowBack = showBack !== undefined ? showBack : !isMainTab
 
-  const clearCache = () => {
+  const clearCache = async () => {
     if (!window.confirm("ล้างแคชแอปและโหลดใหม่? ใช้เมื่อแอปมีปัญหาเท่านั้น")) return
-    if ('serviceWorker' in navigator) {
-      navigator.serviceWorker.getRegistrations().then((registrations) => {
-        for (const registration of registrations) {
-          registration.unregister();
-        }
-        window.location.reload();
-      });
-    } else {
-      window.location.reload();
+    try {
+      if ('serviceWorker' in navigator) {
+        const regs = await navigator.serviceWorker.getRegistrations()
+        await Promise.all(regs.map((r) => r.unregister()))
+      }
+      // Also drop cached responses so stale pages aren't served after reload.
+      if ('caches' in window) {
+        const keys = await caches.keys()
+        await Promise.all(keys.map((k) => caches.delete(k)))
+      }
+    } catch {
+      // ignore — reload regardless
     }
+    window.location.reload()
   }
 
   return (
