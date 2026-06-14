@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useRef } from "react"
+import { useState, useRef, useEffect } from "react"
 import { Camera, X, Plus } from "lucide-react"
 import { compressImage } from "@/lib/utils/image-compression"
 
@@ -15,6 +15,11 @@ export function CameraInput({ onImagesChange, maxImages = 5 }: Props) {
   const cameraInputRef = useRef<HTMLInputElement>(null)
   const galleryInputRef = useRef<HTMLInputElement>(null)
 
+  // Revoke preview object URLs on unmount so they don't accumulate in memory.
+  const previewsRef = useRef<string[]>([])
+  useEffect(() => { previewsRef.current = previews }, [previews])
+  useEffect(() => () => { previewsRef.current.forEach(URL.revokeObjectURL) }, [])
+
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const rawFiles = Array.from(e.target.files || [])
     if (rawFiles.length === 0) return
@@ -23,18 +28,20 @@ export function CameraInput({ onImagesChange, maxImages = 5 }: Props) {
     const allowedCount = maxImages - files.length
     const toProcess = rawFiles.slice(0, allowedCount)
 
-    // Process all files using centralized compression utility
-    const compressedFiles = await Promise.all(toProcess.map(async (file) => {
+    // Compress one at a time. Compressing in parallel decodes every full-size
+    // photo at once, which spikes memory and crashes the page on iOS Safari.
+    const compressedFiles: File[] = []
+    for (const file of toProcess) {
         try {
             const blob = await compressImage(file, 1280, 1280, 0.7)
-            return new File([blob], file.name, {
+            compressedFiles.push(new File([blob], file.name, {
                 type: 'image/jpeg',
                 lastModified: Date.now(),
-            })
+            }))
         } catch {
-            return file // Fallback to original
+            compressedFiles.push(file) // Fallback to original
         }
-    }))
+    }
 
     const updatedFiles = [...files, ...compressedFiles]
     setFiles(updatedFiles)
@@ -47,9 +54,12 @@ export function CameraInput({ onImagesChange, maxImages = 5 }: Props) {
   }
 
   const removeImage = (index: number) => {
+    const removed = previews[index]
+    if (removed) URL.revokeObjectURL(removed)
+
     const newFiles = files.filter((_, i) => i !== index)
     const newPreviews = previews.filter((_, i) => i !== index)
-    
+
     setFiles(newFiles)
     setPreviews(newPreviews)
     onImagesChange(newFiles)

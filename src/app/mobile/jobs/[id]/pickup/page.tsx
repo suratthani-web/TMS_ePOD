@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useRef, useEffect } from "react"
+import { useState, useRef, useEffect, useMemo } from "react"
 import { useRouter, useParams } from "next/navigation"
 import { MobileHeader } from "@/components/mobile/mobile-header"
 import { Button } from "@/components/ui/button"
@@ -59,6 +59,19 @@ export default function JobPickupPage() {
         })
     }
   }, [params.id])
+
+  // Stable object URLs for the off-screen report — recreating these on every
+  // render leaks image memory and helps crash the page on iOS. Revoke on
+  // change/unmount.
+  const photoUrls = useMemo(() => photos.map(p => URL.createObjectURL(p)), [photos])
+  const signatureUrl = useMemo(() => (signature ? URL.createObjectURL(signature) : null), [signature])
+  const conditionPhotoUrls = useMemo(
+    () => Object.fromEntries(Object.entries(conditionPhotos).map(([k, v]) => [k, URL.createObjectURL(v)])),
+    [conditionPhotos]
+  )
+  useEffect(() => () => { photoUrls.forEach(URL.revokeObjectURL) }, [photoUrls])
+  useEffect(() => () => { if (signatureUrl) URL.revokeObjectURL(signatureUrl) }, [signatureUrl])
+  useEffect(() => () => { Object.values(conditionPhotoUrls).forEach(URL.revokeObjectURL) }, [conditionPhotoUrls])
 
   const isContainer = job?.job_type === 'container'
 
@@ -324,17 +337,15 @@ export default function JobPickupPage() {
                                 seal_no: sealNo
                             }
                         } as ContainerReportJob}
-                        photos={photos.map(p => URL.createObjectURL(p))}
-                        conditionPhotos={Object.fromEntries(
-                            Object.entries(conditionPhotos).map(([k, v]) => [k, URL.createObjectURL(v)])
-                        )}
+                        photos={photoUrls}
+                        conditionPhotos={conditionPhotoUrls}
                     />
                 ) : (
                     <PickupReport 
                         ref={reportRef} 
                         job={job} 
-                        photos={photos.map(p => URL.createObjectURL(p))} 
-                        signature={signature ? URL.createObjectURL(signature) : null}
+                        photos={photoUrls}
+                        signature={signatureUrl}
                         loadedQty={Number(loadedQty)}
                     />
                 )

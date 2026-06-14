@@ -15,13 +15,13 @@ export async function compressImage(
     quality: number = 0.7
 ): Promise<Blob> {
     return new Promise((resolve, reject) => {
-        const reader = new FileReader()
-        reader.readAsDataURL(file)
-        reader.onload = (event) => {
-            const img = new Image()
-            img.src = event.target?.result as string
-            img.onload = () => {
-                const canvas = document.createElement('canvas')
+        // Use an object URL instead of a base64 data URL — readAsDataURL holds a
+        // big base64 string of the whole file in memory on top of the decoded
+        // image, which adds up fast on memory-constrained iOS Safari.
+        const url = URL.createObjectURL(file)
+        const img = new Image()
+        img.onload = () => {
+            try {
                 let width = img.width
                 let height = img.height
 
@@ -38,8 +38,9 @@ export async function compressImage(
                     }
                 }
 
-                canvas.width = width
-                canvas.height = height
+                const canvas = document.createElement('canvas')
+                canvas.width = Math.round(width)
+                canvas.height = Math.round(height)
 
                 const ctx = canvas.getContext('2d')
                 if (!ctx) {
@@ -48,7 +49,7 @@ export async function compressImage(
                 }
 
                 // Draw image on canvas
-                ctx.drawImage(img, 0, 0, width, height)
+                ctx.drawImage(img, 0, 0, canvas.width, canvas.height)
 
                 // Export as blob
                 canvas.toBlob(
@@ -62,9 +63,13 @@ export async function compressImage(
                     'image/jpeg',
                     quality
                 )
+            } catch (e) {
+                reject(e)
+            } finally {
+                URL.revokeObjectURL(url)
             }
-            img.onerror = (err) => reject(err)
         }
-        reader.onerror = (err) => reject(err)
+        img.onerror = (err) => { URL.revokeObjectURL(url); reject(err) }
+        img.src = url
     })
 }
