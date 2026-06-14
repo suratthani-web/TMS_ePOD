@@ -6,6 +6,7 @@ import { PermissionRequester } from "@/components/mobile/permission-requester"
 import { getDriverSession } from "@/lib/actions/auth-actions"
 import { SyncManager } from "@/components/mobile/sync-manager"
 import { SessionStabilizer } from "@/components/mobile/session-stabilizer"
+import { SWUpdater } from "@/components/mobile/sw-updater"
 import { PresenceManager } from "@/components/mobile/presence-manager"
 import { RealtimeJobsTrigger } from "@/components/mobile/realtime-jobs-trigger"
 
@@ -19,6 +20,7 @@ export default async function MobileLayout({
   return (
     <div className="flex flex-col h-[100dvh] w-screen overflow-hidden bg-background text-foreground relative">
       <SyncManager />
+      <SWUpdater />
       <SessionStabilizer session={session} />
       {session && <LocationTracker driverId={session.driverId} branchId={session.branchId} />}
       {session && <PermissionRequester driverId={session.driverId} />}
