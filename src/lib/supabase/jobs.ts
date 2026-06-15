@@ -1089,7 +1089,7 @@ export async function getDriverDashboardStats(driverId: string) {
         .eq('Driver_ID', driverId)
         .neq('Job_Status', 'Cancelled')
         .neq('Job_Status', 'Draft')
-        .or(`Job_Status.not.in.(Completed,Delivered),Plan_Date.eq.${today}`)
+        .or(`Job_Status.not.in.(Completed,Complete,Delivered,Verified,Billed,Paid),Plan_Date.eq.${today}`)
         .order('Plan_Date', { ascending: true }) 
         .order('Created_At', { ascending: true }),
 
@@ -1138,7 +1138,10 @@ export async function getDriverDashboardStats(driverId: string) {
         j.Show_Price_To_Driver !== false
     ).reduce((sum: number, j: Partial<Job>) => sum + (j.Cost_Driver_Total || 0), 0) || 0) : 0
 
-    const activeJobs = jobs?.filter((j: Partial<Job>) => !['Completed', 'Delivered', 'Cancelled', 'Draft', 'Verified', 'Rejected'].includes(j.Job_Status || '')) || []
+    // "Billed"/"Paid" jobs are finished (delivered + invoiced) — they must not
+    // count as work to do. This caused a driver to see "51 งานที่ต้องทำ" when 50
+    // of them were already billed.
+    const activeJobs = jobs?.filter((j: Partial<Job>) => !['Completed', 'Complete', 'Delivered', 'Cancelled', 'Draft', 'Verified', 'Rejected', 'Billed', 'Paid'].includes(j.Job_Status || '')) || []
     const currentJob = activeJobs.length > 0 ? activeJobs[0] : null
     const totalRemaining = activeJobs.length
 
