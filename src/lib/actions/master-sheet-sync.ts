@@ -155,10 +155,24 @@ export async function appendJobToMaster(jobId: string): Promise<{ success: boole
 
     const sheets = getSheetsClient()
 
+    // Accept either a tab NAME or a gid (e.g. "gid=1430884426" copied from the
+    // sheet URL) — the Sheets API ranges need the tab name, so resolve a gid.
+    let tabName = TAB
+    const gidMatch = TAB.match(/^(?:gid=)?(\d+)$/)
+    if (gidMatch) {
+      try {
+        const meta = await sheets.spreadsheets.get({ spreadsheetId: SHEET_ID, fields: 'sheets.properties(sheetId,title)' })
+        const t = meta.data.sheets?.find(s => String(s.properties?.sheetId) === gidMatch[1])?.properties?.title
+        if (t) tabName = t
+      } catch { /* keep TAB as-is */ }
+    }
+    // Quote the tab name so names with spaces (e.g. "MASTER เดือนมกราคม") work.
+    const qtab = `'${tabName.replace(/'/g, "''")}'`
+
     // Find the header row (the one containing "วันที่") and place values by name.
     let headers: string[] = []
     try {
-      const head = await sheets.spreadsheets.values.get({ spreadsheetId: SHEET_ID, range: `${TAB}!A1:BZ3` })
+      const head = await sheets.spreadsheets.values.get({ spreadsheetId: SHEET_ID, range: `${qtab}!A1:BZ3` })
       const found = (head.data.values || []).find(r => (r || []).some(c => String(c).trim() === 'วันที่'))
       headers = (found || []).map(h => String(h || '').trim())
     } catch {
@@ -171,7 +185,7 @@ export async function appendJobToMaster(jobId: string): Promise<{ success: boole
 
     await sheets.spreadsheets.values.append({
       spreadsheetId: SHEET_ID,
-      range: `${TAB}!A:BZ`,
+      range: `${qtab}!A:BZ`,
       valueInputOption: 'USER_ENTERED',
       insertDataOption: 'INSERT_ROWS',
       requestBody: { values: [row] },
