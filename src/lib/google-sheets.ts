@@ -6,15 +6,20 @@ import { join } from 'path'
 const SCOPES = ['https://www.googleapis.com/auth/spreadsheets']
 
 /**
- * Google Sheets client authenticated with the project service account
- * (same service_account.json used by google-drive.ts). The target spreadsheet
- * must be shared with the service account email as Editor.
+ * Google Sheets client authenticated with the project service account.
+ * The target spreadsheet must be shared with the service account email as Editor.
+ *
+ * Credentials are read from the GOOGLE_SERVICE_ACCOUNT_JSON env var (the full
+ * contents of service_account.json) when present — required on Vercel, where
+ * service_account.json is gitignored and not deployed. Falls back to the local
+ * file for development.
  */
 export function getSheetsClient() {
-  const KEY_FILE_PATH = join(process.cwd(), 'service_account.json')
-  const auth = new google.auth.GoogleAuth({
-    keyFile: KEY_FILE_PATH,
-    scopes: SCOPES,
-  })
+  const raw = process.env.GOOGLE_SERVICE_ACCOUNT_JSON
+
+  const auth = raw
+    ? new google.auth.GoogleAuth({ credentials: JSON.parse(raw), scopes: SCOPES })
+    : new google.auth.GoogleAuth({ keyFile: join(process.cwd(), 'service_account.json'), scopes: SCOPES })
+
   return google.sheets({ version: 'v4', auth })
 }
