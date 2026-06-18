@@ -8,6 +8,7 @@ import { getSession } from '@/lib/session'
 
 import { transitionJobStatus } from "@/services/job-status-machine"
 import { requireAdmin } from "@/services/permission-guards"
+import { appendJobToMaster } from "@/lib/actions/master-sheet-sync"
 
 export async function verifyJob(
   jobId: string, 
@@ -60,7 +61,17 @@ export async function verifyJob(
 
     revalidatePath('/jobs/history')
     revalidatePath('/planning')
-    
+
+    // Mirror into the MASTER Google Sheet on first verification only (avoid
+    // duplicate rows on re-verify). Best-effort — never block verification.
+    if (status === 'Verified' && transition.previousStatus !== 'Verified') {
+      try {
+        await appendJobToMaster(jobId)
+      } catch (e) {
+        console.error('[verifyJob] MASTER sheet sync failed:', e)
+      }
+    }
+
     return { success: true }
   } catch (err) {
     const error = err as Error
