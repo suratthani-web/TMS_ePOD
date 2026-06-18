@@ -33,6 +33,17 @@ export function AdminVerificationDialog({ job, open, onOpenChange }: AdminVerifi
       const result = await verifyJob(job.Job_ID, status, note)
       if (result.success) {
         toast.success(status === 'Verified' ? t('verification.toast_verified') : t('verification.toast_rejected'))
+        // Surface the MASTER Google Sheet write outcome (best-effort ledger sync)
+        const sync = (result as { sheetSync?: { success: boolean; error?: string; skipped?: boolean } }).sheetSync
+        if (status === 'Verified' && sync) {
+          if (sync.skipped) {
+            toast.info('ข้ามการเขียน Google Sheet (งานนี้ถูกตรวจสอบไปแล้ว)')
+          } else if (!sync.success) {
+            toast.error('เขียน Google Sheet ไม่สำเร็จ: ' + (sync.error || 'unknown error'), { duration: 9000 })
+          } else {
+            toast.success('บันทึกลง MASTER Sheet แล้ว')
+          }
+        }
         onOpenChange(false)
       } else {
         toast.error(result.error || 'Failed to update status')
