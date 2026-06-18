@@ -63,16 +63,16 @@ export async function verifyJob(
     revalidatePath('/planning')
 
     // Mirror into the MASTER Google Sheet on first verification only (avoid
-    // duplicate rows on re-verify). Best-effort — never block verification.
-    if (status === 'Verified' && transition.previousStatus !== 'Verified') {
-      try {
-        await appendJobToMaster(jobId)
-      } catch (e) {
-        console.error('[verifyJob] MASTER sheet sync failed:', e)
-      }
+    // duplicate rows on re-verify). Best-effort — never block verification, but
+    // return the outcome so a failed ledger write isn't silent.
+    let sheetSync: { success: boolean; error?: string; skipped?: boolean } | undefined
+    if (status === 'Verified') {
+      sheetSync = transition.previousStatus === 'Verified'
+        ? { success: true, skipped: true }
+        : await appendJobToMaster(jobId)
     }
 
-    return { success: true }
+    return { success: true, sheetSync }
   } catch (err) {
     const error = err as Error
     console.error('Error in verifyJob:', error.message)
