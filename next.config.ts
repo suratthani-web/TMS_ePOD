@@ -1,21 +1,53 @@
 import type { NextConfig } from "next";
 import path from "path";
+
+type PrecacheManifestEntry = {
+  url: string;
+  revision?: string | null;
+  integrity?: string;
+};
+
 // eslint-disable-next-line @typescript-eslint/no-require-imports
-const withPWA = require("@ducanh2912/next-pwa").default({
+const nextPWA = require("@ducanh2912/next-pwa");
+const withPWA = nextPWA.default({
   dest: "public",
   disable: process.env.NODE_ENV === "development",
   register: true,
   skipWaiting: true,
   workboxOptions: {
     importScripts: ["/sw-push.js"],
-    // Exclude dynamic pages from Service Worker caching to prevent no-response errors
+    runtimeCaching: [
+      {
+        urlPattern: /\/_next\/static\/.*\.js$/i,
+        handler: "NetworkOnly",
+        options: {
+          cacheName: "next-static-js-network-only",
+        },
+      },
+      ...nextPWA.runtimeCaching.filter((entry: { options?: { cacheName?: string } }) => (
+        entry.options?.cacheName !== "next-static-js-assets" &&
+        entry.options?.cacheName !== "static-js-assets"
+      )),
+    ],
+    // Exclude app chunks from precache. They embed Server Action IDs and must
+    // stay in sync with the current server deployment.
     exclude: [
+      /\/_next\/static\/chunks\/app\/.*\.js$/i,
+      /\/_next\/static\/chunks\/(?:main|main-app|webpack|framework).*\.js$/i,
+      /static\/chunks\/app\/.*\.js$/i,
+      /static\/chunks\/(?:main|main-app|webpack|framework).*\.js$/i,
       /chat/,
       /planning/,
       /billing/,
       /drivers/,
       /dashboard/,
       /monitoring/,
+    ],
+    manifestTransforms: [
+      async (entries: PrecacheManifestEntry[]) => ({
+        manifest: entries.filter((entry) => !/^\/?_next\/static\/chunks\/.*\.js$/i.test(entry.url)),
+        warnings: [],
+      }),
     ],
   },
 });
