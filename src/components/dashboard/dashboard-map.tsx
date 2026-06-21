@@ -36,6 +36,7 @@ type RoutePoint = {
 type DashboardMapJob = {
     Job_ID: string
     Job_Status?: string | null
+    Driver_ID?: string | null
     Pickup_Lat?: number | string | null
     Pickup_Lon?: number | string | null
     Delivery_Lat?: number | string | null
@@ -51,6 +52,7 @@ type DashboardMapJob = {
 type MissionMarker = {
     id: string
     jobId: string
+    driverId?: string
     name: string
     lat: number
     lng: number
@@ -87,9 +89,10 @@ interface DashboardMapProps {
     } | null
     sosDriverIds?: (string | null)[]
     dangerZones?: { id?: string; name: string; coordinates: [number, number][] }[]
+    selectedId?: string | null
 }
 
-export function DashboardMap({ drivers, allJobs = [], activeJobs = [], focusPosition, plannedRoute, routeSummary, sosDriverIds = [], dangerZones = [] }: DashboardMapProps) {
+export function DashboardMap({ drivers, allJobs = [], activeJobs = [], focusPosition, plannedRoute, routeSummary, sosDriverIds = [], dangerZones = [], selectedId = null }: DashboardMapProps) {
     const { t } = useLanguage()
     const [currentTime, setCurrentTime] = useState<number>(0)
     
@@ -187,6 +190,7 @@ export function DashboardMap({ drivers, allJobs = [], activeJobs = [], focusPosi
                 missions.push({
                     id: `${j.Job_ID}-origin`,
                     jobId: j.Job_ID,
+                    driverId: j.Driver_ID || undefined,
                     name: oName || 'Pickup',
                     lat: finalOLat,
                     lng: finalOLng,
@@ -202,6 +206,7 @@ export function DashboardMap({ drivers, allJobs = [], activeJobs = [], focusPosi
                 missions.push({
                     id: `${j.Job_ID}-destination-${idx}`,
                     jobId: j.Job_ID,
+                    driverId: j.Driver_ID || undefined,
                     name: destinations.length > 1 ? `${dest.name} (จุดที่ ${idx + 1})` : dest.name,
                     lat: dest.lat,
                     lng: dest.lng,
@@ -212,8 +217,13 @@ export function DashboardMap({ drivers, allJobs = [], activeJobs = [], focusPosi
                 })
             })
         })
-        return missions
-    }, [activeJobs])
+
+        // Show mission markers (origin/destination + route line) ONLY for the
+        // selected job/vehicle — keeps the live map clean when many trucks run
+        // at once. Nothing selected → no mission markers shown.
+        if (!selectedId) return []
+        return missions.filter(m => m.jobId === selectedId || m.driverId === selectedId)
+    }, [activeJobs, selectedId])
 
     // Generate Profit Points for Heatmap
     const profitPoints = useMemo(() => {
