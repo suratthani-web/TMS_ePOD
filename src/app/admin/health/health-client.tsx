@@ -79,6 +79,13 @@ export function HealthClient({ initialData }: { initialData: HealthData }) {
       const res = await bypassHealthIssueAction(jobId)
       if (res.success) {
         toast.success(t('common.toast.success_edit'))
+        // Surface the MASTER Google Sheet write outcome (was previously silent here)
+        const sync = (res as { sheetSync?: { success: boolean; error?: string; skipped?: boolean } }).sheetSync
+        if (sync) {
+          if (sync.skipped) toast.info('ข้ามการเขียน Google Sheet (งานนี้ถูกตรวจสอบไปแล้ว)')
+          else if (!sync.success) toast.error('เขียน Google Sheet ไม่สำเร็จ: ' + (sync.error || 'unknown error'), { duration: 9000 })
+          else toast.success('บันทึกลง MASTER Sheet แล้ว')
+        }
         setIssues((prev) => prev.filter((i) => i.jobId !== jobId))
       } else {
         toast.error(typeof res.error === 'string' ? res.error : t('common.toast.error_save'))
