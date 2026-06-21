@@ -494,6 +494,7 @@ export function MonitoringCommandCenter({
                     activeJobs={filteredJobs}
                     focusPosition={focusPosition}
                     dangerZones={dangerZones}
+                    selectedId={selectedId}
                 />
             </div>
         </div>
