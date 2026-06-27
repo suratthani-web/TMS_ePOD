@@ -50,7 +50,7 @@ export default async function JobHistoryPage(props: Props) {
   const canExport = isAdminUser || hasExportPermission
 
   const { data: jobs, count } = jobsResult
-  const { drivers, vehicles, customers, routes } = creationData
+  const { drivers, vehicles, customers, routes, subcontractors } = creationData
 
   return (
     <DashboardLayout>
@@ -62,6 +62,7 @@ export default async function JobHistoryPage(props: Props) {
         vehicles={vehicles}
         customers={customers}
         routes={routes}
+        subcontractors={subcontractors}
         customerMode={customerMode}
         canViewPrice={canViewPrice}
         canDelete={canDelete}

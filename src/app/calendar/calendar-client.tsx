@@ -21,6 +21,7 @@ import { Vehicle } from "@/lib/supabase/vehicles"
 import { Customer } from "@/lib/supabase/customers"
 import { Route } from "@/lib/supabase/routes"
 import { Job } from "@/lib/supabase/jobs"
+import { Subcontractor } from "@/types/subcontractor"
 import { PremiumButton } from "@/components/ui/premium-button"
 import { useLanguage } from "@/components/providers/language-provider"
 import { toast } from "sonner"
@@ -45,6 +46,7 @@ interface Props {
   vehicles: Vehicle[]
   customers: Customer[]
   routes: Route[]
+  subcontractors: Subcontractor[]
 }
 
 export function CalendarClient({ 
@@ -54,7 +56,8 @@ export function CalendarClient({
   drivers,
   vehicles,
   customers,
-  routes
+  routes,
+  subcontractors
 }: Props) {
   const { t, language } = useLanguage()
   const [year, setYear] = useState(initialYear)
@@ -377,6 +380,7 @@ export function CalendarClient({
         vehicles={vehicles}
         customers={customers}
         routes={routes}
+        subcontractors={subcontractors}
         defaultDate={selectedDate || undefined}
       />
 
@@ -391,6 +395,7 @@ export function CalendarClient({
             vehicles={vehicles}
             customers={customers}
             routes={routes}
+            subcontractors={subcontractors}
             canDelete
           />
        )}
