@@ -41,6 +41,7 @@ import { Driver } from "@/lib/supabase/drivers"
 import { Vehicle } from "@/lib/supabase/vehicles"
 import { Customer } from "@/lib/supabase/customers"
 import { Route } from "@/lib/supabase/routes"
+import { Subcontractor } from "@/types/subcontractor"
 
 interface HistoryClientProps {
   jobs: Job[]
@@ -50,6 +51,7 @@ interface HistoryClientProps {
   vehicles: Vehicle[]
   customers: Customer[]
   routes: Route[]
+  subcontractors: Subcontractor[]
   customerMode: boolean
   canViewPrice: boolean
   canDelete: boolean
@@ -69,6 +71,7 @@ export function HistoryClient({
   vehicles, 
   customers, 
   routes,
+  subcontractors,
   customerMode,
   canViewPrice,
   canDelete,
@@ -519,6 +522,7 @@ export function HistoryClient({
                                             vehicles={vehicles}
                                             customers={customers}
                                             routes={routes}
+                                            subcontractors={subcontractors}
                                             canViewPrice={canViewPrice}
                                             canDelete={canDelete}
                                         />
