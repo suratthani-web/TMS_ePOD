@@ -95,29 +95,31 @@ export async function createJob(data: JobFormData) {
   let subId = data.Sub_ID || null
   
   if (data.Driver_ID) {
-    const { data: driver } = await supabase
+    const { data: driver, error: driverErr } = await supabase
       .from('Master_Drivers')
       .select('Driver_Name, Sub_ID, Show_Price_Default')
       .eq('Driver_ID', data.Driver_ID)
       .single()
-    if (driver) {
+    if (!driverErr && driver) {
       if (!driverName) driverName = driver.Driver_Name
       if (!subId) subId = driver.Sub_ID || null
-      // Default to driver preference if not explicitly set in form
       if (data.Show_Price_To_Driver === undefined) {
          data.Show_Price_To_Driver = driver.Show_Price_Default ?? true
       }
+    } else if (driverErr) {
+      console.warn('[createJob] Driver lookup failed:', driverErr.message)
     }
   }
 
   // If subId still null, try looking up via Vehicle_Plate
   if (!subId && data.Vehicle_Plate) {
-    const { data: vehicle } = await supabase
+    const { data: vehicle, error: vehicleErr } = await supabase
       .from('Master_Vehicles')
       .select('Sub_ID')
       .eq('Vehicle_Plate', data.Vehicle_Plate)
       .single()
-    if (vehicle) subId = vehicle.Sub_ID || null
+    if (!vehicleErr && vehicle) subId = vehicle.Sub_ID || null
+    else if (vehicleErr) console.warn('[createJob] Vehicle lookup failed:', vehicleErr.message)
   }
 
   // Get Pricing from Engine
@@ -132,6 +134,12 @@ export async function createJob(data: JobFormData) {
   const { error: error1 } = await supabase.from('Jobs_Main').insert(payload)
   
   if (!error1) {
+      // Save Container Data if applicable — rollback job if container save fails
+      const containerResult = await handleContainerData(supabase, data.Job_ID, data, true)
+      if (!containerResult.success) {
+        return { success: false, message: `ข้อมูลตู้บันทึกไม่สำเร็จ งานถูกยกเลิก: ${containerResult.error}` }
+      }
+
       // Send notifications - ONLY if NOT a draft
       if (data.Job_Status !== 'Draft') {
           if (data.Driver_ID) {
@@ -142,9 +150,6 @@ export async function createJob(data: JobFormData) {
       }
 
       revalidatePath('/planning')
-      
-      // Save Container Data if applicable
-      await handleContainerData(supabase, data.Job_ID, data)
 
       return { success: true, message: 'Job created successfully' }
   }
@@ -155,6 +160,11 @@ export async function createJob(data: JobFormData) {
       const { error: error2 } = await supabase.from('Jobs_Main').insert(buildInsertPayload({ ...data, Job_ID: newId }, driverName, subId, pricing.unitPrice))
       
       if (!error2) {
+          const containerResult2 = await handleContainerData(supabase, newId, data, true)
+          if (!containerResult2.success) {
+            return { success: false, message: `ข้อมูลตู้บันทึกไม่สำเร็จ งานถูกยกเลิก: ${containerResult2.error}` }
+          }
+
           if (data.Job_Status !== 'Draft') {
               if (data.Driver_ID) {
                   try { await notifyDriverNewJob(data.Driver_ID, newId, data.Customer_Name || 'ไม่ระบุ') } catch (e) { console.error(e) }
@@ -162,9 +172,6 @@ export async function createJob(data: JobFormData) {
                   try { await notifyMarketplaceNewJob(newId, data.Customer_Name || 'ไม่ระบุ') } catch (e) { console.error(e) }
               }
           }
-
-          // Save Container Data if applicable
-          await handleContainerData(supabase, newId, data)
 
           revalidatePath('/planning')
           revalidatePath('/dashboard')
@@ -230,8 +237,13 @@ function buildInsertPayload(data: JobFormData, driverName: string, subId: string
   }
 }
 
-async function handleContainerData(supabase: Awaited<ReturnType<typeof createAdminClient>>, jobId: string, data: JobFormData) {
-  if (data.job_type !== 'container') return
+async function handleContainerData(
+  supabase: Awaited<ReturnType<typeof createAdminClient>>,
+  jobId: string,
+  data: JobFormData,
+  rollbackOnFail = false
+): Promise<{ success: boolean; error?: string }> {
+  if (data.job_type !== 'container') return { success: true }
 
   const containerData = {
     job_id: jobId,
@@ -254,7 +266,17 @@ async function handleContainerData(supabase: Awaited<ReturnType<typeof createAdm
     .from('jobs_container')
     .upsert(containerData, { onConflict: 'job_id' })
 
-  if (error) console.error('[CONTAINER_ERROR] Failed to save container data:', error)
+  if (error) {
+    console.error('[CONTAINER_ERROR] Failed to save container data:', error)
+    if (rollbackOnFail) {
+      // Remove the main job to keep data consistent
+      await supabase.from('Jobs_Main').delete().eq('Job_ID', jobId)
+      console.error('[CONTAINER_ROLLBACK] Deleted Jobs_Main row for:', jobId)
+    }
+    return { success: false, error: error.message }
+  }
+
+  return { success: true }
 }
 
 /**
@@ -610,12 +632,34 @@ export async function createBulkJobs(
       return cleanJob
   })
 
-  const { error } = await supabase
+  // Check for duplicate Job_IDs before inserting to avoid silent overwrites
+  const incomingIds = jobsMainData.map(j => j.Job_ID).filter(Boolean)
+  const { data: existingJobs } = await supabase
     .from('Jobs_Main')
-    .upsert(jobsMainData, { onConflict: 'Job_ID' })
+    .select('Job_ID')
+    .in('Job_ID', incomingIds)
 
-  if (error) {
-    return { success: false, message: `Failed to import: ${error.message}` }
+  const existingIds = new Set((existingJobs || []).map((j: { Job_ID: string }) => j.Job_ID))
+  const duplicateIds = incomingIds.filter((id): id is string => !!id && existingIds.has(id))
+
+  const newJobs = jobsMainData.filter(j => !existingIds.has(j.Job_ID as string))
+  const updateJobs = jobsMainData.filter(j => existingIds.has(j.Job_ID as string))
+
+  // Insert new jobs only (no silent overwrite)
+  if (newJobs.length > 0) {
+    const { error: insertErr } = await supabase.from('Jobs_Main').insert(newJobs)
+    if (insertErr) return { success: false, message: `Failed to import: ${insertErr.message}` }
+  }
+
+  // Update existing jobs explicitly (auditable)
+  if (updateJobs.length > 0) {
+    for (const job of updateJobs) {
+      const { error: updateErr } = await supabase
+        .from('Jobs_Main')
+        .update(job)
+        .eq('Job_ID', job.Job_ID)
+      if (updateErr) console.warn(`[BULK_IMPORT] Failed to update existing job ${job.Job_ID}:`, updateErr.message)
+    }
   }
 
   // Save Container Data for each job (if applicable)
@@ -714,9 +758,14 @@ export async function createBulkJobs(
   const uniqueDates = Array.from(new Set((finalizedData as Partial<JobFormData>[]).map((j: Partial<JobFormData>) => j.Plan_Date))).filter(Boolean)
   const dateStr = uniqueDates.length === 1 ? ` for ${uniqueDates[0]}` : ""
   
-  return { 
-    success: true, 
-    message: `Successfully imported ${finalizedData.length} jobs${dateStr}` 
+  const dupNote = duplicateIds.length > 0
+    ? ` (อัปเดต ${duplicateIds.length} รายการที่มีอยู่แล้ว: ${duplicateIds.slice(0, 3).join(', ')}${duplicateIds.length > 3 ? '...' : ''})`
+    : ''
+
+  return {
+    success: true,
+    message: `นำเข้าสำเร็จ ${finalizedData.length} งาน${dateStr}${dupNote}`,
+    duplicateIds: duplicateIds.length > 0 ? duplicateIds : undefined
   }
 }
 
@@ -740,25 +789,28 @@ export async function updateJob(jobId: string, data: Partial<JobFormData>) {
   
   // Update Driver Name and Sub_ID if Driver_ID specifically changes
   if (data.Driver_ID) {
-    const { data: driver } = await supabase
+    const { data: driver, error: driverErr } = await supabase
       .from('Master_Drivers')
       .select('Driver_Name, Sub_ID')
       .eq('Driver_ID', data.Driver_ID)
       .single()
-    if (driver) {
+    if (!driverErr && driver) {
        updateData.Driver_Name = driver.Driver_Name
        if (!updateData.Sub_ID) updateData.Sub_ID = driver.Sub_ID || null
+    } else if (driverErr) {
+      console.warn('[updateJob] Driver lookup failed:', driverErr.message)
     }
   }
 
   // Also check Vehicle_Plate for Sub_ID if still not present
   if (!updateData.Sub_ID && data.Vehicle_Plate) {
-    const { data: vehicle } = await supabase
+    const { data: vehicle, error: vehicleErr } = await supabase
       .from('Master_Vehicles')
       .select('Sub_ID')
       .eq('Vehicle_Plate', data.Vehicle_Plate)
       .single()
-    if (vehicle) updateData.Sub_ID = vehicle.Sub_ID || null
+    if (!vehicleErr && vehicle) updateData.Sub_ID = vehicle.Sub_ID || null
+    else if (vehicleErr) console.warn('[updateJob] Vehicle lookup failed:', vehicleErr.message)
   }
   
   // 1. Handle Status Transition if requested
@@ -773,19 +825,24 @@ export async function updateJob(jobId: string, data: Partial<JobFormData>) {
     delete updateData.Job_Status
   }
 
-  // 2. Pricing Engine Integration
-  if ((!updateData.Price_Cust_Total || Number(updateData.Price_Cust_Total) === 0) || (data.Loaded_Qty !== undefined)) {
-     const { data: currentJob } = await supabase
-        .from('Jobs_Main')
-        .select('*')
-        .eq('Job_ID', jobId)
-        .single()
+  // 2. Fetch current job once — used for pricing AND as optimistic-lock baseline
+  const { data: currentJob, error: fetchErr } = await supabase
+    .from('Jobs_Main')
+    .select('*')
+    .eq('Job_ID', jobId)
+    .single()
 
+  if (fetchErr || !currentJob) {
+    return { success: false, message: `Job not found: ${fetchErr?.message || jobId}` }
+  }
+
+  // 3. Pricing Engine Integration (uses fetched job as base, avoids second fetch)
+  if ((!updateData.Price_Cust_Total || Number(updateData.Price_Cust_Total) === 0) || (data.Loaded_Qty !== undefined)) {
      const pricing = await calculateJobPrice({
          ...currentJob,
          ...updateData
      })
-     
+
      if (pricing.totalPrice > 0) {
          updateData.Price_Cust_Total = pricing.totalPrice
          updateData.Price_Per_Unit = pricing.unitPrice

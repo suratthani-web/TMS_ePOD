@@ -9,6 +9,8 @@ import { getActiveFleetStatus } from "@/lib/supabase/gps"
 import { getActiveFleetAlerts } from "@/lib/actions/fleet-intelligence-actions"
 import { getESGStats } from "@/lib/supabase/esg-analytics"
 import { getAllCustomers } from "@/lib/supabase/customers"
+import { getLiveKPIData } from "@/lib/actions/kpi-live-actions"
+import { RealtimeKPIBanner } from "@/components/dashboard/realtime-kpi-banner"
 import { cookies } from "next/headers"
 import { AlertTriangle } from "lucide-react"
 import type { ComponentProps } from "react"
@@ -155,10 +157,14 @@ export async function DashboardContent({ searchParams }: DashboardContentProps) 
     )
   }
 
+  const initialKPI = await getLiveKPIData(currentBranchId).catch(() => undefined)
+
   return (
-    <DashboardClient 
-      branchId={currentBranchId || ""} 
-      customerMode={customerMode}
+    <div className="space-y-4">
+      <RealtimeKPIBanner branchId={currentBranchId} initialData={initialKPI} />
+      <DashboardClient
+        branchId={currentBranchId || ""}
+        customerMode={customerMode}
       userName={custName}
       jobStats={dailyStats}
       driverStats={driverStats}
@@ -178,5 +184,6 @@ export async function DashboardContent({ searchParams }: DashboardContentProps) 
       initialStart={start}
       initialEnd={end}
     />
+    </div>
   )
 }

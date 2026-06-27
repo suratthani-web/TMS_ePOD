@@ -386,16 +386,13 @@ export function JobDialog({
     if (show && internalMode === 'create') fetchNearby()
   }, [origins, formData.Job_ID, show, internalMode])
 
-  // AUTO-DISTANCE: Trigger calculation when endpoints have valid coordinates
+  // AUTO-DISTANCE + AUTO-OPTIMIZE: Trigger when endpoints have valid coordinates
   useEffect(() => {
     const calculateDistance = async () => {
-        // Collect all points from origins and destinations in order
         const points = [
             ...origins.filter(o => o.lat && o.lng).map(o => ({ lat: Number(o.lat), lng: Number(o.lng) })),
             ...destinations.filter(d => d.lat && d.lng).map(d => ({ lat: Number(d.lat), lng: Number(d.lng) }))
         ]
-        
-        // Only trigger if we have at least 2 valid points (one origin, one destination)
         if (points.length >= 2) {
             const dist = await getDrivingDistance(points)
             if (dist !== null) {
@@ -403,7 +400,35 @@ export function JobDialog({
             }
         }
     }
-    if (show) calculateDistance()
+
+    const autoOptimize = async () => {
+        // Auto-optimize only when 2+ destinations all have coordinates
+        const validDests = destinations.filter(d => d.lat && d.lng)
+        if (validDests.length < 2 || validDests.length !== destinations.length) return
+        const validOrigins = origins.filter(o => o.lat && o.lng)
+        if (validOrigins.length === 0) return
+
+        const points = [
+            ...origins.map(o => ({ lat: Number(o.lat), lng: Number(o.lng) })),
+            ...destinations.map(d => ({ lat: Number(d.lat), lng: Number(d.lng) }))
+        ]
+        const optimizedIndices = await optimizeRouteSequence(points)
+        if (optimizedIndices && optimizedIndices.length === points.length) {
+            const newDestinations = []
+            for (const idx of optimizedIndices) {
+                if (idx >= origins.length) {
+                    newDestinations.push(destinations[idx - origins.length])
+                }
+            }
+            setDestinations(newDestinations)
+            toast.success(language === 'th' ? 'จัดลำดับเส้นทางอัตโนมัติเรียบร้อย' : 'Route auto-optimized', { icon: '🗺️' })
+        }
+    }
+
+    if (show) {
+        calculateDistance()
+        autoOptimize()
+    }
   }, [origins, destinations, show])
 
   const handleOptimizeRoute = async () => {
@@ -1967,14 +1992,14 @@ export function JobDialog({
                                 <button
                                     type="button"
                                     onClick={() => {
-                                        if (subcontractors.length > 0 && !assignment.Sub_ID) {
-                                            updateAssignment(index, 'Sub_ID', subcontractors[0].Sub_ID)
+                                        if (!assignment.Sub_ID) {
+                                            updateAssignment(index, 'Sub_ID', subcontractors.length > 0 ? subcontractors[0].Sub_ID : 'PENDING')
                                         }
                                     }}
                                     className={cn(
                                         "flex-1 rounded-lg text-lg font-black transition-all",
-                                        assignment.Sub_ID 
-                                            ? "bg-background text-primary shadow-sm" 
+                                        assignment.Sub_ID
+                                            ? "bg-background text-primary shadow-sm"
                                             : "text-muted-foreground hover:bg-background/50"
                                     )}
                                 >
@@ -2021,7 +2046,7 @@ export function JobDialog({
                                     value={assignment.Vehicle_Plate}
                                     onChange={(val) => updateAssignment(index, 'Vehicle_Plate', val)}
                                     vehicles={vehicles.filter((v) => {
-                                        const subMatch = !assignment.Sub_ID ? (!v.Sub_ID) : v.Sub_ID === assignment.Sub_ID
+                                        const subMatch = !assignment.Sub_ID || v.Sub_ID === assignment.Sub_ID
                                         const typeMatch = !assignment.Vehicle_Type || v.Vehicle_Type === assignment.Vehicle_Type
                                         return subMatch && typeMatch
                                     })}
