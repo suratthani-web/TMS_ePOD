@@ -15,6 +15,7 @@ import { Job } from "@/lib/supabase/jobs"
 import type { JobContainer } from "@/types/database"
 import { Loader2, Box, Info, Camera, ShieldCheck, ChevronRight } from "lucide-react"
 import html2canvas from "html2canvas"
+import { withTimeout } from "@/lib/utils/with-timeout"
 import { QuantityStepper } from "@/components/mobile/quantity-stepper"
 import { Label } from "@/components/ui/label"
 import { cn } from "@/lib/utils"
@@ -129,14 +130,15 @@ export default function JobPickupPage() {
         // 1. Capture Report
         if (reportRef.current && job) {
             try {
-                const canvas = await html2canvas(reportRef.current, {
+                // Cap html2canvas — it can hang indefinitely on iOS WebViews.
+                const canvas = await withTimeout(html2canvas(reportRef.current, {
                     scale: 1, // Keep memory low — scale>1 on retina iOS crashes the WebView
                     useCORS: true,
                     logging: false,
                     windowWidth: 800
-                })
-                
-                const reportBlob = await new Promise<Blob | null>(resolve => 
+                }), 25000, 'pickup report capture')
+
+                const reportBlob = await new Promise<Blob | null>(resolve =>
                     canvas.toBlob(resolve, 'image/jpeg', 0.8)
                 )
                 
@@ -164,8 +166,9 @@ export default function JobPickupPage() {
             if (loadedQty) formData.append("loaded_qty", loadedQty)
         }
         
-        const result = await submitJobPickup(params.id, formData)
-        
+        // Cap the round-trip so a stalled iOS connection can't hang the spinner.
+        const result = await withTimeout(submitJobPickup(params.id, formData), 120000, 'pickup upload')
+
         if (result.success) {
             toast.success("บันทึกข้อมูลเรียบร้อยแล้ว", { id: "pickup-upload" })
             setCompleted(true)

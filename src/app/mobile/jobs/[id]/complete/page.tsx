@@ -16,6 +16,7 @@ import { Job } from "@/lib/supabase/jobs"
 import html2canvas from "html2canvas"
 import { analyzePODImage, AIAnalysisResult } from "@/lib/utils/ai-verification"
 import { saveJobOffline, blobToB64 } from "@/lib/utils/offline-storage"
+import { withTimeout } from "@/lib/utils/with-timeout"
 import { QuantityStepper } from "@/components/mobile/quantity-stepper"
 import { notifyTrackingStateChanged } from "@/lib/tracking-state"
 
@@ -138,8 +139,10 @@ export default function JobCompletePage() {
                 }
             }
 
-            const reportBlob = await captureReport()
-            if (reportBlob && reportBlob.size > 5000) { 
+            // Best-effort: never let html2canvas hang the submit on iOS — cap it
+            // and proceed without the report if it stalls or fails.
+            const reportBlob = await withTimeout(captureReport(), 25000, 'report capture').catch(() => null)
+            if (reportBlob && reportBlob.size > 5000) {
                 formData.append("pod_report", reportBlob, isContainer ? `Container_Delivery_Report_${params.id}.jpg` : `POD_Report_${params.id}.jpg`)
             }
         }
@@ -153,7 +156,11 @@ export default function JobCompletePage() {
             formData.append("job_type", "container")
         }
         
-        const result = await submitJobPOD(params.id, formData)
+        // Cap the round-trip so a stalled iOS connection can't hang the spinner
+        // forever. On timeout we throw → fall to the offline-save path, which is
+        // the right behaviour for a genuinely stuck network. If the request did
+        // land, the offline replay de-dupes via the server-side proof check.
+        const result = await withTimeout(submitJobPOD(params.id, formData), 120000, 'POD upload')
 
         if (result.success) {
             toast.success("ส่งงานเรียบร้อยแล้ว", { id: "pod-upload" })
@@ -184,7 +191,11 @@ export default function JobCompletePage() {
             // Try one last time to capture report for offline if needed
             if (reportRef.current && job) {
                 try {
-                    const canvas = await html2canvas(reportRef.current!, { scale: 1, useCORS: true })
+                    const canvas = await withTimeout(
+                        html2canvas(reportRef.current!, { scale: 1, useCORS: true }),
+                        15000,
+                        'offline report capture'
+                    )
                     reportB64 = canvas.toDataURL('image/jpeg', 0.6)
                 } catch { /* Fail silently */ }
             }
