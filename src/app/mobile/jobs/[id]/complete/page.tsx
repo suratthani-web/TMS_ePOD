@@ -154,17 +154,28 @@ export default function JobCompletePage() {
         }
         
         const result = await submitJobPOD(params.id, formData)
-        
+
         if (result.success) {
             toast.success("ส่งงานเรียบร้อยแล้ว", { id: "pod-upload" })
             setCompleted(true)
             // Delivery confirmed — stop GPS tracking for this job.
             notifyTrackingStateChanged()
-        } else {
-            throw new Error(String(result.error))
+            return
         }
+
+        // The request reached the server and was rejected (status guard,
+        // validation, upload failure, etc.). This is NOT a connectivity problem:
+        // queuing it offline would replay the same rejection forever and falsely
+        // show the driver a green "success" screen while nothing was saved.
+        // Surface the real error so they can correct it and retry.
+        toast.error(String(result.error) || "ส่งงานไม่สำเร็จ กรุณาลองใหม่", {
+            id: "pod-upload",
+            description: "ข้อมูลยังไม่ถูกบันทึก กรุณาตรวจสอบและลองอีกครั้ง"
+        })
     } catch (error) {
-        console.error("POD Background failure, saving to IndexedDB:", error)
+        // Only genuine network failures throw (the server action never completed
+        // a round-trip). These are safe to queue offline for auto-retry.
+        console.error("POD network failure, saving to IndexedDB:", error)
         try {
             const photoB64s = await Promise.all(photos.map(p => blobToB64(p)))
             const sigB64 = signature ? await blobToB64(signature) : null
