@@ -13,7 +13,9 @@ import { TRACKING_EVENT, readCachedActiveJob, writeCachedActiveJob } from "@/lib
 const BackgroundGeolocation = registerPlugin<BackgroundGeolocationPlugin>('BackgroundGeolocation')
 
 const UPDATE_INTERVAL = 300000 // Update every 5 minutes
-const MIN_DISTANCE = 0.0002 // Approx 20-30 meters
+const MIN_DISTANCE = 0.0005 // Approx 50 meters — each move past this writes a GPS
+                            // log (a server action). 50m keeps a usable trail
+                            // while roughly halving writes vs the old ~20-30m.
 
 export function LocationTracker({ driverId }: { driverId?: string, branchId?: string }) {
   const [status, setStatus] = useState<"idle" | "tracking" | "error">("idle")
@@ -116,7 +118,7 @@ export function LocationTracker({ driverId }: { driverId?: string, branchId?: st
               backgroundMessage: "กำลังบันทึกตำแหน่งสำหรับการส่งงานของคุณในเบื้องหลัง",
               requestPermissions: true,
               stale: false,
-              distanceFilter: 20 // Update position every 20 meters
+              distanceFilter: 50 // Update position every 50 meters (fewer GPS-log writes)
             },
             (position: any, err: any) => {
               if (err) {
