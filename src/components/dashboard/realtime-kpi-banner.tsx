@@ -5,7 +5,8 @@ import { getLiveKPIData, LiveKPIData } from "@/lib/actions/kpi-live-actions"
 import { Activity, TrendingUp, TrendingDown, AlertTriangle, CheckCircle2, Clock, RefreshCw, Minus } from "lucide-react"
 import { cn } from "@/lib/utils"
 
-const POLL_INTERVAL = 30_000 // 30 seconds
+const POLL_INTERVAL = 90_000 // 90 seconds — KPIs for daily logistics don't move
+                             // fast enough to justify 30s server-side aggregation.
 
 function fmt(n: number) {
   if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`
@@ -41,8 +42,24 @@ export function RealtimeKPIBanner({ branchId, initialData }: Props) {
 
   useEffect(() => {
     if (!initialData) refresh()
-    const id = setInterval(refresh, POLL_INTERVAL)
-    return () => clearInterval(id)
+
+    // Only poll while the tab is actually being watched. A dashboard left open
+    // in a background tab was aggregating KPIs server-side every 30s around the
+    // clock — the single biggest waste of the Fluid Active-CPU quota. Pause when
+    // hidden, and refresh immediately when the operator returns to the tab.
+    let id: ReturnType<typeof setInterval> | null = null
+    const start = () => { if (id === null) id = setInterval(refresh, POLL_INTERVAL) }
+    const stop = () => { if (id !== null) { clearInterval(id); id = null } }
+
+    const onVisibility = () => {
+      if (document.visibilityState === "visible") { refresh(); start() }
+      else stop()
+    }
+
+    if (document.visibilityState === "visible") start()
+    document.addEventListener("visibilitychange", onVisibility)
+
+    return () => { stop(); document.removeEventListener("visibilitychange", onVisibility) }
   }, [refresh, initialData])
 
   if (loading) {

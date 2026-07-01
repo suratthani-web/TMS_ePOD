@@ -47,17 +47,21 @@ export default function MobileChatPage() {
     init()
   }, [router])
 
-  // 3. Polling Fallback — refresh every 8s in case Realtime is not working 
-  // (Supabase Realtime may not fire inside Android WebView)
+  // 3. Polling Fallback — a safety net for when Realtime doesn't fire inside an
+  // Android WebView. Realtime already delivers foreground messages instantly, so
+  // this only needs to be an occasional catch-up: every 25s, and never while the
+  // app is backgrounded (drivers keep the app open all day for GPS, so an 8s
+  // poll here was a steady drain on the Fluid Active-CPU quota for nothing).
   useEffect(() => {
     if (!driverId) return
     const poll = setInterval(async () => {
+      if (document.visibilityState !== "visible") return
       const latest = await getChatHistory(driverId)
       setMessages(prev => {
         if (latest.length !== prev.length) return latest
         return prev
       })
-    }, 8000)
+    }, 25000)
     return () => clearInterval(poll)
   }, [driverId])
 
