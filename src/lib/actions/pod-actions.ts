@@ -98,8 +98,13 @@ export async function submitJobPOD(jobId: string, formData: FormData) {
         .eq("Job_ID", jobId)
         .single()
 
-    const loadedQty = Number(formData.get("loaded_qty") || 0)
-    
+    // Quantity precedence: the number entered at delivery wins; if the driver
+    // leaves it blank, fall back to the quantity captured at pickup instead of
+    // overwriting it with 0 (which used to zero out the price).
+    const enteredQty = Number(formData.get("loaded_qty") || 0)
+    const pickupQty = Number(jobData?.Loaded_Qty || 0)
+    const loadedQty = enteredQty > 0 ? enteredQty : pickupQty
+
     // Use Centralized Pricing Engine
     const pricing = await calculateJobPrice({
         ...jobData,

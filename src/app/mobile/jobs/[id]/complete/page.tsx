@@ -107,6 +107,17 @@ export default function JobCompletePage() {
         return
     }
 
+    // Warn if the delivery count differs from what was recorded at pickup.
+    // (Blank at delivery is fine — the server keeps the pickup quantity.)
+    const pickupQty = Number(job?.Loaded_Qty || 0)
+    if (!isContainer && loadedQty && pickupQty > 0 && Number(loadedQty) !== pickupQty) {
+        const ok = confirm(
+            `จำนวนตอนส่ง (${loadedQty}) ไม่ตรงกับตอนรับ (${pickupQty})\n\n` +
+            `ระบบจะใช้จำนวนตอนส่ง (${loadedQty}) เป็นหลัก\nยืนยันหรือไม่?`
+        )
+        if (!ok) return
+    }
+
     setLoading(true)
     toast.info("กำลังประมวลผลและอัปโหลดหลักฐาน...", { id: "pod-upload" })
     
@@ -342,11 +353,17 @@ export default function JobCompletePage() {
                 {!isContainer && job && job.Price_Per_Unit && Number(job.Price_Per_Unit) > 0 && (
                 <section>
                     <h2 className="text-muted-foreground font-bold mb-2">2. ยืนยันจำนวนที่ส่งจริง</h2>
-                    <QuantityStepper 
+                    <QuantityStepper
                         value={loadedQty}
                         onChange={setLoadedQty}
                         label="ระบุจำนวนที่ส่งมอบจริง (ชิ้น)"
                     />
+                    {Number(job.Loaded_Qty) > 0 && (
+                        <p className="text-xs text-muted-foreground mt-2">
+                            จำนวนตอนรับสินค้า: <span className="font-semibold text-foreground">{Number(job.Loaded_Qty)}</span> ชิ้น
+                            {" — "}เว้นว่างไว้ได้หากส่งครบเท่าเดิม
+                        </p>
+                    )}
                 </section>
                 )}
 
