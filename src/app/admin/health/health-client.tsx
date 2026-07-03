@@ -62,6 +62,9 @@ export function HealthClient({ initialData }: { initialData: HealthData }) {
       if (res.success) {
         toast.success(t('common.toast.success_edit'))
         setIssues((prev) => prev.filter((i) => i.jobId !== jobId))
+      } else if (res.result && res.result.totalPrice <= 0) {
+        // Pricing engine couldn't find a rate — tell the admin the real cause
+        toast.error(`ยิงค์ราคาไม่ได้: ${res.result.reason || 'ไม่พบเรทราคาของลูกค้า/เส้นทางนี้'} — กรุณาตรวจสอบตารางราคา หรือกดปล่อยผ่านหากเป็นงานแถม`)
       } else {
         toast.error(t('common.toast.error_save'))
       }

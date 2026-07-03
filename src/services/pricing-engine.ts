@@ -110,6 +110,13 @@ export async function syncJobPrice(jobId: string): Promise<{ success: boolean; r
 
   const result = await calculateJobPrice(job);
 
+  // No usable rate found — writing 0 back would report "success" while the
+  // job stays broken (the health issue immediately reappears). Return the
+  // engine's reason instead so the admin knows to fix the rate master data.
+  if (!result.totalPrice || result.totalPrice <= 0) {
+    return { success: false, result };
+  }
+
   const { error: updateError } = await supabase
     .from('Jobs_Main')
     .update({
