@@ -342,6 +342,17 @@ export async function confirmInvoicePayment(id: string, type: 'Invoice' | 'Billi
 
         if (error) throw error
 
+        // Close the loop: move the linked jobs from 'Billed' to 'Paid' so job
+        // status reflects that payment was received (previously jobs stayed
+        // 'Billed' forever, so reports couldn't tell paid from unpaid work).
+        const jobLink = type === 'Invoice' ? 'Invoice_ID' : 'Billing_Note_ID'
+        const { error: jobsError } = await supabase
+            .from('Jobs_Main')
+            .update({ Job_Status: 'Paid' })
+            .eq(jobLink, id)
+            .eq('Job_Status', 'Billed')
+        if (jobsError) console.error(`[confirmInvoicePayment] failed to mark jobs Paid:`, jobsError)
+
         await logActivity({
             module: 'Billing',
             action_type: 'UPDATE',

@@ -193,12 +193,16 @@ export async function voidAndRejectInvoice(invoiceId: string) {
     try {
         const supabase = await createAdminClient()
 
-        // 1. Unlink Jobs first (Safety first)
+        // 1. Unlink Jobs AND revert their status so they can be billed again.
+        // Previously only the links were cleared while Job_Status stayed 'Billed',
+        // leaving the jobs orphaned — invisible to the billable-jobs list and
+        // impossible to re-invoice (lost revenue).
         const { error: unlinkError } = await supabase
             .from('Jobs_Main')
-            .update({ 
+            .update({
                 Invoice_ID: null,
-                Billing_Note_ID: null 
+                Billing_Note_ID: null,
+                Job_Status: 'Completed'
             })
             .eq('Invoice_ID', invoiceId)
 
