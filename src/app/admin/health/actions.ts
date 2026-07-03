@@ -45,17 +45,28 @@ export async function syncHealthJobPrice(jobId: string) {
   return res
 }
 
-export async function runMasterBackfillAction() {
-  await requireAdmin()
-  const { backfillMasterSheet } = await import("@/lib/actions/master-sheet-sync")
-  return await backfillMasterSheet()
+function validateDateRange(startDate: string, endDate: string) {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(startDate) || !/^\d{4}-\d{2}-\d{2}$/.test(endDate)) {
+    return 'รูปแบบวันที่ต้องเป็น YYYY-MM-DD'
+  }
+  if (startDate > endDate) return 'วันที่เริ่มต้องไม่เกินวันที่สิ้นสุด'
+  return null
 }
 
-export async function runVerifyBackfillHistoricalAction(endDate: string) {
+export async function runMasterBackfillAction(startDate: string, endDate: string) {
   await requireAdmin()
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(endDate)) return { success: false, error: 'รูปแบบวันที่ต้องเป็น YYYY-MM-DD' }
+  const validationError = validateDateRange(startDate, endDate)
+  if (validationError) return { success: false, error: validationError }
+  const { backfillMasterSheet } = await import("@/lib/actions/master-sheet-sync")
+  return await backfillMasterSheet(startDate, endDate)
+}
+
+export async function runVerifyBackfillHistoricalAction(startDate: string, endDate: string) {
+  await requireAdmin()
+  const validationError = validateDateRange(startDate, endDate)
+  if (validationError) return { success: false, error: validationError }
   const { verifyAndBackfillHistorical } = await import("@/lib/actions/master-sheet-sync")
-  return await verifyAndBackfillHistorical(endDate)
+  return await verifyAndBackfillHistorical(endDate, startDate)
 }
 
 export async function bypassHealthIssueAction(jobId: string, reason?: string) {

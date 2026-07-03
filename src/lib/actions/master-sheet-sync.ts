@@ -10,6 +10,7 @@ const TAB = process.env.MASTER_SHEET_TAB || 'สยามรุ่งเรื�
 
 type ExtraCost = { type?: string; charge_cust?: number | string; cost_driver?: number | string }
 type MasterJob = Record<string, unknown>
+type LegacyLedgerRow = { rowNumber: number; date: string; fingerprint: string }
 
 // Keyword groups → the fixed MASTER charge columns (decision D).
 // Anything not matching a group falls into "อื่นๆ" / "อื่นๆรถร่วม".
@@ -156,6 +157,17 @@ function jobLegacyFingerprint(job: MasterJob): string {
   })
 }
 
+function columnLetter(index: number): string {
+  let value = index + 1
+  let result = ''
+  while (value > 0) {
+    value--
+    result = String.fromCharCode(65 + (value % 26)) + result
+    value = Math.floor(value / 26)
+  }
+  return result
+}
+
 /**
  * Read identifiers already present in the ledger. Older rows have no Job_ID,
  * so retain a per-date count for those rows; this lets a one-time migration
@@ -170,6 +182,7 @@ async function readLedgerState(
   jobIds: Set<string>
   legacyRowsByDate: Map<string, number>
   legacyFingerprints: Map<string, number>
+  legacyRows: LegacyLedgerRow[]
 }> {
   const dateIndex = order.indexOf('วันที่')
   const jobIdIndex = order.indexOf('รหัสสร้างาน')
@@ -185,8 +198,9 @@ async function readLedgerState(
   const jobIds = new Set<string>()
   const legacyRowsByDate = new Map<string, number>()
   const legacyFingerprints = new Map<string, number>()
+  const legacyRows: LegacyLedgerRow[] = []
   const valueAt = (row: unknown[], header: string) => row[order.indexOf(header)]
-  for (const row of existing.data.values || []) {
+  for (const [offset, row] of (existing.data.values || []).entries()) {
     const jobId = String(row[jobIdIndex] || '').trim()
     if (jobId) {
       jobIds.add(jobId)
@@ -206,9 +220,51 @@ async function readLedgerState(
         subcontractorPrice: valueAt(row, 'ราคารถร่วม'),
       })
       legacyFingerprints.set(fingerprint, (legacyFingerprints.get(fingerprint) || 0) + 1)
+      legacyRows.push({ rowNumber: headerRow + 1 + offset, date, fingerprint })
     }
   }
-  return { jobIds, legacyRowsByDate, legacyFingerprints }
+  return { jobIds, legacyRowsByDate, legacyFingerprints, legacyRows }
+}
+
+async function fillLegacyJobIds(
+  sheets: SheetsClient,
+  qtab: string,
+  order: string[],
+  jobs: MasterJob[],
+  ledger: Awaited<ReturnType<typeof readLedgerState>>
+): Promise<number> {
+  const jobIdIndex = order.indexOf('รหัสสร้างาน')
+  if (jobIdIndex < 0 || ledger.legacyRows.length === 0) return 0
+
+  const availableByFingerprint = new Map<string, string[]>()
+  for (const job of jobs) {
+    const jobId = String(job.Job_ID || '').trim()
+    if (!jobId || ledger.jobIds.has(jobId)) continue
+    const fingerprint = jobLegacyFingerprint(job)
+    const ids = availableByFingerprint.get(fingerprint) || []
+    ids.push(jobId)
+    availableByFingerprint.set(fingerprint, ids)
+  }
+
+  const jobIdColumn = columnLetter(jobIdIndex)
+  const updates: { range: string; values: string[][] }[] = []
+  for (const row of ledger.legacyRows) {
+    const ids = availableByFingerprint.get(row.fingerprint)
+    const jobId = ids?.shift()
+    if (!jobId) continue
+    updates.push({ range: `${qtab}!${jobIdColumn}${row.rowNumber}`, values: [[jobId]] })
+  }
+
+  for (let i = 0; i < updates.length; i += 500) {
+    await sheets.spreadsheets.values.batchUpdate({
+      spreadsheetId: SHEET_ID,
+      requestBody: {
+        valueInputOption: 'RAW',
+        data: updates.slice(i, i + 500),
+      },
+    })
+  }
+  return updates.length
 }
 
 function jobsMissingFromLedger(
@@ -370,7 +426,7 @@ const BILLING_LOCKED = ['Billed', 'Paid'] // keep Job_Status; only flag verifica
 export async function verifyAndBackfillHistorical(
   endDate: string,
   startDate?: string
-): Promise<{ success: boolean; verified?: number; appended?: number; error?: string }> {
+): Promise<{ success: boolean; verified?: number; appended?: number; jobIdsFilled?: number; error?: string }> {
   try {
     if (!/^\d{4}-\d{2}-\d{2}$/.test(endDate) || (startDate && !/^\d{4}-\d{2}-\d{2}$/.test(startDate))) {
       return { success: false, error: 'Date range must use YYYY-MM-DD' }
@@ -430,6 +486,7 @@ export async function verifyAndBackfillHistorical(
     const sheets = getSheetsClient()
     const { qtab, order, headerRow } = await resolveOrder(sheets)
     const ledger = await readLedgerState(sheets, qtab, order, headerRow)
+    const jobIdsFilled = await fillLegacyJobIds(sheets, qtab, order, jobs, ledger)
     const missingJobs = jobsMissingFromLedger(
       jobs,
       ledger.jobIds,
@@ -464,16 +521,16 @@ export async function verifyAndBackfillHistorical(
       const { error } = await supabase.from('Jobs_Main')
         .update({ Job_Status: 'Verified', Verification_Status: 'Verified', Verified_By: 'backfill', Verified_At: now })
         .in('Job_ID', ids)
-      if (error) return { success: false, appended: rows.length, error: error.message }
+      if (error) return { success: false, appended: rows.length, jobIdsFilled, error: error.message }
     }
     for (const ids of chunk(toFlagOnly, 400)) {
       const { error } = await supabase.from('Jobs_Main')
         .update({ Verification_Status: 'Verified', Verified_By: 'backfill', Verified_At: now })
         .in('Job_ID', ids)
-      if (error) return { success: false, appended: rows.length, error: error.message }
+      if (error) return { success: false, appended: rows.length, jobIdsFilled, error: error.message }
     }
 
-    return { success: true, verified: toVerifyStatus.length + toFlagOnly.length, appended: rows.length }
+    return { success: true, verified: toVerifyStatus.length + toFlagOnly.length, appended: rows.length, jobIdsFilled }
   } catch (err) {
     const msg = err instanceof Error ? err.message : 'Unknown error'
     console.error('[MASTER_SHEET] historical backfill failed:', msg)
@@ -482,23 +539,36 @@ export async function verifyAndBackfillHistorical(
 }
 
 /**
- * Backfill: append ALL already-verified jobs to the MASTER tab in one batch.
- * Intended for a fresh/empty tab. Reads headers once and builds every row in
- * memory, then appends in chunks to stay within Sheets/Vercel limits.
+ * Backfill already-verified jobs in an optional date range. Existing rows are
+ * reconciled first, so this is safe to re-run and can also populate Job_ID on
+ * exact legacy matches.
  */
-export async function backfillMasterSheet(): Promise<{ success: boolean; count?: number; error?: string }> {
+export async function backfillMasterSheet(
+  startDate?: string,
+  endDate?: string
+): Promise<{ success: boolean; count?: number; jobIdsFilled?: number; error?: string }> {
   try {
+    if ((startDate && !/^\d{4}-\d{2}-\d{2}$/.test(startDate)) || (endDate && !/^\d{4}-\d{2}-\d{2}$/.test(endDate))) {
+      return { success: false, error: 'Date range must use YYYY-MM-DD' }
+    }
+    if (startDate && endDate && startDate > endDate) {
+      return { success: false, error: 'Start date must not be after end date' }
+    }
+
     const supabase = createAdminClient()
     const PAGE = 1000
     const jobs: MasterJob[] = []
     for (let from = 0; ; from += PAGE) {
-      const { data, error } = await supabase
+      let query = supabase
         .from('Jobs_Main')
         .select('*')
         .eq('Verification_Status', 'Verified')
         .order('Plan_Date', { ascending: true })
         .order('Job_ID', { ascending: true })
         .range(from, from + PAGE - 1)
+      if (startDate) query = query.gte('Plan_Date', startDate)
+      if (endDate) query = query.lte('Plan_Date', endDate)
+      const { data, error } = await query
       if (error) return { success: false, error: error.message }
       if (!data || data.length === 0) break
       jobs.push(...data)
@@ -508,12 +578,20 @@ export async function backfillMasterSheet(): Promise<{ success: boolean; count?:
     if (jobs.length === 0) return { success: true, count: 0 }
 
     const sheets = getSheetsClient()
-    const { qtab, order } = await resolveOrder(sheets)
+    const { qtab, order, headerRow } = await resolveOrder(sheets)
+    const ledger = await readLedgerState(sheets, qtab, order, headerRow)
+    const jobIdsFilled = await fillLegacyJobIds(sheets, qtab, order, jobs, ledger)
+    const missingJobs = jobsMissingFromLedger(
+      jobs,
+      ledger.jobIds,
+      ledger.legacyRowsByDate,
+      ledger.legacyFingerprints
+    )
 
     // Fuel price is keyed by date — cache so we don't refetch per row.
     const fuelCache = new Map<string, number | ''>()
     const rows: (string | number)[][] = []
-    for (const job of jobs) {
+    for (const job of missingJobs) {
       const dateKey = String(job.Plan_Date || '').slice(0, 10)
       let fuel = fuelCache.get(dateKey)
       if (fuel === undefined) {
@@ -535,7 +613,7 @@ export async function backfillMasterSheet(): Promise<{ success: boolean; count?:
       })
     }
 
-    return { success: true, count: rows.length }
+    return { success: true, count: rows.length, jobIdsFilled }
   } catch (err) {
     const msg = err instanceof Error ? err.message : 'Unknown error'
     console.error('[MASTER_SHEET] backfill failed:', msg)
