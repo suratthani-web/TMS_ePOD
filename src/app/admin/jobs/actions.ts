@@ -7,6 +7,7 @@ import { getSession } from '@/lib/session'
 
 import { type JobStatus, transitionJobStatus } from "@/services/job-status-machine"
 import { timeTH, dateKeyTH } from "@/lib/utils/date-th"
+import { appendJobToMaster } from "@/lib/actions/master-sheet-sync"
 
 const JOB_STATUSES: readonly JobStatus[] = [
   'Draft',
@@ -100,9 +101,16 @@ export async function adminUpdateJobStatus(jobId: string, newStatus: string, not
       await supabase.from('Jobs_Main').update(updateData).eq('Job_ID', jobId)
   }
 
+  // Mirror into the MASTER Google Sheet on first verification, matching
+  // verifyJob() so every path to 'Verified' writes the ledger row (a manual
+  // status change here previously skipped it, leaving the sheet incomplete).
+  if (newStatus === 'Verified' && transition.previousStatus !== 'Verified') {
+      await appendJobToMaster(jobId).catch(() => { /* best-effort, never block */ })
+  }
+
   revalidatePath(`/admin/jobs/${jobId}`)
   revalidatePath('/planning')
-  
+
   return { success: true, message: 'Job status updated successfully' }
 }
 

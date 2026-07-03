@@ -6,7 +6,7 @@ import { getFuelPriceNumber } from '@/lib/actions/fuel-actions'
 
 // Test sheet by default; set MASTER_SHEET_ID to swap to the real one.
 const SHEET_ID = process.env.MASTER_SHEET_ID || '1PELYgiHBeIuweu64cctWV3kK0LIyIBqednrsUx5maWg'
-const TAB = process.env.MASTER_SHEET_TAB || 'MASTER'
+const TAB = process.env.MASTER_SHEET_TAB || 'สยามรุ่งเรือง'
 
 type ExtraCost = { type?: string; charge_cust?: number | string; cost_driver?: number | string }
 
@@ -63,30 +63,46 @@ function n(v: number): number | '' {
   return v ? v : ''
 }
 
-/**
- * Append one verified job as a row to the MASTER tab of the Google Sheet.
- * Best-effort: returns {success,error} and never throws.
- * Column order matches the live MASTER tab (29 columns, A..AC).
- */
-export async function appendJobToMaster(jobId: string): Promise<{ success: boolean; error?: string }> {
-  try {
-    const supabase = createAdminClient()
-    const { data: job, error } = await supabase
-      .from('Jobs_Main')
-      .select('*')
-      .eq('Job_ID', jobId)
-      .single()
+// Fixed order, used only if the header row can't be read from the sheet.
+const FALLBACK_ORDER = [
+  'วันที่', 'รหัสลูกค้า', 'ลูกค้า', 'ประเภทรถลูกค้า', 'จำนวนสินค้าลูกค้า', 'ต้นทางลูกค้า', 'ปลายทางลูกค้า',
+  'ระยะทางไป-กลับลูกค้า', 'ราคาน้ำมันลูกค้า', 'ราคาลูกค้า', 'ค่าขึ้นชั้นลูกค้า', 'ย้ายลูกค้า', 'ค่าส่งต่อ',
+  'เพิ่ม นน.', 'ตีกลับลูกค้า', 'อื่นๆ', 'รวมลูกค้า', 'ทะเบียนรถร่วม', 'ชื่อรถร่วม', 'ประเภทรถรถร่วม',
+  'ต้นทางรถร่วม', 'ปลายทางรถร่วม', 'ราคาน้ำมัน', 'ราคารถร่วม', 'ค่าขึ้นชั้นรถร่วม', 'ย้ายรถร่วม',
+  'อื่นๆรถร่วม', 'ตีกลับรถร่วม', 'รวมรถร่วม',
+]
 
-    if (error || !job) return { success: false, error: 'Job not found' }
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type SheetsClient = ReturnType<typeof getSheetsClient>
 
-    const extras = parseExtras(job.extra_costs_json)
-
-    // Decision C: fuel price for the job's date (blank if unavailable)
-    let fuel: number | '' = ''
+// Resolve the tab name (accepting a gid) and read the header row once, so a
+// batch backfill doesn't repeat this per row.
+async function resolveOrder(sheets: SheetsClient): Promise<{ qtab: string; order: string[] }> {
+  let tabName = TAB
+  const gidMatch = TAB.match(/^(?:gid=)?(\d+)$/)
+  if (gidMatch) {
     try {
-      const fp = await getFuelPriceNumber(String(job.Plan_Date || '').slice(0, 10) || undefined)
-      fuel = fp ?? ''
-    } catch { fuel = '' }
+      const meta = await sheets.spreadsheets.get({ spreadsheetId: SHEET_ID, fields: 'sheets.properties(sheetId,title)' })
+      const t = meta.data.sheets?.find(s => String(s.properties?.sheetId) === gidMatch[1])?.properties?.title
+      if (t) tabName = t
+    } catch { /* keep TAB as-is */ }
+  }
+  const qtab = `'${tabName.replace(/'/g, "''")}'`
+
+  let headers: string[] = []
+  try {
+    const head = await sheets.spreadsheets.values.get({ spreadsheetId: SHEET_ID, range: `${qtab}!A1:BZ3` })
+    const found = (head.data.values || []).find(r => (r || []).some(c => String(c).trim() === 'วันที่'))
+    headers = (found || []).map(h => String(h || '').trim())
+  } catch { /* fall back to fixed order */ }
+
+  return { qtab, order: headers.length > 0 ? headers : FALLBACK_ORDER }
+}
+
+// Build the MASTER row for a job, keyed by column header name.
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function buildRowValues(job: any, fuel: number | ''): Record<string, string | number> {
+    const extras = parseExtras(job.extra_costs_json)
 
     // Customer-side charges
     const custLabor = sumByKeywords(extras, 'charge_cust', CHARGE_GROUPS.labor)
@@ -144,43 +160,25 @@ export async function appendJobToMaster(jobId: string): Promise<{ success: boole
       'รวมรถร่วม': n(subTotal),
     }
 
-    // Fixed order, used only if the header row can't be read from the sheet.
-    const FALLBACK_ORDER = [
-      'วันที่', 'รหัสลูกค้า', 'ลูกค้า', 'ประเภทรถลูกค้า', 'จำนวนสินค้าลูกค้า', 'ต้นทางลูกค้า', 'ปลายทางลูกค้า',
-      'ระยะทางไป-กลับลูกค้า', 'ราคาน้ำมันลูกค้า', 'ราคาลูกค้า', 'ค่าขึ้นชั้นลูกค้า', 'ย้ายลูกค้า', 'ค่าส่งต่อ',
-      'เพิ่ม นน.', 'ตีกลับลูกค้า', 'อื่นๆ', 'รวมลูกค้า', 'ทะเบียนรถร่วม', 'ชื่อรถร่วม', 'ประเภทรถรถร่วม',
-      'ต้นทางรถร่วม', 'ปลายทางรถร่วม', 'ราคาน้ำมัน', 'ราคารถร่วม', 'ค่าขึ้นชั้นรถร่วม', 'ย้ายรถร่วม',
-      'อื่นๆรถร่วม', 'ตีกลับรถร่วม', 'รวมรถร่วม',
-    ]
+    return byName
+}
 
+/**
+ * Append one verified job as a row to the MASTER tab of the Google Sheet.
+ * Best-effort: returns {success,error} and never throws.
+ */
+export async function appendJobToMaster(jobId: string): Promise<{ success: boolean; error?: string }> {
+  try {
+    const supabase = createAdminClient()
+    const { data: job, error } = await supabase.from('Jobs_Main').select('*').eq('Job_ID', jobId).single()
+    if (error || !job) return { success: false, error: 'Job not found' }
+
+    let fuel: number | '' = ''
+    try { fuel = (await getFuelPriceNumber(String(job.Plan_Date || '').slice(0, 10) || undefined)) ?? '' } catch { fuel = '' }
+
+    const byName = buildRowValues(job, fuel)
     const sheets = getSheetsClient()
-
-    // Accept either a tab NAME or a gid (e.g. "gid=1430884426" copied from the
-    // sheet URL) — the Sheets API ranges need the tab name, so resolve a gid.
-    let tabName = TAB
-    const gidMatch = TAB.match(/^(?:gid=)?(\d+)$/)
-    if (gidMatch) {
-      try {
-        const meta = await sheets.spreadsheets.get({ spreadsheetId: SHEET_ID, fields: 'sheets.properties(sheetId,title)' })
-        const t = meta.data.sheets?.find(s => String(s.properties?.sheetId) === gidMatch[1])?.properties?.title
-        if (t) tabName = t
-      } catch { /* keep TAB as-is */ }
-    }
-    // Quote the tab name so names with spaces (e.g. "MASTER เดือนมกราคม") work.
-    const qtab = `'${tabName.replace(/'/g, "''")}'`
-
-    // Find the header row (the one containing "วันที่") and place values by name.
-    let headers: string[] = []
-    try {
-      const head = await sheets.spreadsheets.values.get({ spreadsheetId: SHEET_ID, range: `${qtab}!A1:BZ3` })
-      const found = (head.data.values || []).find(r => (r || []).some(c => String(c).trim() === 'วันที่'))
-      headers = (found || []).map(h => String(h || '').trim())
-    } catch {
-      // fall back to fixed order
-    }
-
-    const order = headers.length > 0 ? headers : FALLBACK_ORDER
-    // Unknown columns (e.g. ones added later) get an empty value, not a crash.
+    const { qtab, order } = await resolveOrder(sheets)
     const row = order.map(h => byName[h] ?? '')
 
     await sheets.spreadsheets.values.append({
@@ -195,6 +193,144 @@ export async function appendJobToMaster(jobId: string): Promise<{ success: boole
   } catch (err) {
     const msg = err instanceof Error ? err.message : 'Unknown error'
     console.error('[MASTER_SHEET] append failed:', msg)
+    return { success: false, error: msg }
+  }
+}
+
+// Job statuses that represent finished/delivered work (eligible for the
+// historical verification backfill). Cancelled/Draft/in-progress are excluded.
+const DONE_STATUSES = ['Completed', 'Complete', 'Delivered', 'Finished', 'Closed', 'Billed', 'Paid', 'Verified']
+const BILLING_LOCKED = ['Billed', 'Paid'] // keep Job_Status; only flag verification
+
+/**
+ * ONE-TIME historical backfill: for every finished job on/before `endDate`,
+ * mark it Verified (Job_Status -> 'Verified' unless already Billed/Paid) and
+ * write it to the MASTER tab. Intended for a fresh tab.
+ */
+export async function verifyAndBackfillHistorical(
+  endDate: string
+): Promise<{ success: boolean; verified?: number; appended?: number; error?: string }> {
+  try {
+    const supabase = createAdminClient()
+    const { data: jobs, error } = await supabase
+      .from('Jobs_Main')
+      .select('*')
+      .lte('Plan_Date', endDate)
+      .in('Job_Status', DONE_STATUSES)
+      .order('Plan_Date', { ascending: true })
+      .limit(5000)
+
+    if (error) return { success: false, error: error.message }
+    if (!jobs || jobs.length === 0) return { success: true, verified: 0, appended: 0 }
+
+    // Split the not-yet-verified jobs: billing-locked ones keep their status,
+    // the rest move to Job_Status='Verified'.
+    const now = new Date().toISOString()
+    const toVerifyStatus: string[] = [] // -> Job_Status='Verified'
+    const toFlagOnly: string[] = []     // -> Verification only
+    for (const job of jobs) {
+      if (job.Verification_Status === 'Verified') continue
+      if (BILLING_LOCKED.includes(job.Job_Status)) toFlagOnly.push(job.Job_ID)
+      else toVerifyStatus.push(job.Job_ID)
+    }
+
+    const chunk = <T,>(arr: T[], size: number) =>
+      Array.from({ length: Math.ceil(arr.length / size) }, (_, i) => arr.slice(i * size, i * size + size))
+
+    for (const ids of chunk(toVerifyStatus, 400)) {
+      await supabase.from('Jobs_Main')
+        .update({ Job_Status: 'Verified', Verification_Status: 'Verified', Verified_By: 'backfill', Verified_At: now })
+        .in('Job_ID', ids)
+    }
+    for (const ids of chunk(toFlagOnly, 400)) {
+      await supabase.from('Jobs_Main')
+        .update({ Verification_Status: 'Verified', Verified_By: 'backfill', Verified_At: now })
+        .in('Job_ID', ids)
+    }
+
+    // Write EVERY finished job in range to MASTER (verification change doesn't
+    // affect the financial row values).
+    const sheets = getSheetsClient()
+    const { qtab, order } = await resolveOrder(sheets)
+    const fuelCache = new Map<string, number | ''>()
+    const rows: (string | number)[][] = []
+    for (const job of jobs) {
+      const dateKey = String(job.Plan_Date || '').slice(0, 10)
+      let fuel = fuelCache.get(dateKey)
+      if (fuel === undefined) {
+        try { fuel = (await getFuelPriceNumber(dateKey || undefined)) ?? '' } catch { fuel = '' }
+        fuelCache.set(dateKey, fuel)
+      }
+      rows.push(order.map(h => buildRowValues(job, fuel as number | '')[h] ?? ''))
+    }
+    for (let i = 0; i < rows.length; i += 500) {
+      await sheets.spreadsheets.values.append({
+        spreadsheetId: SHEET_ID,
+        range: `${qtab}!A:BZ`,
+        valueInputOption: 'USER_ENTERED',
+        insertDataOption: 'INSERT_ROWS',
+        requestBody: { values: rows.slice(i, i + 500) },
+      })
+    }
+
+    return { success: true, verified: toVerifyStatus.length + toFlagOnly.length, appended: rows.length }
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : 'Unknown error'
+    console.error('[MASTER_SHEET] historical backfill failed:', msg)
+    return { success: false, error: msg }
+  }
+}
+
+/**
+ * Backfill: append ALL already-verified jobs to the MASTER tab in one batch.
+ * Intended for a fresh/empty tab. Reads headers once and builds every row in
+ * memory, then appends in chunks to stay within Sheets/Vercel limits.
+ */
+export async function backfillMasterSheet(): Promise<{ success: boolean; count?: number; error?: string }> {
+  try {
+    const supabase = createAdminClient()
+    const { data: jobs, error } = await supabase
+      .from('Jobs_Main')
+      .select('*')
+      .eq('Verification_Status', 'Verified')
+      .order('Plan_Date', { ascending: true })
+      .limit(5000)
+
+    if (error) return { success: false, error: error.message }
+    if (!jobs || jobs.length === 0) return { success: true, count: 0 }
+
+    const sheets = getSheetsClient()
+    const { qtab, order } = await resolveOrder(sheets)
+
+    // Fuel price is keyed by date — cache so we don't refetch per row.
+    const fuelCache = new Map<string, number | ''>()
+    const rows: (string | number)[][] = []
+    for (const job of jobs) {
+      const dateKey = String(job.Plan_Date || '').slice(0, 10)
+      let fuel = fuelCache.get(dateKey)
+      if (fuel === undefined) {
+        try { fuel = (await getFuelPriceNumber(dateKey || undefined)) ?? '' } catch { fuel = '' }
+        fuelCache.set(dateKey, fuel)
+      }
+      const byName = buildRowValues(job, fuel)
+      rows.push(order.map(h => byName[h] ?? ''))
+    }
+
+    // Append in chunks of 500 rows.
+    for (let i = 0; i < rows.length; i += 500) {
+      await sheets.spreadsheets.values.append({
+        spreadsheetId: SHEET_ID,
+        range: `${qtab}!A:BZ`,
+        valueInputOption: 'USER_ENTERED',
+        insertDataOption: 'INSERT_ROWS',
+        requestBody: { values: rows.slice(i, i + 500) },
+      })
+    }
+
+    return { success: true, count: rows.length }
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : 'Unknown error'
+    console.error('[MASTER_SHEET] backfill failed:', msg)
     return { success: false, error: msg }
   }
 }

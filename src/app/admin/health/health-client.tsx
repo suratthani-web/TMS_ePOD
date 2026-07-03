@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react"
 import type { ReconcileIssue } from "@/services/billing-reconciliation"
 import type { HealthIssue } from "@/services/operations-health"
-import { syncHealthJobPrice, getAdminHealthData, bypassHealthIssueAction } from "./actions"
+import { syncHealthJobPrice, getAdminHealthData, bypassHealthIssueAction, runMasterBackfillAction, runVerifyBackfillHistoricalAction } from "./actions"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -31,6 +31,7 @@ export function HealthClient({ initialData }: { initialData: HealthData }) {
   const [loading, setLoading] = useState(false)
   const [fixing, setFixing] = useState<string | null>(null)
   const [bypassing, setBypassing] = useState<string | null>(null)
+  const [backfilling, setBackfilling] = useState(false)
   
   const [branchId, setBranchId] = useState(initialData.branchId)
   const [customerId, setCustomerId] = useState(initialData.customerId || 'All')
@@ -166,6 +167,60 @@ export function HealthClient({ initialData }: { initialData: HealthData }) {
             <Button variant="outline" size="sm" onClick={() => fetchHealth()} disabled={loading} className="font-bold uppercase tracking-widest text-[10px] h-10 px-4">
                 {loading ? <Loader2 className="w-3 h-3 animate-spin mr-2" /> : <RefreshCcw className="w-3 h-3 mr-2" />}
                 {t('common.sync_active')}
+            </Button>
+
+            <Button
+                variant="outline"
+                size="sm"
+                onClick={async () => {
+                    if (!confirm("ดึงงานที่ตรวจสอบแล้วทั้งหมดไปใส่แท็บ MASTER (สยามรุ่งเรือง)?\nควรใช้กับแท็บใหม่/ว่างเท่านั้น เพื่อกันแถวซ้ำ")) return
+                    setBackfilling(true)
+                    try {
+                        const res = await runMasterBackfillAction()
+                        if (res.success) toast.success(`เขียนลง MASTER Sheet แล้ว ${res.count ?? 0} รายการ`)
+                        else toast.error("Backfill ไม่สำเร็จ: " + (res.error || "unknown"), { duration: 9000 })
+                    } catch (e) {
+                        toast.error("Backfill error: " + (e instanceof Error ? e.message : String(e)))
+                    } finally {
+                        setBackfilling(false)
+                    }
+                }}
+                disabled={backfilling}
+                className="font-bold uppercase tracking-widest text-[10px] h-10 px-4"
+            >
+                {backfilling ? <Loader2 className="w-3 h-3 animate-spin mr-2" /> : <FileWarning className="w-3 h-3 mr-2" />}
+                Backfill MASTER
+            </Button>
+
+            <Button
+                variant="outline"
+                size="sm"
+                onClick={async () => {
+                    const endDate = prompt(
+                        "ใส่ Verified ให้งานที่ส่งเสร็จทั้งหมด ตั้งแต่งานแรกถึงวันที่ (YYYY-MM-DD)\nแล้วเขียนลงแท็บ MASTER (สยามรุ่งเรือง)\n\nใช้กับแท็บใหม่/ว่างเท่านั้น",
+                        "2026-06-30"
+                    )
+                    if (!endDate) return
+                    setBackfilling(true)
+                    try {
+                        const res = await runVerifyBackfillHistoricalAction(endDate.trim())
+                        if (res.success) {
+                            toast.success(`ตั้ง Verified ${res.verified ?? 0} งาน และเขียนลง MASTER ${res.appended ?? 0} แถว`)
+                            fetchHealth()
+                        } else {
+                            toast.error("ไม่สำเร็จ: " + (res.error || "unknown"), { duration: 9000 })
+                        }
+                    } catch (e) {
+                        toast.error("Error: " + (e instanceof Error ? e.message : String(e)))
+                    } finally {
+                        setBackfilling(false)
+                    }
+                }}
+                disabled={backfilling}
+                className="font-bold uppercase tracking-widest text-[10px] h-10 px-4 border-amber-500/50 text-amber-600 hover:bg-amber-50"
+            >
+                {backfilling ? <Loader2 className="w-3 h-3 animate-spin mr-2" /> : <ShieldAlert className="w-3 h-3 mr-2" />}
+                Verify + Backfill ย้อนหลัง
             </Button>
         </div>
       </div>

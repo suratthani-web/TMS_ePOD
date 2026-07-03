@@ -45,6 +45,19 @@ export async function syncHealthJobPrice(jobId: string) {
   return res
 }
 
+export async function runMasterBackfillAction() {
+  await requireAdmin()
+  const { backfillMasterSheet } = await import("@/lib/actions/master-sheet-sync")
+  return await backfillMasterSheet()
+}
+
+export async function runVerifyBackfillHistoricalAction(endDate: string) {
+  await requireAdmin()
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(endDate)) return { success: false, error: 'รูปแบบวันที่ต้องเป็น YYYY-MM-DD' }
+  const { verifyAndBackfillHistorical } = await import("@/lib/actions/master-sheet-sync")
+  return await verifyAndBackfillHistorical(endDate)
+}
+
 export async function bypassHealthIssueAction(jobId: string, reason?: string) {
   await requireAdmin()
   // Use 'Verified' status to effectively bypass and dismiss from health checks.
