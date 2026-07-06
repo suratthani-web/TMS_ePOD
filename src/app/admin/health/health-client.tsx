@@ -7,8 +7,11 @@ import { syncHealthJobPrice, getAdminHealthData, bypassHealthIssueAction, runMas
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { AlertCircle, CheckCircle, RefreshCcw, Loader2, ShieldAlert, FileWarning, Wallet, Check, Building, Users } from "lucide-react"
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog"
+import { AlertCircle, CheckCircle, RefreshCcw, Loader2, ShieldAlert, FileWarning, Wallet, Check, Building, Users, CalendarRange } from "lucide-react"
 import { toast } from "sonner"
 import { useLanguage } from "@/components/providers/language-provider"
 import Link from "next/link"
@@ -24,6 +27,9 @@ type HealthData = {
   isSuper: boolean
 }
 
+type BackfillMode = 'verified' | 'verify'
+const todayTH = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Bangkok' }).format(new Date())
+
 export function HealthClient({ initialData }: { initialData: HealthData }) {
   const { t } = useLanguage()
   const [issues, setIssues] = useState(initialData.issues)
@@ -32,6 +38,9 @@ export function HealthClient({ initialData }: { initialData: HealthData }) {
   const [fixing, setFixing] = useState<string | null>(null)
   const [bypassing, setBypassing] = useState<string | null>(null)
   const [backfilling, setBackfilling] = useState(false)
+  const [backfillMode, setBackfillMode] = useState<BackfillMode | null>(null)
+  const [backfillStartDate, setBackfillStartDate] = useState(`${todayTH.slice(0, 7)}-01`)
+  const [backfillEndDate, setBackfillEndDate] = useState(todayTH)
   
   const [branchId, setBranchId] = useState(initialData.branchId)
   const [customerId, setCustomerId] = useState(initialData.customerId || 'All')
@@ -92,7 +101,7 @@ export function HealthClient({ initialData }: { initialData: HealthData }) {
         // Surface the MASTER Google Sheet write outcome (was previously silent here)
         const sync = (res as { sheetSync?: { success: boolean; error?: string; skipped?: boolean } }).sheetSync
         if (sync) {
-          if (sync.skipped) toast.info('ข้ามการเขียน Google Sheet (งานนี้ถูกตรวจสอบไปแล้ว)')
+          if (sync.skipped) toast.info('ข้ามการเขียน Google Sheet (งานนี้อยู่ในชีตแล้ว)')
           else if (!sync.success) toast.error('เขียน Google Sheet ไม่สำเร็จ: ' + (sync.error || 'unknown error'), { duration: 9000 })
           else toast.success('บันทึกลง MASTER Sheet แล้ว')
         }
@@ -104,6 +113,37 @@ export function HealthClient({ initialData }: { initialData: HealthData }) {
       toast.error(t('common.toast.error_save'))
     } finally {
       setBypassing(null)
+    }
+  }
+
+  const handleBackfill = async () => {
+    if (!backfillMode) return
+    if (!backfillStartDate || !backfillEndDate) {
+      toast.error('กรุณาเลือกวันที่เริ่มและวันที่สิ้นสุด')
+      return
+    }
+    if (backfillStartDate > backfillEndDate) {
+      toast.error('วันที่เริ่มต้องไม่เกินวันที่สิ้นสุด')
+      return
+    }
+
+    setBackfilling(true)
+    try {
+      if (backfillMode === 'verified') {
+        const res = await runMasterBackfillAction(backfillStartDate, backfillEndDate)
+        if (!res.success) throw new Error(res.error || 'unknown error')
+        toast.success(`เขียนเพิ่ม ${res.count ?? 0} แถว และเติม Job ID ย้อนหลัง ${res.jobIdsFilled ?? 0} แถว`)
+      } else {
+        const res = await runVerifyBackfillHistoricalAction(backfillStartDate, backfillEndDate)
+        if (!res.success) throw new Error(res.error || 'unknown error')
+        toast.success(`ตั้ง Verified ${res.verified ?? 0} งาน · เขียนเพิ่ม ${res.appended ?? 0} แถว · เติม Job ID ${res.jobIdsFilled ?? 0} แถว`)
+        fetchHealth()
+      }
+      setBackfillMode(null)
+    } catch (e) {
+      toast.error('Backfill ไม่สำเร็จ: ' + (e instanceof Error ? e.message : String(e)), { duration: 9000 })
+    } finally {
+      setBackfilling(false)
     }
   }
 
@@ -172,19 +212,7 @@ export function HealthClient({ initialData }: { initialData: HealthData }) {
             <Button
                 variant="outline"
                 size="sm"
-                onClick={async () => {
-                    if (!confirm("ดึงงานที่ตรวจสอบแล้วทั้งหมดไปใส่แท็บ MASTER (สยามรุ่งเรือง)?\nควรใช้กับแท็บใหม่/ว่างเท่านั้น เพื่อกันแถวซ้ำ")) return
-                    setBackfilling(true)
-                    try {
-                        const res = await runMasterBackfillAction()
-                        if (res.success) toast.success(`เขียนลง MASTER Sheet แล้ว ${res.count ?? 0} รายการ`)
-                        else toast.error("Backfill ไม่สำเร็จ: " + (res.error || "unknown"), { duration: 9000 })
-                    } catch (e) {
-                        toast.error("Backfill error: " + (e instanceof Error ? e.message : String(e)))
-                    } finally {
-                        setBackfilling(false)
-                    }
-                }}
+                onClick={() => setBackfillMode('verified')}
                 disabled={backfilling}
                 className="font-bold uppercase tracking-widest text-[10px] h-10 px-4"
             >
@@ -195,27 +223,7 @@ export function HealthClient({ initialData }: { initialData: HealthData }) {
             <Button
                 variant="outline"
                 size="sm"
-                onClick={async () => {
-                    const endDate = prompt(
-                        "ใส่ Verified ให้งานที่ส่งเสร็จทั้งหมด ตั้งแต่งานแรกถึงวันที่ (YYYY-MM-DD)\nแล้วเขียนลงแท็บ MASTER (สยามรุ่งเรือง)\n\nใช้กับแท็บใหม่/ว่างเท่านั้น",
-                        "2026-06-30"
-                    )
-                    if (!endDate) return
-                    setBackfilling(true)
-                    try {
-                        const res = await runVerifyBackfillHistoricalAction(endDate.trim())
-                        if (res.success) {
-                            toast.success(`ตั้ง Verified ${res.verified ?? 0} งาน และเขียนลง MASTER ${res.appended ?? 0} แถว`)
-                            fetchHealth()
-                        } else {
-                            toast.error("ไม่สำเร็จ: " + (res.error || "unknown"), { duration: 9000 })
-                        }
-                    } catch (e) {
-                        toast.error("Error: " + (e instanceof Error ? e.message : String(e)))
-                    } finally {
-                        setBackfilling(false)
-                    }
-                }}
+                onClick={() => setBackfillMode('verify')}
                 disabled={backfilling}
                 className="font-bold uppercase tracking-widest text-[10px] h-10 px-4 border-amber-500/50 text-amber-600 hover:bg-amber-50"
             >
@@ -224,6 +232,59 @@ export function HealthClient({ initialData }: { initialData: HealthData }) {
             </Button>
         </div>
       </div>
+
+      <Dialog open={backfillMode !== null} onOpenChange={(open) => { if (!open && !backfilling) setBackfillMode(null) }}>
+        <DialogContent className="max-w-md bg-card border border-border text-foreground rounded-2xl shadow-xl">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <CalendarRange className="h-5 w-5 text-amber-500" />
+              {backfillMode === 'verify' ? 'Verify + Backfill ย้อนหลัง' : 'Backfill MASTER'}
+            </DialogTitle>
+            <DialogDescription>
+              {backfillMode === 'verify'
+                ? 'ตั้ง Verified ให้งานที่เสร็จแล้ว พร้อมเติมข้อมูลและ Job ID ลงแท็บสยามรุ่งเรือง'
+                : 'เติมเฉพาะงานที่ Verified แล้ว และใส่ Job ID ให้แถวเก่าที่จับคู่ได้แน่นอน'}
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="grid gap-4 py-2 sm:grid-cols-2">
+            <div className="space-y-2">
+              <Label htmlFor="backfill-start-date">วันที่เริ่ม</Label>
+              <Input
+                id="backfill-start-date"
+                type="date"
+                value={backfillStartDate}
+                max={backfillEndDate || undefined}
+                onChange={(e) => setBackfillStartDate(e.target.value)}
+                disabled={backfilling}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="backfill-end-date">วันที่สิ้นสุด</Label>
+              <Input
+                id="backfill-end-date"
+                type="date"
+                value={backfillEndDate}
+                min={backfillStartDate || undefined}
+                onChange={(e) => setBackfillEndDate(e.target.value)}
+                disabled={backfilling}
+              />
+            </div>
+          </div>
+
+          <div className="rounded-xl border border-amber-500/20 bg-amber-500/5 p-3 text-xs text-muted-foreground">
+            ระบบตรวจแถวเดิมก่อนเขียนทุกครั้ง จึงสามารถรันช่วงเดิมซ้ำได้โดยไม่เพิ่มงานซ้ำ
+          </div>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setBackfillMode(null)} disabled={backfilling}>ยกเลิก</Button>
+            <Button onClick={handleBackfill} disabled={backfilling || !backfillStartDate || !backfillEndDate}>
+              {backfilling ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <CalendarRange className="mr-2 h-4 w-4" />}
+              เริ่ม Backfill
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <Card className="border-t-4 border-t-destructive">

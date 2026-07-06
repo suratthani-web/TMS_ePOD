@@ -62,14 +62,15 @@ export async function verifyJob(
     revalidatePath('/jobs/history')
     revalidatePath('/planning')
 
-    // Mirror into the MASTER Google Sheet on first verification only (avoid
-    // duplicate rows on re-verify). Best-effort — never block verification, but
-    // return the outcome so a failed ledger write isn't silent.
+    // Mirror into the MASTER Google Sheet on verification. Dedup is handled by
+    // appendJobToMaster itself (skips when the Job_ID is already in the ledger),
+    // so we must NOT gate on Job_Status here: a job can be Job_Status='Verified'
+    // yet never written to the sheet (e.g. an earlier write failed, or the
+    // status was set via a bulk/override path). Best-effort — never block
+    // verification, but return the outcome so a failed ledger write isn't silent.
     let sheetSync: { success: boolean; error?: string; skipped?: boolean } | undefined
     if (status === 'Verified') {
-      sheetSync = transition.previousStatus === 'Verified'
-        ? { success: true, skipped: true }
-        : await appendJobToMaster(jobId)
+      sheetSync = await appendJobToMaster(jobId)
     }
 
     return { success: true, sheetSync }

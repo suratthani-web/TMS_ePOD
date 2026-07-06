@@ -98,9 +98,20 @@ export function AdminJobActions({ jobId, currentStatus }: Props) {
     try {
       setLoading(true)
       const result = await adminUpdateJobStatus(jobId, status, note)
-      
+
       if (result.success) {
         toast.success("Job status updated")
+        // Surface the MASTER Google Sheet write outcome (only set when Verified)
+        const sync = (result as { sheetSync?: { success: boolean; error?: string; skipped?: boolean } }).sheetSync
+        if (sync) {
+          if (sync.skipped) {
+            toast.info('ข้ามการเขียน Google Sheet (งานนี้อยู่ในชีตแล้ว)')
+          } else if (!sync.success) {
+            toast.error('เขียน Google Sheet ไม่สำเร็จ: ' + (sync.error || 'unknown error'), { duration: 9000 })
+          } else {
+            toast.success('บันทึกลง MASTER Sheet แล้ว')
+          }
+        }
         setOpen(false)
         router.refresh()
       } else {
