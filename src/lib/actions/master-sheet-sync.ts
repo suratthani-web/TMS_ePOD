@@ -67,7 +67,7 @@ function n(v: number): number | '' {
 
 // Fixed order, used only if the header row can't be read from the sheet.
 const FALLBACK_ORDER = [
-  'วันที่', 'รหัสสร้างาน', 'รหัสลูกค้า', 'ลูกค้า', 'ประเภทรถลูกค้า', 'จำนวนสินค้าลูกค้า', 'ต้นทางลูกค้า', 'ปลายทางลูกค้า',
+  'วันที่', 'รหัสสร้างงาน', 'รหัสลูกค้า', 'ลูกค้า', 'ประเภทรถลูกค้า', 'จำนวนสินค้าลูกค้า', 'ต้นทางลูกค้า', 'ปลายทางลูกค้า',
   'ระยะทางไป-กลับลูกค้า', 'ราคาน้ำมันลูกค้า', 'ราคาลูกค้า', 'ค่าขึ้นชั้นลูกค้า', 'ย้ายลูกค้า', 'ค่าส่งต่อ',
   'เพิ่ม นน.', 'ตีกลับลูกค้า', 'อื่นๆ', 'รวมลูกค้า', 'ทะเบียนรถร่วม', 'ชื่อรถร่วม', 'ประเภทรถรถร่วม',
   'ต้นทางรถร่วม', 'ปลายทางรถร่วม', 'ราคาน้ำมัน', 'ราคารถร่วม', 'ค่าขึ้นชั้นรถร่วม', 'ย้ายรถร่วม',
@@ -185,9 +185,9 @@ async function readLedgerState(
   legacyRows: LegacyLedgerRow[]
 }> {
   const dateIndex = order.indexOf('วันที่')
-  const jobIdIndex = order.indexOf('รหัสสร้างาน')
+  const jobIdIndex = order.indexOf('รหัสสร้างงาน')
   if (dateIndex < 0 || jobIdIndex < 0) {
-    throw new Error('MASTER sheet must contain วันที่ and รหัสสร้างาน columns')
+    throw new Error('MASTER sheet must contain วันที่ and รหัสสร้างงาน columns')
   }
 
   const existing = await sheets.spreadsheets.values.get({
@@ -233,7 +233,7 @@ async function fillLegacyJobIds(
   jobs: MasterJob[],
   ledger: Awaited<ReturnType<typeof readLedgerState>>
 ): Promise<number> {
-  const jobIdIndex = order.indexOf('รหัสสร้างาน')
+  const jobIdIndex = order.indexOf('รหัสสร้างงาน')
   if (jobIdIndex < 0 || ledger.legacyRows.length === 0) return 0
 
   const availableByFingerprint = new Map<string, string[]>()
@@ -338,7 +338,7 @@ function buildRowValues(job: any, fuel: number | ''): Record<string, string | nu
     // (Renaming a header is the only thing that would need a code update.)
     const byName: Record<string, string | number> = {
       'วันที่': fmtDate(job.Plan_Date),     // decision A: Plan_Date
-      'รหัสสร้างาน': job.Job_ID || '',
+      'รหัสสร้างงาน': job.Job_ID || '',
       'รหัสลูกค้า': 20,
       'ลูกค้า': job.Customer_Name || '',
       'ประเภทรถลูกค้า': job.Vehicle_Type || '',
