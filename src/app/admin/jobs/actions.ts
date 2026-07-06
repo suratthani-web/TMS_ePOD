@@ -101,17 +101,20 @@ export async function adminUpdateJobStatus(jobId: string, newStatus: string, not
       await supabase.from('Jobs_Main').update(updateData).eq('Job_ID', jobId)
   }
 
-  // Mirror into the MASTER Google Sheet on first verification, matching
-  // verifyJob() so every path to 'Verified' writes the ledger row (a manual
-  // status change here previously skipped it, leaving the sheet incomplete).
-  if (newStatus === 'Verified' && transition.previousStatus !== 'Verified') {
-      await appendJobToMaster(jobId).catch(() => { /* best-effort, never block */ })
+  // Mirror into the MASTER Google Sheet on verification, matching verifyJob().
+  // Dedup lives in appendJobToMaster (ledger check), so we don't gate on
+  // Job_Status — a force/override path can leave the job Verified without ever
+  // writing the row. Surface the outcome instead of swallowing it, so a failed
+  // ledger write isn't invisible (this path previously never warned the admin).
+  let sheetSync: { success: boolean; error?: string; skipped?: boolean } | undefined
+  if (newStatus === 'Verified') {
+      sheetSync = await appendJobToMaster(jobId)
   }
 
   revalidatePath(`/admin/jobs/${jobId}`)
   revalidatePath('/planning')
 
-  return { success: true, message: 'Job status updated successfully' }
+  return { success: true, message: 'Job status updated successfully', sheetSync }
 }
 
 export async function adminOverrideSensorVerification(jobId: string, status: 'Verified' | 'Suspect', notes: string) {

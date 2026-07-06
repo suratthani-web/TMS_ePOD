@@ -37,7 +37,7 @@ export function AdminVerificationDialog({ job, open, onOpenChange }: AdminVerifi
         const sync = (result as { sheetSync?: { success: boolean; error?: string; skipped?: boolean } }).sheetSync
         if (status === 'Verified' && sync) {
           if (sync.skipped) {
-            toast.info('ข้ามการเขียน Google Sheet (งานนี้ถูกตรวจสอบไปแล้ว)')
+            toast.info('ข้ามการเขียน Google Sheet (งานนี้อยู่ในชีตแล้ว)')
           } else if (!sync.success) {
             toast.error('เขียน Google Sheet ไม่สำเร็จ: ' + (sync.error || 'unknown error'), { duration: 9000 })
           } else {
