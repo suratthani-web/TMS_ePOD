@@ -998,6 +998,7 @@ export function JobDialog({
 
     setLoading(true)
 
+    let sheetSync: { success: boolean; error?: string; skipped?: boolean } | undefined
     try {
       // Job ID Handling: Manual or Auto-gen
       const effectiveJobId = formData.Job_ID.trim() || generateJobId()
@@ -1074,6 +1075,7 @@ export function JobDialog({
         if (!job?.Job_ID) throw new Error(t('jobs.dialog.error'))
         const result = await updateJob(job.Job_ID, updateData)
         if (!result.success) throw new Error(result.message)
+        sheetSync = (result as { sheetSync?: { success: boolean; error?: string; skipped?: boolean } }).sheetSync
       }
       
       if (stayOpen) {
@@ -1099,6 +1101,16 @@ export function JobDialog({
       }
       
       toast.success(internalMode === 'create' ? t('jobs.dialog.save_success') : t('jobs.dialog.edit_success'))
+      // Surface the MASTER Google Sheet write outcome when this edit verified the job
+      if (sheetSync) {
+        if (sheetSync.skipped) {
+          toast.info('ข้ามการเขียน Google Sheet (งานนี้อยู่ในชีตแล้ว)')
+        } else if (!sheetSync.success) {
+          toast.error('เขียน Google Sheet ไม่สำเร็จ: ' + (sheetSync.error || 'unknown error'), { duration: 9000 })
+        } else {
+          toast.success('บันทึกลง MASTER Sheet แล้ว')
+        }
+      }
       router.refresh()
     } catch (error: unknown) {
       // Submit error

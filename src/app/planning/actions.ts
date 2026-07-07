@@ -13,6 +13,8 @@ import { getCustomerId, getUserId, isCustomer, isSuperAdmin, isAdmin } from '@/l
 import { sanitizeJobData } from '@/lib/supabase/utils'
 import { getFuelPriceNumber, getSuggestedRate } from '@/lib/actions/fuel-actions'
 import { optimizeRoute, RoutePoint } from '@/lib/ai/route-optimizer'
+import { appendJobToMaster } from '@/lib/actions/master-sheet-sync'
+import { getSession } from '@/lib/session'
 
 export type JobFormData = {
   Job_ID: string
@@ -815,12 +817,24 @@ export async function updateJob(jobId: string, data: Partial<JobFormData>) {
   }
   
   // 1. Handle Status Transition if requested
+  let verifiedViaStatus = false
   if (data.Job_Status) {
     const transition = await transitionJobStatus(jobId, data.Job_Status as import("@/services/job-status-machine").JobStatus, {
       reason: 'Manual update from planning'
     })
     if (!transition.success) {
       return { success: false, message: transition.message || 'Invalid job status transition' }
+    }
+    // Changing status to 'Verified' here must mirror the verification dialog:
+    // stamp the verification fields and write the MASTER Sheet row, otherwise
+    // this edit-dialog path silently leaves the ledger (and Verification_Status)
+    // out of sync with the other verify entry points.
+    if (data.Job_Status === 'Verified') {
+      verifiedViaStatus = true
+      const session = await getSession()
+      updateData.Verification_Status = 'Verified'
+      updateData.Verified_By = session?.username || session?.userId || 'admin'
+      updateData.Verified_At = new Date().toISOString()
     }
     // Remove from updateData to prevent double update
     delete updateData.Job_Status
@@ -882,7 +896,15 @@ export async function updateJob(jobId: string, data: Partial<JobFormData>) {
     }
   })
 
-  return { success: true, message: 'Job updated successfully' }
+  // Mirror into the MASTER Google Sheet when this edit set the job to 'Verified'.
+  // Dedup lives in appendJobToMaster (ledger check), so it's safe to call every
+  // time — matching verifyJob() and adminUpdateJobStatus().
+  let sheetSync: { success: boolean; error?: string; skipped?: boolean } | undefined
+  if (verifiedViaStatus) {
+    sheetSync = await appendJobToMaster(jobId)
+  }
+
+  return { success: true, message: 'Job updated successfully', sheetSync }
 }
 
 export async function deleteJob(jobId: string) {
