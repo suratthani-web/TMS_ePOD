@@ -19,7 +19,7 @@ const log = (msg: string) => console.log(`[FUEL_SERVICE] ${msg}`)
  * Sync daily fuel prices from Kapook Gas Price website
  */
 async function fetchFromBangchak() {
-    const url = "https://www.bangchak.co.th/api/oilprice"
+    const url = "https://oil-price.bangchak.co.th/ApiOilPrice2/th"
     log(`Attempting Bangchak API: ${url}`)
 
     const controller = new AbortController()
@@ -41,23 +41,30 @@ async function fetchFromBangchak() {
         
         clearTimeout(timeoutId)
         
-        const contentType = response.headers.get('content-type')
-        if (!response.ok || !contentType?.includes('application/json')) {
+        if (!response.ok) {
             throw new Error(`Invalid response/blocked (Status: ${response.status})`)
         }
 
         const data = await response.json()
-        const oilList = data.data?.items || []
         
-        type BangchakOil = { OilName: string; PriceToday: string; PriceTomorrow: string }
+        // Parse the stringified JSON array in OilList
+        let oilList: any[] = []
+        if (Array.isArray(data) && data.length > 0) {
+            const rawOilList = data[0].OilList
+            oilList = typeof rawOilList === 'string' ? JSON.parse(rawOilList) : (rawOilList || [])
+        } else if (data && data.OilList) {
+            oilList = typeof data.OilList === 'string' ? JSON.parse(data.OilList) : (data.OilList || [])
+        }
+        
+        type BangchakOil = { OilName: string; PriceToday: number | string; PriceTomorrow: number | string }
         const standardDiesel = oilList.find((oil: BangchakOil) => oil.OilName === 'ไฮดีเซล S') 
             || oilList.find((oil: BangchakOil) => oil.OilName.includes('ดีเซล') && !oil.OilName.includes('พรีเมียม') && !oil.OilName.includes('B20'))
 
         if (!standardDiesel) throw new Error("Diesel not found in JSON")
 
         return {
-            today: parseFloat(standardDiesel.PriceToday),
-            tomorrow: parseFloat(standardDiesel.PriceTomorrow)
+            today: parseFloat(String(standardDiesel.PriceToday)),
+            tomorrow: parseFloat(String(standardDiesel.PriceTomorrow))
         }
     } catch (err: unknown) {
         log(`Bangchak Attempt Failed: ${(err as Error).message}`)
@@ -135,10 +142,9 @@ const fuelCache = new Map<string, { price: number; priceTomorrow: number | null;
 const CACHE_TTL = 5 * 60 * 1000 // 5 minutes cache for DB results
 
 /**
- * Sync daily fuel prices from multiple sources
+ * Internal helper to sync daily fuel prices without requireAdmin() check (e.g. for Cron context)
  */
-export async function syncDailyFuelPrices() {
-    await requireAdmin()
+export async function syncDailyFuelPricesInternal() {
     const now = Date.now()
     if (now - lastSyncTimestamp < SYNC_COOLDOWN) {
         // Only log if it's been at least 10 seconds since last "skipped" log to prevent spam
@@ -225,6 +231,14 @@ export async function syncDailyFuelPrices() {
         log(`Sync failed: ${(error as Error).message}`)
         return { success: false, error: (error as Error).message }
     }
+}
+
+/**
+ * Sync daily fuel prices from multiple sources
+ */
+export async function syncDailyFuelPrices() {
+    await requireAdmin()
+    return syncDailyFuelPricesInternal()
 }
 
 /**
