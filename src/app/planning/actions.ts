@@ -545,7 +545,15 @@ export async function createBulkJobs(
       Plan_Date: normalizeDate(data.Plan_Date) || todayTH(),
       Customer_ID: (data.Customer_ID as string) || customerMap.get((data.Customer_Name as string)?.toLowerCase().trim()) || null,
       Customer_Name: data.Customer_Name as string,
-      Route_Name: route?.Route_Name || (data.Route_Name as string) || 'Direct',
+      // Match the dialog's behaviour: when no master route resolves, name the
+      // route "Origin - Destination" (not the generic 'Direct') so imported
+      // drafts with origins/destinations show the real path. Only fall back to
+      // null when there's nothing to derive from.
+      Route_Name: route?.Route_Name
+        || (data.Route_Name as string)
+        || (data.Origin_Location && data.Dest_Location
+              ? `${String(data.Origin_Location).trim()} - ${String(data.Dest_Location).trim()}`
+              : null),
       Driver_ID: driverId || null,
       Driver_Name: driver?.Driver_Name || null,
       Vehicle_Plate: vehiclePlate || null,

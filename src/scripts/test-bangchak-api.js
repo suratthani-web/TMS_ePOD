@@ -10,7 +10,15 @@ async function testBangchak() {
             }
         })
         const data = await response.json()
-        const oilList = data.OilList || []
+        
+        // Parse the stringified JSON array in OilList
+        let oilList = []
+        if (Array.isArray(data) && data.length > 0) {
+            const rawOilList = data[0].OilList
+            oilList = typeof rawOilList === 'string' ? JSON.parse(rawOilList) : (rawOilList || [])
+        } else if (data && data.OilList) {
+            oilList = typeof data.OilList === 'string' ? JSON.parse(data.OilList) : (data.OilList || [])
+        }
         
         console.log('--- START OIL LIST ---')
         oilList.forEach(o => console.log(`- ${o.OilName}: Today=${o.PriceToday}, Tomorrow=${o.PriceTomorrow}`))
