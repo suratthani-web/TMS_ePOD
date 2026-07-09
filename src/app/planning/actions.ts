@@ -824,31 +824,7 @@ export async function updateJob(jobId: string, data: Partial<JobFormData>) {
     else if (vehicleErr) console.warn('[updateJob] Vehicle lookup failed:', vehicleErr.message)
   }
   
-  // 1. Handle Status Transition if requested
-  let verifiedViaStatus = false
-  if (data.Job_Status) {
-    const transition = await transitionJobStatus(jobId, data.Job_Status as import("@/services/job-status-machine").JobStatus, {
-      reason: 'Manual update from planning'
-    })
-    if (!transition.success) {
-      return { success: false, message: transition.message || 'Invalid job status transition' }
-    }
-    // Changing status to 'Verified' here must mirror the verification dialog:
-    // stamp the verification fields and write the MASTER Sheet row, otherwise
-    // this edit-dialog path silently leaves the ledger (and Verification_Status)
-    // out of sync with the other verify entry points.
-    if (data.Job_Status === 'Verified') {
-      verifiedViaStatus = true
-      const session = await getSession()
-      updateData.Verification_Status = 'Verified'
-      updateData.Verified_By = session?.username || session?.userId || 'admin'
-      updateData.Verified_At = new Date().toISOString()
-    }
-    // Remove from updateData to prevent double update
-    delete updateData.Job_Status
-  }
-
-  // 2. Fetch current job once — used for pricing AND as optimistic-lock baseline
+  // 1. Fetch current job once — used for the status baseline, pricing AND as optimistic-lock baseline
   const { data: currentJob, error: fetchErr } = await supabase
     .from('Jobs_Main')
     .select('*')
@@ -858,6 +834,37 @@ export async function updateJob(jobId: string, data: Partial<JobFormData>) {
   if (fetchErr || !currentJob) {
     return { success: false, message: `Job not found: ${fetchErr?.message || jobId}` }
   }
+
+  // 2. Handle Status Transition ONLY when the status genuinely changed vs the DB.
+  // The edit dialog sends Job_Status on every save, and that field can be stale
+  // (e.g. defaulted to 'New' before the form finished syncing to the loaded job).
+  // Blindly transitioning would fail an unrelated field edit (like adding a price
+  // to a Completed job) with "Illegal transition: Completed -> New". So: skip when
+  // unchanged, and if the requested change is illegal, keep the current status and
+  // still save the other fields instead of aborting the whole update.
+  let verifiedViaStatus = false
+  if (data.Job_Status && data.Job_Status !== currentJob.Job_Status) {
+    const transition = await transitionJobStatus(jobId, data.Job_Status as import("@/services/job-status-machine").JobStatus, {
+      reason: 'Manual update from planning'
+    })
+    if (!transition.success) {
+      // Do NOT block the rest of the edit on an unintended/illegal status change.
+      console.warn(`[updateJob] Skipping status change for ${jobId}: ${transition.message}`)
+    } else if (data.Job_Status === 'Verified') {
+      // Changing status to 'Verified' here must mirror the verification dialog:
+      // stamp the verification fields and write the MASTER Sheet row, otherwise
+      // this edit-dialog path silently leaves the ledger (and Verification_Status)
+      // out of sync with the other verify entry points.
+      verifiedViaStatus = true
+      const session = await getSession()
+      updateData.Verification_Status = 'Verified'
+      updateData.Verified_By = session?.username || session?.userId || 'admin'
+      updateData.Verified_At = new Date().toISOString()
+    }
+  }
+  // Never let the status field flow into the plain field update below; transitions
+  // are the only sanctioned way to change Job_Status.
+  delete updateData.Job_Status
 
   // 3. Pricing Engine Integration (uses fetched job as base, avoids second fetch)
   if ((!updateData.Price_Cust_Total || Number(updateData.Price_Cust_Total) === 0) || (data.Loaded_Qty !== undefined)) {
