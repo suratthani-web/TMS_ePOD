@@ -52,7 +52,7 @@ export async function createDriver(data: DriverFormData) {
   return { success: true, message: 'Driver created successfully' }
 }
 
-export async function createBulkDrivers(drivers: Partial<DriverFormData>[]) {
+export async function createBulkDrivers(drivers: any[]) {
   const isAdminUser = await isAdmin()
   if (!isAdminUser) {
     return { success: false, message: 'คุณไม่มีสิทธิ์ในการนำเข้าข้อมูล (Admin access required)' }
@@ -67,8 +67,8 @@ export async function createBulkDrivers(drivers: Partial<DriverFormData>[]) {
   const validSubSet = new Set(validSubs?.map((s: { Sub_ID: string }) => s.Sub_ID) || [])
 
   // Helper to normalize keys
-  const normalizeData = (row: Partial<DriverFormData>) => {
-    const normalized: Partial<DriverFormData> & { Expire_Date?: string } = {}
+  const normalizeData = (row: any) => {
+    const normalized: any = {}
     
     const getValue = (keys: string[]) => {
       const rowKeys = Object.keys(row)
