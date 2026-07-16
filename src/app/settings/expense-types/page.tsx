@@ -1,4 +1,4 @@
-﻿"use client"
+"use client"
 
 import { useState, useEffect, useCallback } from "react"
 import { DashboardLayout } from "@/components/layout/dashboard-layout"
@@ -143,7 +143,7 @@ export default function ExpenseTypesPage() {
                         <div className="col-span-12 md:col-span-4 space-y-4">
                             <Label className="text-sm font-semibold text-muted-foreground ml-4">{t('settings_pages.expense_types.default_yield')}</Label>
                             <div className="relative">
-                                <span className="absolute left-6 top-1/2 -translate-y-1/2 text-primary font-black italic">à¸¿</span>
+                                <span className="absolute left-6 top-1/2 -translate-y-1/2 text-primary font-black italic">฿</span>
                                 <Input
                                     type="number"
                                     value={newType.default_amount}
@@ -216,7 +216,7 @@ export default function ExpenseTypesPage() {
                                                 <div className="flex-1 space-y-2">
                                                     <Label className="text-sm font-semibold text-muted-foreground ml-4">{t('settings_pages.expense_types.edit_yield')}</Label>
                                                     <div className="relative">
-                                                        <span className="absolute left-6 top-1/2 -translate-y-1/2 text-primary font-black italic">à¸¿</span>
+                                                        <span className="absolute left-6 top-1/2 -translate-y-1/2 text-primary font-black italic">฿</span>
                                                         <Input
                                                             type="number"
                                                             value={et.default_amount || 0}
@@ -243,7 +243,7 @@ export default function ExpenseTypesPage() {
                                                 <div className="flex-1">
                                                     <p className="text-sm font-semibold text-muted-foreground mb-1">{t('settings_pages.expense_types.base_yield')}</p>
                                                     <p className="text-2xl font-black text-foreground tracking-tight">
-                                                        {et.default_amount ? `à¸¿${et.default_amount.toLocaleString()}` : 'à¸¿0.00'}
+                                                        {et.default_amount ? `฿${et.default_amount.toLocaleString('th-TH', { minimumFractionDigits: 0, maximumFractionDigits: 2 })}` : '฿0'}
                                                     </p>
                                                 </div>
                                                 <div className="flex items-center gap-4">
