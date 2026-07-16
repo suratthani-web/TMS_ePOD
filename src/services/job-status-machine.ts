@@ -193,6 +193,7 @@ export async function transitionJobStatus(
     // 5. Revalidate relevant paths
     revalidatePath('/planning');
     revalidatePath('/jobs/history');
+    revalidatePath('/pod');
     revalidatePath(`/jobs/${jobId}`);
     
     return { 
@@ -280,14 +281,23 @@ async function sendDeliveryCompletionNotification(jobId: string) {
     // Format delivery time
     let deliveryTime = 'ไม่ระบุ';
     if (job.Actual_Delivery_Time) {
-      deliveryTime = new Date(job.Actual_Delivery_Time).toLocaleString('th-TH', {
-        timeZone: 'Asia/Bangkok',
-        year: 'numeric',
-        month: 'long',
-        day: 'numeric',
-        hour: '2-digit',
-        minute: '2-digit'
-      }) + ' น.';
+      const hasDate = job.Actual_Delivery_Time.includes('-') || job.Actual_Delivery_Time.includes('/');
+      const todayDate = new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Bangkok' });
+      const parseTarget = hasDate ? job.Actual_Delivery_Time : `${todayDate}T${job.Actual_Delivery_Time}`;
+      const parsedDate = new Date(parseTarget);
+      
+      if (!isNaN(parsedDate.getTime())) {
+        deliveryTime = parsedDate.toLocaleString('th-TH', {
+          timeZone: 'Asia/Bangkok',
+          year: 'numeric',
+          month: 'long',
+          day: 'numeric',
+          hour: '2-digit',
+          minute: '2-digit'
+        }) + ' น.';
+      } else {
+        deliveryTime = job.Actual_Delivery_Time + ' น.';
+      }
     } else {
       deliveryTime = new Date().toLocaleString('th-TH', { timeZone: 'Asia/Bangkok' }) + ' น. (เวลาอ้างอิงของเซิร์ฟเวอร์)';
     }

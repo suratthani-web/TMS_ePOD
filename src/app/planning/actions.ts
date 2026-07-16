@@ -845,7 +845,8 @@ export async function updateJob(jobId: string, data: Partial<JobFormData>) {
   let verifiedViaStatus = false
   if (data.Job_Status && data.Job_Status !== currentJob.Job_Status) {
     const transition = await transitionJobStatus(jobId, data.Job_Status as import("@/services/job-status-machine").JobStatus, {
-      reason: 'Manual update from planning'
+      reason: 'Manual update from planning',
+      force: true
     })
     if (!transition.success) {
       // Do NOT block the rest of the edit on an unintended/illegal status change.
