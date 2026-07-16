@@ -1605,13 +1605,34 @@ export async function POST(req: NextRequest) {
                                             .single()
 
                                         if (jobWithCust?.Customer_ID) {
-                                            const { data: custInfo } = await supabase.from('Master_Customers')
-                                                .select('Line_User_ID')
-                                                .eq('Customer_ID', jobWithCust.Customer_ID)
-                                                .single()
+                                            let lineUserId = null
                                             
-                                            if (custInfo?.Line_User_ID) {
-                                                await pushToUser(custInfo.Line_User_ID, `📦 [แจ้งเตือนการส่งมอบสินค้า]\n\nเรียนคุณลูกค้า สินค้าของงาน #${activeJob.Job_ID} ได้รับการจัดส่งเรียบร้อยแล้วครับ!\n\n⭐️ เพื่อการปรับปรุงและพัฒนาบริการที่ดีขึ้น กรุณาให้คะแนนความพึงพอใจโดยการส่งตัวเลขกลับหาเรา:\nพิมพ์ "5" สำหรับ ดีเยี่ยม ⭐️⭐️⭐️⭐️⭐️\nพิมพ์ "4" สำหรับ ดีมาก ⭐️⭐️⭐️⭐️\nพิมพ์ "3" สำหรับ ปานกลาง ⭐️⭐️⭐️\nพิมพ์ "2" สำหรับ พอใช้ ⭐️⭐️\nพิมพ์ "1" สำหรับ ต้องปรับปรุง ⭐️`)
+                                            // 1. Try Master_Customers
+                                            try {
+                                                const { data: custInfo } = await supabase.from('Master_Customers')
+                                                    .select('Line_User_ID')
+                                                    .eq('Customer_ID', jobWithCust.Customer_ID)
+                                                    .single()
+                                                if (custInfo?.Line_User_ID) {
+                                                    lineUserId = custInfo.Line_User_ID
+                                                }
+                                            } catch {}
+
+                                            // 2. Try Master_Users as fallback (e.g. 'uni')
+                                            if (!lineUserId) {
+                                                try {
+                                                    const { data: userCust } = await supabase.from('Master_Users')
+                                                        .select('Line_User_ID')
+                                                        .ilike('Username', jobWithCust.Customer_ID)
+                                                        .maybeSingle()
+                                                    if (userCust?.Line_User_ID) {
+                                                        lineUserId = userCust.Line_User_ID
+                                                    }
+                                                } catch {}
+                                            }
+                                            
+                                            if (lineUserId) {
+                                                await pushToUser(lineUserId, `📦 [แจ้งเตือนการส่งมอบสินค้า]\n\nเรียนคุณลูกค้า สินค้าของงาน #${activeJob.Job_ID} ได้รับการจัดส่งเรียบร้อยแล้วครับ!\n\n⭐️ เพื่อการปรับปรุงและพัฒนาบริการที่ดีขึ้น กรุณาให้คะแนนความพึงพอใจโดยการส่งตัวเลขกลับหาเรา:\nพิมพ์ "5" สำหรับ ดีเยี่ยม ⭐️⭐️⭐️⭐️⭐️\nพิมพ์ "4" สำหรับ ดีมาก ⭐️⭐️⭐️⭐️\nพิมพ์ "3" สำหรับ ปานกลาง ⭐️⭐️⭐️\nพิมพ์ "2" สำหรับ พอใช้ ⭐️⭐️\nพิมพ์ "1" สำหรับ ต้องปรับปรุง ⭐️`)
                                             }
                                         }
                                     } catch (surveyErr) {

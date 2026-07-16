@@ -343,16 +343,33 @@ async function sendDeliveryCompletionNotification(jobId: string) {
     
     // 2. Get the bound customer
     if (job.Customer_ID) {
-      const { data: customer } = await supabase
-        .from('Master_Customers')
-        .select('Line_User_ID')
-        .eq('Customer_ID', job.Customer_ID)
-        .not('Line_User_ID', 'is', null)
-        .single();
-        
-      if (customer?.Line_User_ID) {
-        lineUserIds.push(customer.Line_User_ID);
-      }
+      // Check Master_Customers first
+      try {
+        const { data: customer } = await supabase
+          .from('Master_Customers')
+          .select('Line_User_ID')
+          .eq('Customer_ID', job.Customer_ID)
+          .not('Line_User_ID', 'is', null)
+          .single();
+          
+        if (customer?.Line_User_ID) {
+          lineUserIds.push(customer.Line_User_ID);
+        }
+      } catch { /* ignore and proceed */ }
+
+      // Also check Master_Users in case the customer account is registered as a user login (e.g. 'uni')
+      try {
+        const { data: userCust } = await supabase
+          .from('Master_Users')
+          .select('Line_User_ID')
+          .ilike('Username', job.Customer_ID)
+          .not('Line_User_ID', 'is', null)
+          .maybeSingle();
+
+        if (userCust?.Line_User_ID) {
+          lineUserIds.push(userCust.Line_User_ID);
+        }
+      } catch { /* ignore and proceed */ }
     }
     
     // Deduplicate Line User IDs
