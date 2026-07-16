@@ -64,6 +64,10 @@ const nextConfig: NextConfig = {
         },
         {
             protocol: 'https',
+            hostname: 'uotofvfmlimkdmkcfsbr.supabase.co',
+        },
+        {
+            protocol: 'https',
             hostname: 'drive.google.com',
         },
         {

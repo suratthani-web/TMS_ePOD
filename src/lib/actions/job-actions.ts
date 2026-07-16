@@ -61,6 +61,7 @@ export async function verifyJob(
 
     revalidatePath('/jobs/history')
     revalidatePath('/planning')
+    revalidatePath('/pod')
 
     // Mirror into the MASTER Google Sheet on verification. Dedup is handled by
     // appendJobToMaster itself (skips when the Job_ID is already in the ledger),
