@@ -83,9 +83,9 @@ export async function getCostPerTrip(startDate?: string, endDate?: string, custo
   let query = supabase
     .from('Jobs_Main')
     .select('Job_ID, Plan_Date, Customer_Name, Route_Name, Origin_Location, Dest_Location, Driver_Name, Vehicle_Plate, Job_Status, Price_Cust_Total, Cost_Driver_Total, Price_Cust_Extra, Cost_Driver_Extra, Est_Distance_KM, Loaded_Qty')
-    // Include Billed/Paid so completed work that has moved into invoicing still
+    // Include Billed/Paid and Verified so completed work that has moved into invoicing or verification still
     // counts toward profitability — those are the jobs with confirmed revenue.
-    .in('Job_Status', ['Completed', 'Delivered', 'Finished', 'Closed', 'Billed', 'Paid'])
+    .in('Job_Status', ['Completed', 'Delivered', 'Finished', 'Closed', 'Billed', 'Paid', 'Verified'])
     .gte('Plan_Date', start)
     .lte('Plan_Date', end)
     .order('Plan_Date', { ascending: false })

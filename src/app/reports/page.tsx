@@ -101,8 +101,8 @@ export default async function ReportsPage() {
     inProgress: unified?.statusDist?.find((s: { name: string, value: number }) => ['In Progress', 'In Transit', 'Active'].includes(s.name))
                  ? unified.statusDist.filter((s: { name: string, value: number }) => ['In Progress', 'In Transit', 'Active'].includes(s.name)).reduce((a: number, b: { value: number }) => a + b.value, 0)
                  : 0,
-    delivered: unified?.statusDist?.find((s: { name: string, value: number }) => ['Completed', 'Delivered', 'Finished', 'Closed'].includes(s.name))
-                   ? unified.statusDist.filter((s: { name: string, value: number }) => ['Completed', 'Delivered', 'Finished', 'Closed'].includes(s.name)).reduce((a: number, b: { value: number }) => a + b.value, 0)
+    delivered: unified?.statusDist?.find((s: { name: string, value: number }) => ['Completed', 'Delivered', 'Finished', 'Closed', 'Verified', 'Billed', 'Paid'].includes(s.name))
+                   ? unified.statusDist.filter((s: { name: string, value: number }) => ['Completed', 'Delivered', 'Finished', 'Closed', 'Verified', 'Billed', 'Paid'].includes(s.name)).reduce((a: number, b: { value: number }) => a + b.value, 0)
                    : 0
   }
 
