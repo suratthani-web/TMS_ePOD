@@ -78,9 +78,9 @@ type SheetsClient = ReturnType<typeof getSheetsClient>
 
 // Resolve the tab name (accepting a gid) and read the header row once, so a
 // batch backfill doesn't repeat this per row.
-async function resolveOrder(sheets: SheetsClient): Promise<{ qtab: string; order: string[]; headerRow: number }> {
-  let tabName = TAB
-  const gidMatch = TAB.match(/^(?:gid=)?(\d+)$/)
+async function resolveOrder(sheets: SheetsClient, tabOverride?: string): Promise<{ qtab: string; order: string[]; headerRow: number }> {
+  let tabName = tabOverride || TAB
+  const gidMatch = tabName.match(/^(?:gid=)?(\d+)$/)
   if (gidMatch) {
     try {
       const meta = await sheets.spreadsheets.get({ spreadsheetId: SHEET_ID, fields: 'sheets.properties(sheetId,title)' })
@@ -391,7 +391,43 @@ export async function appendJobToMaster(jobId: string): Promise<{ success: boole
 
     const byName = buildRowValues(job, fuel)
     const sheets = getSheetsClient()
-    const { qtab, order, headerRow } = await resolveOrder(sheets)
+
+    let tabOverride = TAB
+    if (job.Customer_Name || job.Customer_ID) {
+      try {
+        const meta = await sheets.spreadsheets.get({ spreadsheetId: SHEET_ID, fields: 'sheets.properties(title)' })
+        const existingTabs = meta.data.sheets?.map(s => s.properties?.title || '') || []
+        
+        const cleanStr = (s: string) => {
+          return s.toLowerCase()
+            .replace(/บริษัท|จำกัด\(มหาชน\)|จำกัด|ห้างหุ้นส่วนจำกัด|หจก\./g, '')
+            .replace(/[\s\(\)\-\.,_]/g, '')
+            .trim()
+        }
+
+        const normCustName = job.Customer_Name ? cleanStr(job.Customer_Name) : ''
+        const normCustId = job.Customer_ID ? cleanStr(job.Customer_ID) : ''
+
+        const matchedTab = existingTabs.find(tab => {
+          const normTab = cleanStr(tab)
+          if (!normTab) return false
+          
+          if (normCustName === normTab || normCustId === normTab) return true
+          if (normCustName && normTab && (normCustName.includes(normTab) || normTab.includes(normCustName))) return true
+          if (normCustId && normTab && (normCustId.includes(normTab) || normTab.includes(normCustId))) return true
+          
+          return false
+        })
+
+        if (matchedTab) {
+          tabOverride = matchedTab
+        }
+      } catch (e) {
+        console.warn('[MASTER_SHEET] failed to fetch sheet metadata, using default tab:', e)
+      }
+    }
+
+    const { qtab, order, headerRow } = await resolveOrder(sheets, tabOverride)
     const ledger = await readLedgerState(sheets, qtab, order, headerRow)
     if (ledger.jobIds.has(jobId)) return { success: true, skipped: true }
     const row = order.map(h => byName[h] ?? '')
