@@ -371,7 +371,7 @@ async function sendDeliveryCompletionNotification(jobId: string) {
         const { data: userCust } = await supabase
           .from('Master_Users')
           .select('Line_User_ID')
-          .ilike('Username', job.Customer_ID)
+          .eq('Customer_ID', job.Customer_ID)
           .not('Line_User_ID', 'is', null)
           .maybeSingle();
 
