@@ -391,6 +391,14 @@ export async function createBulkJobs(
     const destinations: { name: string, lat: number | null, lng: number | null }[] = []
     const rowKeys = Object.keys(row)
     
+    // Parse fallback from Route_Name if Origin/Dest Location fields are missing
+    const rawRouteName = normalized.Route_Name as string
+    if (rawRouteName && rawRouteName.includes(' - ')) {
+        const parts = rawRouteName.split(' - ')
+        if (!normalized.Origin_Location) normalized.Origin_Location = parts[0].trim()
+        if (!normalized.Dest_Location) normalized.Dest_Location = parts[parts.length - 1].trim()
+    }
+    
     // 1. Origins Mapping
     const primaryOrigin = normalized.Origin_Location as string
     if (primaryOrigin) {
