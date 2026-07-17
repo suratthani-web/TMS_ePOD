@@ -281,27 +281,30 @@ async function sendDeliveryCompletionNotification(jobId: string) {
     // Format delivery time
     let deliveryTime = 'ไม่ระบุ';
     if (job.Actual_Delivery_Time) {
-      const hasDate = job.Actual_Delivery_Time.includes('-') || job.Actual_Delivery_Time.includes('/');
-      const todayDate = new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Bangkok' });
-      let parseTarget = hasDate ? job.Actual_Delivery_Time : `${todayDate}T${job.Actual_Delivery_Time}`;
-      
-      // If the string doesn't specify a timezone offset, append +07:00 for Bangkok time
-      if (!parseTarget.includes('Z') && !parseTarget.includes('+') && !/-\d{2}:\d{2}$/.test(parseTarget)) {
-        parseTarget = parseTarget + '+07:00';
-      }
-      
-      const parsedDate = new Date(parseTarget);
-      
-      if (!isNaN(parsedDate.getTime())) {
-        deliveryTime = parsedDate.toLocaleString('th-TH', {
-          timeZone: 'Asia/Bangkok',
-          year: 'numeric',
-          month: 'long',
-          day: 'numeric',
-          hour: '2-digit',
-          minute: '2-digit'
-        }) + ' น.';
-      } else {
+      try {
+        const timePart = job.Actual_Delivery_Time.includes('T') 
+          ? job.Actual_Delivery_Time.split('T')[1].slice(0, 5) 
+          : job.Actual_Delivery_Time.slice(0, 5); // "HH:mm"
+          
+        const datePart = job.Actual_Delivery_Time.includes('T')
+          ? job.Actual_Delivery_Time.split('T')[0]
+          : (job.Delivery_Date || new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Bangkok' }));
+          
+        const [year, month, day] = datePart.split('-');
+        const [hour, minute] = timePart.split(':');
+        
+        if (year && month && day && hour && minute) {
+          const thaiMonths = [
+            'มกราคม', 'กุมภาพันธ์', 'มีนาคม', 'เมษายน', 'พฤษภาคม', 'มิถุนายน',
+            'กรกฎาคม', 'สิงหาคม', 'กันยายน', 'ตุลาคม', 'พฤศจิกายน', 'ธันวาคม'
+          ];
+          const monthIndex = parseInt(month, 10) - 1;
+          const thaiYear = parseInt(year, 10) + 543;
+          deliveryTime = `${parseInt(day, 10)} ${thaiMonths[monthIndex]} ${thaiYear} ${hour}:${minute} น.`;
+        } else {
+          deliveryTime = job.Actual_Delivery_Time + ' น.';
+        }
+      } catch (err) {
         deliveryTime = job.Actual_Delivery_Time + ' น.';
       }
     } else {
