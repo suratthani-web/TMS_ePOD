@@ -283,7 +283,13 @@ async function sendDeliveryCompletionNotification(jobId: string) {
     if (job.Actual_Delivery_Time) {
       const hasDate = job.Actual_Delivery_Time.includes('-') || job.Actual_Delivery_Time.includes('/');
       const todayDate = new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Bangkok' });
-      const parseTarget = hasDate ? job.Actual_Delivery_Time : `${todayDate}T${job.Actual_Delivery_Time}`;
+      let parseTarget = hasDate ? job.Actual_Delivery_Time : `${todayDate}T${job.Actual_Delivery_Time}`;
+      
+      // If the string doesn't specify a timezone offset, append +07:00 for Bangkok time
+      if (!parseTarget.includes('Z') && !parseTarget.includes('+') && !/-\d{2}:\d{2}$/.test(parseTarget)) {
+        parseTarget = parseTarget + '+07:00';
+      }
+      
       const parsedDate = new Date(parseTarget);
       
       if (!isNaN(parsedDate.getTime())) {
