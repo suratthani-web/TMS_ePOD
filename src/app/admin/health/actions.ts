@@ -53,20 +53,20 @@ function validateDateRange(startDate: string, endDate: string) {
   return null
 }
 
-export async function runMasterBackfillAction(startDate: string, endDate: string) {
+export async function runMasterBackfillAction(startDate: string, endDate: string, customerId?: string) {
   await requireAdmin()
   const validationError = validateDateRange(startDate, endDate)
   if (validationError) return { success: false, error: validationError }
   const { backfillMasterSheet } = await import("@/lib/actions/master-sheet-sync")
-  return await backfillMasterSheet(startDate, endDate)
+  return await backfillMasterSheet(startDate, endDate, customerId)
 }
 
-export async function runVerifyBackfillHistoricalAction(startDate: string, endDate: string) {
+export async function runVerifyBackfillHistoricalAction(startDate: string, endDate: string, customerId?: string) {
   await requireAdmin()
   const validationError = validateDateRange(startDate, endDate)
   if (validationError) return { success: false, error: validationError }
   const { verifyAndBackfillHistorical } = await import("@/lib/actions/master-sheet-sync")
-  return await verifyAndBackfillHistorical(endDate, startDate)
+  return await verifyAndBackfillHistorical(endDate, startDate, customerId)
 }
 
 export async function bypassHealthIssueAction(jobId: string, reason?: string) {

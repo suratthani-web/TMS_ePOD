@@ -129,12 +129,13 @@ export function HealthClient({ initialData }: { initialData: HealthData }) {
 
     setBackfilling(true)
     try {
+      const targetCustId = customerId !== 'All' ? customerId : undefined
       if (backfillMode === 'verified') {
-        const res = await runMasterBackfillAction(backfillStartDate, backfillEndDate)
+        const res = await runMasterBackfillAction(backfillStartDate, backfillEndDate, targetCustId)
         if (!res.success) throw new Error(res.error || 'unknown error')
         toast.success(`เขียนเพิ่ม ${res.count ?? 0} แถว และเติม Job ID ย้อนหลัง ${res.jobIdsFilled ?? 0} แถว`)
       } else {
-        const res = await runVerifyBackfillHistoricalAction(backfillStartDate, backfillEndDate)
+        const res = await runVerifyBackfillHistoricalAction(backfillStartDate, backfillEndDate, targetCustId)
         if (!res.success) throw new Error(res.error || 'unknown error')
         toast.success(`ตั้ง Verified ${res.verified ?? 0} งาน · เขียนเพิ่ม ${res.appended ?? 0} แถว · เติม Job ID ${res.jobIdsFilled ?? 0} แถว`)
         fetchHealth()

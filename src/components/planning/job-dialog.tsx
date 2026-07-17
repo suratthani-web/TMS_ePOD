@@ -497,7 +497,16 @@ export function JobDialog({
       
       // Smart recovery: If JSON is empty/missing, try Master_Routes then Root columns
       if (parsedOrigins.length === 0 || (!parsedOrigins[0].name)) {
-        const originName = job.Origin_Location || masterRoute?.Origin || ''
+        let originName = job.Origin_Location || masterRoute?.Origin || ''
+        
+        // Try parsing from Route_Name if everything else is empty
+        if (!originName && job.Route_Name) {
+          const parts = job.Route_Name.split(/\s*[-–—→>]\s*/)
+          if (parts.length > 1) {
+            originName = parts[0].trim()
+          }
+        }
+
         const lat = (parsedOrigins[0]?.lat || job.Pickup_Lat || masterRoute?.Origin_Lat)?.toString() || ''
         const lng = (parsedOrigins[0]?.lng || job.Pickup_Lon || masterRoute?.Origin_Lon)?.toString() || ''
         
@@ -513,7 +522,16 @@ export function JobDialog({
       let parsedDestinations = parseJson(rawDestinations, []) as LocationPoint[]
       
       if (parsedDestinations.length === 0 || (!parsedDestinations[parsedDestinations.length - 1].name)) {
-        const destName = job.Dest_Location || masterRoute?.Destination || ''
+        let destName = job.Dest_Location || masterRoute?.Destination || ''
+
+        // Try parsing from Route_Name if everything else is empty
+        if (!destName && job.Route_Name) {
+          const parts = job.Route_Name.split(/\s*[-–—→>]\s*/)
+          if (parts.length > 1) {
+            destName = parts[parts.length - 1].trim()
+          }
+        }
+
         const lastIndex = parsedDestinations.length > 0 ? parsedDestinations.length - 1 : 0
         const lat = (parsedDestinations[lastIndex]?.lat || job.Delivery_Lat || masterRoute?.Dest_Lat)?.toString() || ''
         const lng = (parsedDestinations[lastIndex]?.lng || job.Delivery_Lon || masterRoute?.Dest_Lon)?.toString() || ''
