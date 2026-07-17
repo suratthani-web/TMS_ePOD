@@ -377,6 +377,39 @@ function buildRowValues(job: any, fuel: number | ''): Record<string, string | nu
 }
 
 /**
+ * Helper to match a job's customer name or ID to an existing Google Sheet tab title.
+ */
+export function getJobTabName(
+  job: { Customer_Name?: unknown; Customer_ID?: unknown },
+  existingTabs: string[]
+): string {
+  if (!job.Customer_Name && !job.Customer_ID) return TAB
+
+  const cleanStr = (s: string) => {
+    return s.toLowerCase()
+      .replace(/บริษัท|จำกัด\(มหาชน\)|จำกัด|ห้างหุ้นส่วนจำกัด|หจก\./g, '')
+      .replace(/[\s\(\)\-\.,_]/g, '')
+      .trim()
+  }
+
+  const normCustName = job.Customer_Name ? cleanStr(String(job.Customer_Name)) : ''
+  const normCustId = job.Customer_ID ? cleanStr(String(job.Customer_ID)) : ''
+
+  const matchedTab = existingTabs.find(tab => {
+    const normTab = cleanStr(tab)
+    if (!normTab) return false
+    
+    if (normCustName === normTab || normCustId === normTab) return true
+    if (normCustName && normTab && (normCustName.includes(normTab) || normTab.includes(normCustName))) return true
+    if (normCustId && normTab && (normCustId.includes(normTab) || normTab.includes(normCustId))) return true
+    
+    return false
+  })
+
+  return matchedTab || TAB
+}
+
+/**
  * Append one verified job as a row to the MASTER tab of the Google Sheet.
  * Best-effort: returns {success,error} and never throws.
  */
@@ -397,31 +430,7 @@ export async function appendJobToMaster(jobId: string): Promise<{ success: boole
       try {
         const meta = await sheets.spreadsheets.get({ spreadsheetId: SHEET_ID, fields: 'sheets.properties(title)' })
         const existingTabs = meta.data.sheets?.map(s => s.properties?.title || '') || []
-        
-        const cleanStr = (s: string) => {
-          return s.toLowerCase()
-            .replace(/บริษัท|จำกัด\(มหาชน\)|จำกัด|ห้างหุ้นส่วนจำกัด|หจก\./g, '')
-            .replace(/[\s\(\)\-\.,_]/g, '')
-            .trim()
-        }
-
-        const normCustName = job.Customer_Name ? cleanStr(job.Customer_Name) : ''
-        const normCustId = job.Customer_ID ? cleanStr(job.Customer_ID) : ''
-
-        const matchedTab = existingTabs.find(tab => {
-          const normTab = cleanStr(tab)
-          if (!normTab) return false
-          
-          if (normCustName === normTab || normCustId === normTab) return true
-          if (normCustName && normTab && (normCustName.includes(normTab) || normTab.includes(normCustName))) return true
-          if (normCustId && normTab && (normCustId.includes(normTab) || normTab.includes(normCustId))) return true
-          
-          return false
-        })
-
-        if (matchedTab) {
-          tabOverride = matchedTab
-        }
+        tabOverride = getJobTabName(job, existingTabs)
       } catch (e) {
         console.warn('[MASTER_SHEET] failed to fetch sheet metadata, using default tab:', e)
       }
@@ -461,7 +470,8 @@ const BILLING_LOCKED = ['Billed', 'Paid'] // keep Job_Status; only flag verifica
  */
 export async function verifyAndBackfillHistorical(
   endDate: string,
-  startDate?: string
+  startDate?: string,
+  customerId?: string
 ): Promise<{ success: boolean; verified?: number; appended?: number; jobIdsFilled?: number; error?: string }> {
   try {
     if (!/^\d{4}-\d{2}-\d{2}$/.test(endDate) || (startDate && !/^\d{4}-\d{2}-\d{2}$/.test(startDate))) {
@@ -488,6 +498,8 @@ export async function verifyAndBackfillHistorical(
         .order('Job_ID', { ascending: true })
         .range(from, from + PAGE - 1)
       if (startDate) query = query.gte('Plan_Date', startDate)
+      if (customerId && customerId !== 'All') query = query.eq('Customer_ID', customerId)
+      
       const { data, error } = await query
       if (error) return { success: false, error: error.message }
       if (!data || data.length === 0) break
@@ -516,38 +528,59 @@ export async function verifyAndBackfillHistorical(
     const chunk = <T,>(arr: T[], size: number) =>
       Array.from({ length: Math.ceil(arr.length / size) }, (_, i) => arr.slice(i * size, i * size + size))
 
-    // Reconcile against the ledger itself, not only Verification_Status. This
-    // includes jobs that were marked Verified after a previous sheet write
-    // failed, while avoiding duplicate legacy rows that predate Job_ID output.
     const sheets = getSheetsClient()
-    const { qtab, order, headerRow } = await resolveOrder(sheets)
-    const ledger = await readLedgerState(sheets, qtab, order, headerRow)
-    const jobIdsFilled = await fillLegacyJobIds(sheets, qtab, order, jobs, ledger)
-    const missingJobs = jobsMissingFromLedger(
-      jobs,
-      ledger.jobIds,
-      ledger.legacyRowsByDate,
-      ledger.legacyFingerprints
-    )
-    const fuelCache = new Map<string, number | ''>()
-    const rows: (string | number)[][] = []
-    for (const job of missingJobs) {
-      const dateKey = String(job.Plan_Date || '').slice(0, 10)
-      let fuel = fuelCache.get(dateKey)
-      if (fuel === undefined) {
-        try { fuel = (await getFuelPriceNumber(dateKey || undefined)) ?? '' } catch { fuel = '' }
-        fuelCache.set(dateKey, fuel)
+    
+    // Fetch all existing tabs from Google Sheets to group properly
+    const meta = await sheets.spreadsheets.get({ spreadsheetId: SHEET_ID, fields: 'sheets.properties(title)' })
+    const existingTabs = meta.data.sheets?.map(s => s.properties?.title || '') || []
+
+    const jobsByTab = new Map<string, MasterJob[]>()
+    for (const job of jobs) {
+      const tabName = getJobTabName(job, existingTabs)
+      if (!jobsByTab.has(tabName)) {
+        jobsByTab.set(tabName, [])
       }
-      rows.push(order.map(h => buildRowValues(job, fuel as number | '')[h] ?? ''))
+      jobsByTab.get(tabName)!.push(job)
     }
-    for (let i = 0; i < rows.length; i += 500) {
-      await sheets.spreadsheets.values.append({
-        spreadsheetId: SHEET_ID,
-        range: `${qtab}!A:BZ`,
-        valueInputOption: 'USER_ENTERED',
-        insertDataOption: 'INSERT_ROWS',
-        requestBody: { values: rows.slice(i, i + 500) },
-      })
+
+    const fuelCache = new Map<string, number | ''>()
+    let totalAppended = 0
+    let totalJobIdsFilled = 0
+
+    for (const [tabName, tabJobs] of jobsByTab.entries()) {
+      const { qtab, order, headerRow } = await resolveOrder(sheets, tabName)
+      const ledger = await readLedgerState(sheets, qtab, order, headerRow)
+      const jobIdsFilled = await fillLegacyJobIds(sheets, qtab, order, tabJobs, ledger)
+      totalJobIdsFilled += jobIdsFilled
+
+      const missingJobs = jobsMissingFromLedger(
+        tabJobs,
+        ledger.jobIds,
+        ledger.legacyRowsByDate,
+        ledger.legacyFingerprints
+      )
+
+      const rows: (string | number)[][] = []
+      for (const job of missingJobs) {
+        const dateKey = String(job.Plan_Date || '').slice(0, 10)
+        let fuel = fuelCache.get(dateKey)
+        if (fuel === undefined) {
+          try { fuel = (await getFuelPriceNumber(dateKey || undefined)) ?? '' } catch { fuel = '' }
+          fuelCache.set(dateKey, fuel)
+        }
+        rows.push(order.map(h => buildRowValues(job, fuel as number | '')[h] ?? ''))
+      }
+
+      for (let i = 0; i < rows.length; i += 500) {
+        await sheets.spreadsheets.values.append({
+          spreadsheetId: SHEET_ID,
+          range: `${qtab}!A:BZ`,
+          valueInputOption: 'USER_ENTERED',
+          insertDataOption: 'INSERT_ROWS',
+          requestBody: { values: rows.slice(i, i + 500) },
+        })
+      }
+      totalAppended += rows.length
     }
 
     // Mark verification only after the ledger write succeeds. If a database
@@ -557,16 +590,16 @@ export async function verifyAndBackfillHistorical(
       const { error } = await supabase.from('Jobs_Main')
         .update({ Job_Status: 'Verified', Verification_Status: 'Verified', Verified_By: 'backfill', Verified_At: now })
         .in('Job_ID', ids)
-      if (error) return { success: false, appended: rows.length, jobIdsFilled, error: error.message }
+      if (error) return { success: false, appended: totalAppended, jobIdsFilled: totalJobIdsFilled, error: error.message }
     }
     for (const ids of chunk(toFlagOnly, 400)) {
       const { error } = await supabase.from('Jobs_Main')
         .update({ Verification_Status: 'Verified', Verified_By: 'backfill', Verified_At: now })
         .in('Job_ID', ids)
-      if (error) return { success: false, appended: rows.length, jobIdsFilled, error: error.message }
+      if (error) return { success: false, appended: totalAppended, jobIdsFilled: totalJobIdsFilled, error: error.message }
     }
 
-    return { success: true, verified: toVerifyStatus.length + toFlagOnly.length, appended: rows.length, jobIdsFilled }
+    return { success: true, verified: toVerifyStatus.length + toFlagOnly.length, appended: totalAppended, jobIdsFilled: totalJobIdsFilled }
   } catch (err) {
     const msg = err instanceof Error ? err.message : 'Unknown error'
     console.error('[MASTER_SHEET] historical backfill failed:', msg)
@@ -581,7 +614,8 @@ export async function verifyAndBackfillHistorical(
  */
 export async function backfillMasterSheet(
   startDate?: string,
-  endDate?: string
+  endDate?: string,
+  customerId?: string
 ): Promise<{ success: boolean; count?: number; jobIdsFilled?: number; error?: string }> {
   try {
     if ((startDate && !/^\d{4}-\d{2}-\d{2}$/.test(startDate)) || (endDate && !/^\d{4}-\d{2}-\d{2}$/.test(endDate))) {
@@ -604,6 +638,8 @@ export async function backfillMasterSheet(
         .range(from, from + PAGE - 1)
       if (startDate) query = query.gte('Plan_Date', startDate)
       if (endDate) query = query.lte('Plan_Date', endDate)
+      if (customerId && customerId !== 'All') query = query.eq('Customer_ID', customerId)
+      
       const { data, error } = await query
       if (error) return { success: false, error: error.message }
       if (!data || data.length === 0) break
@@ -614,42 +650,61 @@ export async function backfillMasterSheet(
     if (jobs.length === 0) return { success: true, count: 0 }
 
     const sheets = getSheetsClient()
-    const { qtab, order, headerRow } = await resolveOrder(sheets)
-    const ledger = await readLedgerState(sheets, qtab, order, headerRow)
-    const jobIdsFilled = await fillLegacyJobIds(sheets, qtab, order, jobs, ledger)
-    const missingJobs = jobsMissingFromLedger(
-      jobs,
-      ledger.jobIds,
-      ledger.legacyRowsByDate,
-      ledger.legacyFingerprints
-    )
+    
+    // Fetch all existing tabs from Google Sheets to group properly
+    const meta = await sheets.spreadsheets.get({ spreadsheetId: SHEET_ID, fields: 'sheets.properties(title)' })
+    const existingTabs = meta.data.sheets?.map(s => s.properties?.title || '') || []
 
-    // Fuel price is keyed by date — cache so we don't refetch per row.
-    const fuelCache = new Map<string, number | ''>()
-    const rows: (string | number)[][] = []
-    for (const job of missingJobs) {
-      const dateKey = String(job.Plan_Date || '').slice(0, 10)
-      let fuel = fuelCache.get(dateKey)
-      if (fuel === undefined) {
-        try { fuel = (await getFuelPriceNumber(dateKey || undefined)) ?? '' } catch { fuel = '' }
-        fuelCache.set(dateKey, fuel)
+    const jobsByTab = new Map<string, MasterJob[]>()
+    for (const job of jobs) {
+      const tabName = getJobTabName(job, existingTabs)
+      if (!jobsByTab.has(tabName)) {
+        jobsByTab.set(tabName, [])
       }
-      const byName = buildRowValues(job, fuel)
-      rows.push(order.map(h => byName[h] ?? ''))
+      jobsByTab.get(tabName)!.push(job)
     }
 
-    // Append in chunks of 500 rows.
-    for (let i = 0; i < rows.length; i += 500) {
-      await sheets.spreadsheets.values.append({
-        spreadsheetId: SHEET_ID,
-        range: `${qtab}!A:BZ`,
-        valueInputOption: 'USER_ENTERED',
-        insertDataOption: 'INSERT_ROWS',
-        requestBody: { values: rows.slice(i, i + 500) },
-      })
+    const fuelCache = new Map<string, number | ''>()
+    let totalAppended = 0
+    let totalJobIdsFilled = 0
+
+    for (const [tabName, tabJobs] of jobsByTab.entries()) {
+      const { qtab, order, headerRow } = await resolveOrder(sheets, tabName)
+      const ledger = await readLedgerState(sheets, qtab, order, headerRow)
+      const jobIdsFilled = await fillLegacyJobIds(sheets, qtab, order, tabJobs, ledger)
+      totalJobIdsFilled += jobIdsFilled
+
+      const missingJobs = jobsMissingFromLedger(
+        tabJobs,
+        ledger.jobIds,
+        ledger.legacyRowsByDate,
+        ledger.legacyFingerprints
+      )
+
+      const rows: (string | number)[][] = []
+      for (const job of missingJobs) {
+        const dateKey = String(job.Plan_Date || '').slice(0, 10)
+        let fuel = fuelCache.get(dateKey)
+        if (fuel === undefined) {
+          try { fuel = (await getFuelPriceNumber(dateKey || undefined)) ?? '' } catch { fuel = '' }
+          fuelCache.set(dateKey, fuel)
+        }
+        rows.push(order.map(h => buildRowValues(job, fuel as number | '')[h] ?? ''))
+      }
+
+      for (let i = 0; i < rows.length; i += 500) {
+        await sheets.spreadsheets.values.append({
+          spreadsheetId: SHEET_ID,
+          range: `${qtab}!A:BZ`,
+          valueInputOption: 'USER_ENTERED',
+          insertDataOption: 'INSERT_ROWS',
+          requestBody: { values: rows.slice(i, i + 500) },
+        })
+      }
+      totalAppended += rows.length
     }
 
-    return { success: true, count: rows.length, jobIdsFilled }
+    return { success: true, count: totalAppended, jobIdsFilled: totalJobIdsFilled }
   } catch (err) {
     const msg = err instanceof Error ? err.message : 'Unknown error'
     console.error('[MASTER_SHEET] backfill failed:', msg)
