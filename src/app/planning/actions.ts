@@ -393,10 +393,12 @@ export async function createBulkJobs(
     
     // Parse fallback from Route_Name if Origin/Dest Location fields are missing
     const rawRouteName = normalized.Route_Name as string
-    if (rawRouteName && rawRouteName.includes(' - ')) {
-        const parts = rawRouteName.split(' - ')
-        if (!normalized.Origin_Location) normalized.Origin_Location = parts[0].trim()
-        if (!normalized.Dest_Location) normalized.Dest_Location = parts[parts.length - 1].trim()
+    if (rawRouteName) {
+        const parts = rawRouteName.split(/\s*[-–—→>]\s*/)
+        if (parts.length > 1) {
+            if (!normalized.Origin_Location) normalized.Origin_Location = parts[0].trim()
+            if (!normalized.Dest_Location) normalized.Dest_Location = parts[parts.length - 1].trim()
+        }
     }
     
     // 1. Origins Mapping
@@ -983,9 +985,9 @@ export async function getJobCreationData(selectedBranchId?: string) {
   let subcontractors = subcontractorsResult.data || []
 
   if (branchId && branchId !== 'All') {
-      customers = customers.filter((c: { Branch_ID?: string }) => c.Branch_ID === branchId)
-      routes = routes.filter((r: { Branch_ID?: string }) => r.Branch_ID === branchId)
-      subcontractors = subcontractors.filter((s: { Branch_ID?: string }) => s.Branch_ID === branchId)
+      customers = customers.filter((c: { Branch_ID?: string | null }) => !c.Branch_ID || c.Branch_ID === 'All' || c.Branch_ID === branchId)
+      routes = routes.filter((r: { Branch_ID?: string | null }) => !r.Branch_ID || r.Branch_ID === 'All' || r.Branch_ID === branchId)
+      subcontractors = subcontractors.filter((s: { Branch_ID?: string | null }) => !s.Branch_ID || s.Branch_ID === 'All' || s.Branch_ID === branchId)
   }
 
   return {
