@@ -19,6 +19,7 @@ import { Driver } from "@/lib/supabase/drivers"
 import { predictJobDelay } from "@/services/ai-prediction"
 import { SafetyScoreBadge } from "./safety-score-badge"
 import { useLanguage } from "@/components/providers/language-provider"
+import { useCustomer } from "@/components/providers/customer-provider"
 import { useRealtime } from "@/hooks/useRealtime"
 import { RealtimeIndicator } from "@/components/ui/realtime-indicator"
 import { toast } from "sonner"
@@ -73,6 +74,7 @@ export function MonitoringCommandCenter({
     dangerZones = []
 }: MonitoringCommandCenterProps) {
     const { t } = useLanguage()
+    const { selectedCustomer, customers } = useCustomer()
     const [searchQuery, setSearchQuery] = useState('')
     const [selectedId, setSelectedId] = useState<string | null>(null)
     const [filter, setFilter] = useState<'all' | 'jobs' | 'drivers' | 'alerts' | 'health'>('all')
@@ -232,6 +234,15 @@ export function MonitoringCommandCenter({
     const driversWithGPS = useMemo(() => {
         return drivers
             .filter(d => {
+                // Customer Selector filter
+                if (selectedCustomer && selectedCustomer !== 'All') {
+                    const customersForDriver = driverToCustomerMap[d.Driver_ID] || []
+                    const activeCustName = customers.find(c => c.Customer_ID === selectedCustomer)?.Customer_Name
+                    if (!activeCustName || !customersForDriver.includes(activeCustName)) {
+                        return false
+                    }
+                }
+
                 // Search filter
                 const matchesSearch = !searchQuery || 
                     d.Driver_Name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -239,8 +250,8 @@ export function MonitoringCommandCenter({
                 
                 // Focus Mode filter
                 if (showPinnedOnly && pinnedCustomerNames.length > 0) {
-                    const customers = driverToCustomerMap[d.Driver_ID] || []
-                    const isPinned = customers.some(c => pinnedCustomerNames.includes(c))
+                    const customersList = driverToCustomerMap[d.Driver_ID] || []
+                    const isPinned = customersList.some(c => pinnedCustomerNames.includes(c))
                     return matchesSearch && isPinned
                 }
 
@@ -252,10 +263,15 @@ export function MonitoringCommandCenter({
                 return { ...d, status: isOnline ? 'Online' : 'Offline' }
             })
             .sort((a, b) => (a.status === 'Online' ? -1 : 1))
-    }, [drivers, searchQuery, showPinnedOnly, pinnedCustomerNames, driverToCustomerMap])
+    }, [drivers, searchQuery, showPinnedOnly, pinnedCustomerNames, driverToCustomerMap, selectedCustomer, customers])
 
     const filteredJobs = useMemo(() => {
         return jobs.filter(j => {
+            // Customer Selector filter
+            if (selectedCustomer && selectedCustomer !== 'All' && j.Customer_ID !== selectedCustomer) {
+                return false
+            }
+
             const matchesSearch = !searchQuery || 
                 j.Job_ID?.toLowerCase().includes(searchQuery.toLowerCase()) ||
                 j.Customer_Name?.toLowerCase().includes(searchQuery.toLowerCase())
@@ -265,7 +281,7 @@ export function MonitoringCommandCenter({
             }
             return matchesSearch
         })
-    }, [jobs, searchQuery, showPinnedOnly, pinnedCustomerNames])
+    }, [jobs, searchQuery, showPinnedOnly, pinnedCustomerNames, selectedCustomer])
 
     const alertCount = filteredJobs.filter(j => j.Job_Status === 'SOS' || j.Job_Status === 'Failed').length
 
