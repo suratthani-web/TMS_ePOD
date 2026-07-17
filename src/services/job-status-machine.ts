@@ -269,7 +269,7 @@ async function sendDeliveryCompletionNotification(jobId: string) {
     // Fetch job details
     const { data: job, error: jobErr } = await supabase
       .from('Jobs_Main')
-      .select('Job_ID, Customer_Name, Route_Name, Driver_Name, Vehicle_Plate, Photo_Proof_Url, Signature_Url, Customer_ID, Actual_Delivery_Time')
+      .select('Job_ID, Customer_Name, Route_Name, Driver_Name, Vehicle_Plate, Photo_Proof_Url, Signature_Url, Customer_ID, Actual_Delivery_Time, Delivery_Date')
       .eq('Job_ID', jobId)
       .single();
       
