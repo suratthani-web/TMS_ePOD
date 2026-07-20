@@ -115,6 +115,25 @@ const nextConfig: NextConfig = {
       },
     ];
   },
+  async redirects() {
+    return [
+      {
+        source: '/tracking',
+        destination: '/dashboard/tracking',
+        permanent: true,
+      },
+      {
+        source: '/tracking/:jobId',
+        destination: '/track/:jobId',
+        permanent: true,
+      },
+      {
+        source: '/track',
+        destination: '/dashboard/tracking',
+        permanent: true,
+      }
+    ];
+  },
 };
 
 export default withPWA(nextConfig);

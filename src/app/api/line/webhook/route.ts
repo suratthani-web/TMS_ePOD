@@ -874,7 +874,7 @@ export async function POST(req: NextRequest) {
                                 if (job.Driver_Name) {
                                     lines.push(`👨‍✈️ คนขับ: ${job.Driver_Name}`)
                                 }
-                                lines.push(`🗺️ แผนที่ติดตามรถ: ${process.env.NEXT_PUBLIC_APP_URL || 'https://tms-app.vercel.app'}/tracking/${job.Job_ID}`)
+                                lines.push(`🗺️ แผนที่ติดตามรถ: ${process.env.NEXT_PUBLIC_APP_URL || 'https://tms-app.vercel.app'}/track/${job.Job_ID}`)
                                 lines.push('────────────────')
                             })
                             
@@ -1057,7 +1057,7 @@ export async function POST(req: NextRequest) {
                             await replyToUser(replyToken, `📱 [LINE LIFF Mini-App]\n\nพี่ ${boundDriver.Driver_Name} สามารถใช้งานระบบ TMS เต็มรูปแบบในห้องแชทได้โดยไม่ต้องออกไปแอปอื่นครับ:\n🔗 เข้าสู่แอปคนขับ: ${appUrl}/mobile/jobs\n\nอำนวยความสะดวกด้วยฟังก์ชันเซ็นชื่อดิจิทัลและถ่ายรูปหลักฐานในปุ่มเดียวครับ! 🚀`)
                             continue
                         } else if (boundCustomer) {
-                            await replyToUser(replyToken, `📱 [LINE LIFF Mini-App]\n\nคุณ ${boundCustomer.Customer_Name} สามารถเปิดแอปติดตามสถานะจัดส่งและดาวน์โหลดเอกสารจากแชทนี้ได้เลย:\n🔗 เข้าสู่ระบบลูกค้า: ${appUrl}/tracking\n\nรวดเร็ว ทันใจ ไม่ต้องติดตั้งแอปเพิ่มเติมครับ! 🚀`)
+                            await replyToUser(replyToken, `📱 [LINE LIFF Mini-App]\n\nคุณ ${boundCustomer.Customer_Name} สามารถเปิดแอปติดตามสถานะจัดส่งและดาวน์โหลดเอกสารจากแชทนี้ได้เลย:\n🔗 เข้าสู่ระบบลูกค้า: ${appUrl}/dashboard/tracking\n\nรวดเร็ว ทันใจ ไม่ต้องติดตั้งแอปเพิ่มเติมครับ! 🚀`)
                             continue
                         } else {
                             await replyToUser(replyToken, `📱 [LINE LIFF Mini-App]\n\nท่านสามารถเข้าสู่หน้าควบคุมกลางและแดชบอร์ดแอดมินสำหรับอุปกรณ์เคลื่อนที่ได้ที่นี่:\n🔗 เข้าสู่หน้าจัดการ: ${appUrl}/planning\n\nควบคุมเที่ยววิ่ง จ่ายงาน และตรวจพิกัด GPS ได้เรียลไทม์ 🚀`)
