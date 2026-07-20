@@ -148,6 +148,16 @@ export function HealthClient({ initialData }: { initialData: HealthData }) {
     }
   }
 
+  const getTargetSheetName = () => {
+    if (!customerId || customerId === 'All') return 'สยามรุ่งเรือง / ยูนิคอร์ด'
+    const cust = initialData.customers.find(c => c.Customer_ID === customerId)
+    if (!cust) return 'สยามรุ่งเรือง'
+    const name = cust.Customer_Name
+    if (name.includes('ยูนิคอร์ด')) return 'ยูนิคอร์ด'
+    if (name.includes('สยามรุ่งเรือง')) return 'สยามรุ่งเรือง'
+    return name
+  }
+
   const getSeverityIcon = (severity: string) => {
     switch (severity) {
       case "CRITICAL": return <ShieldAlert className="w-5 h-5 text-destructive" />
@@ -243,7 +253,7 @@ export function HealthClient({ initialData }: { initialData: HealthData }) {
             </DialogTitle>
             <DialogDescription>
               {backfillMode === 'verify'
-                ? 'ตั้ง Verified ให้งานที่เสร็จแล้ว พร้อมเติมข้อมูลและ Job ID ลงแท็บสยามรุ่งเรือง'
+                ? `ตั้ง Verified ให้งานที่เสร็จแล้ว พร้อมเติมข้อมูลและ Job ID ลงแท็บ${getTargetSheetName()}`
                 : 'เติมเฉพาะงานที่ Verified แล้ว และใส่ Job ID ให้แถวเก่าที่จับคู่ได้แน่นอน'}
             </DialogDescription>
           </DialogHeader>
