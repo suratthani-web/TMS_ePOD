@@ -874,7 +874,7 @@ export async function POST(req: NextRequest) {
                                 if (job.Driver_Name) {
                                     lines.push(`👨‍✈️ คนขับ: ${job.Driver_Name}`)
                                 }
-                                lines.push(`🗺️ แผนที่ติดตามรถ: ${process.env.NEXT_PUBLIC_APP_URL || 'https://tms-app.vercel.app'}/track/${job.jobId}`)
+                                lines.push(`🗺️ แผนที่ติดตามรถ: ${process.env.NEXT_PUBLIC_APP_URL || 'https://tms-app.vercel.app'}/track/${job.Job_ID}`)
                                 lines.push('────────────────')
                             })
                             
