@@ -336,12 +336,20 @@ function buildRowValues(job: any, fuel: number | ''): Record<string, string | nu
     // place them according to the sheet's actual header row, so inserting,
     // adding or reordering columns later keeps working — matching is by name.
     // (Renaming a header is the only thing that would need a code update.)
-    let custId = 20
+    let custId: number | string = 20
     const idStr = String(job.Customer_ID || '').toLowerCase()
     const nameStr = String(job.Customer_Name || '').toLowerCase()
 
     if (idStr.includes('unicord') || idStr.includes('ยูนิคอร์ด') || nameStr.includes('unicord') || nameStr.includes('ยูนิคอร์ด')) {
       custId = 2
+    } else if (idStr.includes('แบมบิโน่') || idStr.includes('bambino') || nameStr.includes('แบมบิโน่') || nameStr.includes('bambino')) {
+      custId = 77
+    } else if (idStr.includes('ยังค์มีดี') || idStr.includes('youngmede') || nameStr.includes('ยังค์มีดี') || nameStr.includes('youngmede')) {
+      custId = 109
+    } else if (idStr.includes('อินไลน์') || idStr.includes('inline') || nameStr.includes('อินไลน์') || nameStr.includes('inline')) {
+      custId = 60
+    } else if (idStr.includes('คิวพลัส') || idStr.includes('qplus') || nameStr.includes('คิวพลัส') || nameStr.includes('qplus')) {
+      custId = 55
     } else if (idStr.includes('siam') || idStr.includes('สยามรุ่งเรือง') || nameStr.includes('siam') || nameStr.includes('สยามรุ่งเรือง')) {
       custId = 20
     } else if (job.Customer_ID) {
