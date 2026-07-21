@@ -40,6 +40,17 @@ export function DriversContent({
 }: DriversContentProps) {
   const { t } = useLanguage()
   const [deletingId, setDeletingId] = useState<string | null>(null)
+  const [searchQuery, setSearchQuery] = useState("")
+
+  const filteredDrivers = (drivers || []).filter(driver => {
+    if (!searchQuery.trim()) return true
+    const q = searchQuery.toLowerCase().trim()
+    const name = (driver.Driver_Name || '').toLowerCase()
+    const phone = (driver.Mobile_No || '').toLowerCase()
+    const id = (driver.Driver_ID || '').toLowerCase()
+    const plate = (driver.Vehicle_Plate || '').toLowerCase()
+    return name.includes(q) || phone.includes(q) || id.includes(q) || plate.includes(q)
+  })
 
   const handleDelete = async (id: string, name: string) => {
     if (!confirm(`${t('common.delete') || 'ต้องการลบ'} ${name}?`)) return
@@ -129,7 +140,9 @@ export function DriversContent({
                 <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-muted-foreground" size={16} />
                 <input 
                     type="text" 
-                    placeholder={t('common.search') || "ค้นหา..."}
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    placeholder={t('common.search') || "ค้นหาชื่อคนขับ, เบอร์โทร..."}
                     className="w-full h-10 pl-11 pr-4 rounded-lg bg-muted/30 border border-border text-foreground placeholder:text-muted-foreground focus:ring-primary focus:border-primary transition-all text-sm outline-none"
                 />
             </div>
@@ -171,8 +184,15 @@ export function DriversContent({
       </div>
 
       {/* Driver Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {(drivers || []).map((driver) => (
+      {filteredDrivers.length === 0 ? (
+        <div className="text-center py-12 bg-card border border-border rounded-xl">
+          <Users className="mx-auto h-12 w-12 text-muted-foreground/40 mb-3" />
+          <h3 className="text-sm font-medium text-foreground">ไม่พบข้อมูลพนักงานขับรถ</h3>
+          <p className="text-xs text-muted-foreground mt-1">ลองค้นหาด้วยคำอื่น หรือเพิ่มพนักงานขับรถใหม่</p>
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          {filteredDrivers.map((driver) => (
           <div key={driver.Driver_ID} className="group bg-card border border-border rounded-xl hover:shadow-md transition-all duration-200 overflow-hidden">
             <div className="p-5 space-y-4">
               <div className="flex justify-between items-start">
@@ -246,8 +266,9 @@ export function DriversContent({
               </div>
             </div>
           </div>
-        ))}
-      </div>
+          ))}
+        </div>
+      )}
       
       <div className="flex justify-center mt-8">
         <Pagination totalItems={count || 0} limit={12} />
