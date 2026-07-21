@@ -228,7 +228,6 @@ export async function createBulkCustomers(customers: Record<string, unknown>[]) 
                 Customer_Name: String(c.Customer_Name || ''),
                 Contact_Person: c.Contact_Person,
                 Phone: c.Phone,
-                Email: c.Email,
                 Address: c.Address,
                 Tax_ID: c.Tax_ID,
                 Branch_ID: c.Branch_ID || branchId || 'HQ',
