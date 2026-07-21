@@ -419,7 +419,76 @@ export function getJobTabName(
     return false
   })
 
-  return matchedTab || TAB
+  if (matchedTab) return matchedTab
+
+  // If no exact dedicated tab exists for this customer:
+  // Siam Rungrueng -> "สยามรุ่งเรือง" tab
+  if (normCustName.includes('สยามรุ่งเรือง') || normCustName.includes('siam') || normCustId === '20') {
+    const siamTab = existingTabs.find(t => t.includes('สยามรุ่งเรือง'))
+    if (siamTab) return siamTab
+  }
+
+  // Multi-customer tab (Unicord + 4 new customers) -> "ยูนิคอร์ด" tab
+  const unicordTab = existingTabs.find(t => t.includes('ยูนิคอร์ด'))
+  if (unicordTab) return unicordTab
+
+  return TAB
+}
+
+/**
+ * Sort range in a Google Sheet tab by Date (Col 1) ascending and Customer (Col 4) ascending.
+ */
+export async function sortSheetTab(
+  sheets: SheetsClient,
+  tabName: string
+): Promise<void> {
+  try {
+    const meta = await sheets.spreadsheets.get({
+      spreadsheetId: SHEET_ID,
+      fields: 'sheets.properties(sheetId,title)',
+    })
+    const sheetProp = meta.data.sheets?.find(
+      (s: { properties?: { title?: string | null; sheetId?: number | null } | null }) => s.properties?.title === tabName
+    )?.properties
+    if (!sheetProp || sheetProp.sheetId === undefined) return
+
+    const sheetId = sheetProp.sheetId
+    const { order, headerRow } = await resolveOrder(sheets, tabName)
+
+    const dateColIndex = order.indexOf('วันที่') >= 0 ? order.indexOf('วันที่') : 0
+    const custColIndex = order.indexOf('ลูกค้า') >= 0 ? order.indexOf('ลูกค้า') : 3
+
+    await sheets.spreadsheets.batchUpdate({
+      spreadsheetId: SHEET_ID,
+      requestBody: {
+        requests: [
+          {
+            sortRange: {
+              range: {
+                sheetId: sheetId,
+                startRowIndex: headerRow, // Skip header row
+                startColumnIndex: 0,
+                endColumnIndex: order.length,
+              },
+              sortSpecs: [
+                {
+                  dimensionIndex: dateColIndex,
+                  sortOrder: 'ASCENDING',
+                },
+                {
+                  dimensionIndex: custColIndex,
+                  sortOrder: 'ASCENDING',
+                },
+              ],
+            },
+          },
+        ],
+      },
+    })
+    console.log(`[MASTER_SHEET] Auto-sorted tab '${tabName}' chronologically by Date and Customer.`)
+  } catch (err) {
+    console.warn(`[MASTER_SHEET] Auto-sort tab '${tabName}' warning:`, err)
+  }
 }
 
 /**
@@ -461,6 +530,9 @@ export async function appendJobToMaster(jobId: string): Promise<{ success: boole
       insertDataOption: 'INSERT_ROWS',
       requestBody: { values: [row] },
     })
+
+    // Auto-sort the tab chronologically by Date & Customer
+    await sortSheetTab(sheets, tabOverride)
 
     return { success: true }
   } catch (err) {
@@ -594,6 +666,11 @@ export async function verifyAndBackfillHistorical(
         })
       }
       totalAppended += rows.length
+
+      // Auto-sort the tab chronologically by Date & Customer after backfill
+      if (rows.length > 0) {
+        await sortSheetTab(sheets, tabName)
+      }
     }
 
     // Mark verification only after the ledger write succeeds. If a database
