@@ -2067,8 +2067,19 @@ export function JobDialog({
                                     value={assignment.Vehicle_Plate}
                                     onChange={(val) => updateAssignment(index, 'Vehicle_Plate', val)}
                                     vehicles={vehicles.filter((v) => {
+                                        if (assignment.Driver_ID && v.Driver_ID === assignment.Driver_ID) return true
                                         const subMatch = !assignment.Sub_ID || v.Sub_ID === assignment.Sub_ID
-                                        const typeMatch = !assignment.Vehicle_Type || v.Vehicle_Type === assignment.Vehicle_Type
+                                        const matchVehicleType = (sel?: string | null, vType?: string | null) => {
+                                            if (!sel || sel === 'All' || sel === '') return true
+                                            if (!vType) return true
+                                            const s1 = sel.toLowerCase().replace(/[\s\-_]/g, '')
+                                            const s2 = vType.toLowerCase().replace(/[\s\-_]/g, '')
+                                            if (s1 === s2 || s1.includes(s2) || s2.includes(s1)) return true
+                                            const n1 = s1.match(/^\d+/)?.[0]
+                                            const n2 = s2.match(/^\d+/)?.[0]
+                                            return Boolean(n1 && n2 && n1 === n2)
+                                        }
+                                        const typeMatch = matchVehicleType(assignment.Vehicle_Type, v.Vehicle_Type)
                                         return subMatch && typeMatch
                                     })}
                                     customerId={formData.Customer_ID}
