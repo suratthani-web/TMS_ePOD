@@ -401,33 +401,8 @@ export function JobDialog({
         }
     }
 
-    const autoOptimize = async () => {
-        // Auto-optimize only when 2+ destinations all have coordinates
-        const validDests = destinations.filter(d => d.lat && d.lng)
-        if (validDests.length < 2 || validDests.length !== destinations.length) return
-        const validOrigins = origins.filter(o => o.lat && o.lng)
-        if (validOrigins.length === 0) return
-
-        const points = [
-            ...origins.map(o => ({ lat: Number(o.lat), lng: Number(o.lng) })),
-            ...destinations.map(d => ({ lat: Number(d.lat), lng: Number(d.lng) }))
-        ]
-        const optimizedIndices = await optimizeRouteSequence(points)
-        if (optimizedIndices && optimizedIndices.length === points.length) {
-            const newDestinations = []
-            for (const idx of optimizedIndices) {
-                if (idx >= origins.length) {
-                    newDestinations.push(destinations[idx - origins.length])
-                }
-            }
-            setDestinations(newDestinations)
-            toast.success(language === 'th' ? 'จัดลำดับเส้นทางอัตโนมัติเรียบร้อย' : 'Route auto-optimized', { icon: '🗺️' })
-        }
-    }
-
     if (show) {
         calculateDistance()
-        autoOptimize()
     }
   }, [origins, destinations, show])
 
