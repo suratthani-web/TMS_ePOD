@@ -28,6 +28,8 @@ import { RequestShipmentDialog } from "./request-shipment-dialog"
 import { useRouter } from "next/navigation"
 import { ExcelExport } from "@/components/ui/excel-export"
 
+import { CustomerSummaryWidget } from "@/components/dashboard/customer-summary-widget"
+
 const container: Variants = {
     hidden: { opacity: 0 },
     show: {
@@ -89,6 +91,8 @@ interface DashboardClientProps {
     }
     initialStart?: string
     initialEnd?: string
+    allCustomers?: any[]
+    isAdminUser?: boolean
 }
 
 export function DashboardClient({ 
@@ -107,7 +111,9 @@ export function DashboardClient({
     fleetHealth,
     esg,
     initialStart = "",
-    initialEnd = ""
+    initialEnd = "",
+    allCustomers = [],
+    isAdminUser = false
 }: DashboardClientProps) {
     const { t, language } = useLanguage()
     const router = useRouter()
@@ -286,6 +292,11 @@ export function DashboardClient({
                     customerMode={customerMode}
                 />
             </div>
+
+            {/* Customer Summary Cards (7 Active Customers Overview) */}
+            {!customerMode && allCustomers && allCustomers.length > 0 && (
+                <CustomerSummaryWidget customers={allCustomers} isAdminUser={isAdminUser} />
+            )}
 
             {/* Operations Grid */}
             <motion.div 

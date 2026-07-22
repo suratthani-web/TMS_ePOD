@@ -163,25 +163,27 @@ export async function DashboardContent({ searchParams }: DashboardContentProps) 
       <DashboardClient
         branchId={currentBranchId || ""}
         customerMode={customerMode}
-      userName={custName}
-      jobStats={dailyStats}
-      driverStats={driverStats}
-      sosCount={sosIds.length}
-      fleetAlertsCount={fleetAlerts.length}
-      weeklyStats={unified.trend || []}
-      fleetStatus={fleetStatus}
-      marketplaceJobs={marketplaceJobs}
-      heatmapJobs={heatmapJobs}
-      activeJobs={activeJobs}
-      fleetHealth={98}
-      esg={{
-        fuelSaved: esgResult?.fuelSavedLiters || unified.esg?.fuelSaved || 0,
-        co2Saved: esgResult?.co2SavedKg || unified.esg?.co2Saved || 0,
-        treesSaved: esgResult?.treesSaved || unified.esg?.treesSaved || 0
-      }}
-      initialStart={start}
-      initialEnd={end}
-    />
+        userName={custName}
+        jobStats={dailyStats}
+        driverStats={driverStats}
+        sosCount={sosIds.length}
+        fleetAlertsCount={fleetAlerts.length}
+        weeklyStats={unified.trend || []}
+        fleetStatus={fleetStatus}
+        marketplaceJobs={marketplaceJobs}
+        heatmapJobs={heatmapJobs}
+        activeJobs={activeJobs}
+        fleetHealth={98}
+        esg={{
+          fuelSaved: esgResult?.fuelSavedLiters || unified.esg?.fuelSaved || 0,
+          co2Saved: esgResult?.co2SavedKg || unified.esg?.co2Saved || 0,
+          treesSaved: esgResult?.treesSaved || unified.esg?.treesSaved || 0
+        }}
+        initialStart={start}
+        initialEnd={end}
+        allCustomers={allCustomers || []}
+        isAdminUser={isAdminUser}
+      />
     </div>
   )
 }
