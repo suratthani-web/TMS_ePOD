@@ -104,7 +104,15 @@ export async function proxy(request: NextRequest) {
                           pathname.startsWith('/planning') || 
                           pathname.startsWith('/billing') || 
                           pathname.startsWith('/dashboard') ||
-                          pathname.startsWith('/settings')
+                          pathname.startsWith('/settings') ||
+                          pathname.startsWith('/jobs') ||
+                          pathname.startsWith('/drivers') ||
+                          pathname.startsWith('/vehicles') ||
+                          pathname.startsWith('/reports') ||
+                          pathname.startsWith('/routes') ||
+                          pathname.startsWith('/monitoring') ||
+                          pathname.startsWith('/pod') ||
+                          pathname.startsWith('/sos')
 
       // If we are on a desktop route but it's a mobile device, redirect to mobile app ONLY if it's not an admin route
       if (isDeviceMobile && !isAdminRoute) {

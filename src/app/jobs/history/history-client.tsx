@@ -143,16 +143,36 @@ export function HistoryClient({
     }
   }
 
-  const handleDateChange = (name: string, value: string) => {
-    const params = new URLSearchParams(searchParams.toString())
-    if (value) {
-      params.set(name, value)
-    } else {
-      params.delete(name)
-    }
-    params.set("page", "1")
-    router.push(`${pathname}?${params.toString()}`)
-  }
+  const [fromInput, setFromInput] = useState(dateFrom)
+  const [toInput, setToInput] = useState(dateTo)
+
+  useEffect(() => {
+    setFromInput(dateFrom)
+  }, [dateFrom])
+
+  useEffect(() => {
+    setToInput(dateTo)
+  }, [dateTo])
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      const currentFrom = searchParams.get('from') || ''
+      const currentTo = searchParams.get('to') || ''
+      if (currentFrom === fromInput && currentTo === toInput) return
+
+      const params = new URLSearchParams(searchParams.toString())
+      if (fromInput) params.set('from', fromInput)
+      else params.delete('from')
+
+      if (toInput) params.set('to', toInput)
+      else params.delete('to')
+
+      params.set('page', '1')
+      router.push(`${pathname}?${params.toString()}`)
+    }, 600)
+
+    return () => clearTimeout(timer)
+  }, [fromInput, toInput, router, pathname, searchParams])
 
   const statusConfig: Record<string, { label: string; color: string; icon: React.ReactNode }> = {
     New: { label: t('common.pending'), color: "text-primary bg-primary/10 border-primary/20", icon: <Package size={14} /> },
@@ -266,9 +286,9 @@ export function HistoryClient({
                     <Label className="text-[10px] font-black text-muted-foreground uppercase tracking-[0.3em] ml-1">{t('common.date')}</Label>
                     <input
                         type="date"
-                        value={dateFrom}
+                        value={fromInput}
                         name="from"
-                        onChange={(e) => handleDateChange('from', e.target.value)}
+                        onChange={(e) => setFromInput(e.target.value)}
                         className="h-12 w-full bg-muted/50 border-border/5 text-foreground font-black rounded-xl shadow-inner focus:ring-primary/40 transition-all px-6 text-xs font-bold uppercase tracking-widest outline-none"
                     />
                 </div>
@@ -276,9 +296,9 @@ export function HistoryClient({
                     <Label className="text-[10px] font-black text-muted-foreground uppercase tracking-[0.3em] ml-1">{t('common.date')}</Label>
                     <input
                         type="date"
-                        value={dateTo}
+                        value={toInput}
                         name="to"
-                        onChange={(e) => handleDateChange('to', e.target.value)}
+                        onChange={(e) => setToInput(e.target.value)}
                         className="h-12 w-full bg-muted/50 border-border/5 text-foreground font-black rounded-xl shadow-inner focus:ring-primary/40 transition-all px-6 text-xs font-bold uppercase tracking-widest outline-none"
                     />
                 </div>
