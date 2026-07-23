@@ -458,175 +458,174 @@ export function JobDialog({
   useEffect(() => {
     if (!show) return;
 
-    let isSubscribed = true
-    const loadFreshJobData = async () => {
-      let activeJob = job
+    const syncMode = job ? 'edit' : mode;
 
-      // Always fetch fresh job data from Supabase to bypass client-side state lag
-      if (job?.Job_ID) {
-        try {
-          const supabase = createClient()
-          const { data: freshJob } = await supabase
-            .from('Jobs_Main')
-            .select('*')
-            .eq('Job_ID', job.Job_ID)
-            .single()
-          if (freshJob && isSubscribed) {
-            activeJob = freshJob as Job
-          }
-        } catch {
-          // Fallback to prop job if query fails
+    const populateFromJob = (targetJob: Job) => {
+      const masterRoute = routes.find(r => r.Route_Name === targetJob.Route_Name)
+
+      // A. Sync Origins
+      const rawOrigins = (targetJob.origins || targetJob.original_origins_json)
+      let parsedOrigins = parseJson(rawOrigins, []) as LocationPoint[]
+      
+      if (parsedOrigins.length === 0 || (!parsedOrigins[0]?.name)) {
+        let originName = targetJob.Origin_Location || masterRoute?.Origin || ''
+        if (!originName && targetJob.Route_Name) {
+          const parts = targetJob.Route_Name.split(/\s*[-–—→>]\s*/)
+          if (parts.length > 1) originName = parts[0].trim()
+        }
+        const lat = (parsedOrigins[0]?.lat || targetJob.Pickup_Lat || masterRoute?.Origin_Lat)?.toString() || ''
+        const lng = (parsedOrigins[0]?.lng || targetJob.Pickup_Lon || masterRoute?.Origin_Lon)?.toString() || ''
+        
+        if (originName || lat || lng) {
+            parsedOrigins = [{ name: originName, lat, lng }]
+        } else {
+            parsedOrigins = [{ name: '', lat: '', lng: '' }]
+        }
+      }
+      setOrigins(parsedOrigins.map(o => ({
+        name: o.name || '',
+        lat: o.lat !== null && o.lat !== undefined ? String(o.lat) : '',
+        lng: o.lng !== null && o.lng !== undefined ? String(o.lng) : ''
+      })))
+
+      // B. Sync Destinations
+      const rawDestinations = (targetJob.destinations || targetJob.original_destinations_json)
+      let parsedDestinations = parseJson(rawDestinations, []) as LocationPoint[]
+      
+      if (parsedDestinations.length === 0 || (!parsedDestinations[parsedDestinations.length - 1]?.name)) {
+        let destName = targetJob.Dest_Location || masterRoute?.Destination || ''
+        if (!destName && targetJob.Route_Name) {
+          const parts = targetJob.Route_Name.split(/\s*[-–—→>]\s*/)
+          if (parts.length > 1) destName = parts[parts.length - 1].trim()
+        }
+
+        const lastIndex = parsedDestinations.length > 0 ? parsedDestinations.length - 1 : 0
+        const lat = (parsedDestinations[lastIndex]?.lat || targetJob.Delivery_Lat || masterRoute?.Dest_Lat)?.toString() || ''
+        const lng = (parsedDestinations[lastIndex]?.lng || targetJob.Delivery_Lon || masterRoute?.Dest_Lon)?.toString() || ''
+
+        if (destName || lat || lng) {
+            const fallbackDest = { 
+              name: destName, 
+              lat, 
+              lng, 
+              so_no: parsedDestinations[lastIndex]?.so_no || '' 
+            }
+            if (parsedDestinations.length > 0) parsedDestinations[lastIndex] = fallbackDest
+            else parsedDestinations = [fallbackDest]
+        } else {
+            parsedDestinations = [{ name: '', lat: '', lng: '', so_no: '' }]
         }
       }
 
-      if (!isSubscribed) return
-
-      if (activeJob) {
-        const masterRoute = routes.find(r => r.Route_Name === activeJob.Route_Name)
-
-        // A. Sync Origins
-        const rawOrigins = (activeJob.origins || activeJob.original_origins_json)
-        let parsedOrigins = parseJson(rawOrigins, []) as LocationPoint[]
-        
-        if (parsedOrigins.length === 0 || (!parsedOrigins[0]?.name)) {
-          let originName = activeJob.Origin_Location || masterRoute?.Origin || ''
-          if (!originName && activeJob.Route_Name) {
-            const parts = activeJob.Route_Name.split(/\s*[-–—→>]\s*/)
-            if (parts.length > 1) originName = parts[0].trim()
-          }
-          const lat = (parsedOrigins[0]?.lat || activeJob.Pickup_Lat || masterRoute?.Origin_Lat)?.toString() || ''
-          const lng = (parsedOrigins[0]?.lng || activeJob.Pickup_Lon || masterRoute?.Origin_Lon)?.toString() || ''
-          
-          if (originName || lat || lng) {
-              parsedOrigins = [{ name: originName, lat, lng }]
-          } else {
-              parsedOrigins = [{ name: '', lat: '', lng: '' }]
+      // Auto-complete coordinates from Customers master if blank
+      parsedDestinations = parsedDestinations.map(d => {
+        let lat = d.lat !== null && d.lat !== undefined ? String(d.lat) : ''
+        let lng = d.lng !== null && d.lng !== undefined ? String(d.lng) : ''
+        if ((!lat || !lng) && d.name) {
+          const matchedCust = customers.find(c => 
+            c.Customer_Name?.trim().toLowerCase() === d.name?.trim().toLowerCase() || 
+            c.Branch_Name?.trim().toLowerCase() === d.name?.trim().toLowerCase()
+          )
+          if (matchedCust?.Lat && matchedCust?.Lng) {
+            lat = String(matchedCust.Lat)
+            lng = String(matchedCust.Lng)
           }
         }
-        setOrigins(parsedOrigins.map(o => ({
-          name: o.name || '',
-          lat: o.lat !== null && o.lat !== undefined ? String(o.lat) : '',
-          lng: o.lng !== null && o.lng !== undefined ? String(o.lng) : ''
-        })))
-
-        // B. Sync Destinations
-        const rawDestinations = (activeJob.destinations || activeJob.original_destinations_json)
-        let parsedDestinations = parseJson(rawDestinations, []) as LocationPoint[]
-        
-        if (parsedDestinations.length === 0 || (!parsedDestinations[parsedDestinations.length - 1]?.name)) {
-          let destName = activeJob.Dest_Location || masterRoute?.Destination || ''
-          if (!destName && activeJob.Route_Name) {
-            const parts = activeJob.Route_Name.split(/\s*[-–—→>]\s*/)
-            if (parts.length > 1) destName = parts[parts.length - 1].trim()
-          }
-
-          const lastIndex = parsedDestinations.length > 0 ? parsedDestinations.length - 1 : 0
-          const lat = (parsedDestinations[lastIndex]?.lat || activeJob.Delivery_Lat || masterRoute?.Dest_Lat)?.toString() || ''
-          const lng = (parsedDestinations[lastIndex]?.lng || activeJob.Delivery_Lon || masterRoute?.Dest_Lon)?.toString() || ''
-
-          if (destName || lat || lng) {
-              const fallbackDest = { 
-                name: destName, 
-                lat, 
-                lng, 
-                so_no: parsedDestinations[lastIndex]?.so_no || '' 
-              }
-              if (parsedDestinations.length > 0) parsedDestinations[lastIndex] = fallbackDest
-              else parsedDestinations = [fallbackDest]
-          } else {
-              parsedDestinations = [{ name: '', lat: '', lng: '', so_no: '' }]
-          }
+        return {
+          name: d.name || '',
+          lat,
+          lng,
+          so_no: d.so_no !== null && d.so_no !== undefined ? String(d.so_no) : ''
         }
+      })
 
-        // Auto-complete coordinates from Customers master if blank
-        parsedDestinations = parsedDestinations.map(d => {
-          let lat = d.lat !== null && d.lat !== undefined ? String(d.lat) : ''
-          let lng = d.lng !== null && d.lng !== undefined ? String(d.lng) : ''
-          if ((!lat || !lng) && d.name) {
-            const matchedCust = customers.find(c => 
-              c.Customer_Name?.trim().toLowerCase() === d.name?.trim().toLowerCase() || 
-              c.Branch_Name?.trim().toLowerCase() === d.name?.trim().toLowerCase()
-            )
-            if (matchedCust?.Lat && matchedCust?.Lng) {
-              lat = String(matchedCust.Lat)
-              lng = String(matchedCust.Lng)
-            }
-          }
-          return {
-            name: d.name || '',
-            lat,
-            lng,
-            so_no: d.so_no !== null && d.so_no !== undefined ? String(d.so_no) : ''
-          }
-        })
+      setDestinations(parsedDestinations)
 
-        setDestinations(parsedDestinations)
+      // C. Sync Extra Costs
+      const rawCosts = (targetJob.extra_costs || targetJob.extra_costs_json)
+      setExtraCosts(parseJson(rawCosts, []) as ExtraCost[])
 
-        // C. Sync Extra Costs
-        const rawCosts = (activeJob.extra_costs || activeJob.extra_costs_json)
-        setExtraCosts(parseJson(rawCosts, []) as ExtraCost[])
-
-      // C. Sync Assignments & Form Data Atomically
-      const initialAssignments = job.assignments && job.assignments.length > 0
-        ? job.assignments
+      // D. Sync Assignments & Form Data
+      const initialAssignments = targetJob.assignments && targetJob.assignments.length > 0
+        ? targetJob.assignments
         : [{
-            Vehicle_Plate: job.Vehicle_Plate || '',
-            Vehicle_Type: job.Vehicle_Type || '4-Wheel',
-            Driver_ID: job.Driver_ID || '',
-            Sub_ID: job.Sub_ID || '',
-            Show_Price_To_Driver: job.Show_Price_To_Driver !== false,
-            Price_Cust_Total: job.Price_Cust_Total !== null ? Number(job.Price_Cust_Total) : 0,
-            Cost_Driver_Total: job.Cost_Driver_Total !== null ? Number(job.Cost_Driver_Total) : 0,
+            Vehicle_Plate: targetJob.Vehicle_Plate || '',
+            Vehicle_Type: targetJob.Vehicle_Type || '4-Wheel',
+            Driver_ID: targetJob.Driver_ID || '',
+            Sub_ID: targetJob.Sub_ID || '',
+            Show_Price_To_Driver: targetJob.Show_Price_To_Driver !== false,
+            Price_Cust_Total: targetJob.Price_Cust_Total !== null ? Number(targetJob.Price_Cust_Total) : 0,
+            Cost_Driver_Total: targetJob.Cost_Driver_Total !== null ? Number(targetJob.Cost_Driver_Total) : 0,
           }]
       setAssignments(initialAssignments)
 
       const firstAssign = initialAssignments[0]
       const newFormData = {
-        Job_ID: syncMode === 'edit' ? (job.Job_ID || '') : generateJobId(), // Preserve ID only if editing
-        Plan_Date: job.Plan_Date || job.Pickup_Date || defaultDate || new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Bangkok' }),
-        Delivery_Date: job.Delivery_Date || defaultDate || new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Bangkok' }),
-        Customer_ID: job.Customer_ID || '',
-        Customer_Name: job.Customer_Name || '',
-        Route_Name: job.Route_Name || '',
-        Driver_ID: firstAssign.Driver_ID || job.Driver_ID || '',
-        Vehicle_Plate: firstAssign.Vehicle_Plate || job.Vehicle_Plate || '',
-        Vehicle_Type: firstAssign.Vehicle_Type || job.Vehicle_Type || '4-Wheel',
-        Sub_ID: firstAssign.Sub_ID || job.Sub_ID || '',
-        Price_Cust_Total: firstAssign.Price_Cust_Total !== undefined ? firstAssign.Price_Cust_Total : (job.Price_Cust_Total !== null ? Number(job.Price_Cust_Total) : 0),
-        Cost_Driver_Total: firstAssign.Cost_Driver_Total !== undefined ? firstAssign.Cost_Driver_Total : (job.Cost_Driver_Total !== null ? Number(job.Cost_Driver_Total) : 0),
-        Price_Cust_Extra: job.Price_Cust_Extra !== null && job.Price_Cust_Extra !== undefined ? Number(job.Price_Cust_Extra) : 0,
-        Cost_Driver_Extra: job.Cost_Driver_Extra !== null && job.Cost_Driver_Extra !== undefined ? Number(job.Cost_Driver_Extra) : 0,
-        Cargo_Type: job.Cargo_Type || '',
-        Notes: job.Notes || '',
-        Job_Status: syncMode === 'edit' ? (job.Job_Status || 'New') : 'New',
-        Weight_Kg: job.Weight_Kg !== null && job.Weight_Kg !== undefined ? Number(job.Weight_Kg) : 0,
-        Volume_Cbm: job.Volume_Cbm !== null && job.Volume_Cbm !== undefined ? Number(job.Volume_Cbm) : 0,
-        Est_Distance_KM: job.Est_Distance_KM !== null && job.Est_Distance_KM !== undefined ? Number(job.Est_Distance_KM) : 0,
-        Zone: job.Zone || '',
-        Branch_ID: job.Branch_ID || '',
-        Show_Price_To_Driver: firstAssign.Show_Price_To_Driver ?? job.Show_Price_To_Driver ?? true,
-        Pickup_Lat: job.Pickup_Lat || null,
-        Pickup_Lon: job.Pickup_Lon || null,
-        Delivery_Lat: job.Delivery_Lat || null,
-        Delivery_Lon: job.Delivery_Lon || null,
-        Loaded_Qty: job.Loaded_Qty !== null && job.Loaded_Qty !== undefined ? job.Loaded_Qty : '',
-        job_type: (job as any)?.job_type || 'normal',
-        chassis_plate: (job as any)?.chassis_plate || '',
-        container_no: (job as any)?.container?.container_no || '',
-        seal_no: (job as any)?.container?.seal_no || '',
-        container_size: (job as any)?.container?.container_size || '',
-        shipping_line: (job as any)?.container?.shipping_line || '',
-        vessel_voyage: (job as any)?.container?.vessel_voyage || '',
-        lfd_demurrage: (job as any)?.container?.lfd_demurrage || '',
-        lfd_detention: (job as any)?.container?.lfd_detention || '',
-        target_temperature: (job as any)?.container?.target_temperature || '',
-        booking_no: (job as any)?.container?.booking_no || '',
-        container_subtype: (job as any)?.container?.container_subtype || 'import',
-        pickup_empty_date: (job as any)?.container?.pickup_empty_date || '',
-        port_closing_datetime: (job as any)?.container?.port_closing_datetime ? (job as any).container.port_closing_datetime.slice(0, 16) : '',
+        Job_ID: syncMode === 'edit' ? (targetJob.Job_ID || '') : generateJobId(),
+        Plan_Date: targetJob.Plan_Date || targetJob.Pickup_Date || defaultDate || new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Bangkok' }),
+        Delivery_Date: targetJob.Delivery_Date || defaultDate || new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Bangkok' }),
+        Customer_ID: targetJob.Customer_ID || '',
+        Customer_Name: targetJob.Customer_Name || '',
+        Route_Name: targetJob.Route_Name || '',
+        Driver_ID: firstAssign.Driver_ID || targetJob.Driver_ID || '',
+        Vehicle_Plate: firstAssign.Vehicle_Plate || targetJob.Vehicle_Plate || '',
+        Vehicle_Type: firstAssign.Vehicle_Type || targetJob.Vehicle_Type || '4-Wheel',
+        Sub_ID: firstAssign.Sub_ID || targetJob.Sub_ID || '',
+        Price_Cust_Total: firstAssign.Price_Cust_Total !== undefined ? firstAssign.Price_Cust_Total : (targetJob.Price_Cust_Total !== null ? Number(targetJob.Price_Cust_Total) : 0),
+        Cost_Driver_Total: firstAssign.Cost_Driver_Total !== undefined ? firstAssign.Cost_Driver_Total : (targetJob.Cost_Driver_Total !== null ? Number(targetJob.Cost_Driver_Total) : 0),
+        Price_Cust_Extra: targetJob.Price_Cust_Extra !== null && targetJob.Price_Cust_Extra !== undefined ? Number(targetJob.Price_Cust_Extra) : 0,
+        Cost_Driver_Extra: targetJob.Cost_Driver_Extra !== null && targetJob.Cost_Driver_Extra !== undefined ? Number(targetJob.Cost_Driver_Extra) : 0,
+        Cargo_Type: targetJob.Cargo_Type || '',
+        Notes: targetJob.Notes || '',
+        Job_Status: syncMode === 'edit' ? (targetJob.Job_Status || 'New') : 'New',
+        Weight_Kg: targetJob.Weight_Kg !== null && targetJob.Weight_Kg !== undefined ? Number(targetJob.Weight_Kg) : 0,
+        Volume_Cbm: targetJob.Volume_Cbm !== null && targetJob.Volume_Cbm !== undefined ? Number(targetJob.Volume_Cbm) : 0,
+        Est_Distance_KM: targetJob.Est_Distance_KM !== null && targetJob.Est_Distance_KM !== undefined ? Number(targetJob.Est_Distance_KM) : 0,
+        Zone: targetJob.Zone || '',
+        Branch_ID: targetJob.Branch_ID || '',
+        Show_Price_To_Driver: firstAssign.Show_Price_To_Driver ?? targetJob.Show_Price_To_Driver ?? true,
+        Pickup_Lat: targetJob.Pickup_Lat || null,
+        Pickup_Lon: targetJob.Pickup_Lon || null,
+        Delivery_Lat: targetJob.Delivery_Lat || null,
+        Delivery_Lon: targetJob.Delivery_Lon || null,
+        Loaded_Qty: targetJob.Loaded_Qty !== null && targetJob.Loaded_Qty !== undefined ? targetJob.Loaded_Qty : '',
+        job_type: (targetJob as any)?.job_type || 'normal',
+        chassis_plate: (targetJob as any)?.chassis_plate || '',
+        container_no: (targetJob as any)?.container?.container_no || '',
+        seal_no: (targetJob as any)?.container?.seal_no || '',
+        container_size: (targetJob as any)?.container?.container_size || '',
+        shipping_line: (targetJob as any)?.container?.shipping_line || '',
+        vessel_voyage: (targetJob as any)?.container?.vessel_voyage || '',
+        lfd_demurrage: (targetJob as any)?.container?.lfd_demurrage || '',
+        lfd_detention: (targetJob as any)?.container?.lfd_detention || '',
+        target_temperature: (targetJob as any)?.container?.target_temperature || '',
+        booking_no: (targetJob as any)?.container?.booking_no || '',
+        container_subtype: (targetJob as any)?.container?.container_subtype || 'import',
+        pickup_empty_date: (targetJob as any)?.container?.pickup_empty_date || '',
+        port_closing_datetime: (targetJob as any)?.container?.port_closing_datetime ? (targetJob as any).container.port_closing_datetime.slice(0, 16) : '',
       }
-      setFormData(newFormData);
+      setFormData(newFormData)
+    }
 
+    if (job) {
+      populateFromJob(job)
+
+      let isMounted = true
+      if (job.Job_ID) {
+        const supabase = createClient()
+        supabase
+          .from('Jobs_Main')
+          .select('*')
+          .eq('Job_ID', job.Job_ID)
+          .single()
+          .then(({ data: freshJob }) => {
+            if (freshJob && isMounted) {
+              populateFromJob(freshJob as Job)
+            }
+          })
+          .catch(() => {})
+      }
+      return () => { isMounted = false }
     } else {
       setFormData({
         Job_ID: generateJobId(),
@@ -676,12 +675,6 @@ export function JobDialog({
       setDestinations([{ name: '', lat: '', lng: '' }])
       setExtraCosts([])
       setAssignments([{ Vehicle_Type: '4-Wheel', Vehicle_Plate: '', Driver_ID: '', Sub_ID: '', Show_Price_To_Driver: true, Cost_Driver_Total: 0, Price_Cust_Total: 0 }])
-    }
-
-    loadFreshJobData()
-
-    return () => {
-      isSubscribed = false
     }
   }, [show, mode, job, defaultDate])
 
