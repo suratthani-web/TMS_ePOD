@@ -119,9 +119,19 @@ export async function submitJobPOD(jobId: string, formData: FormData) {
     const timeString = timeTH(now)
 
     // Check multi-drop / multi-pickup total count
-    const totalDrop = (jobData?.original_destinations_json && Array.isArray(jobData.original_destinations_json) && jobData.original_destinations_json.length > 0)
-        ? jobData.original_destinations_json.length
-        : Number(jobData?.Total_Drop || 1)
+    let parsedDests: unknown[] = []
+    if (jobData?.original_destinations_json) {
+        try {
+            parsedDests = typeof jobData.original_destinations_json === 'string'
+                ? JSON.parse(jobData.original_destinations_json)
+                : (jobData.original_destinations_json as unknown[])
+        } catch {
+            parsedDests = []
+        }
+    }
+    const totalDrop = (Array.isArray(parsedDests) && parsedDests.length > 0)
+        ? parsedDests.length
+        : (Number(jobData?.Total_Drop) > 0 ? Number(jobData.Total_Drop) : 1)
 
     // Existing URLs accumulation for Multi-drop
     const existingSignatures = jobData?.Signature_Url ? jobData.Signature_Url.split(',').filter(Boolean) : []

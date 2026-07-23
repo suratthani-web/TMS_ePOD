@@ -148,24 +148,31 @@ export function ExtraServiceModal({
           <div className="bg-slate-800/60 p-3 rounded-2xl border border-slate-800 flex items-center justify-between">
             <div>
               <p className="text-sm font-bold text-slate-200">จำนวนย้ายสินค้า (กล่อง)</p>
-              <p className="text-[11px] text-slate-400">การยกย้ายสินค้าหน้างาน</p>
+              <p className="text-[11px] text-slate-400">พิมพ์ตัวเลขหรือกดปุ่มบวก-ลบ</p>
             </div>
-            <div className="flex items-center gap-3">
+            <div className="flex items-center gap-2">
               <Button
                 type="button"
                 variant="outline"
                 size="icon"
-                className="h-9 w-9 rounded-xl border-slate-700 bg-slate-800 text-slate-200"
+                className="h-9 w-9 rounded-xl border-slate-700 bg-slate-800 text-slate-200 shrink-0"
                 onClick={() => setMovedQty(Math.max(0, movedQty - 1))}
               >
                 <Minus size={14} />
               </Button>
-              <span className="w-8 text-center text-lg font-black text-white">{movedQty}</span>
+              <Input
+                type="number"
+                inputMode="numeric"
+                value={movedQty === 0 ? "" : movedQty}
+                onChange={(e) => setMovedQty(Math.max(0, parseInt(e.target.value || "0", 10)))}
+                placeholder="0"
+                className="w-16 h-10 bg-slate-900 border-slate-700 text-center font-black text-white text-base rounded-xl focus-visible:ring-indigo-500 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+              />
               <Button
                 type="button"
                 variant="outline"
                 size="icon"
-                className="h-9 w-9 rounded-xl border-slate-700 bg-slate-800 text-slate-200"
+                className="h-9 w-9 rounded-xl border-slate-700 bg-slate-800 text-slate-200 shrink-0"
                 onClick={() => setMovedQty(movedQty + 1)}
               >
                 <Plus size={14} />
@@ -202,24 +209,31 @@ export function ExtraServiceModal({
             <div className="bg-indigo-950/40 p-3 rounded-2xl border border-indigo-900/50 flex items-center justify-between animate-in fade-in duration-300">
               <div>
                 <p className="text-sm font-bold text-indigo-200">จำนวนสินค้าขึ้นชั้น (กล่อง)</p>
-                <p className="text-[11px] text-indigo-400">ระบุจำนวนที่แบกขึ้นชั้น {floorClimbQty}</p>
+                <p className="text-[11px] text-indigo-400">พิมพ์ระบุจำนวนสินค้าที่ยกขึ้นชั้น {floorClimbQty}</p>
               </div>
-              <div className="flex items-center gap-3">
+              <div className="flex items-center gap-2">
                 <Button
                   type="button"
                   variant="outline"
                   size="icon"
-                  className="h-9 w-9 rounded-xl border-indigo-800 bg-indigo-900/50 text-indigo-200"
+                  className="h-9 w-9 rounded-xl border-indigo-800 bg-indigo-900/50 text-indigo-200 shrink-0"
                   onClick={() => setShelvedQty(Math.max(0, shelvedQty - 1))}
                 >
                   <Minus size={14} />
                 </Button>
-                <span className="w-8 text-center text-lg font-black text-indigo-100">{shelvedQty}</span>
+                <Input
+                  type="number"
+                  inputMode="numeric"
+                  value={shelvedQty === 0 ? "" : shelvedQty}
+                  onChange={(e) => setShelvedQty(Math.max(0, parseInt(e.target.value || "0", 10)))}
+                  placeholder="0"
+                  className="w-16 h-10 bg-indigo-950 border-indigo-700 text-center font-black text-indigo-100 text-base rounded-xl focus-visible:ring-indigo-500 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                />
                 <Button
                   type="button"
                   variant="outline"
                   size="icon"
-                  className="h-9 w-9 rounded-xl border-indigo-800 bg-indigo-900/50 text-indigo-200"
+                  className="h-9 w-9 rounded-xl border-indigo-800 bg-indigo-900/50 text-indigo-200 shrink-0"
                   onClick={() => setShelvedQty(shelvedQty + 1)}
                 >
                   <Plus size={14} />

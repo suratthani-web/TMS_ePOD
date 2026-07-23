@@ -221,7 +221,7 @@ export default function JobPickupPage() {
     <div className="min-h-screen bg-background pb-32">
         <MobileHeader title={isContainer ? "บันทึกข้อมูลตู้ (EIR)" : "บันทึกการรับสินค้า"} showBack />
 
-        <div className="px-5 pt-6 space-y-8">
+        <div className="px-5 pt-20 space-y-8">
             {isContainer ? (
                 <>
                     <div className="bg-card rounded-3xl p-6 border border-border shadow-sm space-y-6">

@@ -277,7 +277,7 @@ export default function JobCompletePage() {
   }
 
   return (
-    <div className="min-h-screen bg-slate-950 pb-24 pt-16 px-4">
+    <div className="min-h-screen bg-slate-950 pb-24 pt-20 px-4">
       <MobileHeader title={isContainer ? "คืนตู้ (Gate-In EIR)" : "ส่งงาน (POD)"} showBack />
 
       {/* Hidden Report Container */}
