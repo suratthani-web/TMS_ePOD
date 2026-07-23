@@ -458,86 +458,113 @@ export function JobDialog({
   useEffect(() => {
     if (!show) return;
 
-    // Use mode prop as the primary driver to avoid internal state lag
-    const syncMode = job ? 'edit' : mode;
+    let isSubscribed = true
+    const loadFreshJobData = async () => {
+      let activeJob = job
 
-
-    if (job) {
-      
-      const masterRoute = routes.find(r => r.Route_Name === job.Route_Name)
-
-      // A. Sync Locations
-      const rawOrigins = (job.origins || job.original_origins_json)
-      let parsedOrigins = parseJson(rawOrigins, []) as LocationPoint[]
-      
-      // Smart recovery: If JSON is empty/missing, try Master_Routes then Root columns
-      if (parsedOrigins.length === 0 || (!parsedOrigins[0].name)) {
-        let originName = job.Origin_Location || masterRoute?.Origin || ''
-        
-        // Try parsing from Route_Name if everything else is empty
-        if (!originName && job.Route_Name) {
-          const parts = job.Route_Name.split(/\s*[-–—→>]\s*/)
-          if (parts.length > 1) {
-            originName = parts[0].trim()
+      // Always fetch fresh job data from Supabase to bypass client-side state lag
+      if (job?.Job_ID) {
+        try {
+          const supabase = createClient()
+          const { data: freshJob } = await supabase
+            .from('Jobs_Main')
+            .select('*')
+            .eq('Job_ID', job.Job_ID)
+            .single()
+          if (freshJob && isSubscribed) {
+            activeJob = freshJob as Job
           }
-        }
-
-        const lat = (parsedOrigins[0]?.lat || job.Pickup_Lat || masterRoute?.Origin_Lat)?.toString() || ''
-        const lng = (parsedOrigins[0]?.lng || job.Pickup_Lon || masterRoute?.Origin_Lon)?.toString() || ''
-        
-        if (originName || lat || lng) {
-            parsedOrigins = [{ name: originName, lat, lng }]
-        } else if (parsedOrigins.length === 0) {
-            parsedOrigins = [{ name: '', lat: '', lng: '' }]
+        } catch {
+          // Fallback to prop job if query fails
         }
       }
-      setOrigins(parsedOrigins.map(o => ({
-        name: o.name || '',
-        lat: o.lat !== null && o.lat !== undefined ? String(o.lat) : '',
-        lng: o.lng !== null && o.lng !== undefined ? String(o.lng) : ''
-      })))
 
-      const rawDestinations = (job.destinations || job.original_destinations_json)
-      let parsedDestinations = parseJson(rawDestinations, []) as LocationPoint[]
-      
-      if (parsedDestinations.length === 0 || (!parsedDestinations[parsedDestinations.length - 1]?.name)) {
-        let destName = job.Dest_Location || masterRoute?.Destination || ''
+      if (!isSubscribed) return
 
-        // Try parsing from Route_Name if everything else is empty
-        if (!destName && job.Route_Name) {
-          const parts = job.Route_Name.split(/\s*[-–—→>]\s*/)
-          if (parts.length > 1) {
-            destName = parts[parts.length - 1].trim()
+      if (activeJob) {
+        const masterRoute = routes.find(r => r.Route_Name === activeJob.Route_Name)
+
+        // A. Sync Origins
+        const rawOrigins = (activeJob.origins || activeJob.original_origins_json)
+        let parsedOrigins = parseJson(rawOrigins, []) as LocationPoint[]
+        
+        if (parsedOrigins.length === 0 || (!parsedOrigins[0]?.name)) {
+          let originName = activeJob.Origin_Location || masterRoute?.Origin || ''
+          if (!originName && activeJob.Route_Name) {
+            const parts = activeJob.Route_Name.split(/\s*[-–—→>]\s*/)
+            if (parts.length > 1) originName = parts[0].trim()
+          }
+          const lat = (parsedOrigins[0]?.lat || activeJob.Pickup_Lat || masterRoute?.Origin_Lat)?.toString() || ''
+          const lng = (parsedOrigins[0]?.lng || activeJob.Pickup_Lon || masterRoute?.Origin_Lon)?.toString() || ''
+          
+          if (originName || lat || lng) {
+              parsedOrigins = [{ name: originName, lat, lng }]
+          } else {
+              parsedOrigins = [{ name: '', lat: '', lng: '' }]
+          }
+        }
+        setOrigins(parsedOrigins.map(o => ({
+          name: o.name || '',
+          lat: o.lat !== null && o.lat !== undefined ? String(o.lat) : '',
+          lng: o.lng !== null && o.lng !== undefined ? String(o.lng) : ''
+        })))
+
+        // B. Sync Destinations
+        const rawDestinations = (activeJob.destinations || activeJob.original_destinations_json)
+        let parsedDestinations = parseJson(rawDestinations, []) as LocationPoint[]
+        
+        if (parsedDestinations.length === 0 || (!parsedDestinations[parsedDestinations.length - 1]?.name)) {
+          let destName = activeJob.Dest_Location || masterRoute?.Destination || ''
+          if (!destName && activeJob.Route_Name) {
+            const parts = activeJob.Route_Name.split(/\s*[-–—→>]\s*/)
+            if (parts.length > 1) destName = parts[parts.length - 1].trim()
+          }
+
+          const lastIndex = parsedDestinations.length > 0 ? parsedDestinations.length - 1 : 0
+          const lat = (parsedDestinations[lastIndex]?.lat || activeJob.Delivery_Lat || masterRoute?.Dest_Lat)?.toString() || ''
+          const lng = (parsedDestinations[lastIndex]?.lng || activeJob.Delivery_Lon || masterRoute?.Dest_Lon)?.toString() || ''
+
+          if (destName || lat || lng) {
+              const fallbackDest = { 
+                name: destName, 
+                lat, 
+                lng, 
+                so_no: parsedDestinations[lastIndex]?.so_no || '' 
+              }
+              if (parsedDestinations.length > 0) parsedDestinations[lastIndex] = fallbackDest
+              else parsedDestinations = [fallbackDest]
+          } else {
+              parsedDestinations = [{ name: '', lat: '', lng: '', so_no: '' }]
           }
         }
 
-        const lastIndex = parsedDestinations.length > 0 ? parsedDestinations.length - 1 : 0
-        const lat = (parsedDestinations[lastIndex]?.lat || job.Delivery_Lat || masterRoute?.Dest_Lat)?.toString() || ''
-        const lng = (parsedDestinations[lastIndex]?.lng || job.Delivery_Lon || masterRoute?.Dest_Lon)?.toString() || ''
-
-        if (destName || lat || lng) {
-            const fallbackDest = { 
-              name: destName, 
-              lat, 
-              lng, 
-              so_no: parsedDestinations[lastIndex]?.so_no || '' 
+        // Auto-complete coordinates from Customers master if blank
+        parsedDestinations = parsedDestinations.map(d => {
+          let lat = d.lat !== null && d.lat !== undefined ? String(d.lat) : ''
+          let lng = d.lng !== null && d.lng !== undefined ? String(d.lng) : ''
+          if ((!lat || !lng) && d.name) {
+            const matchedCust = customers.find(c => 
+              c.Customer_Name?.trim().toLowerCase() === d.name?.trim().toLowerCase() || 
+              c.Branch_Name?.trim().toLowerCase() === d.name?.trim().toLowerCase()
+            )
+            if (matchedCust?.Lat && matchedCust?.Lng) {
+              lat = String(matchedCust.Lat)
+              lng = String(matchedCust.Lng)
             }
-            if (parsedDestinations.length > 0) parsedDestinations[lastIndex] = fallbackDest
-            else parsedDestinations = [fallbackDest]
-        } else if (parsedDestinations.length === 0) {
-            parsedDestinations = [{ name: '', lat: '', lng: '', so_no: '' }]
-        }
-      }
-      setDestinations(parsedDestinations.map(d => ({
-        name: d.name || '',
-        lat: d.lat !== null && d.lat !== undefined ? String(d.lat) : '',
-        lng: d.lng !== null && d.lng !== undefined ? String(d.lng) : '',
-        so_no: d.so_no || ''
-      })))
+          }
+          return {
+            name: d.name || '',
+            lat,
+            lng,
+            so_no: d.so_no !== null && d.so_no !== undefined ? String(d.so_no) : ''
+          }
+        })
 
-      // B. Sync Extra Costs
-      const rawCosts = (job.extra_costs || job.extra_costs_json)
-      setExtraCosts(parseJson(rawCosts, []) as ExtraCost[])
+        setDestinations(parsedDestinations)
+
+        // C. Sync Extra Costs
+        const rawCosts = (activeJob.extra_costs || activeJob.extra_costs_json)
+        setExtraCosts(parseJson(rawCosts, []) as ExtraCost[])
 
       // C. Sync Assignments & Form Data Atomically
       const initialAssignments = job.assignments && job.assignments.length > 0
@@ -649,6 +676,12 @@ export function JobDialog({
       setDestinations([{ name: '', lat: '', lng: '' }])
       setExtraCosts([])
       setAssignments([{ Vehicle_Type: '4-Wheel', Vehicle_Plate: '', Driver_ID: '', Sub_ID: '', Show_Price_To_Driver: true, Cost_Driver_Total: 0, Price_Cust_Total: 0 }])
+    }
+
+    loadFreshJobData()
+
+    return () => {
+      isSubscribed = false
     }
   }, [show, mode, job?.Job_ID, defaultDate])
 
