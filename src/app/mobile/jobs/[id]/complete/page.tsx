@@ -168,14 +168,14 @@ export default function JobCompletePage() {
                 try {
                     await waitForImages(floorClimbReportRef.current!)
                     const fcCanvas = await html2canvas(floorClimbReportRef.current!, {
-                        scale: 1,
+                        scale: 1.5,
                         useCORS: true,
                         logging: false,
                         backgroundColor: "#ffffff",
-                        windowWidth: 850
+                        width: 800
                     })
                     const fcBlob = await new Promise<Blob | null>(resolve => fcCanvas.toBlob(resolve, 'image/jpeg', 0.85))
-                    if (fcBlob && fcBlob.size > 5000) {
+                    if (fcBlob && fcBlob.size > 1000) {
                         formData.append("floor_climb_report", fcBlob, `Floor_Climb_Report_${params.id}.jpg`)
                     }
                 } catch (fcErr) {
@@ -301,9 +301,12 @@ export default function JobCompletePage() {
     <div className="min-h-screen bg-slate-950 pb-24 pt-20 px-4">
       <MobileHeader title={isContainer ? "คืนตู้ (Gate-In EIR)" : "ส่งงาน (POD)"} showBack />
 
-      {/* Hidden Report Container */}
+      {/* Hidden Report Container for html2canvas rendering */}
       {job && (
-          <div className="fixed left-[-9999px] top-0 space-y-8">
+          <div 
+            className="absolute top-0 left-0 pointer-events-none space-y-8 w-[800px]" 
+            style={{ zIndex: -9999, opacity: 0.99 }}
+          >
              {isContainer ? (
                  <ContainerDeliveryReport
                      ref={reportRef}
