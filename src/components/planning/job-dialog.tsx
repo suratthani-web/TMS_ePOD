@@ -613,18 +613,22 @@ export function JobDialog({
 
       let isMounted = true
       if (job.Job_ID) {
-        const supabase = createClient()
-        supabase
-          .from('Jobs_Main')
-          .select('*')
-          .eq('Job_ID', job.Job_ID)
-          .single()
-          .then(({ data: freshJob }) => {
+        const fetchFresh = async () => {
+          try {
+            const supabase = createClient()
+            const { data: freshJob } = await supabase
+              .from('Jobs_Main')
+              .select('*')
+              .eq('Job_ID', job.Job_ID)
+              .single()
             if (freshJob && isMounted) {
               populateFromJob(freshJob as Job)
             }
-          })
-          .catch(() => {})
+          } catch {
+            // Ignore error
+          }
+        }
+        fetchFresh()
       }
       return () => { isMounted = false }
     } else {
