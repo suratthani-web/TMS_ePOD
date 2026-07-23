@@ -491,12 +491,16 @@ export function JobDialog({
             parsedOrigins = [{ name: '', lat: '', lng: '' }]
         }
       }
-      setOrigins(parsedOrigins)
+      setOrigins(parsedOrigins.map(o => ({
+        name: o.name || '',
+        lat: o.lat !== null && o.lat !== undefined ? String(o.lat) : '',
+        lng: o.lng !== null && o.lng !== undefined ? String(o.lng) : ''
+      })))
 
       const rawDestinations = (job.destinations || job.original_destinations_json)
       let parsedDestinations = parseJson(rawDestinations, []) as LocationPoint[]
       
-      if (parsedDestinations.length === 0 || (!parsedDestinations[parsedDestinations.length - 1].name)) {
+      if (parsedDestinations.length === 0 || (!parsedDestinations[parsedDestinations.length - 1]?.name)) {
         let destName = job.Dest_Location || masterRoute?.Destination || ''
 
         // Try parsing from Route_Name if everything else is empty
@@ -512,14 +516,24 @@ export function JobDialog({
         const lng = (parsedDestinations[lastIndex]?.lng || job.Delivery_Lon || masterRoute?.Dest_Lon)?.toString() || ''
 
         if (destName || lat || lng) {
-            const fallbackDest = { name: destName, lat, lng }
+            const fallbackDest = { 
+              name: destName, 
+              lat, 
+              lng, 
+              so_no: parsedDestinations[lastIndex]?.so_no || '' 
+            }
             if (parsedDestinations.length > 0) parsedDestinations[lastIndex] = fallbackDest
             else parsedDestinations = [fallbackDest]
         } else if (parsedDestinations.length === 0) {
-            parsedDestinations = [{ name: '', lat: '', lng: '' }]
+            parsedDestinations = [{ name: '', lat: '', lng: '', so_no: '' }]
         }
       }
-      setDestinations(parsedDestinations)
+      setDestinations(parsedDestinations.map(d => ({
+        name: d.name || '',
+        lat: d.lat !== null && d.lat !== undefined ? String(d.lat) : '',
+        lng: d.lng !== null && d.lng !== undefined ? String(d.lng) : '',
+        so_no: d.so_no || ''
+      })))
 
       // B. Sync Extra Costs
       const rawCosts = (job.extra_costs || job.extra_costs_json)
@@ -830,6 +844,21 @@ export function JobDialog({
                     updateDestination(index, 'lng', coords.lng.toString());
                     toast.success(`ดึงพิกัดจากลิงก์มาสเตอร์: ${name}`);
                 }
+            }
+            return
+        }
+    }
+
+    // 3. Customer Lookup - Fallback for coordinates
+    if (customers && customers.length > 0) {
+        const custMatch = customers.find(c => c.Customer_Name && c.Customer_Name.trim().toLowerCase() === name.toLowerCase())
+        if (custMatch) {
+            const lat = (custMatch as any).Delivery_Lat || (custMatch as any).lat
+            const lng = (custMatch as any).Delivery_Lon || (custMatch as any).lng || (custMatch as any).lon
+            if (lat && lng) {
+                updateDestination(index, 'lat', String(lat))
+                updateDestination(index, 'lng', String(lng))
+                toast.success(`ดึงพิกัดปลายทางจากข้อมูลลูกค้า: ${name}`)
             }
         }
     }
