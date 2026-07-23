@@ -19,6 +19,7 @@ export type ESGStats = {
     treesSaved: number
     fuelConsumedLiters: number // ปริมาณน้ำมันเชื้อเพลิงรวม (ลิตร)
     fuelSavedLiters: number // Alias for UI compatibility
+    totalSavedKm: number // Alias for UI compatibility
     efficiencyRate: number // % ใบงานที่มีข้อมูลสมบูรณ์
     scope1EmissionsKg: number // Scope 1: รถบริษัท (Direct Emissions - Exact Volume)
     scope3EmissionsKg: number // Scope 3: รถร่วม (Upstream Transportation - Distance Estimated)
@@ -147,6 +148,8 @@ export async function getESGStats(startDate?: string, endDate?: string, branchId
             .map(([month, co2Emissions]) => ({ month, co2Emissions: Math.round(co2Emissions) }))
             .sort((a, b) => a.month.localeCompare(b.month))
 
+        const totalSavedKm = Math.round(totalCo2Emissions / 0.263)
+
         return {
             validJobsCount,
             incompleteJobsCount,
@@ -155,6 +158,7 @@ export async function getESGStats(startDate?: string, endDate?: string, branchId
             treesSaved: Math.round(treesSaved * 10) / 10,
             fuelConsumedLiters: Math.round(totalFuelLiters * 10) / 10,
             fuelSavedLiters: Math.round(totalFuelLiters * 10) / 10,
+            totalSavedKm,
             efficiencyRate: totalJobs > 0 ? Math.round((validJobsCount / totalJobs) * 100) : 0,
             scope1EmissionsKg: Math.round(scope1Co2Total * 100) / 100,
             scope3EmissionsKg: Math.round(scope3Co2Total * 100) / 100,
@@ -172,6 +176,7 @@ export async function getESGStats(startDate?: string, endDate?: string, branchId
             treesSaved: 0,
             fuelConsumedLiters: 0,
             fuelSavedLiters: 0,
+            totalSavedKm: 0,
             efficiencyRate: 0,
             scope1EmissionsKg: 0,
             scope3EmissionsKg: 0,
