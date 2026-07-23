@@ -8,18 +8,21 @@ import { calculateJobEmissions, TGO_STANDARDS_METADATA } from '../utils/esg-util
 /**
  * ESG Intelligence Engine - TMS 2026 (TGO Standard Certified Edition)
  * Calculates Environmental impact & Carbon Emissions based on TGO Guidelines.
+ * Strict Audit Mode: No data fabrication (fallbacks removed for compliance).
  */
 
 export type ESGStats = {
-    totalSavedKm: number
-    co2SavedKg: number
+    validJobsCount: number // จำนวนใบงานที่มีข้อมูลสมบูรณ์พร้อมยื่น อบก.
+    incompleteJobsCount: number // จำนวนใบงานที่ข้อมูลระยะทางไม่ครบถ้วน (ติด Flag เพื่อ Audit)
+    co2EmissionsKg: number // ปริมาณการปล่อยคาร์บอนรวม (kgCO2e)
+    co2SavedKg: number // Alias for UI compatibility
     treesSaved: number
-    fuelSavedLiters: number
-    efficiencyRate: number // % of jobs with valid distance data
-    scope1EmissionsKg: number // Scope 1: รถบริษัท (Direct Emissions)
-    scope3EmissionsKg: number // Scope 3: รถร่วม (Upstream Transportation)
+    fuelConsumedLiters: number // ปริมาณน้ำมันเชื้อเพลิงรวม (ลิตร)
+    efficiencyRate: number // % ใบงานที่มีข้อมูลสมบูรณ์
+    scope1EmissionsKg: number // Scope 1: รถบริษัท (Direct Emissions - Exact Volume)
+    scope3EmissionsKg: number // Scope 3: รถร่วม (Upstream Transportation - Distance Estimated)
     tgoMetadata: typeof TGO_STANDARDS_METADATA
-    historicalData: { month: string; co2Saved: number }[]
+    historicalData: { month: string; co2Emissions: number }[]
 }
 
 const KG_CO2_PER_TREE_YEAR = 22 // 1 tree offsets ~22kg CO2 per year (TGO Baseline)
@@ -70,10 +73,11 @@ export async function getESGStats(startDate?: string, endDate?: string, branchId
 
         if (!jobs || jobs.length === 0) {
             return {
-                totalSavedKm: 0,
-                co2SavedKg: 0,
+                validJobsCount: 0,
+                incompleteJobsCount: 0,
+                co2EmissionsKg: 0,
                 treesSaved: 0,
-                fuelSavedLiters: 0,
+                fuelConsumedLiters: 0,
                 efficiencyRate: 0,
                 scope1EmissionsKg: 0,
                 scope3EmissionsKg: 0,
@@ -83,22 +87,22 @@ export async function getESGStats(startDate?: string, endDate?: string, branchId
         }
 
         const totalJobs = jobs.length
-        const optimizedJobs = jobs.filter((j: any) => 
-            (Number(j.Est_Distance_KM) > 0) || 
-            (j.Pickup_Lat && j.Pickup_Lon) ||
-            (j.original_origins_json && j.original_origins_json.length > 0)
-        ).length
-        const effectiveOptimizedCount = Math.max(optimizedJobs, Math.round(totalJobs * 0.45), totalJobs > 0 ? 1 : 0)
-        
+        let validJobsCount = 0
+        let incompleteJobsCount = 0
+
         let totalFuelLiters = 0
         let totalCo2Emissions = 0
         let scope1Co2Total = 0
         let scope3Co2Total = 0
 
+        const monthlyTrend: Record<string, number> = {}
+
         jobs.forEach((j: any) => {
             const vType = j.Vehicle_Type || 'default'
+            const actualFuel = j.Actual_Fuel_Liters ? Number(j.Actual_Fuel_Liters) : null
             let dist = Number(j.Est_Distance_KM) || 0
             
+            // Try to recover distance from coordinates if Est_Distance_KM is missing
             if (dist <= 0) {
                 const lat1 = Number(j.Pickup_Lat) || (j.original_origins_json?.[0]?.lat ? Number(j.original_origins_json[0].lat) : null)
                 const lon1 = Number(j.Pickup_Lon) || (j.original_origins_json?.[0]?.lng ? Number(j.original_origins_json[0].lng) : null)
@@ -110,9 +114,13 @@ export async function getESGStats(startDate?: string, endDate?: string, branchId
                 }
             }
 
-            if (dist <= 0) dist = 12.5 
-            
-            const actualFuel = j.Actual_Fuel_Liters ? Number(j.Actual_Fuel_Liters) : null
+            // STRICT AUDIT COMPLIANCE: If distance is <= 0 AND no actual fuel liters provided, flag as incomplete (No 12.5km fallback to prevent fabrication)
+            if (dist <= 0 && (actualFuel === null || actualFuel <= 0)) {
+                incompleteJobsCount++
+                return // Skip this job from GHG calculation to ensure 100% verifier compliance
+            }
+
+            validJobsCount++
             const impact = calculateJobEmissions(dist, actualFuel, vType)
 
             totalFuelLiters += impact.fuelUsedLiters
@@ -123,34 +131,29 @@ export async function getESGStats(startDate?: string, endDate?: string, branchId
             } else {
                 scope3Co2Total += impact.co2EmissionsKg
             }
+
+            // Monthly Trend Aggregation
+            const dateStr = j.Plan_Date as string
+            if (dateStr) {
+                const month = dateStr.substring(0, 7)
+                monthlyTrend[month] = (monthlyTrend[month] || 0) + impact.co2EmissionsKg
+            }
         })
 
-        const totalSavedKm = Math.round(totalCo2Emissions / 0.263) // Estimated baseline distance savings
         const treesSaved = totalCo2Emissions / KG_CO2_PER_TREE_YEAR
 
-        // Historical Trend (Grouped by Month)
-        const monthlyTrend: Record<string, number> = {}
-        jobs.forEach((j: any) => {
-            const dateStr = j.Plan_Date as string
-            if (!dateStr) return
-            const month = dateStr.substring(0, 7)
-            const vType = j.Vehicle_Type || 'default'
-            const dist = Number(j.Est_Distance_KM) || 12.5
-            const impact = calculateJobEmissions(dist, j.Actual_Fuel_Liters ? Number(j.Actual_Fuel_Liters) : null, vType)
-            
-            monthlyTrend[month] = (monthlyTrend[month] || 0) + impact.co2EmissionsKg
-        })
-
         const historicalData = Object.entries(monthlyTrend)
-            .map(([month, co2Saved]) => ({ month, co2Saved: Math.round(co2Saved) }))
+            .map(([month, co2Emissions]) => ({ month, co2Emissions: Math.round(co2Emissions) }))
             .sort((a, b) => a.month.localeCompare(b.month))
 
         return {
-            totalSavedKm: Math.round(totalSavedKm),
+            validJobsCount,
+            incompleteJobsCount,
+            co2EmissionsKg: Number(totalCo2Emissions.toFixed(1)),
             co2SavedKg: Number(totalCo2Emissions.toFixed(1)),
             treesSaved: Math.round(treesSaved * 10) / 10,
-            fuelSavedLiters: Math.round(totalFuelLiters * 10) / 10,
-            efficiencyRate: totalJobs > 0 ? Math.round((effectiveOptimizedCount / totalJobs) * 100) : 0,
+            fuelConsumedLiters: Math.round(totalFuelLiters * 10) / 10,
+            efficiencyRate: totalJobs > 0 ? Math.round((validJobsCount / totalJobs) * 100) : 0,
             scope1EmissionsKg: Math.round(scope1Co2Total * 100) / 100,
             scope3EmissionsKg: Math.round(scope3Co2Total * 100) / 100,
             tgoMetadata: TGO_STANDARDS_METADATA,
@@ -160,10 +163,12 @@ export async function getESGStats(startDate?: string, endDate?: string, branchId
     } catch (err) { const error = err as Error;
         console.error("ESG Calculation Error:", error?.message || error)
         return {
-            totalSavedKm: 0,
+            validJobsCount: 0,
+            incompleteJobsCount: 0,
+            co2EmissionsKg: 0,
             co2SavedKg: 0,
             treesSaved: 0,
-            fuelSavedLiters: 0,
+            fuelConsumedLiters: 0,
             efficiencyRate: 0,
             scope1EmissionsKg: 0,
             scope3EmissionsKg: 0,
@@ -172,4 +177,5 @@ export async function getESGStats(startDate?: string, endDate?: string, branchId
         }
     }
 }
+
 
