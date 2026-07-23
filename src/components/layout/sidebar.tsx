@@ -28,6 +28,7 @@ import {
   Zap,
   Settings,
   ShieldCheck,
+  Leaf,
   ShieldAlert,
   Key,
   Compass,
@@ -120,6 +121,7 @@ const navigation: NavGroup[] = [
     items: [
       { titleKey: "navigation.settings", href: "/settings", icon: <Settings size={20} /> },
       { titleKey: "navigation.fleet_standards", href: "/settings/fleet-standards", icon: <ShieldCheck size={20} /> },
+      { titleKey: "navigation.esg_settings", href: "/settings/esg", icon: <Leaf size={20} /> },
       { titleKey: "settings.items.change_password", href: "/settings/security", icon: <Key size={20} /> },
     ],
   },
