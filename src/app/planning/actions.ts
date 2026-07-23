@@ -188,6 +188,12 @@ export async function createJob(data: JobFormData) {
 }
 
 
+const stringifyIfObject = (val: unknown) => {
+  if (!val) return null
+  if (typeof val === 'string') return val
+  try { return JSON.stringify(val) } catch { return String(val) }
+}
+
 function buildInsertPayload(data: JobFormData, driverName: string, subId: string | null, unitPrice: number = 0) {
   let custTotal = Number(data.Price_Cust_Total) || 0
   
@@ -198,6 +204,11 @@ function buildInsertPayload(data: JobFormData, driverName: string, subId: string
           custTotal = Number((qty * unitPrice).toFixed(2))
       }
   }
+
+  const parsedDests = parseIfString(data.original_destinations_json as string)
+  const totalDrop = Array.isArray(parsedDests) && parsedDests.length > 0
+    ? parsedDests.length
+    : (data.original_destinations_json ? 1 : 1)
 
   return {
       Job_ID: data.Job_ID,
@@ -215,9 +226,9 @@ function buildInsertPayload(data: JobFormData, driverName: string, subId: string
       Notes: data.Notes,
       Price_Cust_Total: custTotal,
       Cost_Driver_Total: data.Cost_Driver_Total || 0,
-      original_origins_json: parseIfString(data.original_origins_json),
-      original_destinations_json: parseIfString(data.original_destinations_json),
-      extra_costs_json: parseIfString(data.extra_costs_json),
+      original_origins_json: stringifyIfObject(data.original_origins_json),
+      original_destinations_json: stringifyIfObject(data.original_destinations_json),
+      extra_costs_json: stringifyIfObject(data.extra_costs_json),
       Sub_ID: subId,
       Show_Price_To_Driver: data.Show_Price_To_Driver ?? true,
       Weight_Kg: data.Weight_Kg || 0,
@@ -230,9 +241,7 @@ function buildInsertPayload(data: JobFormData, driverName: string, subId: string
       Delivery_Lat: data.Delivery_Lat || null,
       Delivery_Lon: data.Delivery_Lon || null,
       Branch_ID: data.Branch_ID || null,
-      Total_Drop: Array.isArray(parseIfString(data.original_destinations_json)) 
-        ? (parseIfString(data.original_destinations_json) as unknown[]).length 
-        : (data.original_destinations_json ? 1 : 1),
+      Total_Drop: totalDrop,
       Loaded_Qty: Number(data.Loaded_Qty) || 0,
       Created_At: new Date().toISOString(),
       job_type: data.job_type || 'normal',
@@ -798,12 +807,13 @@ export async function updateJob(jobId: string, data: Partial<JobFormData>) {
 
   const updateData = sanitizeJobData({ ...data })
   
-  // Ensure JSON fields are parsed if they are strings
-  if (data.extra_costs_json) updateData.extra_costs_json = parseIfString(data.extra_costs_json)
-  if (data.original_origins_json) updateData.original_origins_json = parseIfString(data.original_origins_json)
-  if (data.original_destinations_json) {
-    const dests = parseIfString(data.original_destinations_json)
-    updateData.original_destinations_json = dests
+  // Ensure JSON fields are stringified properly for Postgres text columns
+  if (data.extra_costs_json !== undefined) updateData.extra_costs_json = stringifyIfObject(data.extra_costs_json)
+  if (data.original_origins_json !== undefined) updateData.original_origins_json = stringifyIfObject(data.original_origins_json)
+  if (data.original_destinations_json !== undefined) {
+    const destStr = stringifyIfObject(data.original_destinations_json)
+    updateData.original_destinations_json = destStr
+    const dests = parseIfString(destStr)
     if (Array.isArray(dests)) {
       updateData.Total_Drop = dests.length
     }
