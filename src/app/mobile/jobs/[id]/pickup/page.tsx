@@ -173,8 +173,9 @@ export default function JobPickupPage() {
             toast.success("บันทึกข้อมูลเรียบร้อยแล้ว", { id: "pickup-upload" })
             setCompleted(true)
             setTimeout(() => {
+                router.refresh()
                 router.push(`/mobile/jobs/${params.id}?success=pickup`)
-            }, 1500)
+            }, 1200)
         } else {
             toast.error(result.error || "เกิดข้อผิดพลาด", { id: "pickup-upload" })
         }
@@ -203,6 +204,37 @@ export default function JobPickupPage() {
         <div className="min-h-screen bg-background flex flex-col items-center justify-center p-6 text-center">
             <Loader2 className="animate-spin text-primary mb-4" size={40} />
             <p className="text-muted-foreground font-bold">กำลังโหลดข้อมูลงาน...</p>
+        </div>
+    )
+  }
+
+  const isAlreadyPickedUp = Boolean(
+    completed || 
+    (job && ['Picked Up', 'In Transit', 'Arrived Dropoff', 'Delivered', 'Completed'].includes(job.Job_Status)) ||
+    (job && (job.Pickup_Photo_Url || job.Pickup_Signature_Url))
+  )
+
+  if (isAlreadyPickedUp) {
+    return (
+        <div className="min-h-screen bg-background flex flex-col items-center justify-center p-6 text-center space-y-4">
+            <div className="w-20 h-20 bg-emerald-500/10 rounded-3xl flex items-center justify-center text-emerald-500 mb-2">
+                <ShieldCheck size={48} />
+            </div>
+            <h1 className="text-2xl font-black text-foreground italic">รับสินค้าเรียบร้อยแล้ว</h1>
+            <p className="text-muted-foreground text-sm font-medium max-w-xs">
+                งานนี้ได้รับการบันทึกข้อมูลการรับสินค้าแล้ว สามารถไปยังขั้นตอนจัดส่งต่อไปได้เลย
+            </p>
+            <div className="pt-4 space-y-2 w-full max-w-xs">
+                <Button 
+                    onClick={() => {
+                        router.refresh()
+                        router.push(`/mobile/jobs/${params.id}`)
+                    }} 
+                    className="w-full h-12 bg-primary font-bold rounded-2xl"
+                >
+                    ไปยังหน้ารายละเอียดงาน
+                </Button>
+            </div>
         </div>
     )
   }

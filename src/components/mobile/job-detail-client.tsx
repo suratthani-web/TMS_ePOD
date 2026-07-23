@@ -38,6 +38,9 @@ export function JobDetailClient({ job, success, initialTab = 'mission' }: JobDet
 
     useEffect(() => {
         setMounted(true)
+        if (success === 'pickup' || success === 'pod') {
+            router.refresh()
+        }
         if (typeof window !== "undefined") {
             const params = new URLSearchParams(window.location.search)
             const tab = params.get('tab') as 'mission' | 'info'
@@ -45,7 +48,7 @@ export function JobDetailClient({ job, success, initialTab = 'mission' }: JobDet
                 setActiveTab(tab)
             }
         }
-    }, [activeTab])
+    }, [activeTab, success, router])
 
     const handleTabChange = (tab: 'mission' | 'info') => {
         setActiveTab(tab)
