@@ -525,9 +525,10 @@ export function JobDialog({
           const matchedCust = customers.find(c => 
             c.Customer_Name?.trim().toLowerCase() === d.name?.trim().toLowerCase()
           )
-          if (matchedCust?.Lat && matchedCust?.Lng) {
-            lat = String(matchedCust.Lat)
-            lng = String(matchedCust.Lng)
+          const custRecord = matchedCust as any
+          if (custRecord?.Lat && custRecord?.Lng) {
+            lat = String(custRecord.Lat)
+            lng = String(custRecord.Lng)
           }
         }
         return {
