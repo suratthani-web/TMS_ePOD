@@ -426,7 +426,7 @@ export default function JobCompletePage() {
                             <div className="flex flex-wrap gap-x-4 gap-y-1 text-slate-300">
                                 {extraServiceData.movedQty > 0 && <span>ย้ายสินค้า: <strong>{extraServiceData.movedQty}</strong> กล่อง</span>}
                                 {extraServiceData.floorClimbQty > 0 && <span>ขึ้นชั้น: <strong>ชั้น {extraServiceData.floorClimbQty}</strong> ({extraServiceData.shelvedQty} กล่อง)</span>}
-                                {extraServiceData.approverName && <span>ผู้รับรอง: <strong>{extraServiceData.approverName}</strong></span>}
+                                {extraServiceData.approverPhone && <span>เบอร์ผู้รับรอง: <strong>{extraServiceData.approverPhone}</strong></span>}
                             </div>
                         </div>
                     )}
