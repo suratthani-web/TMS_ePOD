@@ -50,7 +50,7 @@ const ALLOWED_TRANSITIONS: Record<JobStatus, JobStatus[]> = {
   'In Progress': ['Arrived', 'Completed', 'Delivered', 'Cancelled', 'SOS', 'Verified'],
   'Arrived': ['In Transit', 'Completed', 'Delivered', 'Cancelled', 'SOS', 'Verified'],
   'Arrived Pickup': ['Picked Up', 'In Transit', 'Completed', 'Cancelled', 'SOS', 'Verified'],
-  'Arrived Dropoff': ['Completed', 'Delivered', 'Cancelled', 'SOS', 'Verified'],
+  'Arrived Dropoff': ['In Transit', 'Completed', 'Delivered', 'Cancelled', 'SOS', 'Verified'],
   'Completed': ['Verified', 'Rejected', 'Billed', 'Cancelled'],
   'Complete': ['Verified', 'Rejected', 'Billed', 'Cancelled'],
   'Delivered': ['Verified', 'Rejected', 'Billed', 'Cancelled'],
