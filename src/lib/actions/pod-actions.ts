@@ -93,9 +93,11 @@ export async function submitJobPOD(jobId: string, formData: FormData) {
     if (floorClimbReportFile && floorClimbReportFile.size > 0) {
         try {
             const fcName = `${jobId}_${timestamp}_FLOOR_CLIMB.jpg`
-            floorClimbReportUrl = await uploadWithRename(floorClimbReportFile, fcName, 'POD_Documents')
-        } catch {
-            // Failed
+            const buffer = Buffer.from(await floorClimbReportFile.arrayBuffer())
+            const res = await uploadFileToSupabase(buffer, fcName, floorClimbReportFile.type || 'image/jpeg', 'POD_Documents')
+            floorClimbReportUrl = res.directLink
+        } catch (fcErr) {
+            console.warn('[FloorClimbReport upload warning]', fcErr)
         }
     }
 
@@ -154,7 +156,10 @@ export async function submitJobPOD(jobId: string, formData: FormData) {
     const newSignatures = signatureUrl ? [...existingSignatures, signatureUrl] : existingSignatures
     const newPhotos = [...existingPhotos, ...photoUrls]
 
-    const completedDrops = newSignatures.length
+    // Safeguard: 1 submission action can only increment completed drops by at most 1,
+    // preventing duplicate retry signatures from prematurely closing subsequent drops!
+    const maxAllowedSignatures = Math.min(existingSignatures.length + 1, totalDrop)
+    const completedDrops = Math.min(newSignatures.length, maxAllowedSignatures)
     const isFinishedAllDrops = completedDrops >= totalDrop
 
     const updatePayload: Record<string, unknown> = {
