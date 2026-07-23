@@ -450,51 +450,57 @@ export async function createBulkJobs(
         }
     })
 
-    if (origins.length > 0) {
+    if (row.original_origins_json) {
+        normalized.original_origins_json = row.original_origins_json
+    } else if (origins.length > 0) {
         normalized.original_origins_json = origins
     }
 
     // 2. Destinations Mapping
-    const primaryDest = normalized.Dest_Location as string
-    if (primaryDest) {
-        if (primaryDest.includes(' → ')) {
-            const names = primaryDest.split(' → ').map(n => n.trim()).filter(Boolean)
-            names.forEach((name, i) => {
-                destinations.push({
-                    name,
-                    lat: i === names.length - 1 ? (normalized.Delivery_Lat ? Number(normalized.Delivery_Lat) : null) : null,
-                    lng: i === names.length - 1 ? (normalized.Delivery_Lon ? Number(normalized.Delivery_Lon) : null) : null
+    if (row.original_destinations_json) {
+        normalized.original_destinations_json = row.original_destinations_json
+    } else {
+        const primaryDest = normalized.Dest_Location as string
+        if (primaryDest) {
+            if (primaryDest.includes(' → ')) {
+                const names = primaryDest.split(' → ').map(n => n.trim()).filter(Boolean)
+                names.forEach((name, i) => {
+                    destinations.push({
+                        name,
+                        lat: i === names.length - 1 ? (normalized.Delivery_Lat ? Number(normalized.Delivery_Lat) : null) : null,
+                        lng: i === names.length - 1 ? (normalized.Delivery_Lon ? Number(normalized.Delivery_Lon) : null) : null
+                    })
                 })
-            })
-        } else {
-            destinations.push({ 
-                name: primaryDest, 
-                lat: normalized.Delivery_Lat ? Number(normalized.Delivery_Lat) : null,
-                lng: normalized.Delivery_Lon ? Number(normalized.Delivery_Lon) : null
-            })
+            } else {
+                destinations.push({ 
+                    name: primaryDest, 
+                    lat: normalized.Delivery_Lat ? Number(normalized.Delivery_Lat) : null,
+                    lng: normalized.Delivery_Lon ? Number(normalized.Delivery_Lon) : null
+                })
+            }
         }
-    }
 
-    const additionalDestKeys = rowKeys.filter(k => {
-        const nk = k.toLowerCase().replace(/\s+/g, '')
-        return (nk.startsWith('ปลายทาง') || nk.startsWith('destination') || nk.startsWith('dest')) && 
-               /\d+/.test(nk) && 
-               !nk.includes('lat') && !nk.includes('lon')
-    }).sort((a, b) => {
-        const numA = parseInt(a.match(/\d+/)?.[0] || '0')
-        const numB = parseInt(b.match(/\d+/)?.[0] || '0')
-        return numA - numB
-    })
+        const additionalDestKeys = rowKeys.filter(k => {
+            const nk = k.toLowerCase().replace(/\s+/g, '')
+            return (nk.startsWith('ปลายทาง') || nk.startsWith('destination') || nk.startsWith('dest')) && 
+                   /\d+/.test(nk) && 
+                   !nk.includes('lat') && !nk.includes('lon')
+        }).sort((a, b) => {
+            const numA = parseInt(a.match(/\d+/)?.[0] || '0')
+            const numB = parseInt(b.match(/\d+/)?.[0] || '0')
+            return numA - numB
+        })
 
-    additionalDestKeys.forEach(key => {
-        const val = (row as Record<string, unknown>)[key]
-        if (val && String(val).trim()) {
-            destinations.push({ name: String(val).trim(), lat: null, lng: null })
+        additionalDestKeys.forEach(key => {
+            const val = (row as Record<string, unknown>)[key]
+            if (val && String(val).trim()) {
+                destinations.push({ name: String(val).trim(), lat: null, lng: null })
+            }
+        })
+
+        if (destinations.length > 0) {
+            normalized.original_destinations_json = destinations
         }
-    })
-
-    if (destinations.length > 0) {
-        normalized.original_destinations_json = destinations
     }
 
     return normalized
