@@ -55,30 +55,28 @@ export function ExtraServiceModal({
   useEffect(() => {
     // Build options from current job + originalDestinations
     const list: Array<{ so: string; store: string }> = []
-    
-    // Add current job
-    list.push({
-      so: currentJobId,
-      store: currentCustomerName || "งานปัจจุบัน"
-    })
 
-    // Add from originalDestinations if available
-    if (originalDestinations && Array.isArray(originalDestinations)) {
-      originalDestinations.forEach((dest) => {
-        if (dest.so_no && dest.so_no !== currentJobId) {
-          list.push({
-            so: dest.so_no,
-            store: dest.name || "จุดส่งสินค้า"
-          })
-        }
+    if (originalDestinations && Array.isArray(originalDestinations) && originalDestinations.length > 0) {
+      originalDestinations.forEach((dest, idx) => {
+        const soVal = dest.so_no ? String(dest.so_no).trim() : `${currentJobId}-${idx + 1}`
+        const storeVal = dest.name ? String(dest.name).trim() : `จุดส่งที่ ${idx + 1}`
+        list.push({
+          so: soVal,
+          store: storeVal
+        })
+      })
+    } else {
+      list.push({
+        so: currentJobId,
+        store: currentCustomerName || "งานปัจจุบัน"
       })
     }
 
     setSoOptions(list)
 
     if (initialData) {
-      setSelectedSo(initialData.soNo || currentJobId)
-      setStoreName(initialData.storeName || currentCustomerName || "")
+      setSelectedSo(initialData.soNo || (list[0]?.so || currentJobId))
+      setStoreName(initialData.storeName || (list[0]?.store || currentCustomerName || ""))
       setMovedQty(initialData.movedQty || 0)
       setFloorClimbQty(initialData.floorClimbQty || 0)
       setShelvedQty(initialData.shelvedQty || 0)
@@ -86,8 +84,8 @@ export function ExtraServiceModal({
       setApproverSigUrl(initialData.approverSignatureUrl || null)
       setNotes(initialData.notes || "")
     } else {
-      setSelectedSo(currentJobId)
-      setStoreName(currentCustomerName || "")
+      setSelectedSo(list[0]?.so || currentJobId)
+      setStoreName(list[0]?.store || currentCustomerName || "")
     }
   }, [currentJobId, currentCustomerName, originalDestinations, initialData, isOpen])
 
@@ -143,11 +141,11 @@ export function ExtraServiceModal({
         </DialogHeader>
 
         <form onSubmit={handleSubmit} className="space-y-4 mt-2">
-          {/* Dropdown SO Selector */}
+          {/* Dropdown SO Selector & Manual Input */}
           <div className="space-y-1.5">
             <Label className="text-xs font-semibold text-slate-300 flex items-center gap-1.5">
               <Truck size={14} className="text-indigo-400" />
-              เลือก SO / ใบงาน
+              เลือก SO / ใบงาน หรือระบุเลข SO
             </Label>
             <select
               value={selectedSo}
@@ -160,6 +158,12 @@ export function ExtraServiceModal({
                 </option>
               ))}
             </select>
+            <Input 
+              value={selectedSo}
+              onChange={(e) => setSelectedSo(e.target.value)}
+              placeholder="ระบุเลข SO หรือแก้ไขเลข SO..."
+              className="w-full h-11 bg-slate-800/80 border border-slate-700/80 rounded-xl px-3 text-sm text-indigo-300 focus:outline-none focus:ring-2 focus:ring-indigo-500 font-bold mt-2 placeholder:text-slate-500"
+            />
           </div>
 
           {/* Moved Qty (Boxes) */}
