@@ -12,6 +12,7 @@ import { getJobDetails } from "@/app/mobile/jobs/actions"
 import { Loader2, CheckCircle, BrainCircuit, AlertTriangle, ScanLine, Box } from "lucide-react"
 import { PodReport } from "@/components/mobile/pod-report"
 import { ContainerDeliveryReport } from "@/components/mobile/container-delivery-report"
+import { ExtraServiceModal, ExtraServiceData } from "@/components/mobile/extra-service-modal"
 import { Job } from "@/lib/supabase/jobs"
 import html2canvas from "html2canvas"
 import { analyzePODImage, AIAnalysisResult } from "@/lib/utils/ai-verification"
@@ -28,6 +29,10 @@ export default function JobCompletePage() {
   const [loadedQty, setLoadedQty] = useState<string>("")
   const [loading, setLoading] = useState(false)
   const [completed, setCompleted] = useState(false)
+
+  // Extra Service / Floor Climb Modal State
+  const [isExtraModalOpen, setIsExtraModalOpen] = useState(false)
+  const [extraServiceData, setExtraServiceData] = useState<ExtraServiceData | null>(null)
   
   // AI Verification State
   const [verifying, setVerifying] = useState(false)
@@ -290,7 +295,8 @@ export default function JobCompletePage() {
                     ref={reportRef} 
                     job={job} 
                     photos={photoUrls}
-                    signature={signatureUrl} 
+                    signature={signatureUrl}
+                    extraServiceData={extraServiceData} 
                  />
              )}
           </div>
@@ -349,6 +355,45 @@ export default function JobCompletePage() {
             )}
         </section>
 
+                {/* Extra Services / Floor Climb Optional Section */}
+                {!isContainer && job && (
+                <section className="bg-slate-900/60 p-4 rounded-2xl border border-slate-800 space-y-3">
+                    <div className="flex items-center justify-between">
+                        <div>
+                            <h3 className="text-sm font-bold text-white flex items-center gap-2">
+                                <Box className="text-indigo-400" size={18} />
+                                บริการย้ายสินค้า / ขึ้นชั้น (Optional)
+                            </h3>
+                            <p className="text-xs text-slate-400 mt-0.5">
+                                {extraServiceData ? "บันทึกข้อมูลบริการเพิ่มเติมเรียบร้อยแล้ว" : "กดเปิดฟอร์มเพื่อบันทึกจำนวนย้ายหรือขึ้นชั้น"}
+                            </p>
+                        </div>
+                        <Button
+                            type="button"
+                            onClick={() => setIsExtraModalOpen(true)}
+                            className={extraServiceData 
+                                ? "bg-emerald-600/20 text-emerald-400 border border-emerald-500/30 hover:bg-emerald-600/30 text-xs font-bold px-3.5 h-9 rounded-xl"
+                                : "bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold px-3.5 h-9 rounded-xl shadow-md shadow-indigo-600/20"
+                            }
+                        >
+                            {extraServiceData ? "แก้ไขข้อมูล" : "บันทึกบริการ"}
+                        </Button>
+                    </div>
+
+                    {/* Summary Badge if filled */}
+                    {extraServiceData && (
+                        <div className="bg-slate-800/80 p-3 rounded-xl border border-slate-700/60 text-xs space-y-1 text-slate-300">
+                            <p className="font-semibold text-indigo-300">SO: {extraServiceData.soNo}</p>
+                            <div className="flex flex-wrap gap-x-4 gap-y-1 text-slate-300">
+                                {extraServiceData.movedQty > 0 && <span>ย้ายสินค้า: <strong>{extraServiceData.movedQty}</strong> กล่อง</span>}
+                                {extraServiceData.floorClimbQty > 0 && <span>ขึ้นชั้น: <strong>ชั้น {extraServiceData.floorClimbQty}</strong> ({extraServiceData.shelvedQty} กล่อง)</span>}
+                                {extraServiceData.approverName && <span>ผู้รับรอง: <strong>{extraServiceData.approverName}</strong></span>}
+                            </div>
+                        </div>
+                    )}
+                </section>
+                )}
+
                 {/* Always allow quantity input if piece-rate is configured, even if a total price exists */}
                 {!isContainer && job && job.Price_Per_Unit && Number(job.Price_Per_Unit) > 0 && (
                 <section>
@@ -398,6 +443,23 @@ export default function JobCompletePage() {
             </div>
         </div>
       </div>
+
+      {/* Extra Service / Floor Climb Modal */}
+      {job && (
+        <ExtraServiceModal
+          isOpen={isExtraModalOpen}
+          onClose={() => setIsExtraModalOpen(false)}
+          onSave={(data) => setExtraServiceData(data)}
+          currentJobId={job.Job_ID}
+          currentCustomerName={job.Customer_Name || undefined}
+          originalDestinations={
+            typeof job.original_destinations_json === 'string'
+              ? JSON.parse(job.original_destinations_json)
+              : job.original_destinations_json
+          }
+          initialData={extraServiceData}
+        />
+      )}
     </div>
   )
 }

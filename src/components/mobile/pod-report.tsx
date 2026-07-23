@@ -7,9 +7,18 @@ type Props = {
   job: Job
   photos: string[] // Object URLs
   signature: string | null // Object URL
+  extraServiceData?: {
+    soNo?: string
+    storeName?: string
+    movedQty?: number
+    floorClimbQty?: number
+    shelvedQty?: number
+    approverName?: string
+    notes?: string
+  } | null
 }
 
-export const PodReport = forwardRef<HTMLDivElement, Props>(({ job, photos, signature }, ref) => {
+export const PodReport = forwardRef<HTMLDivElement, Props>(({ job, photos, signature, extraServiceData }, ref) => {
   return (
     <div ref={ref} className="bg-white text-black p-8 font-sans w-[800px] mx-auto">
       {/* Header */}
@@ -19,7 +28,7 @@ export const PodReport = forwardRef<HTMLDivElement, Props>(({ job, photos, signa
            <p className="text-xl text-gray-400 mt-1">หลักฐานการส่งสินค้า (Proof of Delivery)</p>
         </div>
         <div className="text-right">
-            <h2 className="text-xl font-bold">{job.Job_ID}</h2>
+            <h2 className="text-xl font-bold">{extraServiceData?.soNo || job.Job_ID}</h2>
             <p className="text-xl">{new Date().toLocaleDateString('th-TH', { 
                 year: 'numeric', month: 'long', day: 'numeric', 
                 hour: '2-digit', minute: '2-digit' 
@@ -55,7 +64,7 @@ export const PodReport = forwardRef<HTMLDivElement, Props>(({ job, photos, signa
                 </div>
                 <div>
                     <span className="text-gray-400 text-lg font-bold block">ปลายทาง (Destination)</span>
-                    <p className="font-medium">{job.Dest_Location || "-"}</p>
+                    <p className="font-medium">{extraServiceData?.storeName || job.Dest_Location || "-"}</p>
                 </div>
             </div>
         </div>
@@ -63,7 +72,7 @@ export const PodReport = forwardRef<HTMLDivElement, Props>(({ job, photos, signa
 
       {/* Items Table */}
       <div className="mb-8">
-        <h3 className="font-bold border-b border-slate-300 pb-1 mb-2">รายการสินค้า (Items)</h3>
+        <h3 className="font-bold border-b border-slate-300 pb-1 mb-2">รายการสินค้า & บริการ (Items & Extra Services)</h3>
         <table className="w-full text-xl text-left">
             <thead className="bg-slate-100 text-muted-foreground">
                 <tr>
@@ -80,6 +89,22 @@ export const PodReport = forwardRef<HTMLDivElement, Props>(({ job, photos, signa
                     <td className="p-2 text-right">{job.Total_Drop || 1} Drop</td>
                     <td className="p-2 text-center text-emerald-600 font-bold">ส่งสำเร็จ</td>
                 </tr>
+                {extraServiceData && (extraServiceData.movedQty || 0) > 0 && (
+                    <tr>
+                        <td className="p-2 text-center">2</td>
+                        <td className="p-2">บริการย้ายสินค้าหน้างาน</td>
+                        <td className="p-2 text-right">{extraServiceData.movedQty} กล่อง</td>
+                        <td className="p-2 text-center text-blue-600 font-bold">บันทึกแล้ว</td>
+                    </tr>
+                )}
+                {extraServiceData && (extraServiceData.floorClimbQty || 0) > 0 && (
+                    <tr>
+                        <td className="p-2 text-center">{(extraServiceData.movedQty || 0) > 0 ? 3 : 2}</td>
+                        <td className="p-2">บริการยกสินค้าขึ้นชั้น {extraServiceData.floorClimbQty}</td>
+                        <td className="p-2 text-right">{extraServiceData.shelvedQty || 0} กล่อง</td>
+                        <td className="p-2 text-center text-purple-600 font-bold">บันทึกแล้ว</td>
+                    </tr>
+                )}
             </tbody>
         </table>
       </div>
@@ -110,7 +135,7 @@ export const PodReport = forwardRef<HTMLDivElement, Props>(({ job, photos, signa
                 )}
              </div>
              <div className="border-t border-slate-300 pt-2">
-                <p className="font-medium text-xl">{job.Customer_Name}</p>
+                <p className="font-medium text-xl">{extraServiceData?.approverName || job.Customer_Name}</p>
                 <p className="text-lg font-bold text-muted-foreground">{new Date().toLocaleString('th-TH')}</p>
              </div>
         </div>

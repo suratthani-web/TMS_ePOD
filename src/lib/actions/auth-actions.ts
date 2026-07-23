@@ -49,41 +49,45 @@ export async function loginDriver(formData: FormData) {
 
   const supabase = createAdminClient()
 
-  // Try to find driver by Mobile_No first, then by Driver_ID
   let driver = null
+  const cleanInput = identifier.trim()
+  const cleanDigits = cleanInput.replace(/\D/g, '')
 
-  // Check if input looks like a phone number (starts with 0 and has 9-10 digits)
-  const isPhone = /^0\d{8,9}$/.test(identifier.replace(/[-\s]/g, ''))
+  // 1. Try exact match by Mobile_No or Driver_ID or Vehicle_Plate
+  const { data: exactMatches } = await supabase
+    .from("Master_Drivers")
+    .select("*")
+    .or(`Mobile_No.eq.${cleanInput},Driver_ID.eq.${cleanInput},Vehicle_Plate.eq.${cleanInput},Mobile_No.eq.${cleanDigits}`)
 
-  if (isPhone) {
-    // Clean phone number (remove dashes/spaces)
-    const cleanPhone = identifier.replace(/[-\s]/g, '')
-    const { data } = await supabase
-      .from("Master_Drivers")
-      .select("*")
-      .eq("Mobile_No", cleanPhone)
-      .single()
-    driver = data
+  if (exactMatches && exactMatches.length > 0) {
+    driver = exactMatches[0]
   }
 
-  // If not found by phone (or input is not a phone), try Driver_ID
-  if (!driver) {
-    const { data } = await supabase
+  // 2. If cleanDigits exists (e.g. 0902824017 or 0627570879), search by clean digits
+  if (!driver && cleanDigits.length >= 8) {
+    const { data: phoneMatches } = await supabase
       .from("Master_Drivers")
       .select("*")
-      .eq("Driver_ID", identifier)
-      .single()
-    driver = data
+      .ilike("Mobile_No", `%${cleanDigits}%`)
+
+    if (phoneMatches && phoneMatches.length > 0) {
+      driver = phoneMatches[0]
+    }
   }
 
-  // Still not found? Try Mobile_No as-is (in case format differs)
-  if (!driver) {
-    const { data } = await supabase
+  // 3. Fallback: Search all drivers by cleaned phone digits
+  if (!driver && cleanDigits.length >= 8) {
+    const { data: allDrivers } = await supabase
       .from("Master_Drivers")
       .select("*")
-      .eq("Mobile_No", identifier)
-      .single()
-    driver = data
+
+    if (allDrivers) {
+      driver = allDrivers.find(d => {
+        const dbPhoneDigits = (d.Mobile_No || "").replace(/\D/g, "")
+        const dbId = (d.Driver_ID || "").trim()
+        return dbPhoneDigits.includes(cleanDigits) || cleanDigits.includes(dbPhoneDigits) || dbId === cleanInput
+      })
+    }
   }
 
   if (!driver) {
