@@ -103,24 +103,24 @@ export async function submitJobPOD(jobId: string, formData: FormData) {
     // overwriting it with 0 (which used to zero out the price).
     const enteredQty = Number(formData.get("loaded_qty") || 0)
     const pickupQty = Number(jobData?.Loaded_Qty || 0)
-    const loadedQty = enteredQty > 0 ? enteredQty : pickupQty
+    // Check multi-drop / multi-pickup total count
+    const totalDrop = (jobData?.original_destinations_json && Array.isArray(jobData.original_destinations_json) && jobData.original_destinations_json.length > 0)
+        ? jobData.original_destinations_json.length
+        : Number(jobData?.Total_Drop || 1)
 
-    // Use Centralized Pricing Engine
-    const pricing = await calculateJobPrice({
-        ...jobData,
-        Loaded_Qty: loadedQty
-    })
+    // Existing URLs accumulation for Multi-drop
+    const existingSignatures = jobData?.Signature_Url ? jobData.Signature_Url.split(',').filter(Boolean) : []
+    const existingPhotos = jobData?.Photo_Proof_Url ? jobData.Photo_Proof_Url.split(',').filter(Boolean) : []
 
-    const adminPrice = Number(jobData?.Price_Cust_Total || 0)
-    const currentNotes = jobData?.Notes || ""
+    const newSignatures = signatureUrl ? [...existingSignatures, signatureUrl] : existingSignatures
+    const newPhotos = [...existingPhotos, ...photoUrls]
 
-    const clientTimestamp = formData.get("actualCompletionTime") as string
-    const now = clientTimestamp ? new Date(clientTimestamp) : new Date()
-    const timeString = timeTH(now)
+    const completedDrops = newSignatures.length
+    const isFinishedAllDrops = completedDrops >= totalDrop
 
     const updatePayload: Record<string, unknown> = {
-      Photo_Proof_Url: photoUrls.join(','),
-      Signature_Url: signatureUrl,
+      Photo_Proof_Url: newPhotos.join(','),
+      Signature_Url: newSignatures.join(','),
       Delivery_Date: new Date().toISOString(),
       Actual_Delivery_Time: timeString,
       Loaded_Qty: loadedQty
@@ -179,22 +179,28 @@ export async function submitJobPOD(jobId: string, formData: FormData) {
 
     if (updateError) throw updateError
 
-    // Transition after proof fields are saved so status guards can validate current DB state.
-    const transition = await transitionJobStatus(jobId, 'Completed', { 
-        reason: 'POD Submission', 
-        notes: `Photos: ${photoUrls.length}, Signature: Yes` 
+    // Transition Status:
+    // If there are remaining drops in a Multi-Drop job, set status back to 'In Transit'
+    // Only transition to 'Completed' when ALL drops are delivered!
+    const targetStatus = isFinishedAllDrops ? 'Completed' : 'In Transit'
+
+    const transition = await transitionJobStatus(jobId, targetStatus, { 
+        reason: `POD Submission (Drop ${completedDrops}/${totalDrop})`, 
+        notes: `Photos: ${photoUrls.length}, Signature: Yes, Progress: ${completedDrops}/${totalDrop}` 
     })
     if (!transition.success) {
-        throw new Error(transition.message || 'ไม่สามารถเปลี่ยนสถานะงานเป็นเสร็จสิ้นได้')
+        throw new Error(transition.message || `ไม่สามารถเปลี่ยนสถานะงานเป็น ${targetStatus} ได้`)
     }
 
     try {
-        const co2Data = await calculateJobCO2(supabase, jobId)
-        if (co2Data) {
-            const { data: job } = await supabase.from('Jobs_Main').select('Notes').eq('Job_ID', jobId).single()
-            await supabase.from('Jobs_Main').update({
-                Notes: job?.Notes ? `${job.Notes}\n${co2Data.note}` : co2Data.note
-            }).eq('Job_ID', jobId)
+        if (isFinishedAllDrops) {
+            const co2Data = await calculateJobCO2(supabase, jobId)
+            if (co2Data) {
+                const { data: job } = await supabase.from('Jobs_Main').select('Notes').eq('Job_ID', jobId).single()
+                await supabase.from('Jobs_Main').update({
+                    Notes: job?.Notes ? `${job.Notes}\n${co2Data.note}` : co2Data.note
+                }).eq('Job_ID', jobId)
+            }
         }
     } catch (e) {
         console.error("POD CO2 Calc error:", e)
