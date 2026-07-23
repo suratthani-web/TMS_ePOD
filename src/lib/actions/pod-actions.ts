@@ -88,6 +88,20 @@ export async function submitJobPOD(jobId: string, formData: FormData) {
       ...uploadPromises
     ])
 
+    const floorClimbReportFile = formData.get("floor_climb_report") as File
+    let floorClimbReportUrl = null
+    if (floorClimbReportFile && floorClimbReportFile.size > 0) {
+        try {
+            const fcName = `${jobId}_${timestamp}_FLOOR_CLIMB.jpg`
+            floorClimbReportUrl = await uploadWithRename(floorClimbReportFile, fcName, 'POD_Documents')
+        } catch {
+            // Failed
+        }
+    }
+
+    if (floorClimbReportUrl) {
+        photoUrls.unshift(floorClimbReportUrl)
+    }
     if (podReportUrl) {
         photoUrls.unshift(podReportUrl)
     }

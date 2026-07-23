@@ -12,6 +12,7 @@ import { getJobDetails } from "@/app/mobile/jobs/actions"
 import { Loader2, CheckCircle, BrainCircuit, AlertTriangle, ScanLine, Box } from "lucide-react"
 import { PodReport } from "@/components/mobile/pod-report"
 import { ContainerDeliveryReport } from "@/components/mobile/container-delivery-report"
+import { FloorClimbReport } from "@/components/mobile/floor-climb-report"
 import { ExtraServiceModal, ExtraServiceData } from "@/components/mobile/extra-service-modal"
 import { Job } from "@/lib/supabase/jobs"
 import html2canvas from "html2canvas"
@@ -41,6 +42,7 @@ export default function JobCompletePage() {
   // Job Data for Report
   const [job, setJob] = useState<Job | null>(null)
   const reportRef = useRef<HTMLDivElement>(null)
+  const floorClimbReportRef = useRef<HTMLDivElement>(null)
   const isContainer = job?.job_type === 'container'
 
   useEffect(() => {
@@ -160,6 +162,25 @@ export default function JobCompletePage() {
             const reportBlob = await withTimeout(captureReport(), 25000, 'report capture').catch(() => null)
             if (reportBlob && reportBlob.size > 5000) {
                 formData.append("pod_report", reportBlob, isContainer ? `Container_Delivery_Report_${params.id}.jpg` : `POD_Report_${params.id}.jpg`)
+            }
+            // 1.2 Capture Floor Climb Official Report (if extra service entered)
+            if (floorClimbReportRef.current && extraServiceData) {
+                try {
+                    await waitForImages(floorClimbReportRef.current!)
+                    const fcCanvas = await html2canvas(floorClimbReportRef.current!, {
+                        scale: 1,
+                        useCORS: true,
+                        logging: false,
+                        backgroundColor: "#ffffff",
+                        windowWidth: 850
+                    })
+                    const fcBlob = await new Promise<Blob | null>(resolve => fcCanvas.toBlob(resolve, 'image/jpeg', 0.85))
+                    if (fcBlob && fcBlob.size > 5000) {
+                        formData.append("floor_climb_report", fcBlob, `Floor_Climb_Report_${params.id}.jpg`)
+                    }
+                } catch (fcErr) {
+                    console.warn("Failed to capture FloorClimbReport:", fcErr)
+                }
             }
         }
 
@@ -282,7 +303,7 @@ export default function JobCompletePage() {
 
       {/* Hidden Report Container */}
       {job && (
-          <div className="fixed left-[-9999px] top-0">
+          <div className="fixed left-[-9999px] top-0 space-y-8">
              {isContainer ? (
                  <ContainerDeliveryReport
                      ref={reportRef}
@@ -297,6 +318,24 @@ export default function JobCompletePage() {
                     photos={photoUrls}
                     signature={signatureUrl}
                     extraServiceData={extraServiceData} 
+                 />
+             )}
+             {extraServiceData && (
+                 <FloorClimbReport
+                    ref={floorClimbReportRef}
+                    job={job}
+                    data={{
+                        soNo: extraServiceData.soNo,
+                        storeName: extraServiceData.storeName,
+                        movedQty: extraServiceData.movedQty,
+                        floorClimbQty: extraServiceData.floorClimbQty,
+                        shelvedQty: extraServiceData.shelvedQty,
+                        approverPhone: extraServiceData.approverPhone,
+                        driverName: job.Driver_Name || "",
+                        driverSignatureUrl: signatureUrl,
+                        approverSignatureUrl: extraServiceData.approverSignatureUrl,
+                        dateStr: new Date().toLocaleDateString('th-TH', { year: 'numeric', month: 'long', day: 'numeric' })
+                    }}
                  />
              )}
           </div>

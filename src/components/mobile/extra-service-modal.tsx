@@ -5,7 +5,8 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { Button } from "@/components/ui/button"
 import { Label } from "@/components/ui/label"
 import { Input } from "@/components/ui/input"
-import { Package, Layers, Truck, UserCheck, Plus, Minus, ArrowUpRight, CheckCircle2 } from "lucide-react"
+import { Package, Layers, Truck, UserCheck, Plus, Minus, CheckCircle2, Phone, PenTool } from "lucide-react"
+import { SignaturePad } from "@/components/mobile/signature-pad"
 
 export type ExtraServiceData = {
   soNo: string
@@ -13,7 +14,9 @@ export type ExtraServiceData = {
   movedQty: number
   floorClimbQty: number
   shelvedQty: number
-  approverName: string
+  approverPhone: string
+  approverSignatureUrl?: string | null
+  approverSignatureBlob?: Blob | null
   notes: string
 }
 
@@ -44,7 +47,9 @@ export function ExtraServiceModal({
   const [movedQty, setMovedQty] = useState<number>(0)
   const [floorClimbQty, setFloorClimbQty] = useState<number>(0)
   const [shelvedQty, setShelvedQty] = useState<number>(0)
-  const [approverName, setApproverName] = useState<string>("")
+  const [approverPhone, setApproverPhone] = useState<string>("")
+  const [approverSigBlob, setApproverSigBlob] = useState<Blob | null>(null)
+  const [approverSigUrl, setApproverSigUrl] = useState<string | null>(null)
   const [notes, setNotes] = useState<string>("")
 
   useEffect(() => {
@@ -77,7 +82,8 @@ export function ExtraServiceModal({
       setMovedQty(initialData.movedQty || 0)
       setFloorClimbQty(initialData.floorClimbQty || 0)
       setShelvedQty(initialData.shelvedQty || 0)
-      setApproverName(initialData.approverName || "")
+      setApproverPhone(initialData.approverPhone || "")
+      setApproverSigUrl(initialData.approverSignatureUrl || null)
       setNotes(initialData.notes || "")
     } else {
       setSelectedSo(currentJobId)
@@ -93,6 +99,16 @@ export function ExtraServiceModal({
     }
   }
 
+  const handleSignatureSave = (blob: Blob | null) => {
+    setApproverSigBlob(blob)
+    if (blob) {
+      const url = URL.createObjectURL(blob)
+      setApproverSigUrl(url)
+    } else {
+      setApproverSigUrl(null)
+    }
+  }
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
     onSave({
@@ -101,7 +117,9 @@ export function ExtraServiceModal({
       movedQty,
       floorClimbQty,
       shelvedQty,
-      approverName,
+      approverPhone,
+      approverSignatureUrl: approverSigUrl,
+      approverSignatureBlob: approverSigBlob,
       notes
     })
     onClose()
@@ -109,18 +127,18 @@ export function ExtraServiceModal({
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="max-w-md bg-slate-900 text-white border-slate-800 rounded-3xl p-6 shadow-2xl">
+      <DialogContent className="max-w-md bg-slate-900 text-white border-slate-800 rounded-3xl p-6 shadow-2xl max-h-[90vh] overflow-y-auto">
         <DialogHeader className="space-y-1 text-left">
           <div className="flex items-center gap-2 text-indigo-400">
             <div className="p-2 bg-indigo-500/10 rounded-xl">
               <Package size={20} />
             </div>
             <DialogTitle className="text-xl font-bold tracking-tight text-white">
-              บันทึกบริการเพิ่มเติม / ค่าขึ้นชั้น
+              แบบฟอร์มย้ายสินค้าและขึ้นชั้น
             </DialogTitle>
           </div>
           <p className="text-xs text-slate-400 font-medium">
-            ระบุรายละเอียดการย้ายหรือขึ้นชั้นสินค้าเพื่อออกใบยืนยัน (Optional)
+            บันทึกรายละเอียดและลงลายเซ็นรับรองบริการหน้างาน
           </p>
         </DialogHeader>
 
@@ -242,18 +260,29 @@ export function ExtraServiceModal({
             </div>
           )}
 
-          {/* Approver Name */}
+          {/* Approver Signature Pad */}
+          <div className="space-y-1.5 pt-1">
+            <Label className="text-xs font-semibold text-slate-300 flex items-center gap-1.5">
+              <PenTool size={14} className="text-indigo-400" />
+              ลายเซ็นผู้เซ็นรับรอง (ลายมือชื่อลูกค้า/ผู้รับ)
+            </Label>
+            <div className="bg-white rounded-2xl p-2 border border-slate-700">
+              <SignaturePad onSave={handleSignatureSave} />
+            </div>
+          </div>
+
+          {/* Approver Phone */}
           <div className="space-y-1.5">
             <Label className="text-xs font-semibold text-slate-300 flex items-center gap-1.5">
-              <UserCheck size={14} className="text-indigo-400" />
-              ชื่อผู้รับรองหน้างาน (ถ้ามี)
+              <Phone size={14} className="text-indigo-400" />
+              เบอร์โทรศัพท์ผู้เซ็นรับรอง
             </Label>
             <Input
-              type="text"
-              placeholder="ระบุชื่อผู้รับสินค้า / ผู้เซ็นอนุมัติ"
-              value={approverName}
-              onChange={(e) => setApproverName(e.target.value)}
-              className="h-11 bg-slate-800 border-slate-700 rounded-xl text-sm text-white placeholder:text-slate-500 focus-visible:ring-indigo-500"
+              type="tel"
+              placeholder="ระบุเบอร์โทรศัพท์ผู้เซ็นรับรอง..."
+              value={approverPhone}
+              onChange={(e) => setApproverPhone(e.target.value)}
+              className="h-11 bg-slate-800 border-slate-700 rounded-xl text-sm text-white placeholder:text-slate-500 focus-visible:ring-indigo-500 font-medium"
             />
           </div>
 
