@@ -27,6 +27,21 @@ function num(v: unknown): number {
   return Number.isFinite(n) ? n : 0
 }
 
+// Customer IDs are stored as "CUST-9910" (the system prepends "CUST-" to the
+// number the user typed). The MASTER sheet's รหัสลูกค้า column wants the plain
+// number. Strip the prefix and return it only when what remains is purely
+// numeric (so legacy ids like "CUST-2604-2178" or "skn-002" fall through).
+function masterCustomerCode(rawId: unknown): string | null {
+  const stripped = String(rawId ?? '').trim().replace(/^CUST-?/i, '')
+  return /^\d+$/.test(stripped) ? stripped : null
+}
+
+// Test/QA jobs (TILOG demo) must never reach any customer ledger tab.
+function isTestCustomer(job: { Customer_Name?: unknown; Customer_ID?: unknown }): boolean {
+  const s = (String(job.Customer_Name ?? '') + ' ' + String(job.Customer_ID ?? '')).toUpperCase()
+  return s.includes('TILOG')
+}
+
 function parseExtras(raw: unknown): ExtraCost[] {
   let v = raw
   if (typeof v === 'string') {
@@ -307,9 +322,64 @@ function jobsMissingFromLedger(
   })
 }
 
-// Build the MASTER row for a job, keyed by column header name.
+// Resolve the MASTER รหัสลูกค้า code for a job (name keywords first, then the
+// numeric code stripped from "CUST-9910", else default 20).
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-function buildRowValues(job: any, fuel: number | ''): Record<string, string | number> {
+function resolveCustId(job: any): number | string {
+    const idStr = String(job.Customer_ID || '').toLowerCase()
+    const nameStr = String(job.Customer_Name || '').toLowerCase()
+    if (idStr.includes('unicord') || idStr.includes('ยูนิคอร์ด') || nameStr.includes('unicord') || nameStr.includes('ยูนิคอร์ด')) return 2
+    if (idStr.includes('แบมบิโน่') || idStr.includes('bambino') || nameStr.includes('แบมบิโน่') || nameStr.includes('bambino')) return 77
+    if (idStr.includes('ยังค์มีดี') || idStr.includes('youngmede') || nameStr.includes('ยังค์มีดี') || nameStr.includes('youngmede')) return 109
+    if (idStr.includes('อินไลน์') || idStr.includes('inline') || nameStr.includes('อินไลน์') || nameStr.includes('inline')) return 60
+    if (idStr.includes('คิวพลัส') || idStr.includes('qplus') || nameStr.includes('คิวพลัส') || nameStr.includes('qplus')) return 55
+    if (idStr.includes('siam') || idStr.includes('สยามรุ่งเรือง') || nameStr.includes('siam') || nameStr.includes('สยามรุ่งเรือง')) return 20
+    const code = masterCustomerCode(job.Customer_ID)
+    return code ? Number(code) : 20
+}
+
+// The ordered list of drop (destination) names for a job. Multi-drop jobs keep
+// each stop in original_destinations_json; fall back to splitting the "→"-joined
+// Dest_Location string, then to the single Dest_Location.
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function parseDestinations(job: any): string[] {
+    let v: unknown = job.original_destinations_json
+    if (typeof v === 'string') { try { v = JSON.parse(v) } catch { v = null } }
+    if (Array.isArray(v)) {
+        const names = v.map(d => String((d as { name?: unknown })?.name ?? '').trim()).filter(Boolean)
+        if (names.length > 0) return names
+    }
+    if (job.Dest_Location) return String(job.Dest_Location).split('→').map((s: string) => s.trim()).filter(Boolean)
+    return []
+}
+
+// Build the MASTER row(s) for a job, keyed by column header name. A single-drop
+// job yields one row; a multi-drop job yields one row per drop, matching the AI
+// OCR MASTER format — the first (main) row carries origin/vehicle/pricing, and
+// each additional drop is a lightweight row with just date, customer and its
+// destination (origin/vehicle/pricing left blank so totals aren't double-counted).
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function buildRowsForJob(job: any, fuel: number | ''): Record<string, string | number>[] {
+    const drops = parseDestinations(job)
+    if (drops.length <= 1) return [buildRowValues(job, fuel)]
+
+    const main = buildRowValues(job, fuel, drops[0])
+    const custId = resolveCustId(job)
+    const date = fmtDate(job.Plan_Date)
+    const childRows = drops.slice(1).map(dest => ({
+        'วันที่': date,               // keep date + customer so the auto-sort keeps
+        'รหัสลูกค้า': custId,          // the drop rows grouped with their main row
+        'ลูกค้า': job.Customer_Name || '',
+        'ปลายทางลูกค้า': dest,
+        'ปลายทางรถร่วม': dest,
+    })) as Record<string, string | number>[]
+    return [main, ...childRows]
+}
+
+// Build the MASTER row for a job, keyed by column header name.
+// `destOverride` sets the destination cell (used to place one drop per row).
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function buildRowValues(job: any, fuel: number | '', destOverride?: string): Record<string, string | number> {
     const extras = parseExtras(job.extra_costs_json)
 
     // Customer-side charges
@@ -336,26 +406,8 @@ function buildRowValues(job: any, fuel: number | ''): Record<string, string | nu
     // place them according to the sheet's actual header row, so inserting,
     // adding or reordering columns later keeps working — matching is by name.
     // (Renaming a header is the only thing that would need a code update.)
-    let custId: number | string = 20
-    const idStr = String(job.Customer_ID || '').toLowerCase()
-    const nameStr = String(job.Customer_Name || '').toLowerCase()
-
-    if (idStr.includes('unicord') || idStr.includes('ยูนิคอร์ด') || nameStr.includes('unicord') || nameStr.includes('ยูนิคอร์ด')) {
-      custId = 2
-    } else if (idStr.includes('แบมบิโน่') || idStr.includes('bambino') || nameStr.includes('แบมบิโน่') || nameStr.includes('bambino')) {
-      custId = 77
-    } else if (idStr.includes('ยังค์มีดี') || idStr.includes('youngmede') || nameStr.includes('ยังค์มีดี') || nameStr.includes('youngmede')) {
-      custId = 109
-    } else if (idStr.includes('อินไลน์') || idStr.includes('inline') || nameStr.includes('อินไลน์') || nameStr.includes('inline')) {
-      custId = 60
-    } else if (idStr.includes('คิวพลัส') || idStr.includes('qplus') || nameStr.includes('คิวพลัส') || nameStr.includes('qplus')) {
-      custId = 55
-    } else if (idStr.includes('siam') || idStr.includes('สยามรุ่งเรือง') || nameStr.includes('siam') || nameStr.includes('สยามรุ่งเรือง')) {
-      custId = 20
-    } else if (job.Customer_ID) {
-      const parsedId = Number(job.Customer_ID)
-      if (!isNaN(parsedId)) custId = parsedId
-    }
+    const custId = resolveCustId(job)
+    const destination = destOverride ?? (job.Dest_Location || '')
 
     const byName: Record<string, string | number> = {
       'วันที่': fmtDate(job.Plan_Date),     // decision A: Plan_Date
@@ -365,7 +417,7 @@ function buildRowValues(job: any, fuel: number | ''): Record<string, string | nu
       'ประเภทรถลูกค้า': job.Vehicle_Type || '',
       'จำนวนสินค้าลูกค้า': n(num(job.Loaded_Qty)),
       'ต้นทางลูกค้า': job.Origin_Location || '',
-      'ปลายทางลูกค้า': job.Dest_Location || '',
+      'ปลายทางลูกค้า': destination,
       'ระยะทางไป-กลับลูกค้า': n(distanceRoundTrip),   // decision B: ×2
       'ราคาน้ำมันลูกค้า': fuel,                          // decision C
       'ราคาลูกค้า': n(custBase),
@@ -380,7 +432,7 @@ function buildRowValues(job: any, fuel: number | ''): Record<string, string | nu
       'ชื่อรถร่วม': job.Driver_Name || '',
       'ประเภทรถรถร่วม': job.Vehicle_Type || '',
       'ต้นทางรถร่วม': job.Origin_Location || '',
-      'ปลายทางรถร่วม': job.Dest_Location || '',
+      'ปลายทางรถร่วม': destination,
       'ราคาน้ำมัน': fuel,
       'ราคารถร่วม': n(subBase),
       'ค่าขึ้นชั้นรถร่วม': n(subLabor),
@@ -430,8 +482,22 @@ export function getJobTabName(
   if (matchedTab) return matchedTab
 
   // If no exact dedicated tab exists for this customer:
-  // Siam Rungrueng -> "สยามรุ่งเรือง" tab
-  if (normCustName.includes('สยามรุ่งเรือง') || normCustName.includes('siam') || normCustId === '20') {
+  // Siam Rungrueng tab — the default customer (id 20) plus these extra customer
+  // codes that share the "สยามรุ่งเรือง" ledger tab. Add new codes here to route
+  // more customers into it.
+  const SIAM_CUSTOMER_IDS = new Set([
+    '20',
+    '9910', // บริษัท เคเอสแอล.อะโกร แอนด์ เทรดดิ้ง จำกัด
+    '9909', // บริษัท สยามโคลทติ้ง ซัพพลายเออร์ จำกัด
+    '9914', // บริษัท ยูนิคอร์น คอนซูมเมอร์ กรุ๊ป จำกัด
+    '9908', // บริษัท มาร์เก็ต คอนเน็กชั่นส์ เอเชีย จำกัด
+  ])
+  // Match by the plain numeric code stripped from "CUST-9910" (system prepends
+  // the prefix to the number entered), falling back to the raw/cleaned id.
+  const custCode = masterCustomerCode(job.Customer_ID)
+  if (normCustName.includes('สยามรุ่งเรือง') || normCustName.includes('siam')
+      || (custCode && SIAM_CUSTOMER_IDS.has(custCode))
+      || SIAM_CUSTOMER_IDS.has(normCustId)) {
     const siamTab = existingTabs.find(t => t.includes('สยามรุ่งเรือง'))
     if (siamTab) return siamTab
   }
@@ -509,10 +575,13 @@ export async function appendJobToMaster(jobId: string): Promise<{ success: boole
     const { data: job, error } = await supabase.from('Jobs_Main').select('*').eq('Job_ID', jobId).single()
     if (error || !job) return { success: false, error: 'Job not found' }
 
+    // Test/QA jobs (TILOG demo) never go to any ledger tab.
+    if (isTestCustomer(job)) return { success: true, skipped: true }
+
     let fuel: number | '' = ''
     try { fuel = (await getFuelPriceNumber(String(job.Plan_Date || '').slice(0, 10) || undefined)) ?? '' } catch { fuel = '' }
 
-    const byName = buildRowValues(job, fuel)
+    const rowObjects = buildRowsForJob(job, fuel)
     const sheets = getSheetsClient()
 
     let tabOverride = TAB
@@ -529,14 +598,15 @@ export async function appendJobToMaster(jobId: string): Promise<{ success: boole
     const { qtab, order, headerRow } = await resolveOrder(sheets, tabOverride)
     const ledger = await readLedgerState(sheets, qtab, order, headerRow)
     if (ledger.jobIds.has(jobId)) return { success: true, skipped: true }
-    const row = order.map(h => byName[h] ?? '')
+    // One row per drop (multi-drop → main row + one row per extra destination).
+    const values = rowObjects.map(byName => order.map(h => byName[h] ?? ''))
 
     await sheets.spreadsheets.values.append({
       spreadsheetId: SHEET_ID,
       range: `${qtab}!A:BZ`,
       valueInputOption: 'USER_ENTERED',
       insertDataOption: 'INSERT_ROWS',
-      requestBody: { values: [row] },
+      requestBody: { values },
     })
 
     // Auto-sort the tab chronologically by Date & Customer
@@ -629,6 +699,7 @@ export async function verifyAndBackfillHistorical(
 
     const jobsByTab = new Map<string, MasterJob[]>()
     for (const job of jobs) {
+      if (isTestCustomer(job)) continue // TILOG demo jobs never hit a ledger tab
       const tabName = getJobTabName(job, existingTabs)
       if (!jobsByTab.has(tabName)) {
         jobsByTab.set(tabName, [])
@@ -661,7 +732,9 @@ export async function verifyAndBackfillHistorical(
           try { fuel = (await getFuelPriceNumber(dateKey || undefined)) ?? '' } catch { fuel = '' }
           fuelCache.set(dateKey, fuel)
         }
-        rows.push(order.map(h => buildRowValues(job, fuel as number | '')[h] ?? ''))
+        for (const byName of buildRowsForJob(job, fuel as number | '')) {
+          rows.push(order.map(h => byName[h] ?? ''))
+        }
       }
 
       for (let i = 0; i < rows.length; i += 500) {
@@ -755,6 +828,7 @@ export async function backfillMasterSheet(
 
     const jobsByTab = new Map<string, MasterJob[]>()
     for (const job of jobs) {
+      if (isTestCustomer(job)) continue // TILOG demo jobs never hit a ledger tab
       const tabName = getJobTabName(job, existingTabs)
       if (!jobsByTab.has(tabName)) {
         jobsByTab.set(tabName, [])
@@ -787,7 +861,9 @@ export async function backfillMasterSheet(
           try { fuel = (await getFuelPriceNumber(dateKey || undefined)) ?? '' } catch { fuel = '' }
           fuelCache.set(dateKey, fuel)
         }
-        rows.push(order.map(h => buildRowValues(job, fuel as number | '')[h] ?? ''))
+        for (const byName of buildRowsForJob(job, fuel as number | '')) {
+          rows.push(order.map(h => byName[h] ?? ''))
+        }
       }
 
       for (let i = 0; i < rows.length; i += 500) {
