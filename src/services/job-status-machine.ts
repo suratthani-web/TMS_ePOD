@@ -269,12 +269,21 @@ async function sendDeliveryCompletionNotification(jobId: string) {
     // Fetch job details
     const { data: job, error: jobErr } = await supabase
       .from('Jobs_Main')
-      .select('Job_ID, Customer_Name, Route_Name, Driver_Name, Vehicle_Plate, Photo_Proof_Url, Signature_Url, Customer_ID, Actual_Delivery_Time, Delivery_Date')
+      .select('Job_ID, Customer_Name, Route_Name, Driver_Name, Vehicle_Plate, Photo_Proof_Url, Signature_Url, Customer_ID, Actual_Delivery_Time, Delivery_Date, Delivery_Notified_At')
       .eq('Job_ID', jobId)
       .single();
-      
+
     if (jobErr || !job) {
       console.error(`[Notification] Job ${jobId} not found for completion notification.`);
+      return;
+    }
+
+    // Idempotency: this completion notification must fire only once per job.
+    // A re-submitted POD, an offline replay, or a later re-verify all re-run the
+    // Completed/Delivered transition — without this guard each one would re-push
+    // to every admin + the customer, silently burning the limited LINE quota.
+    if (job.Delivery_Notified_At) {
+      console.log(`[Notification] Job ${jobId} already notified at ${job.Delivery_Notified_At}, skipping.`);
       return;
     }
     
@@ -388,16 +397,29 @@ async function sendDeliveryCompletionNotification(jobId: string) {
       console.log(`[Notification] No bound Line users to notify for job completion.`);
       return;
     }
-    
+
+    // Claim the notification slot before sending: only the update that flips a
+    // still-null timestamp wins, so two concurrent transitions can't both push.
+    const { data: claimed } = await supabase
+      .from('Jobs_Main')
+      .update({ Delivery_Notified_At: new Date().toISOString() })
+      .eq('Job_ID', jobId)
+      .is('Delivery_Notified_At', null)
+      .select('Job_ID');
+    if (!claimed || claimed.length === 0) {
+      console.log(`[Notification] Job ${jobId} was notified by a concurrent transition, skipping.`);
+      return;
+    }
+
     console.log(`[Notification] Sending completion notification for job ${jobId} to ${uniqueIds.length} users...`);
-    
+
     // Dynamically import pushToUser to prevent circular dependencies
     const { pushToUser } = await import('@/lib/integrations/line');
-    
+
     for (const userId of uniqueIds) {
       await pushToUser(userId, message);
     }
-    
+
   } catch (err) {
     console.error('[Notification] Error sending completion notification:', err);
   }

@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
 import { createAdminClient } from '@/utils/supabase/server'
-import { pushToUser } from '@/lib/integrations/line'
+import { sendPushToAdminUser } from '@/lib/actions/push-actions'
 import { aiToolExecutors } from '@/lib/ai/tools'
 
 export async function GET(req: Request) {
@@ -13,11 +13,12 @@ export async function GET(req: Request) {
 
         const supabase = createAdminClient()
 
-        // 1. Get all admins bound with a LINE User ID
+        // 1. Get admins to brief. Web Push (free) replaces LINE here, so we brief
+        // every admin — sendPushToAdminUser simply no-ops for those without a
+        // push subscription.
         const { data: admins, error: adminError } = await supabase
             .from('Master_Users')
-            .select('Name, Branch_ID, Line_User_ID')
-            .not('Line_User_ID', 'is', null)
+            .select('Name, Branch_ID, Username, User_ID')
 
         if (adminError || !admins || admins.length === 0) {
             return NextResponse.json({ status: 'no_admins_to_brief' })
@@ -36,7 +37,8 @@ export async function GET(req: Request) {
 
         // 2. Query summary and push to each admin
         for (const admin of admins) {
-            if (!admin.Line_User_ID) continue
+            const adminId = admin.Username || admin.User_ID
+            if (!adminId) continue
 
             const branchId = admin.Branch_ID === 'HQ' ? undefined : admin.Branch_ID
             const today = await aiToolExecutors.get_today_summary({ branchId })
@@ -64,8 +66,14 @@ export async function GET(req: Request) {
                 `ขอให้เป็นวันที่ดีและปลอดภัยในการขนส่งทุกเส้นทางครับ! 🚛💨✨`
             ].join('\n')
 
-            await pushToUser(admin.Line_User_ID, text)
-            briefCount++
+            const res = await sendPushToAdminUser(adminId, {
+                title: `☀️ สรุปเช้านี้ • ${admin.Branch_ID || 'ส่วนกลาง'}`,
+                body: text,
+                url: '/dashboard',
+                type: 'morning_brief',
+                tag: 'morning_brief',
+            })
+            if (res.success) briefCount++
         }
 
         return NextResponse.json({ status: 'ok', briefedAdmins: briefCount })
