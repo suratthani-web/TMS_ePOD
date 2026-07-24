@@ -62,6 +62,7 @@ export type Job = {
   assignments?: JobAssignment[]
   Created_At: string | null
   Photo_Proof_Url: string | null
+  Floor_Climb_Url: string | null
   Signature_Url: string | null
   Pickup_Photo_Url: string | null
   Pickup_Signature_Url: string | null

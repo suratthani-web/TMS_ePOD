@@ -40,7 +40,7 @@ export function CostBreakdownChart({ data }: { data: CostData }) {
                 </Pie>
                 <Tooltip 
                     contentStyle={{ backgroundColor: '#0f172a', borderColor: '#334155', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.1)' }}
-                    formatter={(value: number | string | undefined) => [new Intl.NumberFormat('th-TH', { style: 'currency', currency: 'THB' }).format(Number(value || 0)), '']}
+                    formatter={(value) => [new Intl.NumberFormat('th-TH', { style: 'currency', currency: 'THB' }).format(Number(value || 0)), '']}
                 />
                 <Legend 
                     verticalAlign="bottom" 

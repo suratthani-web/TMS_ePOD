@@ -6,8 +6,23 @@ import {
   Activity, Navigation, ExternalLink, ShieldCheck, Target, Cpu, 
   Layers, TrendingUp, AlertTriangle, Info, DollarSign, User, 
   CheckCircle2, Calendar, Phone, Smartphone, Box, Scale, Maximize2, 
-  RefreshCw, ArrowRight, Eye, PenTool, ArrowLeft, Send
+  RefreshCw, ArrowRight, Eye, PenTool, ArrowLeft, Send, Download, Printer
 } from "lucide-react"
+
+// Print a floor-climb slip on its own — opens a bare A4-landscape page with zero
+// margins so the browser doesn't stamp date/URL/filename around the edges.
+function printFloorClimbSlip(url: string) {
+  const w = window.open('', '_blank', 'width=1000,height=720')
+  if (!w) return
+  w.document.write(
+    '<!doctype html><html><head><title>ใบขึ้นชั้น</title>' +
+    '<style>@page{size:A4 landscape;margin:0}html,body{margin:0;padding:0}' +
+    'img{width:100%;height:auto;display:block}' +
+    '@media print{body{-webkit-print-color-adjust:exact;print-color-adjust:exact}}</style>' +
+    '</head><body><img src="' + url + '" onload="setTimeout(function(){window.focus();window.print();},300)"/></body></html>'
+  )
+  w.document.close()
+}
 import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
 import { CardContent } from "@/components/ui/card"
@@ -433,6 +448,48 @@ export function TrackingHubClient({ initialActiveJobs, customerMode = false }: T
                                 <EvidenceBox label="Pickup proof" photos={selectedJob.pickupPhotos} signature={selectedJob.pickupSignature} phase="P-01" />
                                 <EvidenceBox label="Delivery proof" photos={selectedJob.podPhotos} signature={selectedJob.signature} phase="P-02" />
                              </div>
+
+                             {/* Floor Climb official slips (one per drop) */}
+                             {selectedJob.floorClimbUrls && selectedJob.floorClimbUrls.length > 0 && (
+                                <PremiumCard className="rounded-2xl border border-border/40 shadow-sm overflow-hidden bg-card">
+                                    <div className="p-6 border-b border-border/40 bg-muted/10">
+                                        <h3 className="text-sm font-semibold flex items-center gap-3 text-indigo-500">
+                                            <Layers size={18} /> ใบบันทึกการย้ายสินค้าและขึ้นชั้น
+                                            <span className="text-xs font-bold text-muted-foreground">({selectedJob.floorClimbUrls.length} ใบ)</span>
+                                        </h3>
+                                    </div>
+                                    <div className="p-6 bg-muted/5 space-y-8">
+                                        {selectedJob.floorClimbUrls.map((slipUrl, i) => (
+                                            <div key={i} className="space-y-3">
+                                                <div className="flex items-center justify-between">
+                                                    <span className="text-xs font-bold text-muted-foreground">ดรอปที่ {i + 1}</span>
+                                                    <div className="flex items-center gap-2">
+                                                        <a href={slipUrl} target="_blank" rel="noreferrer">
+                                                            <PremiumButton className="h-9 px-4 rounded-xl font-semibold text-xs gap-1.5">
+                                                                <Eye size={13} /> ดู
+                                                            </PremiumButton>
+                                                        </a>
+                                                        <PremiumButton onClick={() => printFloorClimbSlip(slipUrl)} className="h-9 px-4 rounded-xl font-semibold text-xs gap-1.5">
+                                                            <Printer size={13} /> พิมพ์
+                                                        </PremiumButton>
+                                                        <a href={slipUrl} download={`ใบขึ้นชั้น_${selectedJob.jobId || 'job'}_ดรอป${i + 1}.jpg`} target="_blank" rel="noreferrer">
+                                                            <PremiumButton className="h-9 px-4 rounded-xl font-semibold text-xs gap-1.5">
+                                                                <Download size={13} /> โหลด
+                                                            </PremiumButton>
+                                                        </a>
+                                                    </div>
+                                                </div>
+                                                {/* eslint-disable-next-line @next/next/no-img-element */}
+                                                <img
+                                                    src={slipUrl}
+                                                    alt={`ใบขึ้นชั้น ดรอปที่ ${i + 1}`}
+                                                    className="w-full max-w-2xl mx-auto rounded-xl border border-border/40 bg-white object-contain"
+                                                />
+                                            </div>
+                                        ))}
+                                    </div>
+                                </PremiumCard>
+                             )}
                         </div>
 
                         {/* Right: financial summary and actions */}
@@ -557,6 +614,10 @@ function LedgerRow({ label, cust, driver, sub, customerMode }: { label: string, 
 }
 
 function EvidenceBox({ label, photos, signature, phase }: { label: string, photos: string[], signature: string | null, phase: string }) {
+    // Multi-drop jobs accumulate several signatures comma-joined in one field.
+    // Split so each renders as its own image instead of crashing next/image
+    // with a comma-joined "URL".
+    const signatures = signature ? signature.split(",").map(s => s.trim()).filter(Boolean) : []
     return (
         <div className="p-8 bg-muted/10 border border-border/40 rounded-2xl space-y-6">
             <div className="flex items-center justify-between">
@@ -570,12 +631,12 @@ function EvidenceBox({ label, photos, signature, phase }: { label: string, photo
                         <div className="absolute inset-0 bg-primary/20 opacity-0 group-hover/img:opacity-100 transition-opacity flex items-center justify-center"><Eye size={20} className="text-white" /></div>
                     </div>
                 ))}
-                {signature && (
-                    <div className="w-20 h-20 rounded-2xl border-2 border-border shadow-md overflow-hidden bg-white p-2 relative flex items-center justify-center transition-transform hover:scale-110">
-                        <Image src={signature} alt="Sig" fill className="object-contain" />
+                {signatures.map((sig, i) => (
+                    <div key={`sig-${i}`} className="w-20 h-20 rounded-2xl border-2 border-border shadow-md overflow-hidden bg-white p-2 relative flex items-center justify-center transition-transform hover:scale-110">
+                        <Image src={sig} alt="Sig" fill className="object-contain" />
                     </div>
-                )}
-                {photos.length === 0 && !signature && (
+                ))}
+                {photos.length === 0 && signatures.length === 0 && (
                     <div className="h-20 flex items-center px-6 bg-muted/40 rounded-2xl border-2 border-dashed border-border/60">
                         <p className="text-xs font-medium text-muted-foreground opacity-50">ยังไม่มีหลักฐาน</p>
                     </div>

@@ -86,7 +86,8 @@ export default function JobCompletePage() {
       }
   }
 
-  const waitForImages = (element: HTMLElement) => {
+  const waitForImages = (element: HTMLElement | null) => {
+    if (!element) return Promise.resolve([])
     const images = Array.from(element.getElementsByTagName('img'))
     return Promise.all(
       images.map(img => {
@@ -125,12 +126,15 @@ export default function JobCompletePage() {
         if (!ok) return
     }
 
-    setLoading(true)
+    // NOTE: do NOT setLoading(true) yet. The loading screen is an early-return
+    // that unmounts the off-screen report DOM, which nulls reportRef/
+    // floorClimbReportRef mid-capture and makes html2canvas fail. We capture the
+    // reports first (form still mounted), then flip loading on for the upload.
     toast.info("กำลังประมวลผลและอัปโหลดหลักฐาน...", { id: "pod-upload" })
-    
+
     try {
         const formData = new FormData()
-        
+
         // 1. Capture Report (Heavy Task)
         if (reportRef.current && job) {
             const captureReport = async (retryCount = 0): Promise<Blob | null> => {
@@ -153,36 +157,61 @@ export default function JobCompletePage() {
                     )
                 } catch (err) {
                     if (retryCount < 1) return captureReport(retryCount + 1)
+                    // Surface the real reason instead of swallowing it — a silent
+                    // failure here means the POD report never gets generated.
+                    console.error("[POD report capture FAILED]", err)
+                    toast.error("สร้างใบ POD ไม่สำเร็จ", { description: String((err as Error)?.message || err) })
                     return null
                 }
             }
 
             // Best-effort: never let html2canvas hang the submit on iOS — cap it
             // and proceed without the report if it stalls or fails.
-            const reportBlob = await withTimeout(captureReport(), 25000, 'report capture').catch(() => null)
+            const reportBlob = await withTimeout(captureReport(), 25000, 'report capture').catch((e) => {
+                console.error("[POD report capture TIMEOUT]", e)
+                toast.error("สร้างใบ POD หมดเวลา (timeout)")
+                return null
+            })
             if (reportBlob && reportBlob.size > 5000) {
                 formData.append("pod_report", reportBlob, isContainer ? `Container_Delivery_Report_${params.id}.jpg` : `POD_Report_${params.id}.jpg`)
+            } else {
+                console.error("[POD report] blob missing/too small:", reportBlob?.size)
             }
             // 1.2 Capture Floor Climb Official Report (if extra service entered)
             if (floorClimbReportRef.current && extraServiceData) {
                 try {
                     await waitForImages(floorClimbReportRef.current!)
                     const fcCanvas = await html2canvas(floorClimbReportRef.current!, {
-                        scale: 1.5,
+                        scale: 1,
                         useCORS: true,
                         logging: false,
                         backgroundColor: "#ffffff",
-                        width: 800
+                        windowWidth: 800,
+                        allowTaint: true
                     })
                     const fcBlob = await new Promise<Blob | null>(resolve => fcCanvas.toBlob(resolve, 'image/jpeg', 0.85))
                     if (fcBlob && fcBlob.size > 1000) {
                         formData.append("floor_climb_report", fcBlob, `Floor_Climb_Report_${params.id}.jpg`)
+                    } else {
+                        console.error("[FloorClimb] blob missing/too small:", fcBlob?.size)
+                        toast.error("สร้างใบขึ้นชั้นไม่สำเร็จ (ภาพว่าง)")
                     }
                 } catch (fcErr) {
-                    console.warn("Failed to capture FloorClimbReport:", fcErr)
+                    // No longer silent — this is exactly the failure the driver couldn't see.
+                    console.error("[FloorClimb capture FAILED]", fcErr)
+                    toast.error("สร้างใบขึ้นชั้นไม่สำเร็จ", { description: String((fcErr as Error)?.message || fcErr) })
                 }
+            } else if (extraServiceData && !floorClimbReportRef.current) {
+                // The form was filled but the hidden report element never mounted —
+                // capture is impossible. Make this visible instead of silently skipping.
+                console.error("[FloorClimb] ref is null despite extraServiceData present")
+                toast.error("ใบขึ้นชั้นไม่ถูกสร้าง (ref ว่าง)")
             }
         }
+
+        // Reports are captured — now it's safe to show the loading screen and
+        // let the off-screen report DOM unmount.
+        setLoading(true)
 
         // 2. Photos & Signature
         photos.forEach((photo, index) => formData.append(`photo_${index}`, photo))
@@ -237,10 +266,25 @@ export default function JobCompletePage() {
                 } catch { /* Fail silently */ }
             }
 
+            // Capture the official Floor Climb report too, so an offline submit
+            // doesn't silently drop it when the queue replays later.
+            let floorClimbB64 = null
+            if (floorClimbReportRef.current && extraServiceData) {
+                try {
+                    const fcCanvas = await withTimeout(
+                        html2canvas(floorClimbReportRef.current!, { scale: 1, useCORS: true }),
+                        15000,
+                        'offline floor climb capture'
+                    )
+                    floorClimbB64 = fcCanvas.toDataURL('image/jpeg', 0.85)
+                } catch { /* Fail silently */ }
+            }
+
             const offlineData = {
                 photos: photoB64s,
                 signature: sigB64,
                 pod_report: reportB64,
+                floor_climb_report: floorClimbB64,
                 photo_count: photos.length,
                 actualCompletionTime: new Date().toISOString()
             }

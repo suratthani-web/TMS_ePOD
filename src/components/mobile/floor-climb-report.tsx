@@ -45,7 +45,7 @@ export const FloorClimbReport = forwardRef<HTMLDivElement, Props>(({ job, data }
       <div>
         {/* Title */}
         <h1 className="text-3xl font-bold text-center mb-8 tracking-wide">
-          แบบฟอร์มบันทึกการบันทึกการย้ายสินค้าและขึ้นชั้น
+          แบบฟอร์มบันทึกการย้ายสินค้าและขึ้นชั้น
         </h1>
 
         {/* Form Body - Matching the exact template layout */}
@@ -54,13 +54,13 @@ export const FloorClimbReport = forwardRef<HTMLDivElement, Props>(({ job, data }
           <div className="flex items-baseline justify-between gap-4">
             <div className="flex items-baseline flex-1">
               <span className="font-bold whitespace-nowrap mr-2">ชื่อร้านค้า</span>
-              <span className="border-b border-black flex-1 text-center font-medium pb-0.5 text-2xl">
+              <span className="border-b border-black flex-1 text-center font-medium pb-2 text-2xl">
                 {storeName}
               </span>
             </div>
             <div className="flex items-baseline w-[280px]">
               <span className="font-bold whitespace-nowrap mr-2">วันที่</span>
-              <span className="border-b border-black flex-1 text-center font-medium pb-0.5 text-2xl">
+              <span className="border-b border-black flex-1 text-center font-medium pb-2 text-2xl">
                 {dateStr}
               </span>
             </div>
@@ -70,14 +70,14 @@ export const FloorClimbReport = forwardRef<HTMLDivElement, Props>(({ job, data }
           <div className="flex items-baseline justify-between gap-4">
             <div className="flex items-baseline flex-1">
               <span className="font-bold whitespace-nowrap mr-2">จำนวนสินค้าที่ย้าย</span>
-              <span className="border-b border-black w-28 text-center font-bold pb-0.5 text-2xl">
+              <span className="border-b border-black w-28 text-center font-bold pb-2 text-2xl">
                 {movedQty !== "" ? movedQty : "—"}
               </span>
               <span className="ml-2 whitespace-nowrap">กล่อง / กระสอบ / ชิ้น</span>
             </div>
             <div className="flex items-baseline flex-1">
               <span className="font-bold whitespace-nowrap mr-2">SO. / PO. / INV.</span>
-              <span className="border-b border-black flex-1 text-center font-bold pb-0.5 text-2xl">
+              <span className="border-b border-black flex-1 text-center font-bold pb-2 text-2xl">
                 {soNo}
               </span>
             </div>
@@ -87,14 +87,14 @@ export const FloorClimbReport = forwardRef<HTMLDivElement, Props>(({ job, data }
           <div className="flex items-baseline justify-between gap-4">
             <div className="flex items-baseline flex-1">
               <span className="font-bold whitespace-nowrap mr-2">จำนวนการขึ้นชั้น</span>
-              <span className="border-b border-black w-24 text-center font-bold pb-0.5 text-2xl">
+              <span className="border-b border-black w-24 text-center font-bold pb-2 text-2xl">
                 {floorClimbQty !== "" && Number(floorClimbQty) > 0 ? floorClimbQty : "—"}
               </span>
               <span className="ml-2 whitespace-nowrap">ชั้น</span>
             </div>
             <div className="flex items-baseline flex-1">
               <span className="font-bold whitespace-nowrap mr-2">จำนวนสินค้าที่ขึ้นชั้น</span>
-              <span className="border-b border-black w-28 text-center font-bold pb-0.5 text-2xl">
+              <span className="border-b border-black w-28 text-center font-bold pb-2 text-2xl">
                 {shelvedQty !== "" && Number(shelvedQty) > 0 ? shelvedQty : "—"}
               </span>
               <span className="ml-2 whitespace-nowrap">กล่อง / กระสอบ / ชิ้น</span>

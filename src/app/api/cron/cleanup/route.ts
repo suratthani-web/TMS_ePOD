@@ -119,7 +119,7 @@ export async function GET(req: Request) {
                 // We can safely break the loop immediately, saving many paginated API calls!
                 const oldestFile = files.find(f => f.name !== '.emptyFolderPlaceholder')
                 if (oldestFile) {
-                    const oldestFileTime = new Date(oldestFile.created_at).getTime()
+                    const oldestFileTime = new Date(oldestFile.created_at ?? 0).getTime()
                     if (oldestFileTime >= storageCutoffTime) {
                         console.log(`[CRON Cleanup] Optimization: Oldest file in "${folder}" is newer than 20 days. Skipping rest of folder.`)
                         hasMore = false
@@ -130,7 +130,7 @@ export async function GET(req: Request) {
                 const filesToDelete: string[] = []
                 files.forEach(file => {
                     if (file.name === '.emptyFolderPlaceholder') return
-                    const fileCreatedAt = new Date(file.created_at).getTime()
+                    const fileCreatedAt = new Date(file.created_at ?? 0).getTime()
                     if (fileCreatedAt < storageCutoffTime) {
                         filesToDelete.push(`${folder}/${file.name}`)
                     }

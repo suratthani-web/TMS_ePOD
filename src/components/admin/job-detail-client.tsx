@@ -6,7 +6,7 @@ import { Badge } from "@/components/ui/badge"
 import { 
   ArrowLeft, Calendar, Truck, User, Phone, Package, FileText, Navigation, 
   Activity, Target, Cpu, Layers, TrendingUp, AlertTriangle, ShieldCheck, Info, DollarSign, Eye,
-  Camera, PenTool
+  Camera, PenTool, Download
 } from "lucide-react"
 import JobMapClient from "@/components/maps/job-map-client"
 import { AdminJobActions } from "@/components/admin/admin-job-actions"
@@ -586,7 +586,12 @@ export function JobDetailClient({ job, routeHistory }: JobDetailClientProps) {
           {job.Job_Status === "Delivered" || job.Job_Status === "Completed" ? (
             <div className="space-y-8">
                 {(() => {
-                    const proofUrls = job.Photo_Proof_Url ? job.Photo_Proof_Url.split(',') : []
+                    const allProofUrls = job.Photo_Proof_Url ? job.Photo_Proof_Url.split(',').filter(Boolean) : []
+                    // New jobs store the floor-climb slip in its own column. Older jobs
+                    // kept it inline in Photo_Proof_Url (identified by a "_FLOOR_CLIMB"
+                    // filename) — fall back to that so historical jobs still show it.
+                    const floorClimbUrl = job.Floor_Climb_Url || allProofUrls.find((u: string) => u.includes('FLOOR_CLIMB')) || null
+                    const proofUrls = allProofUrls.filter((u: string) => !u.includes('FLOOR_CLIMB'))
                     const reportUrl = proofUrls.length > 0 ? proofUrls[0] : null
                     const itemPhotos = proofUrls.length > 1 ? proofUrls.slice(1) : []
 
@@ -666,6 +671,35 @@ export function JobDetailClient({ job, routeHistory }: JobDetailClientProps) {
                                     </div>
                                 )}
                             </div>
+
+                            {/* Floor Climb Official Slip (12 Cols) */}
+                            {floorClimbUrl && (
+                                <div className="md:col-span-12 space-y-4 pt-6 border-t border-border">
+                                    <h3 className="text-sm font-black text-foreground flex items-center gap-2">
+                                        <Layers className="h-3.5 w-3.5 text-indigo-400" /> ใบบันทึกการย้ายสินค้าและขึ้นชั้น
+                                    </h3>
+                                    <div className="relative w-full max-w-2xl aspect-[1.5/1] bg-white rounded-2xl overflow-hidden border border-border group/fc shadow-sm">
+                                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                                        <img
+                                            src={floorClimbUrl}
+                                            alt="ใบขึ้นชั้น"
+                                            className="w-full h-full object-contain p-3 group-hover/fc:scale-105 transition-transform duration-500"
+                                        />
+                                        <div className="absolute inset-0 bg-background/70 opacity-0 group-hover/fc:opacity-100 transition-opacity flex items-center justify-center gap-3 backdrop-blur-sm">
+                                            <a href={floorClimbUrl} target="_blank" rel="noreferrer">
+                                                <PremiumButton className="h-10 px-5 rounded-xl font-bold text-sm gap-1.5">
+                                                    <Eye size={14} /> ดูใบขึ้นชั้น
+                                                </PremiumButton>
+                                            </a>
+                                            <a href={floorClimbUrl} download={`ใบขึ้นชั้น_${job.Job_ID || 'job'}.jpg`} target="_blank" rel="noreferrer">
+                                                <PremiumButton className="h-10 px-5 rounded-xl font-bold text-sm gap-1.5">
+                                                    <Download size={14} /> โหลด
+                                                </PremiumButton>
+                                            </a>
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
 
                             {/* Supplementary inventory items (12 Cols) */}
                             {itemPhotos.length > 0 && (

@@ -73,7 +73,7 @@ export function RevenueTrendChart({ data }: { data: RevenueData[] }) {
                 paddingBottom: '8px'
             }}
             itemStyle={{ fontSize: '10px', fontWeight: '900', textTransform: 'uppercase', color: '#fff' }}
-            formatter={(value: number | string | undefined) => [
+            formatter={(value) => [
               new Intl.NumberFormat('th-TH', { style: 'currency', currency: 'THB', maximumFractionDigits: 0 }).format(Number(value || 0)), 
               ''
             ]}

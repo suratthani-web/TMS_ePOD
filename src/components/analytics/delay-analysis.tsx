@@ -97,7 +97,7 @@ export function DelayAnalysis({ data = [] }: Props) {
                                     paddingBottom: '8px'
                                 }}
                                 itemStyle={{ fontSize: '11px', fontWeight: '900', textTransform: 'uppercase', color: '#fff' }}
-                                formatter={(value: number | undefined) => [`${value ?? 0} ${t('common.units')}`, t('common.status')]}
+                                formatter={(value) => [`${value ?? 0} ${t('common.units')}`, t('common.status')]}
                             />
                             <Legend 
                                 layout="vertical" 

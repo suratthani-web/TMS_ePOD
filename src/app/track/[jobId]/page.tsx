@@ -234,9 +234,11 @@ export default async function TrackingPage(props: { params: Promise<{ jobId: str
                                 {job.pickupSignature && (
                                     <div className="space-y-3">
                                         <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider text-center">ลายเซ็นผู้ส่ง/คลังสินค้า</p>
-                                        <div className="h-24 bg-slate-50 rounded-xl overflow-hidden relative border border-slate-100">
-                                            <Image src={job.pickupSignature} alt="Pickup Sig" fill sizes="(max-width: 768px) 100vw, 400px" className="object-contain p-4" />
-                                        </div>
+                                        {job.pickupSignature.split(',').map(s => s.trim()).filter(Boolean).map((sig, i) => (
+                                            <div key={i} className="h-24 bg-slate-50 rounded-xl overflow-hidden relative border border-slate-100">
+                                                <Image src={sig} alt="Pickup Sig" fill sizes="(max-width: 768px) 100vw, 400px" className="object-contain p-4" />
+                                            </div>
+                                        ))}
                                     </div>
                                 )}
                             </div>
@@ -266,9 +268,11 @@ export default async function TrackingPage(props: { params: Promise<{ jobId: str
                                 {job.signature && (
                                     <div className="space-y-3">
                                         <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider text-center">ลายเซ็นผู้รับสินค้า</p>
-                                        <div className="h-24 bg-slate-50 rounded-xl overflow-hidden relative border border-slate-100">
-                                            <Image src={job.signature} alt="POD Sig" fill sizes="(max-width: 768px) 100vw, 400px" className="object-contain p-4" />
-                                        </div>
+                                        {job.signature.split(',').map(s => s.trim()).filter(Boolean).map((sig, i) => (
+                                            <div key={i} className="h-24 bg-slate-50 rounded-xl overflow-hidden relative border border-slate-100">
+                                                <Image src={sig} alt="POD Sig" fill sizes="(max-width: 768px) 100vw, 400px" className="object-contain p-4" />
+                                            </div>
+                                        ))}
                                     </div>
                                 )}
                             </div>

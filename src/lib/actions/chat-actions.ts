@@ -54,13 +54,15 @@ export async function sendChatMessage(senderId: string, message: string, receive
 
     const { error } = await adminSupabase
         .from(tableName)
+        // Dynamic column names (schema auto-detected) can't be statically typed
+        // against the generated Supabase types — cast to satisfy the insert overload.
         .insert({
             [columns.sender_id]: senderId,
             [columns.receiver_id]: receiverId,
             [columns.message]: message,
             [columns.is_read]: false,
             [columns.created_at]: new Date().toISOString()
-        })
+        } as never)
 
     if (error) {
         return { success: false, error: error.message }

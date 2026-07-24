@@ -18,6 +18,7 @@ export interface PublicJobDetails {
   deliveryDate: string | null;
   pickupPhotos: string[];
   podPhotos: string[];
+  floorClimbUrls?: string[];
   signature: string | null;
   pickupSignature: string | null;
   lastLocation?: {
@@ -69,6 +70,7 @@ type PublicJobRow = {
   Actual_Delivery_Time?: string | null
   Pickup_Photo_Url?: string | null
   Photo_Proof_Url?: string | null
+  Floor_Climb_Url?: string | null
   Signature_Proof_Url?: string | null
   Signature_Url?: string | null
   Signature_Pickup_Url?: string | null
@@ -313,7 +315,16 @@ function mapJobToPublicDetails(job: PublicJobRow): PublicJobDetails {
           ? `${job.Delivery_Date}T${job.Actual_Delivery_Time}`
           : (job.Actual_Delivery_Time || null),
         pickupPhotos: job.Pickup_Photo_Url ? job.Pickup_Photo_Url.split(",").filter(Boolean) : [],
-        podPhotos: job.Photo_Proof_Url ? job.Photo_Proof_Url.split(",").filter(Boolean) : [],
+        // The floor-climb slip lives in its own column now; older jobs kept it
+        // inline in Photo_Proof_Url (identified by a "_FLOOR_CLIMB" filename).
+        // Surface it separately and keep it out of the generic POD photo grid.
+        podPhotos: (job.Photo_Proof_Url ? job.Photo_Proof_Url.split(",").filter(Boolean) : [])
+          .filter((u: string) => !u.includes("FLOOR_CLIMB")),
+        // All floor-climb slips (one per drop). Prefer the dedicated column; fall
+        // back to any "_FLOOR_CLIMB" files still living in Photo_Proof_Url (old jobs).
+        floorClimbUrls: (job.Floor_Climb_Url
+          ? job.Floor_Climb_Url.split(",").filter(Boolean)
+          : (job.Photo_Proof_Url ? job.Photo_Proof_Url.split(",").filter((u: string) => u.includes("FLOOR_CLIMB")) : [])),
         signature: job.Signature_Proof_Url || job.Signature_Url || null,
         pickupSignature: job.Signature_Pickup_Url || job.Pickup_Signature_Url || null,
         notes: job.Notes || null,

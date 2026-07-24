@@ -73,6 +73,7 @@ export function PODDownloadButton({ job }: PODDownloadButtonProps) {
 
         // Header
         const header = document.createElement('div')
+        header.classList.add('pdf-block')
         header.style.cssText = 'background: #1e293b; color: white; padding: 40px; margin: -40px -40px 40px -40px; display: flex; justify-content: space-between; align-items: flex-end;'
         
         const headerLeft = document.createElement('div')
@@ -102,8 +103,11 @@ export function PODDownloadButton({ job }: PODDownloadButtonProps) {
         container.appendChild(header)
 
         // Sections helper
+        // A "section header" is glued to the block that follows it so it never
+        // sits orphaned at the bottom of a page. We tag headers as no-break too.
         const createSectionHeader = (text: string) => {
             const h2 = document.createElement('h2')
+            h2.classList.add('pdf-block', 'pdf-glue-next')
             h2.style.cssText = 'font-size: 13px; font-weight: 950; color: #1e293b; border-bottom: 3px solid #1e293b; padding-bottom: 8px; margin-bottom: 30px; text-transform: uppercase; letter-spacing: 1.5px;'
             h2.textContent = text
             return h2
@@ -112,6 +116,7 @@ export function PODDownloadButton({ job }: PODDownloadButtonProps) {
         // Section 1
         container.appendChild(createSectionHeader('1. SHIPMENT & CARRIER DETAILS'))
         const grid1 = document.createElement('div')
+        grid1.classList.add('pdf-block')
         grid1.style.cssText = 'display: grid; grid-template-columns: 1fr 1fr; gap: 40px; margin-bottom: 35px;'
         
         const leftCol = document.createElement('div')
@@ -148,6 +153,7 @@ export function PODDownloadButton({ job }: PODDownloadButtonProps) {
 
         // Status Summary
         const summary = document.createElement('div')
+        summary.classList.add('pdf-block')
         summary.style.cssText = 'display: flex; gap: 20px; margin-bottom: 35px;'
         
         const dateBox = document.createElement('div')
@@ -179,6 +185,7 @@ export function PODDownloadButton({ job }: PODDownloadButtonProps) {
         if (job.notes) {
             container.appendChild(createSectionHeader('2. JOB REMARKS/NOTES'))
             const notesBox = document.createElement('div')
+            notesBox.classList.add('pdf-block')
             notesBox.style.cssText = 'padding: 25px; background: #fffbeb; border: 1px solid #fef3c7; border-radius: 20px; margin-bottom: 35px;'
             const pN = document.createElement('p')
             pN.style.cssText = 'margin: 0; font-size: 14px; color: #92400e; font-weight: 700; line-height: 1.6;'
@@ -191,15 +198,21 @@ export function PODDownloadButton({ job }: PODDownloadButtonProps) {
         container.appendChild(createSectionHeader('3. SHIPMENT EVIDENCE'))
         const evidence = document.createElement('div')
         
+        // Each photo group is wrapped so its label + grid stay together and are
+        // never split across a page boundary.
         // Pickup Photos
         if (job.pickupPhotos && job.pickupPhotos.length > 0) {
+            const pickupWrap = document.createElement('div')
+            pickupWrap.classList.add('pdf-block')
+            pickupWrap.style.marginBottom = '30px'
+
             const pPhL = document.createElement('p')
             pPhL.style.cssText = 'margin: 0 0 15px 0; font-size: 11px; font-weight: 950; color: #6366f1; text-transform: uppercase;'
             pPhL.textContent = 'Inception Proofs (Pickup Photos)'
-            evidence.appendChild(pPhL)
+            pickupWrap.appendChild(pPhL)
 
             const photoGrid = document.createElement('div')
-            photoGrid.style.cssText = 'margin-top: 5px; display: grid; grid-template-columns: repeat(3, 1fr); gap: 15px; margin-bottom: 30px;'
+            photoGrid.style.cssText = 'margin-top: 5px; display: grid; grid-template-columns: repeat(3, 1fr); gap: 15px;'
             job.pickupPhotos.forEach(url => {
                 const imgBox = document.createElement('div')
                 imgBox.style.cssText = 'aspect-ratio: 4/3; border-radius: 12px; overflow: hidden; background: #f1f5f9; border: 1px solid #e2e8f0;'
@@ -210,18 +223,23 @@ export function PODDownloadButton({ job }: PODDownloadButtonProps) {
                 imgBox.appendChild(img)
                 photoGrid.appendChild(imgBox)
             })
-            evidence.appendChild(photoGrid)
+            pickupWrap.appendChild(photoGrid)
+            evidence.appendChild(pickupWrap)
         }
 
         // Delivery Photos
+        const deliveryWrap = document.createElement('div')
+        deliveryWrap.classList.add('pdf-block')
+        deliveryWrap.style.marginBottom = '35px'
+
         const pPodL = document.createElement('p')
         pPodL.style.cssText = 'margin: 0 0 15px 0; font-size: 11px; font-weight: 950; color: #10b981; text-transform: uppercase;'
         pPodL.textContent = 'Completion Proofs (Delivery Photos)'
-        evidence.appendChild(pPodL)
+        deliveryWrap.appendChild(pPodL)
 
         if (job.podPhotos && job.podPhotos.length > 0) {
             const photoGrid = document.createElement('div')
-            photoGrid.style.cssText = 'margin-top: 5px; display: grid; grid-template-columns: repeat(3, 1fr); gap: 15px; margin-bottom: 35px;'
+            photoGrid.style.cssText = 'margin-top: 5px; display: grid; grid-template-columns: repeat(3, 1fr); gap: 15px;'
             job.podPhotos.forEach(url => {
                 const imgBox = document.createElement('div')
                 imgBox.style.cssText = 'aspect-ratio: 4/3; border-radius: 12px; overflow: hidden; background: #f1f5f9; border: 1px solid #e2e8f0; box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1);'
@@ -232,15 +250,17 @@ export function PODDownloadButton({ job }: PODDownloadButtonProps) {
                 imgBox.appendChild(img)
                 photoGrid.appendChild(imgBox)
             })
-            evidence.appendChild(photoGrid)
+            deliveryWrap.appendChild(photoGrid)
         } else {
             const emptyP = document.createElement('p')
-            emptyP.style.cssText = 'color: #94a3b8; font-size: 13px; font-style: italic; background: #f8fafc; padding: 20px; border-radius: 12px; border: 1px dashed #e2e8f0; text-align: center; margin-bottom: 35px;'
+            emptyP.style.cssText = 'color: #94a3b8; font-size: 13px; font-style: italic; background: #f8fafc; padding: 20px; border-radius: 12px; border: 1px dashed #e2e8f0; text-align: center;'
             emptyP.textContent = 'ไม่มีภาพถ่ายหลักฐานการจัดส่งในระบบ'
-            evidence.appendChild(emptyP)
+            deliveryWrap.appendChild(emptyP)
         }
+        evidence.appendChild(deliveryWrap)
 
         const sigGrid = document.createElement('div')
+        sigGrid.classList.add('pdf-block')
         sigGrid.style.cssText = 'display: grid; grid-template-columns: 1fr 1fr; gap: 40px; margin-bottom: 50px;'
         
         const createSigBox = (label: string, signatureUrl: string | null, fallback: string) => {
@@ -277,6 +297,7 @@ export function PODDownloadButton({ job }: PODDownloadButtonProps) {
 
         // Footer
         const footer = document.createElement('div')
+        footer.classList.add('pdf-block')
         footer.style.cssText = 'text-align: center; color: #94a3b8; font-size: 11px; border-top: 1px solid #f1f5f9; padding-top: 40px; margin-top: 20px;'
         const footerStatus = document.createElement('div')
         footerStatus.style.cssText = 'display: flex; justify-content: center; align-items: center; gap: 10px; margin-bottom: 15px;'
@@ -312,36 +333,85 @@ export function PODDownloadButton({ job }: PODDownloadButtonProps) {
         // Wait longer for image loading
         await new Promise(resolve => setTimeout(resolve, 2000))
 
+        const scale = 2
+        const elementRect = element.getBoundingClientRect()
+
+        // Measure each no-break block's vertical span in canvas pixels. A "glue
+        // next" block (a section header) is merged with the block right after it
+        // so a header never gets stranded at the foot of a page.
+        const rawBlocks = Array.from(element.querySelectorAll<HTMLElement>('.pdf-block')).map(el => ({
+            top: (el.getBoundingClientRect().top - elementRect.top) * scale,
+            bottom: (el.getBoundingClientRect().bottom - elementRect.top) * scale,
+            glue: el.classList.contains('pdf-glue-next'),
+        })).sort((a, b) => a.top - b.top)
+
+        const blocks: Array<{ top: number; bottom: number }> = []
+        for (let i = 0; i < rawBlocks.length; i++) {
+            const b = rawBlocks[i]
+            const prev = blocks[blocks.length - 1]
+            // Merge into the previous span when it's a glued header, or when the
+            // two spans touch/overlap (so a header stays attached to its content).
+            if (prev && (prev.bottom >= b.top - 1 || (i > 0 && rawBlocks[i - 1].glue))) {
+                prev.bottom = Math.max(prev.bottom, b.bottom)
+            } else {
+                blocks.push({ top: b.top, bottom: b.bottom })
+            }
+        }
+
         const canvas = await html2canvas(element, {
-            scale: 2,
+            scale,
             useCORS: true,
             backgroundColor: '#ffffff',
             windowWidth: 800,
-            logging: true
+            logging: false
         })
 
         document.body.removeChild(element)
 
-        const imgData = canvas.toDataURL('image/png')
         const pdf = new jsPDF('p', 'mm', 'a4')
-        const pageWidth = pdf.internal.pageSize.getWidth()
-        const pageHeight = pdf.internal.pageSize.getHeight()
-        const imgWidth = pageWidth
-        const imgHeight = (canvas.height * imgWidth) / canvas.width
+        const pageWidthMm = pdf.internal.pageSize.getWidth()
+        const pageHeightMm = pdf.internal.pageSize.getHeight()
+        const pxPerMm = canvas.width / pageWidthMm
+        const pageHeightPx = pageHeightMm * pxPerMm
 
-        let heightLeft = imgHeight
-        let position = 0
+        // Compute page break Y positions that never slice through a block.
+        const breaks = [0]
+        let start = 0
+        while (start < canvas.height - 1) {
+            let end = start + pageHeightPx
+            if (end >= canvas.height) { end = canvas.height; breaks.push(end); break }
+            // Does a block straddle this cut line?
+            const crossing = blocks.find(b => b.top < end - 1 && b.bottom > end + 1)
+            if (crossing) {
+                if (crossing.top <= start + 1) {
+                    // Block is taller than a full page — unavoidable internal cut.
+                    // Leave `end` where it is.
+                } else {
+                    end = crossing.top // break just before the block instead
+                }
+            }
+            breaks.push(end)
+            start = end
+        }
 
-        // Add first page
-        pdf.addImage(imgData, 'PNG', 0, position, imgWidth, imgHeight)
-        heightLeft -= pageHeight
+        // Render each page slice onto its own canvas so the image height matches
+        // the actual content on that page (no giant trailing white space).
+        for (let i = 0; i < breaks.length - 1; i++) {
+            const sliceTop = breaks[i]
+            const sliceHeight = breaks[i + 1] - sliceTop
+            if (sliceHeight <= 1) continue
 
-        // Add additional pages if needed
-        while (heightLeft >= 0) {
-            position -= pageHeight
-            pdf.addPage()
-            pdf.addImage(imgData, 'PNG', 0, position, imgWidth, imgHeight)
-            heightLeft -= pageHeight
+            const pageCanvas = document.createElement('canvas')
+            pageCanvas.width = canvas.width
+            pageCanvas.height = sliceHeight
+            const ctx = pageCanvas.getContext('2d')!
+            ctx.fillStyle = '#ffffff'
+            ctx.fillRect(0, 0, pageCanvas.width, pageCanvas.height)
+            ctx.drawImage(canvas, 0, sliceTop, canvas.width, sliceHeight, 0, 0, canvas.width, sliceHeight)
+
+            const sliceHeightMm = sliceHeight / pxPerMm
+            if (i > 0) pdf.addPage()
+            pdf.addImage(pageCanvas.toDataURL('image/jpeg', 0.9), 'JPEG', 0, 0, pageWidthMm, sliceHeightMm)
         }
 
         pdf.save(`POD_${job.jobId}.pdf`)

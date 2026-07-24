@@ -219,6 +219,8 @@ export const syncOfflineJobs = async () => {
                     formData.append('signature', b64ToBlob(value), 'signature.png')
                 } else if (key === 'pod_report' && typeof value === 'string') {
                     formData.append('pod_report', b64ToBlob(value), 'report.jpg')
+                } else if (key === 'floor_climb_report' && typeof value === 'string') {
+                    formData.append('floor_climb_report', b64ToBlob(value), `Floor_Climb_Report_${job.jobId}.jpg`)
                 } else if (key === 'pickup_report' && typeof value === 'string') {
                     formData.append('pickup_report', b64ToBlob(value), 'report.jpg')
                 } else if (value !== null && value !== undefined) {

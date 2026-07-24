@@ -153,7 +153,7 @@ export function ExtraServiceModal({
               className="w-full h-11 bg-slate-800 border border-slate-700 rounded-xl px-3 text-sm text-white focus:outline-none focus:ring-2 focus:ring-indigo-500 font-bold"
             >
               {soOptions.map((opt, i) => (
-                <option key={i} value={opt.so}>
+                <option key={i} value={opt.so} style={{ backgroundColor: "#1e293b", color: "#ffffff" }}>
                   {opt.so} - {opt.store}
                 </option>
               ))}

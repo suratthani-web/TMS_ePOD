@@ -104,9 +104,8 @@ export async function submitJobPOD(jobId: string, formData: FormData) {
         }
     }
 
-    if (floorClimbReportUrl) {
-        photoUrls.unshift(floorClimbReportUrl)
-    }
+    // Floor-climb slip goes to its own column (Floor_Climb_Url) so the admin UI
+    // can show a dedicated view/download card — no longer mixed into Photo_Proof_Url.
     if (podReportUrl) {
         photoUrls.unshift(podReportUrl)
     }
@@ -171,6 +170,13 @@ export async function submitJobPOD(jobId: string, formData: FormData) {
       Delivery_Date: new Date().toISOString(),
       Actual_Delivery_Time: timeString,
       Loaded_Qty: loadedQty
+    }
+
+    // Accumulate floor-climb slips across drops (multi-drop jobs can have many),
+    // same comma-joined pattern as photos/signatures — never overwrite prior drops.
+    if (floorClimbReportUrl) {
+        const existingFloorClimb = jobData?.Floor_Climb_Url ? jobData.Floor_Climb_Url.split(',').filter(Boolean) : []
+        updatePayload.Floor_Climb_Url = [...existingFloorClimb, floorClimbReportUrl].join(',')
     }
 
     // Only update price if it wasn't already set by admin
