@@ -79,11 +79,11 @@ export default function DriverLoginPage() {
             "p-6"
           )}>
             <div className="relative w-full h-full rounded-full overflow-hidden bg-white/5 flex items-center justify-center">
-              <Image src="/logo-ci.png" alt="LogisPro" fill sizes="(max-width: 768px) 100vw, 400px" className="object-contain mix-blend-multiply dark:mix-blend-normal dark:brightness-110" />
+              <Image src="/drouteMind-mark.svg" alt="DRouteMind" fill sizes="(max-width: 768px) 100vw, 400px" className="object-contain p-6" />
             </div>
           </div>
           <div className="space-y-1">
-            <h1 className="text-4xl font-sans font-black text-accent tracking-tighter uppercase italic">Logis<span className="text-primary">Pro</span></h1>
+            <h1 className="text-4xl font-sans font-black tracking-tighter"><span className="text-primary">D</span><span className="text-accent">Route</span><span className="text-primary">Mind</span></h1>
             <p className="text-muted-foreground text-xl font-sans font-bold uppercase tracking-widest">{t('login.tagline') || 'ขนส่งง่ายๆ มั่นใจทุกการจัดส่ง'}</p>
           </div>
         </div>

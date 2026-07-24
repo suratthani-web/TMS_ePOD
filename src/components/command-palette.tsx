@@ -288,7 +288,7 @@ export function CommandPalette() {
                   <span className="flex items-center gap-1"><kbd className="px-1.5 py-0.5 bg-slate-800 rounded font-bold text-[10px]">Esc</kbd> ปิด</span>
                 </div>
                 <div className="flex items-center gap-1 text-primary/60">
-                  <Command className="w-3 h-3" /> <span className="text-[10px] font-black">LOGIS-PRO</span>
+                  <Command className="w-3 h-3" /> <span className="text-[10px] font-black">DRouteMind</span>
                 </div>
               </div>
             </motion.div>

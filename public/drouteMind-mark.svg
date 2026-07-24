@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 150 140" fill="none" role="img" aria-label="DRouteMind">
+  <!-- speed swoosh -->
+  <path d="M20 116 q40 12 96 -2" stroke="#e12228" stroke-width="5" stroke-linecap="round" opacity=".85"/>
+  <!-- motion chevron -->
+  <path fill="#3a4c86" d="M118 42 L136 66 L118 90 L108 90 L126 66 L108 42 Z" opacity=".55"/>
+  <!-- head -->
+  <path fill="#ffffff" stroke="#17265f" stroke-width="4" d="M58 24 C85 24 106 44 106 70 C106 97 83 116 57 116 C29 116 12 95 12 68 C12 43 31 24 58 24 Z"/>
+  <!-- underside shade for depth -->
+  <path fill="#e6ecf7" d="M20 82 C32 106 82 112 98 84 C84 114 32 116 20 82 Z"/>
+  <!-- eye -->
+  <circle cx="74" cy="56" r="7" fill="#17265f"/>
+  <circle cx="76.5" cy="53.5" r="2.2" fill="#ffffff"/>
+  <!-- beak = DD forward arrows -->
+  <path fill="#f7941d" d="M96 56 H112 L128 70 L112 84 H96 L110 70 Z"/>
+  <path fill="#e12228" d="M114 59 H123 L136 70 L123 81 H114 L125 70 Z"/>
+</svg>

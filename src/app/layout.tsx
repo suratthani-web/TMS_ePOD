@@ -18,13 +18,18 @@ const prompt = Prompt({
 });
 
 export const metadata: Metadata = {
-  title: "LOGIS-PRO 360 | COMMAND CENTRE",
-  description: "Enterprise Transport Management System",
+  title: "DRouteMind | Command Centre",
+  description: "DRouteMind — ระบบบริหารงานขนส่งอัจฉริยะ (DD Transport)",
   manifest: "/manifest.json",
+  icons: {
+    icon: [{ url: "/favicon.svg", type: "image/svg+xml" }],
+    shortcut: "/favicon.svg",
+    apple: [{ url: "/apple-touch-icon.png", sizes: "180x180", type: "image/png" }],
+  },
   appleWebApp: {
     capable: true,
     statusBarStyle: "black-translucent",
-    title: "LOGIS-PRO",
+    title: "DRouteMind",
   },
 };
 

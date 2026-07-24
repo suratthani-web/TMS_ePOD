@@ -69,7 +69,7 @@ export function MobileHeader({ title, showBack, rightElement }: Props) {
                 onClick={clearCache}
                 className="text-[8px] font-black text-primary italic cursor-pointer hover:opacity-80 transition-opacity uppercase tracking-[0.2em] mt-0.5"
             >
-                LOGIS-PRO v1.2.5
+DRouteMind v1.2.5
             </span>
         </div>
       </div>

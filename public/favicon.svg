@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" role="img" aria-label="DRouteMind">
+  <rect width="100" height="100" rx="26" fill="#17265f"/>
+  <circle cx="45" cy="54" r="27" fill="#ffffff"/>
+  <circle cx="55" cy="45" r="4.5" fill="#17265f"/>
+  <path fill="#f7941d" d="M64 47 H77 L91 55 L77 63 H64 L76 55 Z"/>
+</svg>

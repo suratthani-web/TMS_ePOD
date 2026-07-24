@@ -288,21 +288,21 @@ export function Sidebar({ collapsed = false, onToggle }: SidebarProps) {
             collapsed ? "h-10 w-10 rounded-xl" : "h-14 w-14"
           )}>
             <Image
-              src="/logo-mark.png"
-              alt="LogisPro"
+              src="/drouteMind-mark.svg"
+              alt="DRouteMind"
               fill
               priority
               loading="eager"
               sizes="56px"
               className={cn(
-                "object-cover transition-transform duration-300 hover:scale-105"
+                "object-contain p-1.5 transition-transform duration-300 hover:scale-105"
               )}
             />
           </div>
           {!collapsed && (
             <div className="min-w-0 leading-none">
-              <div className="text-[1.35rem] font-black italic uppercase tracking-tight text-accent">
-                LOGIS<span className="text-primary">PRO</span>
+              <div className="text-[1.35rem] font-black tracking-tight">
+                <span className="text-primary">D</span><span className="text-accent">Route</span><span className="text-primary">Mind</span>
               </div>
               <div className="mt-1 truncate text-[0.68rem] font-bold text-muted-foreground">
                 {t('header.command_centre')}

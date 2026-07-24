@@ -1,6 +1,6 @@
 import { getSession } from "@/lib/session"
 import { redirect } from "next/navigation"
-import { Package, Lock } from "lucide-react"
+import { Lock } from "lucide-react"
 import { PortalLoginForm } from "./login-form"
 
 export const dynamic = 'force-dynamic'
@@ -14,11 +14,12 @@ export default async function PortalLoginPage() {
       <div className="w-full max-w-md">
         {/* Logo */}
         <div className="text-center mb-8">
-          <div className="inline-flex items-center justify-center w-16 h-16 bg-blue-600 rounded-2xl mb-4 shadow-lg">
-            <Package className="w-8 h-8 text-white" />
-          </div>
-          <h1 className="text-2xl font-black text-slate-900">Customer Portal</h1>
-          <p className="text-slate-500 mt-1 font-medium">ติดตามงานและดาวน์โหลด POD</p>
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src="/drouteMind-mark.svg" alt="DRouteMind" width={92} height={86} className="mx-auto mb-3" />
+          <h1 className="text-2xl font-black text-slate-900">
+            <span className="text-[#e12228]">D</span>Route<span className="text-[#e12228]">Mind</span>
+          </h1>
+          <p className="text-slate-500 mt-1 font-medium">Customer Portal · ติดตามงานและดาวน์โหลด POD</p>
         </div>
 
         {/* Card */}

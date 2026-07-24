@@ -83,19 +83,19 @@ function StaffLoginContent() {
                 "p-6"
             )}>
                 <div className="relative w-full h-full rounded-full overflow-hidden bg-background/20 flex items-center justify-center">
-                    <Image 
-                        src="/logo2.png" 
-                        alt="LogisPro" 
-                        fill 
+                    <Image
+                        src="/drouteMind-mark.svg"
+                        alt="DRouteMind"
+                        fill
                         sizes="(max-width: 768px) 100vw, 224px"
                         priority
-                        className="object-contain logo-pure transition-all duration-700 dark:brightness-110" 
+                        className="object-contain p-6 transition-all duration-700"
                     />
                 </div>
             </div>
             <div className="space-y-1">
-                <h1 className="text-6xl font-sans font-black text-accent tracking-tighter drop-shadow-lg uppercase italic">
-                    Logis<span className="text-primary">Pro</span>
+                <h1 className="text-6xl font-sans font-black tracking-tighter drop-shadow-lg">
+                    <span className="text-primary">D</span><span className="text-accent">Route</span><span className="text-primary">Mind</span>
                 </h1>
                 <p className="text-lg text-muted-foreground font-medium tracking-wide">
                     Sweet deliveries, serious logistics.
@@ -223,7 +223,7 @@ function StaffLoginContent() {
 
         <div className="space-y-4 animate-in fade-in duration-1000 delay-700 pt-10">
             <p className="text-base font-bold text-muted-foreground font-black uppercase tracking-wide">
-                © 2024 <span className="text-primary/60">LOGIS-PRO</span> COMMAND. ALL RIGHTS RESERVED.
+                © 2026 <span className="text-primary/60">DRouteMind</span> · DD TRANSPORT. ALL RIGHTS RESERVED.
             </p>
             <div className="flex justify-center gap-8 text-base font-bold text-muted-foreground font-black uppercase tracking-normal">
                 <a href="#" className="hover:text-primary transition-colors">Privacy</a>
