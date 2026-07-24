@@ -198,10 +198,10 @@ export default function PODPage({ pods, stats, count, limit, searchParams }: POD
                            <div className="w-4 h-px bg-muted/20" />
                         )}
                         {pod.Pickup_Signature_Url ? (
-                           <div className="group/sig relative">
+                           <div className="group/sig relative cursor-pointer" onClick={() => window.open(pod.Pickup_Signature_Url!.split(',')[0], '_blank')}>
                               <div className="w-10 h-7 rounded border border-border/10 overflow-hidden bg-white shadow-lg relative transition-all group-hover/sig:scale-125 z-10 group-hover/sig:border-indigo-500">
                                  <img 
-                                    src={pod.Pickup_Signature_Url} 
+                                    src={pod.Pickup_Signature_Url.split(',')[0]} 
                                     alt="Pickup Sig" 
                                     className="w-full h-full object-contain p-0.5" 
                                  />
@@ -216,7 +216,7 @@ export default function PODPage({ pods, stats, count, limit, searchParams }: POD
                   <td className="px-4 py-3 text-center">
                      <div className="flex items-center justify-center gap-2">
                         {pod.Photo_Proof_Url ? (
-                           <div className="group/visual relative">
+                           <div className="group/visual relative cursor-pointer" onClick={() => window.open(pod.Photo_Proof_Url!.split(',')[0], '_blank')}>
                               <div className="w-8 h-8 rounded-lg border border-border/10 overflow-hidden bg-black shadow-lg relative transition-all group-hover/visual:scale-125 z-10 group-hover/visual:border-primary">
                                  <img 
                                     src={pod.Photo_Proof_Url.split(',')[0]} 
@@ -229,10 +229,10 @@ export default function PODPage({ pods, stats, count, limit, searchParams }: POD
                            <div className="w-4 h-px bg-muted/20" />
                         )}
                         {pod.Signature_Url ? (
-                           <div className="group/sig relative">
+                           <div className="group/sig relative cursor-pointer" onClick={() => window.open(pod.Signature_Url!.split(',')[0], '_blank')}>
                               <div className="w-10 h-7 rounded border border-border/10 overflow-hidden bg-white shadow-lg relative transition-all group-hover/sig:scale-125 z-10 group-hover/sig:border-primary">
                                  <img 
-                                    src={pod.Signature_Url} 
+                                    src={pod.Signature_Url.split(',')[0]} 
                                     alt={t('pod.auth_sig')} 
                                     className="w-full h-full object-contain p-0.5" 
                                  />

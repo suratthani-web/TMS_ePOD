@@ -484,11 +484,11 @@ export function HistoryClient({
                                         {job.Signature_Url ? (
                                             <div className="relative w-9 h-7 rounded-lg border border-border/10 shadow-lg overflow-hidden bg-white p-1 group/sig ring-2 ring-accent/0 hover:ring-accent/40 transition-all duration-500">
                                                 <img 
-                                                    src={job.Signature_Url} 
+                                                    src={job.Signature_Url.split(',')[0]} 
                                                     alt="Signature" 
                                                     className="w-full h-full object-contain p-0.5 group-hover/sig:scale-110 transition-transform duration-700" 
                                                 />
-                                                <a href={job.Signature_Url} target="_blank" rel="noreferrer" className="absolute inset-0 z-10 flex items-center justify-center bg-accent/40 opacity-0 group-hover/sig:opacity-100 transition-opacity" />
+                                                <a href={job.Signature_Url.split(',')[0]} target="_blank" rel="noreferrer" className="absolute inset-0 z-10 flex items-center justify-center bg-accent/40 opacity-0 group-hover/sig:opacity-100 transition-opacity" />
                                             </div>
                                         ) : (
                                             <div className="w-9 h-7 rounded-lg border border-dashed border-border/5 transition-colors group-hover/row:border-accent/20" />

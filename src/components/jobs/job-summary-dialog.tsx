@@ -372,16 +372,20 @@ export function JobSummaryDialog({ open, onOpenChange, job, routes }: JobSummary
                 <div className="rounded-xl border border-border bg-muted p-4 shadow-sm">
                    <p className="text-base font-bold font-black text-muted-foreground uppercase tracking-widest mb-3">{t('reports.dropoff_signature')}</p>
                   <div className="h-24 flex items-center justify-center border border-dashed border-border rounded-lg relative overflow-hidden bg-muted">
-                    {(job as Record<string, unknown>).Signature_Proof_Url || (job as Record<string, unknown>).Signature_Url ? (
-                      <Image 
-                        src={((job as Record<string, unknown>).Signature_Proof_Url as string) || ((job as Record<string, unknown>).Signature_Url as string) || ''} 
-                        alt="POD Signature" 
-                        fill 
-                        className="object-contain p-2"
-                      />
-                    ) : (
-                      <span className="text-muted-foreground text-lg font-bold italic">{t('reports.no_signature')}</span>
-                    )}
+                    {(() => {
+                      const sigRaw = ((job as Record<string, unknown>).Signature_Proof_Url as string) || ((job as Record<string, unknown>).Signature_Url as string) || ''
+                      const sigUrl = sigRaw ? sigRaw.split(',').filter(Boolean)[0] : null
+                      return sigUrl ? (
+                        <Image 
+                          src={sigUrl} 
+                          alt="POD Signature" 
+                          fill 
+                          className="object-contain p-2"
+                        />
+                      ) : (
+                        <span className="text-muted-foreground text-lg font-bold italic">{t('reports.no_signature')}</span>
+                      )
+                    })()}
                   </div>
                 </div>
               </section>

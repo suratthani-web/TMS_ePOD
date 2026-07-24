@@ -54,7 +54,7 @@ export async function getESGStats(startDate?: string, endDate?: string, branchId
 
         let query = supabase
             .from('Jobs_Main')
-            .select('Job_ID, Plan_Date, Price_Cust_Total, Branch_ID, Customer_ID, Est_Distance_KM, Pickup_Lat, Pickup_Lon, Delivery_Lat, Delivery_Lon, Vehicle_Type, Actual_Fuel_Liters, original_origins_json, original_destinations_json')
+            .select('Job_ID, Plan_Date, Price_Cust_Total, Branch_ID, Customer_ID, Est_Distance_KM, Pickup_Lat, Pickup_Lon, Delivery_Lat, Delivery_Lon, Vehicle_Type, original_origins_json, original_destinations_json')
             .in('Job_Status', REVENUE_STATUSES)
 
         if (sDate) query = query.gte('Plan_Date', sDate)
@@ -70,7 +70,12 @@ export async function getESGStats(startDate?: string, endDate?: string, branchId
         const { data: jobs, error: queryError } = await query
         
         if (queryError) {
-            console.error("[ESG] Supabase Query Error:", queryError)
+            console.error("[ESG] Supabase Query Error:", JSON.stringify({
+                message: queryError.message,
+                code: queryError.code,
+                details: queryError.details,
+                hint: queryError.hint,
+            }))
         }
 
         if (!jobs || jobs.length === 0) {
@@ -104,7 +109,7 @@ export async function getESGStats(startDate?: string, endDate?: string, branchId
 
         jobs.forEach((j: any) => {
             const vType = j.Vehicle_Type || 'default'
-            const actualFuel = j.Actual_Fuel_Liters ? Number(j.Actual_Fuel_Liters) : null
+            const actualFuel: number | null = null // Actual_Fuel_Liters column not yet in DB
             let dist = Number(j.Est_Distance_KM) || 0
             
             // Try to recover distance from coordinates if Est_Distance_KM is missing

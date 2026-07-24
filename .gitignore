@@ -61,3 +61,10 @@ __pycache__/
 
 # stray spreadsheet exports dropped at repo root (templates live in public/)
 /*.xlsx
+
+# dev/debug/admin scripts and data exports — may contain service_role keys or
+# driver PII (names, phones, plaintext passwords). Keep out of the repo.
+/scripts/
+drivers_export.json
+run_backfill.js
+run_git_push*.bat
