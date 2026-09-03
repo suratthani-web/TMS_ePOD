@@ -221,12 +221,18 @@ export default async function TrackingPage(props: { params: Promise<{ jobId: str
                                 {job.pickupPhotos.length > 0 && (
                                     <div className="grid grid-cols-2 gap-3">
                                         {job.pickupPhotos.map((url, i) => (
-                                            <div key={i} className="aspect-video relative rounded-xl overflow-hidden border border-slate-100 bg-slate-50 shadow-inner group cursor-pointer">
-                                                <Image src={url} alt="Pickup" fill sizes="(max-width: 768px) 50vw, 300px" className="object-cover transition-transform group-hover:scale-105" />
+                                            <a 
+                                                key={i} 
+                                                href={url} 
+                                                target="_blank" 
+                                                rel="noreferrer" 
+                                                className="aspect-video relative rounded-xl overflow-hidden border border-slate-100 bg-slate-50 shadow-inner group cursor-pointer block"
+                                            >
+                                                <Image src={url} alt={`Pickup ${i + 1}`} fill sizes="(max-width: 768px) 50vw, 300px" className="object-cover transition-transform group-hover:scale-105" />
                                                 <div className="absolute inset-0 bg-black/20 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
                                                     <ExternalLink size={20} className="text-white" />
                                                 </div>
-                                            </div>
+                                            </a>
                                         ))}
                                     </div>
                                 )}
@@ -235,9 +241,12 @@ export default async function TrackingPage(props: { params: Promise<{ jobId: str
                                     <div className="space-y-3">
                                         <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider text-center">ลายเซ็นผู้ส่ง/คลังสินค้า</p>
                                         {job.pickupSignature.split(',').map(s => s.trim()).filter(Boolean).map((sig, i) => (
-                                            <div key={i} className="h-24 bg-slate-50 rounded-xl overflow-hidden relative border border-slate-100">
+                                            <a key={i} href={sig} target="_blank" rel="noreferrer" className="h-24 bg-slate-50 rounded-xl overflow-hidden relative border border-slate-100 block group">
                                                 <Image src={sig} alt="Pickup Sig" fill sizes="(max-width: 768px) 100vw, 400px" className="object-contain p-4" />
-                                            </div>
+                                                <div className="absolute inset-0 bg-black/10 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                                                    <ExternalLink size={18} className="text-slate-600" />
+                                                </div>
+                                            </a>
                                         ))}
                                     </div>
                                 )}
@@ -266,7 +275,7 @@ export default async function TrackingPage(props: { params: Promise<{ jobId: str
                                                     {photos.length > 0 && (
                                                         <div className="grid grid-cols-2 gap-3">
                                                             {photos.map((url, k) => (
-                                                                <a key={k} href={url} target="_blank" rel="noreferrer" className="aspect-video relative rounded-xl overflow-hidden border border-slate-100 bg-white shadow-inner group">
+                                                                <a key={k} href={url} target="_blank" rel="noreferrer" className="aspect-video relative rounded-xl overflow-hidden border border-slate-100 bg-white shadow-inner group block">
                                                                     <Image src={url} alt={`POD drop ${i + 1}`} fill sizes="(max-width: 768px) 50vw, 300px" className="object-cover transition-transform group-hover:scale-105" />
                                                                     <div className="absolute inset-0 bg-black/20 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
                                                                         <ExternalLink size={18} className="text-white" />
@@ -276,9 +285,12 @@ export default async function TrackingPage(props: { params: Promise<{ jobId: str
                                                         </div>
                                                     )}
                                                     {d.signature && (
-                                                        <div className="h-24 bg-white rounded-xl overflow-hidden relative border border-slate-100">
+                                                        <a href={d.signature} target="_blank" rel="noreferrer" className="h-24 bg-white rounded-xl overflow-hidden relative border border-slate-100 block group">
                                                             <Image src={d.signature} alt="POD Sig" fill sizes="(max-width: 768px) 100vw, 400px" className="object-contain p-3" />
-                                                        </div>
+                                                            <div className="absolute inset-0 bg-black/10 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                                                                <ExternalLink size={18} className="text-slate-600" />
+                                                            </div>
+                                                        </a>
                                                     )}
                                                 </div>
                                             )
@@ -289,12 +301,18 @@ export default async function TrackingPage(props: { params: Promise<{ jobId: str
                                         {job.podPhotos.length > 0 && (
                                             <div className="grid grid-cols-2 gap-3">
                                                 {job.podPhotos.map((url, i) => (
-                                                    <div key={i} className="aspect-video relative rounded-xl overflow-hidden border border-slate-100 bg-slate-50 shadow-inner group cursor-pointer">
-                                                        <Image src={url} alt="POD" fill sizes="(max-width: 768px) 50vw, 300px" className="object-cover transition-transform group-hover:scale-105" />
+                                                    <a 
+                                                        key={i} 
+                                                        href={url} 
+                                                        target="_blank" 
+                                                        rel="noreferrer" 
+                                                        className="aspect-video relative rounded-xl overflow-hidden border border-slate-100 bg-slate-50 shadow-inner group cursor-pointer block"
+                                                    >
+                                                        <Image src={url} alt={`POD ${i + 1}`} fill sizes="(max-width: 768px) 50vw, 300px" className="object-cover transition-transform group-hover:scale-105" />
                                                         <div className="absolute inset-0 bg-black/20 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
                                                             <ExternalLink size={20} className="text-white" />
                                                         </div>
-                                                    </div>
+                                                    </a>
                                                 ))}
                                             </div>
                                         )}
@@ -303,9 +321,12 @@ export default async function TrackingPage(props: { params: Promise<{ jobId: str
                                             <div className="space-y-3">
                                                 <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider text-center">ลายเซ็นผู้รับสินค้า</p>
                                                 {job.signature.split(',').map(s => s.trim()).filter(Boolean).map((sig, i) => (
-                                                    <div key={i} className="h-24 bg-slate-50 rounded-xl overflow-hidden relative border border-slate-100">
+                                                    <a key={i} href={sig} target="_blank" rel="noreferrer" className="h-24 bg-slate-50 rounded-xl overflow-hidden relative border border-slate-100 block group">
                                                         <Image src={sig} alt="POD Sig" fill sizes="(max-width: 768px) 100vw, 400px" className="object-contain p-4" />
-                                                    </div>
+                                                        <div className="absolute inset-0 bg-black/10 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                                                            <ExternalLink size={18} className="text-slate-600" />
+                                                        </div>
+                                                    </a>
                                                 ))}
                                             </div>
                                         )}
