@@ -1,9 +1,10 @@
 import { DashboardLayout } from "@/components/layout/dashboard-layout"
 import { createAdminClient } from "@/lib/supabase/admin"
 import { getJobRouteAdherence } from "@/lib/supabase/route-adherence"
-import { ArrowLeft, MapPin, Route, Navigation, CheckCircle2, AlertTriangle, ExternalLink } from "lucide-react"
+import { ArrowLeft, MapPin, Route, Navigation, CheckCircle2, AlertTriangle, ExternalLink, PackageCheck } from "lucide-react"
 import Link from "next/link"
 import { DropReorder } from "@/components/mobile/drop-reorder"
+import { getJobScanSummary } from "@/lib/actions/scan-actions"
 
 export const dynamic = 'force-dynamic'
 
@@ -22,6 +23,7 @@ export default async function AdminJobDetailPage({
     .single()
 
   const adherence = await getJobRouteAdherence(id)
+  const scanSummary = await getJobScanSummary(id)
 
   // รายการจุดส่งทั้งหมด (multi-drop + จุดย่อยที่คนขับเพิ่มหน้างาน เช่น โกดัง)
   const allDrops: { name?: string; so_no?: string }[] = (() => {
@@ -72,6 +74,91 @@ export default async function AdminJobDetailPage({
             </div>
           )}
         </div>
+
+        {/* สรุปการสแกนสินค้า (รับ vs ส่ง) */}
+        {scanSummary.hasData && (() => {
+          const shortfall = scanSummary.totalReceived - scanSummary.totalDelivered
+          const complete = scanSummary.totalReceived > 0 && shortfall <= 0
+          return (
+            <div className="bg-background/60 border border-border/10 rounded-3xl p-8 shadow-lg">
+              <div className="flex items-center gap-2 mb-6 flex-wrap">
+                <PackageCheck className="text-primary" size={20} />
+                <h2 className="text-lg font-black text-foreground">สแกนสินค้า (รับ / ส่ง)</h2>
+                {scanSummary.totalReceived > 0 && (
+                  complete ? (
+                    <span className="ml-auto inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-emerald-500/10 text-emerald-600 font-bold text-sm">
+                      <CheckCircle2 size={16} /> ส่งครบ
+                    </span>
+                  ) : (
+                    <span className="ml-auto inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-amber-500/10 text-amber-600 font-bold text-sm">
+                      <AlertTriangle size={16} /> ส่งขาด {shortfall} ชิ้น
+                    </span>
+                  )
+                )}
+              </div>
+
+              <div className="grid grid-cols-3 gap-4 mb-6">
+                <Stat label="รับเข้า (ชิ้น)" value={String(scanSummary.totalReceived)} />
+                <Stat label="ส่งแล้ว (ชิ้น)" value={String(scanSummary.totalDelivered)} />
+                <Stat label="คงเหลือ (ชิ้น)" value={shortfall > 0 ? String(shortfall) : "0"} tone={shortfall > 0 ? 'warn' : 'ok'} />
+              </div>
+
+              {scanSummary.items.length > 0 && (
+                <div className="overflow-x-auto rounded-2xl border border-border/10">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="bg-muted/40 text-muted-foreground text-xs font-black uppercase tracking-widest">
+                        <th className="text-left px-4 py-3">สินค้า</th>
+                        <th className="text-right px-4 py-3">รับ</th>
+                        <th className="text-right px-4 py-3">ส่ง</th>
+                        <th className="text-right px-4 py-3">เหลือ</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {scanSummary.items.map((it) => {
+                        const rem = it.received - it.delivered
+                        return (
+                          <tr key={it.key} className="border-t border-border/5">
+                            <td className="px-4 py-3">
+                              <span className="font-bold text-foreground">{it.label}</span>
+                              {it.code && it.code !== it.label && (
+                                <span className="block text-[10px] text-muted-foreground font-mono">{it.code}</span>
+                              )}
+                            </td>
+                            <td className="px-4 py-3 text-right font-bold">{it.received}</td>
+                            <td className="px-4 py-3 text-right font-bold">{it.delivered}</td>
+                            <td className={`px-4 py-3 text-right font-black ${rem > 0 ? 'text-amber-600' : rem < 0 ? 'text-amber-600' : 'text-emerald-600'}`}>
+                              {rem > 0 ? rem : rem < 0 ? `เกิน ${Math.abs(rem)}` : '✓'}
+                            </td>
+                          </tr>
+                        )
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+
+              {scanSummary.drops.length > 0 && (
+                <div className="mt-6 space-y-3">
+                  <p className="text-[10px] font-black text-muted-foreground uppercase tracking-widest">การส่งแยกตามดรอป</p>
+                  {scanSummary.drops.map((d) => (
+                    <div key={String(d.dropIndex)} className="rounded-2xl bg-muted/30 border border-border/5 p-4">
+                      <p className="font-bold text-sm mb-1">
+                        {d.dropIndex != null && allDrops[d.dropIndex]?.name
+                          ? `ดรอป ${d.dropIndex + 1}: ${allDrops[d.dropIndex]?.name}`
+                          : d.dropIndex != null ? `ดรอป ${d.dropIndex + 1}` : 'ไม่ระบุดรอป'}
+                        <span className="text-muted-foreground font-medium"> · {d.total} ชิ้น</span>
+                      </p>
+                      <p className="text-xs text-muted-foreground">
+                        {d.items.map(i => `${i.label} ×${i.qty}`).join(", ")}
+                      </p>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )
+        })()}
 
         {/* 6.4 — แผน vs วิ่งจริง (เก็บจาก GPS อัตโนมัติ) */}
         <div className="bg-background/60 border border-border/10 rounded-3xl p-8 shadow-lg">

@@ -369,6 +369,39 @@ export async function submitJobPOD(jobId: string, formData: FormData) {
         console.error("POD CO2 Calc error:", e)
     }
 
+    // Item-level delivery scans (append-only) → ผูกกับดรอปที่เพิ่งปิด
+    const deliveryScansRaw = formData.get("delivery_scans") as string | null
+    if (deliveryScansRaw) {
+        try {
+            const parsed = JSON.parse(deliveryScansRaw) as Array<{ code: string | null; label: string; qty: number }>
+            if (Array.isArray(parsed) && parsed.length > 0) {
+                const dropIdxRaw = formData.get("scan_drop_index") as string | null
+                const dropIndex = dropIdxRaw != null && dropIdxRaw !== "" ? Number(dropIdxRaw) : null
+                const { data: jobRow } = await supabase
+                    .from('Jobs_Main').select('Driver_ID').eq('Job_ID', jobId).single()
+
+                const rows = parsed
+                    .filter(it => (it.code && it.code.trim()) || (it.label && it.label.trim()))
+                    .map(it => ({
+                        Job_ID: jobId,
+                        drop_index: Number.isFinite(dropIndex as number) ? dropIndex : null,
+                        phase: 'delivery',
+                        code: it.code?.trim() || null,
+                        label: it.label?.trim() || null,
+                        qty: Number(it.qty) || 1,
+                        driver_id: jobRow?.Driver_ID || null,
+                    }))
+
+                if (rows.length > 0) {
+                    const { error: scanErr } = await supabase.from('Job_Scans').insert(rows)
+                    if (scanErr) console.error('[POD_SCAN_INSERT_ERROR]', scanErr)
+                }
+            }
+        } catch (scanErr) {
+            console.error('[POD_SCAN_PARSE_ERROR]', scanErr)
+        }
+    }
+
     revalidatePath("/mobile/jobs")
     return { success: true }
   } catch (error: unknown) {
@@ -477,6 +510,41 @@ export async function submitJobPickup(jobId: string, formData: FormData) {
         .eq('Job_ID', jobId)
 
     if (error) throw error
+
+    // Item-level scans (append-only). รับดรอปเดียว → drop_index = null
+    const scannedRaw = formData.get("scanned_items") as string | null
+    if (scannedRaw) {
+        try {
+            const parsed = JSON.parse(scannedRaw) as Array<{ code: string | null; label: string; qty: number }>
+            if (Array.isArray(parsed) && parsed.length > 0) {
+                const { data: jobRow } = await supabase
+                    .from('Jobs_Main')
+                    .select('Driver_ID')
+                    .eq('Job_ID', jobId)
+                    .single()
+
+                const rows = parsed
+                    .filter(it => (it.code && it.code.trim()) || (it.label && it.label.trim()))
+                    .map(it => ({
+                        Job_ID: jobId,
+                        drop_index: null,
+                        phase: 'pickup',
+                        code: it.code?.trim() || null,
+                        label: it.label?.trim() || null,
+                        qty: Number(it.qty) || 1,
+                        driver_id: jobRow?.Driver_ID || null,
+                    }))
+
+                if (rows.length > 0) {
+                    const { error: scanErr } = await supabase.from('Job_Scans').insert(rows)
+                    // ไม่ให้ scan ล้มทำ pickup ล้มทั้งงาน — log ไว้เฉยๆ
+                    if (scanErr) console.error('[PICKUP_SCAN_INSERT_ERROR]', scanErr)
+                }
+            }
+        } catch (scanParseErr) {
+            console.error('[PICKUP_SCAN_PARSE_ERROR]', scanParseErr)
+        }
+    }
 
     revalidatePath(`/mobile/jobs/${jobId}`)
     return { success: true }

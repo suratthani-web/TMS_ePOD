@@ -17,6 +17,7 @@ import { Loader2, Box, Info, Camera, ShieldCheck, ChevronRight } from "lucide-re
 import html2canvas from "html2canvas"
 import { withTimeout } from "@/lib/utils/with-timeout"
 import { QuantityStepper } from "@/components/mobile/quantity-stepper"
+import { LabelScanner, type ScannedItem } from "@/components/mobile/label-scanner"
 import { Label } from "@/components/ui/label"
 import { cn } from "@/lib/utils"
 
@@ -28,6 +29,7 @@ export default function JobPickupPage() {
   const router = useRouter()
   const params = useParams<{ id: string }>()
   const [photos, setPhotos] = useState<File[]>([])
+  const [scannedItems, setScannedItems] = useState<ScannedItem[]>([])
   const [conditionPhotos, setConditionPhotos] = useState<Record<string, File>>({})
   const [signature, setSignature] = useState<Blob | null>(null)
   const [loadedQty, setLoadedQty] = useState<string>("")
@@ -153,6 +155,13 @@ export default function JobPickupPage() {
         // 2. Append Photos & Data
         photos.forEach((photo, index) => formData.append(`photo_${index}`, photo))
         formData.append("photo_count", photos.length.toString())
+
+        // Item-level scans (รับดรอปเดียว → drop_index = null ฝั่ง server)
+        if (scannedItems.length > 0) {
+            formData.append("scanned_items", JSON.stringify(
+                scannedItems.map(it => ({ code: it.code, label: it.label, qty: it.qty }))
+            ))
+        }
         
         if (isContainer) {
             formData.append("job_type", "container")
@@ -296,9 +305,9 @@ export default function JobPickupPage() {
                         <Label className="text-xs font-black uppercase tracking-widest flex items-center gap-2">
                             <Camera size={16} className="text-primary" /> รูปถ่ายใบ EIR
                         </Label>
-                        <CameraInput 
-                            onImagesChange={setPhotos} 
-                            maxImages={2} 
+                        <CameraInput
+                            onImagesChange={setPhotos}
+                            maxImages={5}
                         />
                     </div>
 
@@ -333,9 +342,17 @@ export default function JobPickupPage() {
                         <Label className="text-xs font-black uppercase tracking-widest flex items-center gap-2">
                             <Camera size={16} className="text-primary" /> รูปถ่ายสินค้าขณะรับ
                         </Label>
-                        <CameraInput 
-                            onImagesChange={setPhotos} 
-                            maxImages={5} 
+                        <CameraInput
+                            onImagesChange={setPhotos}
+                            maxImages={15}
+                        />
+                    </div>
+
+                    <div className="border-t border-border pt-2">
+                        <LabelScanner
+                            items={scannedItems}
+                            onChange={setScannedItems}
+                            title="สแกนลาเบลสินค้าที่รับ"
                         />
                     </div>
 

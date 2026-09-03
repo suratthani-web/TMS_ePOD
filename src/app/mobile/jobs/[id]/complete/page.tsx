@@ -20,6 +20,9 @@ import { analyzePODImage, AIAnalysisResult } from "@/lib/utils/ai-verification"
 import { saveJobOffline, blobToB64 } from "@/lib/utils/offline-storage"
 import { withTimeout } from "@/lib/utils/with-timeout"
 import { QuantityStepper } from "@/components/mobile/quantity-stepper"
+import { DeliveryScanner } from "@/components/mobile/delivery-scanner"
+import type { ScannedItem } from "@/components/mobile/label-scanner"
+import { getJobScans, type ReconciledItem } from "@/lib/actions/scan-actions"
 import { notifyTrackingStateChanged } from "@/lib/tracking-state"
 
 export default function JobCompletePage() {
@@ -28,6 +31,8 @@ export default function JobCompletePage() {
   const [photos, setPhotos] = useState<File[]>([])
   const [signature, setSignature] = useState<Blob | null>(null)
   const [loadedQty, setLoadedQty] = useState<string>("")
+  const [deliveryItems, setDeliveryItems] = useState<ScannedItem[]>([])
+  const [reconciled, setReconciled] = useState<ReconciledItem[]>([])
   const [loading, setLoading] = useState(false)
   const [completed, setCompleted] = useState(false)
 
@@ -52,6 +57,7 @@ export default function JobCompletePage() {
 
   useEffect(() => {
     if (params.id) {
+        getJobScans(params.id).then(setReconciled).catch(() => {})
         getJobDetails(params.id).then(j => {
             setJob(j)
             // User requested to remove the default suggested number to prevent accidental submission
@@ -243,6 +249,14 @@ export default function JobCompletePage() {
         formData.append("photo_count", photos.length.toString())
         formData.append("signature", signature, "signature.png")
         if (loadedQty) formData.append("loaded_qty", loadedQty)
+        // Item-level scans ตอนส่ง → ผูกกับดรอปที่กำลังปิด (index = จำนวนลายเซ็นที่มี)
+        if (deliveryItems.length > 0) {
+            const dropIndex = job?.Signature_Url ? job.Signature_Url.split(',').filter(Boolean).length : 0
+            formData.append("delivery_scans", JSON.stringify(
+                deliveryItems.map(it => ({ code: it.code, label: it.label, qty: it.qty }))
+            ))
+            formData.append("scan_drop_index", String(dropIndex))
+        }
         // จุดลงย่อยที่ลูกค้าแจ้งแบ่งหน้างาน (เช่น โกดัง) → server จะเพิ่มเป็นจุดส่งใหม่
         if (extraServiceData?.subDrops && extraServiceData.subDrops.length > 0) {
             formData.append("add_subdrop_names", JSON.stringify(extraServiceData.subDrops.slice(0, 2)))
@@ -320,6 +334,13 @@ export default function JobCompletePage() {
             // พาจุดลงย่อยไปกับ offline queue ด้วย (replay จะ append เป็น string ปกติ)
             if (extraServiceData?.subDrops && extraServiceData.subDrops.length > 0) {
                 offlineData.add_subdrop_names = JSON.stringify(extraServiceData.subDrops.slice(0, 2))
+            }
+            // พา delivery scans ไปกับ offline queue ด้วย
+            if (deliveryItems.length > 0) {
+                offlineData.delivery_scans = JSON.stringify(
+                    deliveryItems.map(it => ({ code: it.code, label: it.label, qty: it.qty }))
+                )
+                offlineData.scan_drop_index = String(job?.Signature_Url ? job.Signature_Url.split(',').filter(Boolean).length : 0)
             }
 
             await saveJobOffline(params.id, offlineData, 'POD')
@@ -517,6 +538,17 @@ export default function JobCompletePage() {
                             </div>
                         </div>
                     )}
+                </section>
+                )}
+
+                {/* Item-level delivery scan / checklist (Optional) */}
+                {!isContainer && job && (
+                <section className="border-t border-slate-800 pt-3">
+                    <DeliveryScanner
+                        reconciled={reconciled}
+                        items={deliveryItems}
+                        onChange={setDeliveryItems}
+                    />
                 </section>
                 )}
 
