@@ -4,6 +4,7 @@ import android.Manifest;
 import android.content.pm.PackageManager;
 import android.os.Bundle;
 import android.webkit.PermissionRequest;
+import android.webkit.WebSettings;
 import android.webkit.WebView;
 
 import androidx.core.app.ActivityCompat;
@@ -23,10 +24,23 @@ public class MainActivity extends BridgeActivity {
                 != PackageManager.PERMISSION_GRANTED) {
             ActivityCompat.requestPermissions(this, new String[]{ Manifest.permission.CAMERA }, 100);
         }
+    }
 
-        // ปล่อยสิทธิ์กล้องให้ WebView (getUserMedia) โดยยังคง behavior เดิมของ Capacitor
-        // (extend BridgeWebChromeClient → file chooser/POD photo capture ยังทำงานปกติ)
+    @Override
+    public void onStart() {
+        super.onStart();
+        applyCameraWebChromeClient();
+    }
+
+    // ปล่อยสิทธิ์กล้องให้ WebView (getUserMedia) — ตั้งใน onStart เพื่อกันถูก Capacitor
+    // เขียนทับตอน init. extend BridgeWebChromeClient → file chooser/ถ่ายรูป POD ยังทำงานปกติ
+    private void applyCameraWebChromeClient() {
         final WebView webView = this.getBridge().getWebView();
+        if (webView == null) return;
+
+        final WebSettings settings = webView.getSettings();
+        settings.setMediaPlaybackRequiresUserGesture(false);
+
         webView.setWebChromeClient(new BridgeWebChromeClient(this.getBridge()) {
             @Override
             public void onPermissionRequest(final PermissionRequest request) {
