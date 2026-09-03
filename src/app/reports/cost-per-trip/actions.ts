@@ -125,12 +125,12 @@ export async function getCostPerTrip(startDate?: string, endDate?: string, custo
   const globalFallbackPrice = latestFuel?.Price || 35.0 // Baht/Litre
 
   // Fetch actual Fuel Logs for the vehicles & date range
-  let fuelLogs: { Vehicle_Plate: string | null; Date_Time: string | null; Price_Total: number | null; Liters: number | null }[] = []
+  let fuelLogs: { Vehicle_Plate: string | null; Date_Time: string | null; Price_Total: number | null; Liters: number | null; Odometer: number | null }[] = []
   if (uniquePlates.length > 0) {
     fuelLogs = await fetchAllRows(() => {
       let fQuery = supabase
         .from('Fuel_Logs')
-        .select('Vehicle_Plate, Date_Time, Price_Total, Liters')
+        .select('Vehicle_Plate, Date_Time, Price_Total, Liters, Odometer')
         .in('Vehicle_Plate', uniquePlates)
         .gte('Date_Time', `${start}T00:00:00`)
         .lte('Date_Time', `${end}T23:59:59`)
@@ -155,17 +155,41 @@ export async function getCostPerTrip(startDate?: string, endDate?: string, custo
 
   const normalizePlate = (plate?: string | null) => (plate || '').replace(/\s+/g, '').trim()
 
-  // Map Fuel Logs by (Vehicle_Plate | YYYY-MM-DD)
-  const vehicleDayFuel = new Map<string, { cost: number; liters: number }>()
-  for (const f of fuelLogs) {
-    if (!f.Vehicle_Plate || !f.Date_Time) continue
-    const date = f.Date_Time.slice(0, 10)
-    const key = `${normalizePlate(f.Vehicle_Plate)}|${date}`
-    const curr = vehicleDayFuel.get(key) || { cost: 0, liters: 0 }
-    curr.cost += Number(f.Price_Total) || 0
-    curr.liters += Number(f.Liters) || 0
-    vehicleDayFuel.set(key, curr)
+  // 1. Compute Vehicle-Level Baselines (Actual km/L and unit price from Refuels)
+  const vehicleRefuels = new Map<string, typeof fuelLogs>()
+  for (const log of fuelLogs) {
+    if (!log.Vehicle_Plate) continue
+    const norm = normalizePlate(log.Vehicle_Plate)
+    const list = vehicleRefuels.get(norm) || []
+    list.push(log)
+    vehicleRefuels.set(norm, list)
   }
+
+  const vehicleEfficiencyMap = new Map<string, { kmPerLiter: number; avgUnitPrice: number }>()
+  vehicleRefuels.forEach((logs, plateNorm) => {
+    const sorted = [...logs].sort((a, b) => (a.Date_Time || '').localeCompare(b.Date_Time || ''))
+    let totalDist = 0
+    let totalLiters = 0
+    let totalCost = 0
+
+    for (let i = 1; i < sorted.length; i++) {
+      const prev = sorted[i - 1]
+      const curr = sorted[i]
+      if (prev.Odometer && curr.Odometer && curr.Odometer > prev.Odometer && (Number(curr.Liters) || 0) > 0) {
+        totalDist += (curr.Odometer - prev.Odometer)
+        totalLiters += Number(curr.Liters) || 0
+      }
+    }
+
+    logs.forEach(l => {
+      totalCost += Number(l.Price_Total) || 0
+      if (!totalLiters) totalLiters += Number(l.Liters) || 0
+    })
+
+    const kmPerLiter = totalDist > 0 && totalLiters > 0 ? +(totalDist / totalLiters).toFixed(2) : 8.5
+    const avgUnitPrice = totalCost > 0 && totalLiters > 0 ? +(totalCost / totalLiters).toFixed(2) : 38.0
+    vehicleEfficiencyMap.set(plateNorm, { kmPerLiter, avgUnitPrice })
+  })
 
   // Map Maintenance Logs by (Vehicle_Plate | YYYY-MM-DD)
   const vehicleDayMaint = new Map<string, number>()
@@ -177,7 +201,7 @@ export async function getCostPerTrip(startDate?: string, endDate?: string, custo
     vehicleDayMaint.set(key, curr + (Number(m.Cost_Total) || 0))
   }
 
-  // Calculate day total distance & trip count per vehicle-day for proportional cost allocation
+  // Calculate day total distance & trip count per vehicle-day for maintenance cost allocation
   const dayEstDistance = new Map<string, number>()
   const dayTripCount = new Map<string, number>()
   for (const r of rows) {
@@ -201,14 +225,12 @@ export async function getCostPerTrip(startDate?: string, endDate?: string, custo
     const fuelEst = dist > 0 ? dist * 3.5 : 0
     const maintEst = dist * 1.25
 
-    // Real fuel cost from Fuel_Logs
+    // Real fuel cost: calculated from actual vehicle efficiency (KM/L) & actual unit fuel price
+    const eff = vehicleEfficiencyMap.get(normPlate) || { kmPerLiter: 8.5, avgUnitPrice: 38.0 }
     let fuelReal = 0
-    const fuelBucket = bucketKey ? vehicleDayFuel.get(bucketKey) : null
-    if (fuelBucket && fuelBucket.cost > 0) {
-      const totalDayDist = dayEstDistance.get(bucketKey) || 0
-      const totalDayTrips = dayTripCount.get(bucketKey) || 1
-      const share = totalDayDist > 0 ? (dist / totalDayDist) : (1 / totalDayTrips)
-      fuelReal = Math.round(fuelBucket.cost * share)
+    if (dist > 0) {
+      const consumedLiters = +(dist / eff.kmPerLiter).toFixed(2)
+      fuelReal = Math.round(consumedLiters * eff.avgUnitPrice)
     }
 
     // Real maintenance cost from Repair_Tickets
@@ -227,7 +249,7 @@ export async function getCostPerTrip(startDate?: string, endDate?: string, custo
     
     const revenue = (Number(d.Price_Cust_Total) || 0) + (Number(d.Price_Cust_Extra) || 0)
     
-    // Total cost now includes actual fuel and actual maintenance
+    // Total cost now includes actual allocated fuel and actual maintenance
     const totalCost = driverCost + fuelReal + maintReal + tollCost + extraCost
     const profit = revenue - totalCost
     const profitPct = revenue > 0 ? (profit / revenue) * 100 : 0
