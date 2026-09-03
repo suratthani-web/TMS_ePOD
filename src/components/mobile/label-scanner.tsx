@@ -210,30 +210,37 @@ export function ContinuousScanModal({
           if (!document.getElementById("label-reader")) return
           const html5QrCode = new Html5Qrcode("label-reader", { verbose: false })
           scannerRef.current = html5QrCode
-          await html5QrCode.start(
-            { facingMode: "environment" },
-            { fps: 10, qrbox: { width: 260, height: 180 } },
-            (decodedText) => {
-              const now = Date.now()
-              const last = lastScanRef.current
-              // debounce โค้ดเดิม 1.5 วิ กันสแกนค้างเป็นสิบชิ้น
-              if (last.code === decodedText && now - last.at < 1500) return
-              lastScanRef.current = { code: decodedText, at: now }
-              onScanRef.current(decodedText)
-              setCount(c => c + 1)
-            },
-            () => {}
-          )
+          const cfg = { fps: 10, qrbox: { width: 260, height: 180 } }
+          const onDecode = (decodedText: string) => {
+            const now = Date.now()
+            const last = lastScanRef.current
+            // debounce โค้ดเดิม 1.5 วิ กันสแกนค้างเป็นสิบชิ้น
+            if (last.code === decodedText && now - last.at < 1500) return
+            lastScanRef.current = { code: decodedText, at: now }
+            onScanRef.current(decodedText)
+            setCount(c => c + 1)
+          }
+
+          try {
+            // ทางแรก: constraint facingMode (ปกติเร็วสุด)
+            await html5QrCode.start({ facingMode: "environment" }, cfg, onDecode, () => {})
+          } catch (envErr) {
+            // fallback: บาง WebView ไม่รับ facingMode → เลือกกล้องหลังด้วย deviceId
+            const cameras = await Html5Qrcode.getCameras()
+            if (!cameras || cameras.length === 0) throw envErr
+            const back = cameras.find(c => /back|rear|environment|หลัง/i.test(c.label)) || cameras[cameras.length - 1]
+            await html5QrCode.start(back.id, cfg, onDecode, () => {})
+          }
           setIsStarted(true)
           setError(null)
         } catch (err: unknown) {
+          const name = err instanceof Error ? err.name : ""
           const msg = err instanceof Error ? err.message : String(err)
-          if (msg.includes("NotAllowedError") || msg.includes("Permission denied")) {
-            setError("ไม่ได้รับอนุญาตให้ใช้กล้อง (ต้องใช้ผ่าน HTTPS)")
-          } else if (msg.includes("NotFoundError")) {
+          if (msg.includes("NotFoundError") || name === "NotFoundError") {
             setError("ไม่พบกล้องในอุปกรณ์นี้")
           } else {
-            setError("เริ่มสแกนไม่ได้: " + msg)
+            // แสดง error ดิบเพื่อวินิจฉัย (ชื่อ + ข้อความ)
+            setError(`เปิดกล้องไม่ได้ [${name || "?"}] ${msg}`)
           }
           setIsStarted(false)
         }
