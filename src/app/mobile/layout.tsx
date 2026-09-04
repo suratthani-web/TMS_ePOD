@@ -2,6 +2,7 @@ export const dynamic = 'force-dynamic'
 
 import { BottomNav } from "@/components/mobile/bottom-nav"
 import { LocationTracker } from "@/components/mobile/location-tracker"
+import { LocationGate } from "@/components/mobile/location-gate"
 import { PermissionRequester } from "@/components/mobile/permission-requester"
 import { getDriverSession } from "@/lib/actions/auth-actions"
 import { SyncManager } from "@/components/mobile/sync-manager"
@@ -23,6 +24,7 @@ export default async function MobileLayout({
       <SWUpdater />
       <SessionStabilizer session={session} />
       {session && <LocationTracker driverId={session.driverId} branchId={session.branchId} />}
+      {session && <LocationGate />}
       {session && <PermissionRequester driverId={session.driverId} />}
       {session?.driverId && <PresenceManager driverId={session.driverId} />}
       {session?.driverId && <RealtimeJobsTrigger driverId={session.driverId} />}
