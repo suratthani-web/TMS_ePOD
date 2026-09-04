@@ -411,6 +411,31 @@ export default function CustomersSettingsPage() {
                       </div>
                     </div>
 
+                    {/* Require Barcode Scan Toggle Feature */}
+                    <div className="p-6 rounded-[2rem] border-2 border-indigo-500/20 bg-indigo-500/5 flex items-center justify-between shadow-lg">
+                      <div className="space-y-1">
+                        <Label className="text-lg font-black uppercase tracking-wide text-indigo-600 dark:text-indigo-400 flex items-center gap-2">
+                          <span className="w-2.5 h-2.5 rounded-full bg-indigo-500 animate-pulse" />
+                          บังคับสแกนลาเบลสินค้า (Require Scan)
+                        </Label>
+                        <p className="text-sm text-muted-foreground font-bold italic leading-none opacity-80">
+                          เปิด = งานของลูกค้ารายนี้ต้องสแกนลาเบลสินค้าตอนรับและตอนส่ง มิฉะนั้นจะบันทึก/ปิดงานไม่ได้ (ใช้ตรวจว่าของรับ-ส่งครบและถูก)
+                        </p>
+                      </div>
+                      <div className="flex items-center gap-3">
+                        <span className={cn("text-xs font-black uppercase tracking-wider px-3 py-1 rounded-full border", formData.Require_Scan ? "bg-indigo-500/10 border-indigo-500/30 text-indigo-500" : "bg-slate-500/10 border-slate-500/30 text-slate-400")}>
+                          {formData.Require_Scan ? "บังคับ (On)" : "ไม่บังคับ (Off)"}
+                        </span>
+                        <input
+                          type="checkbox"
+                          id="Require_Scan"
+                          checked={!!formData.Require_Scan}
+                          onChange={(e) => updateForm("Require_Scan", e.target.checked)}
+                          className="w-8 h-8 rounded-lg border-border bg-muted text-indigo-600 focus:ring-indigo-500/40 cursor-pointer accent-indigo-500"
+                        />
+                      </div>
+                    </div>
+
                     {/* Stair Climb Sensor Toggle Feature */}
                     <div className="p-6 rounded-[2rem] border-2 border-primary/20 bg-primary/5 flex items-center justify-between shadow-lg">
                       <div className="space-y-1">

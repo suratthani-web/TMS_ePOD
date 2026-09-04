@@ -11,6 +11,7 @@ import { ContainerPickupReport } from "@/components/mobile/container-pickup-repo
 import { toast } from "sonner"
 import { submitJobPickup } from "@/lib/actions/pod-actions"
 import { getJobDetails } from "@/app/mobile/jobs/actions"
+import { getScanRequirement } from "@/lib/actions/scan-actions"
 import { Job } from "@/lib/supabase/jobs"
 import type { JobContainer } from "@/types/database"
 import { Loader2, Box, Info, Camera, ShieldCheck, ChevronRight } from "lucide-react"
@@ -30,6 +31,7 @@ export default function JobPickupPage() {
   const params = useParams<{ id: string }>()
   const [photos, setPhotos] = useState<File[]>([])
   const [scannedItems, setScannedItems] = useState<ScannedItem[]>([])
+  const [requireScan, setRequireScan] = useState(false)
   const [conditionPhotos, setConditionPhotos] = useState<Record<string, File>>({})
   const [signature, setSignature] = useState<Blob | null>(null)
   const [loadedQty, setLoadedQty] = useState<string>("")
@@ -47,6 +49,7 @@ export default function JobPickupPage() {
 
   useEffect(() => {
     if (params.id) {
+        getScanRequirement(params.id).then(setRequireScan).catch(() => {})
         getJobDetails(params.id).then(j => {
             setJob(j)
             if (j?.container) {
@@ -97,7 +100,10 @@ export default function JobPickupPage() {
         if (!signature) {
             errors.push("กรุณาลงลายเซ็นผู้ส่งของ")
         }
-        const needsQty = (job?.Price_Per_Unit && Number(job.Price_Per_Unit) > 0) && 
+        if (requireScan && scannedItems.length === 0) {
+            errors.push("ลูกค้ารายนี้กำหนดให้ต้องสแกนลาเบลสินค้าตอนรับ")
+        }
+        const needsQty = (job?.Price_Per_Unit && Number(job.Price_Per_Unit) > 0) &&
                          (!job?.Price_Cust_Total || Number(job.Price_Cust_Total) === 0)
         if (needsQty && (!loadedQty || Number(loadedQty) <= 0)) {
             errors.push("กรุณาระบุจำนวนสินค้า")

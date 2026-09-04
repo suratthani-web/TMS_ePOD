@@ -22,7 +22,7 @@ import { withTimeout } from "@/lib/utils/with-timeout"
 import { QuantityStepper } from "@/components/mobile/quantity-stepper"
 import { DeliveryScanner } from "@/components/mobile/delivery-scanner"
 import type { ScannedItem } from "@/components/mobile/label-scanner"
-import { getJobScans, type ReconciledItem } from "@/lib/actions/scan-actions"
+import { getJobScans, getScanRequirement, type ReconciledItem } from "@/lib/actions/scan-actions"
 import { notifyTrackingStateChanged } from "@/lib/tracking-state"
 
 export default function JobCompletePage() {
@@ -33,6 +33,7 @@ export default function JobCompletePage() {
   const [loadedQty, setLoadedQty] = useState<string>("")
   const [deliveryItems, setDeliveryItems] = useState<ScannedItem[]>([])
   const [reconciled, setReconciled] = useState<ReconciledItem[]>([])
+  const [requireScan, setRequireScan] = useState(false)
   const [loading, setLoading] = useState(false)
   const [completed, setCompleted] = useState(false)
 
@@ -58,6 +59,7 @@ export default function JobCompletePage() {
   useEffect(() => {
     if (params.id) {
         getJobScans(params.id).then(setReconciled).catch(() => {})
+        getScanRequirement(params.id).then(setRequireScan).catch(() => {})
         getJobDetails(params.id).then(j => {
             setJob(j)
             // User requested to remove the default suggested number to prevent accidental submission
@@ -124,6 +126,12 @@ export default function JobCompletePage() {
     if (!signature) {
         toast.error("กรุณาลงลายเซ็น", {
             description: isContainer ? "กรุณาลงลายเซ็นเจ้าหน้าที่ลานตู้" : "กรุณาลงลายเซ็นผู้รับสินค้า"
+        })
+        return
+    }
+    if (!isContainer && requireScan && deliveryItems.length === 0) {
+        toast.error("ต้องสแกนสินค้าตอนส่ง", {
+            description: "ลูกค้ารายนี้กำหนดให้ต้องสแกนลาเบลสินค้าก่อนปิดงาน"
         })
         return
     }

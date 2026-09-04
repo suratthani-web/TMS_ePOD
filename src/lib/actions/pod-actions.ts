@@ -7,6 +7,7 @@ import { Job } from "@/lib/supabase/jobs"
 import { calculateJobCO2 } from "@/app/mobile/jobs/actions"
 import { transitionJobStatus } from "@/services/job-status-machine"
 import { calculateJobPrice } from "@/services/pricing-engine"
+import { getScanRequirement } from "@/lib/actions/scan-actions"
 import { timeTH } from "@/lib/utils/date-th"
 import type { SupabaseClient } from "@supabase/supabase-js"
 import { createHash } from "crypto"
@@ -42,6 +43,18 @@ export async function submitJobPOD(jobId: string, formData: FormData) {
   }
   if (!hasSignature) {
       return { error: "ไม่พบลายเซ็น (กรุณาเซ็นใหม่)" }
+  }
+
+  // C: บังคับสแกน (ตามลูกค้า) — ตอนส่งต้องมีการสแกนสินค้าอย่างน้อย 1 รายการ
+  if (formData.get("job_type") !== "container") {
+    const requireScan = await getScanRequirement(jobId)
+    if (requireScan) {
+      let scanCount = 0
+      try { const p = JSON.parse((formData.get("delivery_scans") as string) || "[]"); scanCount = Array.isArray(p) ? p.length : 0 } catch {}
+      if (scanCount === 0) {
+        return { error: "ลูกค้ารายนี้กำหนดให้ต้องสแกนสินค้าตอนส่งก่อนปิดงาน" }
+      }
+    }
   }
 
   try {
@@ -428,6 +441,18 @@ export async function submitJobPickup(jobId: string, formData: FormData) {
   const isContainer = formData.get("job_type") === "container"
   const photoCount = parseInt(formData.get("photo_count") as string || "0")
   const timestamp = Date.now()
+
+  // C: บังคับสแกน (ตามลูกค้า) — งานสินค้าทั่วไปต้องมีลาเบลอย่างน้อย 1 รายการ
+  if (!isContainer) {
+    const requireScan = await getScanRequirement(jobId)
+    if (requireScan) {
+      let scanCount = 0
+      try { const p = JSON.parse((formData.get("scanned_items") as string) || "[]"); scanCount = Array.isArray(p) ? p.length : 0 } catch {}
+      if (scanCount === 0) {
+        return { success: false, error: "ลูกค้ารายนี้กำหนดให้ต้องสแกนลาเบลสินค้าตอนรับก่อนบันทึก" }
+      }
+    }
+  }
 
   try {
     const uploadWithRename = async (file: File, name: string, folder: string) => {

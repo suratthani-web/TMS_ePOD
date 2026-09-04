@@ -111,6 +111,26 @@ export async function getJobsScanStatus(jobIds: string[]): Promise<Record<string
   return out
 }
 
+/**
+ * งานนี้ต้องบังคับสแกนไหม (ตาม flag ของลูกค้า Master_Customers.Require_Scan)
+ */
+export async function getScanRequirement(jobId: string): Promise<boolean> {
+  jobId = decodeURIComponent(jobId)
+  const supabase = createAdminClient()
+  const { data: job } = await supabase
+    .from("Jobs_Main")
+    .select("Customer_ID")
+    .eq("Job_ID", jobId)
+    .single()
+  if (!job?.Customer_ID) return false
+  const { data: cust } = await supabase
+    .from("Master_Customers")
+    .select("Require_Scan")
+    .eq("Customer_ID", job.Customer_ID)
+    .single()
+  return !!cust?.Require_Scan
+}
+
 export interface JobScanSummary {
   items: ReconciledItem[]
   drops: { dropIndex: number | null; items: { label: string; qty: number }[]; total: number }[]
