@@ -72,7 +72,7 @@ export function DeliveryScanner({ reconciled, items, onChange }: DeliveryScanner
   return (
     <div className="space-y-3">
       <div className="flex items-center justify-between">
-        <span className="text-xs font-black uppercase tracking-widest flex items-center gap-2 text-white">
+        <span className="text-xs font-black uppercase tracking-widest flex items-center gap-2 text-foreground">
           <PackageCheck size={16} className="text-primary" /> ตรวจส่งสินค้า
         </span>
         {allDone && (
@@ -100,7 +100,7 @@ export function DeliveryScanner({ reconciled, items, onChange }: DeliveryScanner
               <div key={r.key}
                 className={`rounded-2xl p-3 border flex items-center gap-3 ${complete ? "bg-emerald-500/5 border-emerald-500/30" : "bg-card border-border"}`}>
                 <div className="flex-1 min-w-0">
-                  <p className="font-bold text-sm truncate text-white flex items-center gap-1.5">
+                  <p className="font-bold text-sm truncate text-foreground flex items-center gap-1.5">
                     {complete && !over && <CheckCircle2 size={14} className="text-emerald-400 shrink-0" />}
                     {over && <AlertTriangle size={14} className="text-amber-400 shrink-0" />}
                     {r.label}
@@ -117,7 +117,7 @@ export function DeliveryScanner({ reconciled, items, onChange }: DeliveryScanner
                     className="w-8 h-8 rounded-lg bg-muted flex items-center justify-center active:scale-90 disabled:opacity-30">
                     <Minus size={14} />
                   </button>
-                  <span className="w-8 text-center font-black text-sm text-white">{here}</span>
+                  <span className="w-8 text-center font-black text-sm text-foreground">{here}</span>
                   <button type="button" onClick={() => bump(r.code, r.label, 1)}
                     className="w-8 h-8 rounded-lg bg-primary/20 text-primary flex items-center justify-center active:scale-90">
                     <Plus size={14} />
@@ -136,7 +136,7 @@ export function DeliveryScanner({ reconciled, items, onChange }: DeliveryScanner
           {extraItems.map((it) => (
             <div key={it.id} className="rounded-2xl p-3 border border-amber-500/30 bg-amber-500/5 flex items-center gap-3">
               <div className="flex-1 min-w-0">
-                <p className="font-bold text-sm truncate text-white">{it.label}</p>
+                <p className="font-bold text-sm truncate text-foreground">{it.label}</p>
                 {it.code && <p className="text-[10px] text-muted-foreground font-mono truncate">{it.code}</p>}
               </div>
               <div className="flex items-center gap-1 shrink-0">
@@ -144,7 +144,7 @@ export function DeliveryScanner({ reconciled, items, onChange }: DeliveryScanner
                   className="w-8 h-8 rounded-lg bg-muted flex items-center justify-center active:scale-90">
                   <Minus size={14} />
                 </button>
-                <span className="w-8 text-center font-black text-sm text-white">{it.qty}</span>
+                <span className="w-8 text-center font-black text-sm text-foreground">{it.qty}</span>
                 <button type="button" onClick={() => bump(it.code, it.label, 1)}
                   className="w-8 h-8 rounded-lg bg-primary/20 text-primary flex items-center justify-center active:scale-90">
                   <Plus size={14} />
