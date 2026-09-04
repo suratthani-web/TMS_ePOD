@@ -37,6 +37,7 @@ import { cn } from "@/lib/utils"
 import { Badge } from "@/components/ui/badge"
 import { useLanguage } from "@/components/providers/language-provider"
 import { getAllJobs } from "@/lib/supabase/jobs"
+import type { JobScanStat } from "@/lib/actions/scan-actions"
 import * as XLSX from "xlsx"
 import { useState, useEffect } from "react"
 import { Job } from "@/lib/supabase/jobs"
@@ -59,6 +60,7 @@ interface HistoryClientProps {
   canViewPrice: boolean
   canDelete: boolean
   canExport: boolean
+  scanStatus?: Record<string, JobScanStat>
   dateFrom: string
   dateTo: string
   status: string
@@ -66,7 +68,24 @@ interface HistoryClientProps {
   limit: number
 }
 
-export function HistoryClient({ 
+function ScanBadge({ stat }: { stat?: JobScanStat }) {
+  if (!stat || stat.status === "none") return null
+  const map = {
+    complete: { cls: "bg-emerald-500/10 text-emerald-500", label: "สแกนครบ" },
+    short:    { cls: "bg-amber-500/10 text-amber-500",     label: `ส่งขาด ${stat.received - stat.delivered}` },
+    over:     { cls: "bg-amber-500/10 text-amber-500",     label: `ส่งเกิน ${stat.delivered - stat.received}` },
+    nopickup: { cls: "bg-slate-500/10 text-slate-400",     label: "ไม่ได้สแกนรับ" },
+  } as const
+  const m = map[stat.status as keyof typeof map]
+  if (!m) return null
+  return (
+    <span className={`inline-flex items-center gap-1 text-[9px] font-black uppercase tracking-widest rounded-full px-2 py-0.5 w-fit ${m.cls}`}>
+      <Package size={9} className="shrink-0" /> {m.label}
+    </span>
+  )
+}
+
+export function HistoryClient({
   jobs, 
   count, 
   stats,
@@ -79,6 +98,7 @@ export function HistoryClient({
   canViewPrice,
   canDelete,
   canExport,
+  scanStatus,
   dateFrom,
   dateTo,
   status,
@@ -412,6 +432,7 @@ export function HistoryClient({
                                             <MapPin size={9} className="shrink-0" />
                                             ส่ง {fmtDate(job.Delivery_Date)}
                                         </span>
+                                        <ScanBadge stat={scanStatus?.[job.Job_ID]} />
                                     </div>
                                 </div>
                             </div>

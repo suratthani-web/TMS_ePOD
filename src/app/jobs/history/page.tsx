@@ -3,6 +3,7 @@ export const revalidate = 0
 
 import { DashboardLayout } from "@/components/layout/dashboard-layout"
 import { getAllJobs, getJobStatsSummary } from "@/lib/supabase/jobs"
+import { getJobsScanStatus } from "@/lib/actions/scan-actions"
 import { getJobCreationData } from "@/app/planning/actions"
 import { isCustomer, hasPermission, getUserBranchId, isAdmin } from "@/lib/permissions"
 import { HistoryClient } from "./history-client"
@@ -54,12 +55,16 @@ export default async function JobHistoryPage(props: Props) {
   const { data: jobs, count } = jobsResult
   const { drivers, vehicles, customers, routes, subcontractors } = creationData
 
+  // สถานะสแกน (รับ/ส่ง) ของงานในหน้านี้ — ดึงครั้งเดียวกัน N+1
+  const scanStatus = await getJobsScanStatus((jobs || []).map((j: { Job_ID: string }) => j.Job_ID))
+
   return (
     <DashboardLayout>
       <HistoryClient 
         jobs={jobs}
         count={count}
         stats={stats}
+        scanStatus={scanStatus}
         drivers={drivers}
         vehicles={vehicles}
         customers={customers}

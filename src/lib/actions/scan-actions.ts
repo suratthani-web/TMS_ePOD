@@ -40,6 +40,55 @@ export async function getJobScans(jobId: string): Promise<ReconciledItem[]> {
   return Array.from(map.values()).sort((a, b) => a.label.localeCompare(b.label, "th"))
 }
 
+export type ScanStatus =
+  | "none"        // ไม่ได้สแกนเลย
+  | "complete"    // ส่งครบตามที่รับ
+  | "short"       // รับแล้วแต่ส่งยังไม่ครบ
+  | "over"        // ส่งเกินที่รับ
+  | "nopickup"    // ส่งแต่ไม่ได้สแกนตอนรับ (เทียบความครบไม่ได้)
+
+export interface JobScanStat {
+  received: number
+  delivered: number
+  status: ScanStatus
+}
+
+/**
+ * ดึงสถานะสแกนของหลายงานในครั้งเดียว (กัน N+1) สำหรับป้ายในหน้ารายการ
+ */
+export async function getJobsScanStatus(jobIds: string[]): Promise<Record<string, JobScanStat>> {
+  const out: Record<string, JobScanStat> = {}
+  const ids = Array.from(new Set(jobIds.filter(Boolean).map(id => decodeURIComponent(id))))
+  if (ids.length === 0) return out
+
+  const supabase = createAdminClient()
+  const { data, error } = await supabase
+    .from("Job_Scans")
+    .select("Job_ID, phase, qty")
+    .in("Job_ID", ids)
+
+  if (error || !data) return out
+
+  for (const row of data as Array<{ Job_ID: string; phase: string; qty: number }>) {
+    const cur = out[row.Job_ID] || { received: 0, delivered: 0, status: "none" as ScanStatus }
+    const qty = Number(row.qty) || 0
+    if (row.phase === "pickup") cur.received += qty
+    else if (row.phase === "delivery") cur.delivered += qty
+    out[row.Job_ID] = cur
+  }
+
+  for (const id of Object.keys(out)) {
+    const s = out[id]
+    if (s.received === 0 && s.delivered === 0) s.status = "none"
+    else if (s.received === 0 && s.delivered > 0) s.status = "nopickup"
+    else if (s.delivered > s.received) s.status = "over"
+    else if (s.delivered >= s.received) s.status = "complete"
+    else s.status = "short"
+  }
+
+  return out
+}
+
 export interface JobScanSummary {
   items: ReconciledItem[]
   drops: { dropIndex: number | null; items: { label: string; qty: number }[]; total: number }[]
