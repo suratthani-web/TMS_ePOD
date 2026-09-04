@@ -6,11 +6,7 @@ const config: CapacitorConfig = {
   webDir: 'public',
   server: {
     url: 'https://tms-e-pod.vercel.app',
-    cleartext: true,
-    androidScheme: 'https',
-    allowNavigation: [
-      '*'
-    ]
+    cleartext: true
   },
   plugins: {
     PushNotifications: {
