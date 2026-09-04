@@ -180,12 +180,10 @@ export function LabelScanner({ items, onChange, title = "สแกนลาเ�
 }
 
 /* -------------------------------------------------------------------------- */
-/* โมดัลสแกน — ถ่ายรูปบาร์โค้ด/QR แล้วถอดรหัสจากรูป                            */
-/* ใช้กล้องเนทีฟ (file input capture) เหมือนถ่ายรูป POD — เลี่ยงข้อจำกัด        */
-/* getUserMedia ของ Capacitor WebView บน external URL ที่บล็อกกล้องสด           */
+/* โมดัลสแกนต่อเนื่อง — รองรับทั้งกล้องสด (Live stream) และ ถ่ายรูป (Photo Fallback) */
 /* -------------------------------------------------------------------------- */
 
-const FILE_READER_ID = "label-file-reader"
+const FILE_HELPER_ID = "label-file-helper"
 
 export function ContinuousScanModal({
   isOpen,
@@ -196,45 +194,116 @@ export function ContinuousScanModal({
   onOpenChange: (open: boolean) => void
   onScan: (code: string) => void
 }) {
-  const readerRef = useRef<Html5Qrcode | null>(null)
+  const scannerRef = useRef<Html5Qrcode | null>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
-  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const [isStarted, setIsStarted] = useState(false)
+  const [busyFile, setBusyFile] = useState(false)
   const [count, setCount] = useState(0)
-  const [status, setStatus] = useState<{ ok: boolean; msg: string } | null>(null)
+  const [lastScanned, setLastScanned] = useState<string | null>(null)
+  const lastScanRef = useRef<{ code: string; at: number }>({ code: "", at: 0 })
   const onScanRef = useRef(onScan)
 
   useEffect(() => { onScanRef.current = onScan }, [onScan])
 
-  const handleFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0]
-    e.target.value = "" // เผื่อถ่ายรูปเดิมซ้ำ
-    if (!file) return
-    setBusy(true)
-    setStatus(null)
+  const startLiveScanner = async () => {
+    setError(null)
+    setIsStarted(false)
     try {
-      if (!readerRef.current) {
-        readerRef.current = new Html5Qrcode(FILE_READER_ID, { verbose: false })
+      const element = document.getElementById("label-scanner-view")
+      if (!element) return
+
+      if (scannerRef.current) {
+        try { await scannerRef.current.stop() } catch {}
+        scannerRef.current = null
       }
-      const text = await readerRef.current.scanFile(file, false)
-      onScanRef.current(text)
-      setCount(c => c + 1)
-      setStatus({ ok: true, msg: `อ่านได้: ${text}` })
-      try { navigator.vibrate?.(60) } catch {}
-    } catch {
-      setStatus({ ok: false, msg: "อ่านบาร์โค้ดไม่เจอ — ถ่ายให้ชัด เต็มกรอบ ตรงๆ ไม่เอียง แล้วลองใหม่" })
-    } finally {
-      setBusy(false)
+
+      const html5QrCode = new Html5Qrcode("label-scanner-view", { verbose: false })
+      scannerRef.current = html5QrCode
+
+      await html5QrCode.start(
+        { facingMode: "environment" },
+        {
+          fps: 10,
+          qrbox: { width: 260, height: 180 },
+          aspectRatio: 1.0,
+        },
+        (decodedText) => {
+          const now = Date.now()
+          const last = lastScanRef.current
+          // debounce 1.2 วิ สำหรับโค้ดเดิม กันยิงซ้ำรัวๆ
+          if (last.code === decodedText && now - last.at < 1200) return
+          lastScanRef.current = { code: decodedText, at: now }
+          setLastScanned(decodedText)
+          setCount(c => c + 1)
+          onScanRef.current(decodedText)
+          try { navigator.vibrate?.(60) } catch {}
+        },
+        () => {}
+      )
+      setIsStarted(true)
+      setError(null)
+    } catch (err: unknown) {
+      console.warn("Live Camera start failed:", err)
+      const msg = err instanceof Error ? err.message : String(err)
+      if (msg.includes("NotAllowedError") || msg.includes("Permission denied") || msg.includes("Permission dismissed")) {
+        setError("กล้องถูกบล็อกการเข้าถึง (Permission Denied)")
+      } else if (msg.includes("NotFoundError") || msg.includes("DevicesNotFoundError")) {
+        setError("ไม่พบกล้องในอุปกรณ์นี้")
+      } else {
+        setError("ไม่สามารถเปิดกล้องสดได้: " + msg)
+      }
+      setIsStarted(false)
     }
   }
 
-  const close = () => {
-    if (readerRef.current) {
-      try { readerRef.current.clear() } catch {}
-      readerRef.current = null
+  useEffect(() => {
+    let timer: ReturnType<typeof setTimeout>
+    if (isOpen) {
+      timer = setTimeout(startLiveScanner, 400)
     }
+    return () => {
+      if (timer) clearTimeout(timer)
+      if (scannerRef.current) {
+        scannerRef.current.stop().then(() => {
+          scannerRef.current = null
+          setIsStarted(false)
+        }).catch(() => {})
+      }
+    }
+  }, [isOpen])
+
+  // ฟังก์ชันถ่ายรูปสแกน (ทำงานได้ 100% แม้เบราว์เซอร์บล็อก getUserMedia)
+  const handleFileCapture = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    e.target.value = ""
+    if (!file) return
+    setBusyFile(true)
+    try {
+      const html5QrCode = new Html5Qrcode(FILE_HELPER_ID, { verbose: false })
+      const text = await html5QrCode.scanFile(file, false)
+      setLastScanned(text)
+      setCount(c => c + 1)
+      onScanRef.current(text)
+      toast.success(`สแกนสำเร็จ: ${text}`)
+      try { navigator.vibrate?.(60) } catch {}
+      try { html5QrCode.clear() } catch {}
+    } catch {
+      toast.error("อ่านบาร์โค้ดไม่เจอ กรุณาถ่ายให้ชัดเจน เต็มกรอบ แล้วลองใหม่อีกครั้ง")
+    } finally {
+      setBusyFile(false)
+    }
+  }
+
+  const close = async () => {
+    if (scannerRef.current) {
+      try { await scannerRef.current.stop() } catch {}
+      scannerRef.current = null
+    }
+    setIsStarted(false)
+    setError(null)
     setCount(0)
-    setStatus(null)
-    setBusy(false)
+    setLastScanned(null)
     onOpenChange(false)
   }
 
@@ -246,50 +315,111 @@ export function ContinuousScanModal({
             <ScanLine size={24} />
           </div>
           <DialogTitle className="text-lg font-black text-center uppercase tracking-tighter">
-            สแกนลาเบล (ถ่ายรูป)
+            สแกนลาเบลสินค้า
           </DialogTitle>
         </DialogHeader>
 
-        {/* container ซ่อนสำหรับถอดรหัสจากรูป + input กล้องเนทีฟ */}
-        <div id={FILE_READER_ID} className="w-0 h-0 overflow-hidden" />
-        <input
-          ref={fileInputRef}
-          type="file"
-          accept="image/*"
-          capture="environment"
-          onChange={handleFile}
-          className="hidden"
-        />
+        {/* ช่องสแกนกล้องสด */}
+        <div className="relative mt-2 aspect-square bg-card rounded-[2rem] overflow-hidden border border-border/5 shadow-inner">
+          <div id="label-scanner-view" className="w-full h-full" />
+          
+          {/* Helper ซ่อนสำหรับ scanFile */}
+          <div id={FILE_HELPER_ID} className="w-0 h-0 overflow-hidden" />
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept="image/*"
+            capture="environment"
+            onChange={handleFileCapture}
+            className="hidden"
+          />
 
-        {count > 0 && (
-          <div className="mx-auto bg-primary/10 text-primary rounded-full px-4 py-1.5 text-sm font-black">
-            สแกนแล้ว {count} ชิ้น
-          </div>
+          {!isStarted && !error && (
+            <div className="absolute inset-0 flex items-center justify-center bg-card/80 backdrop-blur-sm">
+              <div className="text-center space-y-2">
+                <Loader2 size={32} className="animate-spin text-primary mx-auto" />
+                <p className="text-xs font-bold text-muted-foreground uppercase tracking-widest">
+                  กำลังเริ่มต้นกล้อง...
+                </p>
+              </div>
+            </div>
+          )}
+
+          {error && (
+            <div className="absolute inset-0 flex flex-col items-center justify-center p-6 text-center bg-card/95 backdrop-blur-md space-y-4">
+              <div className="w-12 h-12 rounded-full bg-red-500/10 flex items-center justify-center text-red-500">
+                <Camera size={24} />
+              </div>
+              <div className="space-y-1">
+                <p className="text-sm font-black text-red-400 leading-snug">{error}</p>
+                <p className="text-[11px] text-muted-foreground">
+                  แตะไอคอน 🔒 บนแถบที่อยู่เว็บ เพื่ออนุญาตให้เปิดกล้อง
+                </p>
+              </div>
+              <div className="flex flex-col gap-2 w-full pt-2">
+                <Button
+                  type="button"
+                  onClick={() => fileInputRef.current?.click()}
+                  disabled={busyFile}
+                  className="w-full h-12 rounded-xl font-bold bg-primary text-primary-foreground gap-2 shadow-md"
+                >
+                  {busyFile ? <Loader2 size={18} className="animate-spin" /> : <Camera size={18} />}
+                  ถ่ายรูปเพื่อสแกนแทน
+                </Button>
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={startLiveScanner}
+                  className="w-full h-10 rounded-xl text-xs font-bold"
+                >
+                  ลองเปิดกล้องอีกครั้ง
+                </Button>
+              </div>
+            </div>
+          )}
+
+          {/* Overlay กรอบเล็งบาร์โค้ด */}
+          {isStarted && !error && (
+            <>
+              <div className="absolute inset-0 border-[30px] border-black/40 pointer-events-none" />
+              <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[240px] h-[140px] border-2 border-primary/70 rounded-2xl pointer-events-none shadow-[0_0_15px_rgba(59,130,246,0.5)]">
+                <div className="w-full h-[2px] bg-primary animate-pulse shadow-[0_0_8px_rgba(59,130,246,1)]" />
+              </div>
+            </>
+          )}
+
+          {count > 0 && (
+            <div className="absolute top-3 left-1/2 -translate-x-1/2 bg-emerald-500 text-white rounded-full px-4 py-1 text-xs font-black shadow-lg flex items-center gap-1 z-20">
+              <CheckCircle2 size={14} /> สแกนแล้ว {count} ชิ้น
+            </div>
+          )}
+        </div>
+
+        {lastScanned && (
+          <p className="text-center text-xs font-mono font-bold text-primary truncate px-2">
+            ล่าสุด: {lastScanned}
+          </p>
         )}
 
-        {status && (
-          <div className={`rounded-2xl p-3 text-sm font-bold flex items-start gap-2 ${status.ok ? "bg-emerald-500/10 text-emerald-500" : "bg-amber-500/10 text-amber-500"}`}>
-            {status.ok ? <CheckCircle2 size={18} className="shrink-0 mt-0.5" /> : <AlertTriangle size={18} className="shrink-0 mt-0.5" />}
-            <span className="break-all">{status.msg}</span>
-          </div>
-        )}
-
-        <Button
-          type="button"
-          onClick={() => fileInputRef.current?.click()}
-          disabled={busy}
-          className="w-full h-16 rounded-2xl font-black uppercase tracking-widest gap-2 shadow-lg active:scale-95"
-        >
-          {busy ? <><Loader2 size={22} className="animate-spin" /> กำลังอ่าน...</> : <><Camera size={22} /> ถ่ายรูปบาร์โค้ด</>}
-        </Button>
-
-        <p className="text-center text-muted-foreground text-xs font-bold mt-1">
-          ถ่ายให้บาร์โค้ด/QR อยู่กลางรูป ชัด เต็มกรอบ · ถ่ายทีละชิ้นได้เรื่อยๆ
-        </p>
-
-        <Button onClick={close} variant="outline" className="w-full h-12 mt-2 rounded-2xl font-black gap-2 border-border">
-          <X size={18} /> เสร็จสิ้น
-        </Button>
+        <div className="grid grid-cols-2 gap-2 mt-2">
+          <Button
+            type="button"
+            variant="outline"
+            onClick={() => fileInputRef.current?.click()}
+            disabled={busyFile}
+            className="h-12 rounded-2xl font-bold text-xs gap-1.5 border-border"
+          >
+            {busyFile ? <Loader2 size={16} className="animate-spin" /> : <Camera size={16} />}
+            ถ่ายรูปสแกน
+          </Button>
+          <Button
+            type="button"
+            onClick={close}
+            className="h-12 rounded-2xl font-black uppercase tracking-wider text-xs gap-1.5"
+          >
+            <X size={16} /> เสร็จสิ้น
+          </Button>
+        </div>
       </DialogContent>
     </Dialog>
   )
