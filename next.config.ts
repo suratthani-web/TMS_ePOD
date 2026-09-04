@@ -110,7 +110,10 @@ const nextConfig: NextConfig = {
           },
           {
             key: 'Permissions-Policy',
-            value: 'camera=(), microphone=(), geolocation=(self)',
+            // camera=(self) allows the in-app barcode/QR scanner (getUserMedia);
+            // camera=() would block it page-wide with NotAllowedError even when
+            // the native/OS permission is granted.
+            value: 'camera=(self), microphone=(), geolocation=(self)',
           },
           {
             key: 'Strict-Transport-Security',
