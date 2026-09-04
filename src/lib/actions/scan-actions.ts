@@ -42,10 +42,11 @@ export async function getJobScans(jobId: string): Promise<ReconciledItem[]> {
 
 export type ScanStatus =
   | "none"        // ไม่ได้สแกนเลย
-  | "complete"    // ส่งครบตามที่รับ
-  | "short"       // รับแล้วแต่ส่งยังไม่ครบ
-  | "over"        // ส่งเกินที่รับ
-  | "nopickup"    // ส่งแต่ไม่ได้สแกนตอนรับ (เทียบความครบไม่ได้)
+  | "complete"    // ส่งครบ + ตรงรหัสที่รับมา
+  | "short"       // รับแล้วแต่ส่งยังไม่ครบ (รหัสถูก)
+  | "over"        // ส่งเกินจำนวนที่รับ (รหัสถูก)
+  | "mismatch"    // ส่งผิดรหัส/มีของนอกรายการที่รับ (ไม่ถูก)
+  | "nopickup"    // ส่งแต่ไม่ได้สแกนตอนรับ (เทียบไม่ได้)
 
 export interface JobScanStat {
   received: number
@@ -53,8 +54,12 @@ export interface JobScanStat {
   status: ScanStatus
 }
 
+const keyOf = (code: string | null, label: string | null) =>
+  code?.trim() || `label:${(label || "").trim()}`
+
 /**
  * ดึงสถานะสแกนของหลายงานในครั้งเดียว (กัน N+1) สำหรับป้ายในหน้ารายการ
+ * เทียบ "รายรหัส" (ไม่ใช่แค่ยอดรวม) เพื่อจับส่งผิดชิ้น/นอกรายการ
  */
 export async function getJobsScanStatus(jobIds: string[]): Promise<Record<string, JobScanStat>> {
   const out: Record<string, JobScanStat> = {}
@@ -64,26 +69,43 @@ export async function getJobsScanStatus(jobIds: string[]): Promise<Record<string
   const supabase = createAdminClient()
   const { data, error } = await supabase
     .from("Job_Scans")
-    .select("Job_ID, phase, qty")
+    .select("Job_ID, phase, code, label, qty")
     .in("Job_ID", ids)
 
   if (error || !data) return out
 
-  for (const row of data as Array<{ Job_ID: string; phase: string; qty: number }>) {
-    const cur = out[row.Job_ID] || { received: 0, delivered: 0, status: "none" as ScanStatus }
+  // per-job, per-key ledger
+  const ledger = new Map<string, Map<string, { received: number; delivered: number }>>()
+  for (const row of data as Array<{ Job_ID: string; phase: string; code: string | null; label: string | null; qty: number }>) {
+    const jm = ledger.get(row.Job_ID) || new Map()
+    const key = keyOf(row.code, row.label)
+    const cur = jm.get(key) || { received: 0, delivered: 0 }
     const qty = Number(row.qty) || 0
     if (row.phase === "pickup") cur.received += qty
     else if (row.phase === "delivery") cur.delivered += qty
-    out[row.Job_ID] = cur
+    jm.set(key, cur)
+    ledger.set(row.Job_ID, jm)
   }
 
-  for (const id of Object.keys(out)) {
-    const s = out[id]
-    if (s.received === 0 && s.delivered === 0) s.status = "none"
-    else if (s.received === 0 && s.delivered > 0) s.status = "nopickup"
-    else if (s.delivered > s.received) s.status = "over"
-    else if (s.delivered >= s.received) s.status = "complete"
-    else s.status = "short"
+  for (const [jobId, jm] of ledger) {
+    let totalReceived = 0, totalDelivered = 0
+    let anyShort = false, anyOver = false, anyMismatch = false, anyReceived = false
+    for (const { received, delivered } of jm.values()) {
+      totalReceived += received
+      totalDelivered += delivered
+      if (received > 0) anyReceived = true
+      if (received === 0 && delivered > 0) anyMismatch = true       // ส่งรหัสที่ไม่ได้รับ
+      else if (delivered < received) anyShort = true
+      else if (delivered > received) anyOver = true
+    }
+    let status: ScanStatus
+    if (totalReceived === 0 && totalDelivered === 0) status = "none"
+    else if (!anyReceived && totalDelivered > 0) status = "nopickup"
+    else if (anyMismatch) status = "mismatch"
+    else if (anyShort) status = "short"
+    else if (anyOver) status = "over"
+    else status = "complete"
+    out[jobId] = { received: totalReceived, delivered: totalDelivered, status }
   }
 
   return out

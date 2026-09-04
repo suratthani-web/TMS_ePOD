@@ -78,7 +78,9 @@ export default async function AdminJobDetailPage({
         {/* สรุปการสแกนสินค้า (รับ vs ส่ง) */}
         {scanSummary.hasData && (() => {
           const shortfall = scanSummary.totalReceived - scanSummary.totalDelivered
-          const complete = scanSummary.totalReceived > 0 && shortfall <= 0
+          const anyMismatch = scanSummary.items.some(i => i.received === 0 && i.delivered > 0)
+          const anyShort = scanSummary.items.some(i => i.delivered < i.received)
+          const complete = scanSummary.totalReceived > 0 && !anyMismatch && !anyShort
           return (
             <div className="bg-background/60 border border-border/10 rounded-3xl p-8 shadow-lg">
               <div className="flex items-center gap-2 mb-6 flex-wrap">
@@ -87,11 +89,15 @@ export default async function AdminJobDetailPage({
                 {scanSummary.totalReceived > 0 && (
                   complete ? (
                     <span className="ml-auto inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-emerald-500/10 text-emerald-600 font-bold text-sm">
-                      <CheckCircle2 size={16} /> ส่งครบ
+                      <CheckCircle2 size={16} /> ส่งครบ-ถูกต้อง
+                    </span>
+                  ) : anyMismatch ? (
+                    <span className="ml-auto inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-red-500/10 text-red-600 font-bold text-sm">
+                      <AlertTriangle size={16} /> ส่งผิดรหัส/นอกรายการ
                     </span>
                   ) : (
                     <span className="ml-auto inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-amber-500/10 text-amber-600 font-bold text-sm">
-                      <AlertTriangle size={16} /> ส่งขาด {shortfall} ชิ้น
+                      <AlertTriangle size={16} /> ส่งขาด {shortfall > 0 ? `${shortfall} ชิ้น` : ""}
                     </span>
                   )
                 )}

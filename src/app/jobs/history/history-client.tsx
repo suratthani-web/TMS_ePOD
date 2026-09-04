@@ -71,9 +71,10 @@ interface HistoryClientProps {
 function ScanBadge({ stat }: { stat?: JobScanStat }) {
   if (!stat || stat.status === "none") return null
   const map = {
-    complete: { cls: "bg-emerald-500/10 text-emerald-500", label: "สแกนครบ" },
+    complete: { cls: "bg-emerald-500/10 text-emerald-500", label: "สแกนครบ-ถูก" },
     short:    { cls: "bg-amber-500/10 text-amber-500",     label: `ส่งขาด ${stat.received - stat.delivered}` },
     over:     { cls: "bg-amber-500/10 text-amber-500",     label: `ส่งเกิน ${stat.delivered - stat.received}` },
+    mismatch: { cls: "bg-red-500/10 text-red-500",         label: "ส่งผิดรหัส" },
     nopickup: { cls: "bg-slate-500/10 text-slate-400",     label: "ไม่ได้สแกนรับ" },
   } as const
   const m = map[stat.status as keyof typeof map]
