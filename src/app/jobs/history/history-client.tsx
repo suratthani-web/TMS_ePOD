@@ -47,6 +47,25 @@ import { Customer } from "@/lib/supabase/customers"
 import { Route } from "@/lib/supabase/routes"
 import { Subcontractor } from "@/types/subcontractor"
 
+// รวมค่าคนขับ + ค่าใช้จ่ายอื่นๆ (Cost_Driver_Extra + รายการใน extra_costs_json)
+// ให้ตรงกับที่คำนวณในหน้าแก้ไขงานและรายงาน Trip Performance
+function combinedDriverCost(job: Job): number {
+  const base = Number(job.Cost_Driver_Total) || 0
+  const extraField = Number((job as Record<string, unknown>).Cost_Driver_Extra) || 0
+  const raw = (job as Record<string, unknown>).extra_costs_json ?? (job as Record<string, unknown>).extra_costs
+  let items: unknown[] = []
+  try {
+    items = Array.isArray(raw) ? raw : (raw ? JSON.parse(String(raw)) : [])
+  } catch {
+    items = []
+  }
+  const extraItems = (Array.isArray(items) ? items : []).reduce(
+    (s: number, c) => s + (Number((c as { cost_driver?: unknown })?.cost_driver) || 0),
+    0
+  )
+  return base + extraField + extraItems
+}
+
 interface HistoryClientProps {
   jobs: Job[]
   count: number
@@ -573,9 +592,7 @@ export function HistoryClient({
                                     </div>
                                     <div className="pr-1 flex items-center gap-1.5">
                                         <span className="text-[8px] font-black text-muted-foreground tracking-tighter">
-                                            {typeof job.Cost_Driver_Total === 'number' 
-                                                ? job.Cost_Driver_Total.toLocaleString() 
-                                                : (Number(job.Cost_Driver_Total) || 0).toLocaleString()}
+                                            {combinedDriverCost(job).toLocaleString()}
                                         </span>
                                     </div>
                                 </div>

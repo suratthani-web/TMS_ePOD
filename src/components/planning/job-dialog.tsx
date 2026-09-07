@@ -2657,7 +2657,8 @@ export function JobDialog({
                             <Label className="text-lg font-bold text-muted-foreground">{t('jobs.dialog.pay_driver')}</Label>
                             <Input
                                 type="number"
-                                value={cost.cost_driver}
+                                value={cost.cost_driver || ''}
+                                placeholder="0"
                                 onChange={(e) => updateExtraCost(index, 'cost_driver', e.target.value)}
                                 className="bg-background border-input h-9"
                             />
@@ -2668,7 +2669,8 @@ export function JobDialog({
                             <Label className="text-lg font-bold text-muted-foreground">{t('jobs.dialog.charge_cust')}</Label>
                             <Input
                                 type="number"
-                                value={cost.charge_cust}
+                                value={cost.charge_cust || ''}
+                                placeholder="0"
                                 onChange={(e) => updateExtraCost(index, 'charge_cust', e.target.value)}
                                 className="bg-background border-input h-9"
                             />
