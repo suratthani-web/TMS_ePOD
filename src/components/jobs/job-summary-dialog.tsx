@@ -56,6 +56,7 @@ type JobSummaryDialogProps = {
 export function JobSummaryDialog({ open, onOpenChange, job, routes }: JobSummaryDialogProps) {
   const { t } = useLanguage()
   const [gpsData, setGpsData] = useState<JobGPSData | null>(null)
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null)
 
   const jobId = job?.Job_ID
   const driverName = job?.Driver_Name
@@ -299,7 +300,7 @@ export function JobSummaryDialog({ open, onOpenChange, job, routes }: JobSummary
                 
                 <div className="grid grid-cols-2 gap-3">
                   {pickupPhotos.map((url: string, i: number) => (
-                    <div key={i} className="relative aspect-[4/3] rounded-xl overflow-hidden border border-border bg-muted group cursor-pointer" onClick={() => window.open(url, '_blank')}>
+                    <div key={i} className="relative aspect-[4/3] rounded-xl overflow-hidden border border-border bg-muted group cursor-pointer" onClick={() => setPreviewUrl(url)}>
                       <Image 
                         src={url} 
                         alt={`Pickup proof ${i}`} 
@@ -348,7 +349,7 @@ export function JobSummaryDialog({ open, onOpenChange, job, routes }: JobSummary
                       <div key={i} className={cn(
                         "relative aspect-[4/3] rounded-xl overflow-hidden border border-border bg-muted group cursor-pointer",
                         isReport && "col-span-2 aspect-video ring-2 ring-indigo-500/30"
-                      )} onClick={() => window.open(url, '_blank')}>
+                      )} onClick={() => setPreviewUrl(url)}>
                         <Image 
                           src={url} 
                           alt={`POD proof ${i}`} 
@@ -402,6 +403,30 @@ export function JobSummaryDialog({ open, onOpenChange, job, routes }: JobSummary
             {/* Action buttons removed as per user request */}
           </div>
         </div>
+
+        {/* Image Lightbox — works inside the app webview where window.open is a no-op */}
+        {previewUrl && (
+          <div
+            className="fixed inset-0 z-[100] bg-black/90 flex items-center justify-center p-4 no-print"
+            onClick={() => setPreviewUrl(null)}
+          >
+            <button
+              type="button"
+              onClick={(e) => { e.stopPropagation(); setPreviewUrl(null) }}
+              className="absolute top-4 right-4 text-white/90 hover:text-white bg-white/10 hover:bg-white/20 rounded-full w-11 h-11 flex items-center justify-center text-2xl leading-none"
+              aria-label={t('reports.close_btn')}
+            >
+              ×
+            </button>
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src={previewUrl}
+              alt="Preview"
+              className="max-w-full max-h-[90vh] object-contain rounded-lg"
+              onClick={(e) => e.stopPropagation()}
+            />
+          </div>
+        )}
       </DialogContent>
     </Dialog>
   )

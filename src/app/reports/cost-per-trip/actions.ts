@@ -48,6 +48,8 @@ type CostTripSourceRow = {
   Cost_Driver_Total?: number | string | null
   Cost_Driver_Extra?: number | string | null
   Price_Cust_Extra?: number | string | null
+  extra_costs_json?: string | unknown[] | null
+  extra_costs?: string | unknown[] | null
   Fuel_Cost?: number | string | null
   Maintenance_Cost?: number | string | null
   Toll_Cost?: number | string | null
@@ -86,7 +88,7 @@ export async function getCostPerTrip(startDate?: string, endDate?: string, custo
   const data = await fetchAllRows<CostTripSourceRow>(() => {
     let query = supabase
       .from('Jobs_Main')
-      .select('Job_ID, Plan_Date, Customer_Name, Route_Name, Origin_Location, Dest_Location, Driver_Name, Vehicle_Plate, Job_Status, Price_Cust_Total, Cost_Driver_Total, Price_Cust_Extra, Cost_Driver_Extra, Est_Distance_KM, Loaded_Qty')
+      .select('Job_ID, Plan_Date, Customer_Name, Route_Name, Origin_Location, Dest_Location, Driver_Name, Vehicle_Plate, Job_Status, Price_Cust_Total, Cost_Driver_Total, Price_Cust_Extra, Cost_Driver_Extra, extra_costs_json, Est_Distance_KM, Loaded_Qty')
       // Include Billed/Paid and Verified so completed work that has moved into
       // invoicing/verification still counts toward profitability.
       .in('Job_Status', ['Completed', 'Delivered', 'Finished', 'Closed', 'Billed', 'Paid', 'Verified'])
@@ -245,9 +247,17 @@ export async function getCostPerTrip(startDate?: string, endDate?: string, custo
 
     const tollCost = 0
     const driverCost = Number(d.Cost_Driver_Total) || 0
-    const extraCost = Number(d.Cost_Driver_Extra) || 0
-    
-    const revenue = (Number(d.Price_Cust_Total) || 0) + (Number(d.Price_Cust_Extra) || 0)
+
+    // "ค่าใช้จ่ายอื่นๆ" line items (extra_costs_json) — the driver-cost portion is
+    // folded into extra_cost (shown together with ค่าคนขับ), and the customer-charge
+    // portion into revenue, matching the P&L shown in the job dialog.
+    const extraItems = parseExtraCosts(d.extra_costs_json ?? d.extra_costs)
+    const extraItemsDriver = extraItems.reduce((s, c) => s + (Number(c?.cost_driver) || 0), 0)
+    const extraItemsCharge = extraItems.reduce((s, c) => s + (Number(c?.charge_cust) || 0), 0)
+
+    const extraCost = (Number(d.Cost_Driver_Extra) || 0) + extraItemsDriver
+
+    const revenue = (Number(d.Price_Cust_Total) || 0) + (Number(d.Price_Cust_Extra) || 0) + extraItemsCharge
     
     // Total cost now includes actual allocated fuel and actual maintenance
     const totalCost = driverCost + fuelReal + maintReal + tollCost + extraCost
@@ -299,6 +309,16 @@ export async function getCostPerTrip(startDate?: string, endDate?: string, custo
   }
 
   return { trips, summary }
+}
+
+function parseExtraCosts(raw: string | unknown[] | null | undefined): { cost_driver?: number | string; charge_cust?: number | string }[] {
+  if (!raw) return []
+  try {
+    const arr = Array.isArray(raw) ? raw : JSON.parse(String(raw))
+    return Array.isArray(arr) ? arr : []
+  } catch {
+    return []
+  }
 }
 
 function emptySummary(): CostSummary {
