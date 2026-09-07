@@ -96,6 +96,138 @@ export async function searchPlacesGoogle(query: string): Promise<AILocationResul
   }
 }
 
+export type PlaceAutocompletePrediction = {
+  placeId: string
+  primary: string       // main text (e.g. business name)
+  secondary: string     // secondary text (e.g. address / district)
+  label: string         // combined display text
+}
+
+/**
+ * Google Places Autocomplete (New) — cheap keystroke predictions.
+ *
+ * Much cheaper than Text Search: the typeahead calls this per keystroke, and the
+ * full coordinates are fetched once (placeDetailsGoogle) only when the user picks
+ * a result. Pass a stable `sessionToken` across the keystrokes + the final
+ * details call so Google bills the whole thing as ONE Autocomplete session.
+ * Returns [] on failure/over-quota so callers fall through to the old sources.
+ */
+export async function placesAutocompleteGoogle(
+  query: string,
+  sessionToken?: string,
+): Promise<PlaceAutocompletePrediction[]> {
+  const clean = query.trim();
+  const apiKey = getGoogleMapsApiKey();
+  if (!apiKey || clean.length < 2) return [];
+
+  try {
+    const res = await fetch("https://places.googleapis.com/v1/places:autocomplete", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "X-Goog-Api-Key": apiKey,
+      },
+      body: JSON.stringify({
+        input: clean,
+        languageCode: "th",
+        regionCode: "TH",
+        ...(sessionToken ? { sessionToken } : {}),
+        locationRestriction: {
+          rectangle: {
+            low: { latitude: TH_BOUNDS.minLat, longitude: TH_BOUNDS.minLng },
+            high: { latitude: TH_BOUNDS.maxLat, longitude: TH_BOUNDS.maxLng },
+          },
+        },
+      }),
+      signal: AbortSignal.timeout(4000),
+    });
+
+    if (!res.ok) return [];
+
+    const data = (await res.json()) as {
+      suggestions?: {
+        placePrediction?: {
+          placeId?: string;
+          text?: { text?: string };
+          structuredFormat?: {
+            mainText?: { text?: string };
+            secondaryText?: { text?: string };
+          };
+        };
+      }[];
+    };
+
+    const out: PlaceAutocompletePrediction[] = [];
+    for (const s of data.suggestions ?? []) {
+      const p = s.placePrediction;
+      if (!p?.placeId) continue;
+      const primary = p.structuredFormat?.mainText?.text || p.text?.text || "";
+      const secondary = p.structuredFormat?.secondaryText?.text || "";
+      if (!primary) continue;
+      out.push({
+        placeId: p.placeId,
+        primary,
+        secondary,
+        label: p.text?.text || [primary, secondary].filter(Boolean).join(", "),
+      });
+    }
+    return out;
+  } catch (err) {
+    console.warn("[placesAutocompleteGoogle] failed:", err);
+    return [];
+  }
+}
+
+/**
+ * Google Place Details (New) — resolve a placeId (from placesAutocompleteGoogle)
+ * to coordinates + name + address. Pass the same `sessionToken` used for the
+ * autocomplete keystrokes to close the billing session. Returns null on failure.
+ */
+export async function placeDetailsGoogle(
+  placeId: string,
+  sessionToken?: string,
+): Promise<AILocationResult | null> {
+  const apiKey = getGoogleMapsApiKey();
+  if (!apiKey || !placeId) return null;
+
+  try {
+    const url =
+      `https://places.googleapis.com/v1/places/${encodeURIComponent(placeId)}` +
+      (sessionToken ? `?sessionToken=${encodeURIComponent(sessionToken)}` : "");
+    const res = await fetch(url, {
+      method: "GET",
+      headers: {
+        "X-Goog-Api-Key": apiKey,
+        "X-Goog-FieldMask": "displayName,formattedAddress,location",
+      },
+      signal: AbortSignal.timeout(4000),
+    });
+
+    if (!res.ok) return null;
+
+    const p = (await res.json()) as {
+      displayName?: { text?: string };
+      formattedAddress?: string;
+      location?: { latitude?: number; longitude?: number };
+    };
+
+    const lat = p.location?.latitude;
+    const lng = p.location?.longitude;
+    if (typeof lat !== "number" || typeof lng !== "number") return null;
+
+    return {
+      name: p.displayName?.text || p.formattedAddress || "",
+      address: p.formattedAddress || "",
+      lat: Number(lat.toFixed(6)),
+      lng: Number(lng.toFixed(6)),
+      source: "google",
+    };
+  } catch (err) {
+    console.warn("[placeDetailsGoogle] failed:", err);
+    return null;
+  }
+}
+
 /**
  * Google Geocoding API — address → coordinates (forward geocode), Thailand only.
  * Server-side, capped 300/day. Returns null on failure so callers fall back.

@@ -3,6 +3,9 @@
 import { MapContainer, TileLayer, Marker, Popup, useMap, Polyline, CircleMarker, Circle, Polygon, useMapEvents } from 'react-leaflet'
 import L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
+import 'leaflet.markercluster'
+import 'leaflet.markercluster/dist/MarkerCluster.css'
+import 'leaflet.markercluster/dist/MarkerCluster.Default.css'
 import { useEffect, useState, useRef, Fragment, useMemo } from 'react'
 import { Truck, MapPin } from 'lucide-react'
 import { ProfitabilityHeatmap, ProfitPoint } from './profitability-heatmap'
@@ -131,6 +134,10 @@ type LeafletMapProps = {
   dangerZones?: MapDangerZone[]
   // In-progress polygon being drawn in the danger-zone editor.
   drawingPolygon?: [number, number][]
+  // All saved master locations to plot as pins (admin overview map).
+  savedLocations?: { id?: string; name: string; lat: number; lng: number; phone?: string | null; address?: string | null }[]
+  // Auto-fit the view to all saved locations on first render.
+  fitToSavedLocations?: boolean
 }
 
 function RecenterMap({ position, zoom }: { position: [number, number], zoom?: number }) {
@@ -160,7 +167,63 @@ function FitBounds({ positions }: { positions: [number, number][] }) {
     return null
 }
 
-export default function LeafletMap({ 
+type SavedLoc = { id?: string; name: string; lat: number; lng: number; phone?: string | null; address?: string | null }
+
+// Escape user-supplied text before injecting into the popup HTML string.
+function esc(v: unknown): string {
+  return String(v ?? '').replace(/[&<>"']/g, (c) => (
+    { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c] as string
+  ))
+}
+
+// Renders all saved locations inside a leaflet.markercluster group so dense
+// areas collapse into a counted circle that splits apart as you zoom in.
+function SavedLocationsCluster({ locations, fit }: { locations: SavedLoc[]; fit?: boolean }) {
+  const map = useMap()
+
+  useEffect(() => {
+    if (!map || typeof map.getContainer !== 'function') return
+    initIcons()
+
+    const group = L.markerClusterGroup({
+      chunkedLoading: true,
+      maxClusterRadius: 60,
+      spiderfyOnMaxZoom: true,
+      showCoverageOnHover: false,
+    })
+
+    for (const loc of locations) {
+      const marker = L.marker([loc.lat, loc.lng])
+      marker.bindPopup(
+        `<div style="min-width:160px;padding:2px">
+           <p style="font-size:10px;font-weight:900;text-transform:uppercase;letter-spacing:.1em;color:#6366f1;margin:0 0 2px">📍 สถานที่ในระบบ</p>
+           <p style="font-weight:900;font-size:14px;line-height:1.2;margin:0 0 4px">${esc(loc.name)}</p>
+           ${loc.address ? `<p style="font-size:11px;color:#64748b;line-height:1.35;margin:0 0 4px">${esc(loc.address)}</p>` : ''}
+           ${loc.phone ? `<p style="font-size:11px;font-weight:700;margin:0">☎ ${esc(loc.phone)}</p>` : ''}
+           <p style="font-size:10px;font-family:monospace;color:#94a3b8;margin:4px 0 0">${loc.lat.toFixed(6)}, ${loc.lng.toFixed(6)}</p>
+         </div>`
+      )
+      group.addLayer(marker)
+    }
+
+    map.addLayer(group)
+
+    if (fit && locations.length > 0) {
+      const container = map.getContainer()
+      if (container && document.body.contains(container)) {
+        map.fitBounds(group.getBounds(), { padding: [50, 50], maxZoom: 15, animate: false })
+      }
+    }
+
+    return () => {
+      map.removeLayer(group)
+    }
+  }, [map, locations, fit])
+
+  return null
+}
+
+export default function LeafletMap({
   center = [13.7563, 100.5018], 
   zoom = 13, 
   drivers = [], 
@@ -176,8 +239,14 @@ export default function LeafletMap({
   onShowRoute,
   onMapClick,
   dangerZones = [],
-  drawingPolygon = []
+  drawingPolygon = [],
+  savedLocations = [],
+  fitToSavedLocations = false
 }: LeafletMapProps) {
+  const validSavedLocations = useMemo(
+    () => savedLocations.filter(l => isFinite(l.lat) && isFinite(l.lng) && (l.lat !== 0 || l.lng !== 0)),
+    [savedLocations]
+  )
   const [isHydrated, setIsHydrated] = useState(false)
   const [showGeofences, setShowGeofences] = useState(true)
   const mapCenter = currentPosition || (routeHistory.length > 0 ? routeHistory[0] : (plannedRoute.length > 0 ? [plannedRoute[0].lat, plannedRoute[0].lng] : center)) as [number, number]
@@ -244,6 +313,11 @@ export default function LeafletMap({
 
       {showHeatmap && profitPoints.length > 0 && (
         <ProfitabilityHeatmap data={profitPoints} />
+      )}
+
+      {/* Saved master locations — admin overview pins (clustered) */}
+      {validSavedLocations.length > 0 && (
+        <SavedLocationsCluster locations={validSavedLocations} fit={fitToSavedLocations} />
       )}
 
       {/* Danger zones / operational areas — filled polygons (drawn beneath markers) */}

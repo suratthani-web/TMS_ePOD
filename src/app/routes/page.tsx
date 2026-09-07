@@ -43,11 +43,15 @@ import {
   getBranches,
   Location,
 } from "@/lib/supabase/locations"
-import { extractCoordsFromUrl, extractQueryTextFromUrl, buildGoogleMapLink } from "@/lib/utils"
+import { extractCoordsFromUrl, extractQueryTextFromUrl, buildGoogleMapLink, cn } from "@/lib/utils"
 import { geocodeAddress, reverseGeocode } from "@/lib/ai/geocoding"
 import dynamic from "next/dynamic"
 import type { PickedLocation } from "@/components/maps/location-picker"
 const LocationPicker = dynamic(() => import("@/components/maps/location-picker"), { ssr: false })
+const LeafletMap = dynamic(() => import("@/components/maps/leaflet-map"), {
+  ssr: false,
+  loading: () => <div className="h-[600px] w-full bg-muted animate-pulse rounded-2xl" />,
+})
 import { ExcelImport } from "@/components/ui/excel-import"
 import { ExcelExport } from "@/components/ui/excel-export"
 import { useBranch } from "@/components/providers/branch-provider"
@@ -82,6 +86,7 @@ export default function RoutesPage() {
   }
   const [formData, setFormData] = useState<Partial<Location>>(emptyForm)
   const [pickerOpen, setPickerOpen] = useState(false)
+  const [viewMode, setViewMode] = useState<'list' | 'map'>('list')
 
   const handlePickerConfirm = (loc: PickedLocation) => {
     setFormData(prev => ({
@@ -359,27 +364,52 @@ export default function RoutesPage() {
         </div>
       </div>
 
-      {/* Search */}
-      <div className="mb-8 relative group max-w-xl">
-        <div className="absolute inset-x-0 bottom-0 h-1 bg-primary blur-3xl opacity-20 pointer-events-none" />
-        <div className="relative glass-panel rounded-2xl p-0.5 border-border/5">
-            <div className="flex items-center gap-3 px-4">
-                <Search className="text-primary opacity-50" size={18} />
-                <Input
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                    placeholder={t('routes.search_placeholder')}
-                    className="bg-transparent border-none text-base font-black text-foreground px-2 h-12 placeholder:text-muted-foreground tracking-tight uppercase focus-visible:ring-0"
-                />
-            </div>
+      {/* Search + view toggle */}
+      <div className="mb-8 flex flex-col lg:flex-row lg:items-start gap-4">
+        <div className="relative group max-w-xl flex-1">
+          <div className="absolute inset-x-0 bottom-0 h-1 bg-primary blur-3xl opacity-20 pointer-events-none" />
+          <div className="relative glass-panel rounded-2xl p-0.5 border-border/5">
+              <div className="flex items-center gap-3 px-4">
+                  <Search className="text-primary opacity-50" size={18} />
+                  <Input
+                      value={searchQuery}
+                      onChange={(e) => setSearchQuery(e.target.value)}
+                      placeholder={t('routes.search_placeholder')}
+                      className="bg-transparent border-none text-base font-black text-foreground px-2 h-12 placeholder:text-muted-foreground tracking-tight uppercase focus-visible:ring-0"
+                  />
+              </div>
+          </div>
+          {!loading && (
+            <p className="mt-3 ml-2 text-[10px] font-black uppercase tracking-widest text-muted-foreground">
+              {searchQuery
+                ? `พบ ${locations.length.toLocaleString()} รายการ`
+                : `ทั้งหมด ${totalCount.toLocaleString()} รายการ`}
+              {` • มีพิกัด ${locations.filter(l => l.Lat != null && l.Lon != null).length.toLocaleString()}`}
+            </p>
+          )}
         </div>
-        {!loading && (
-          <p className="mt-3 ml-2 text-[10px] font-black uppercase tracking-widest text-muted-foreground">
-            {searchQuery
-              ? `พบ ${locations.length.toLocaleString()} รายการ`
-              : `ทั้งหมด ${totalCount.toLocaleString()} รายการ`}
-          </p>
-        )}
+
+        {/* List / Map toggle */}
+        <div className="flex items-center gap-1 p-1 glass-panel rounded-2xl border-border/5 shrink-0">
+          <button
+            onClick={() => setViewMode('list')}
+            className={cn(
+              "h-11 px-5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all flex items-center gap-2",
+              viewMode === 'list' ? "bg-primary text-white shadow-lg" : "text-muted-foreground hover:text-foreground"
+            )}
+          >
+            <FileSpreadsheet size={14} /> รายการ
+          </button>
+          <button
+            onClick={() => setViewMode('map')}
+            className={cn(
+              "h-11 px-5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all flex items-center gap-2",
+              viewMode === 'map' ? "bg-primary text-white shadow-lg" : "text-muted-foreground hover:text-foreground"
+            )}
+          >
+            <MapPin size={14} /> แผนที่
+          </button>
+        </div>
       </div>
 
       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
@@ -529,6 +559,32 @@ export default function RoutesPage() {
                     <Navigation className="absolute inset-0 m-auto text-primary animate-pulse" size={32} />
                  </div>
                  <p className="mt-10 text-muted-foreground font-black uppercase tracking-wide text-base font-bold animate-pulse">{t('routes.scanning')}</p>
+            </div>
+          ) : viewMode === 'map' ? (
+            <div className="glass-panel rounded-[2rem] border-border/5 p-2 overflow-hidden">
+              {(() => {
+                const mapped = locations
+                  .filter(l => l.Lat != null && l.Lon != null)
+                  .map(l => ({ id: l.Location_ID || l.Name, name: l.Name, lat: Number(l.Lat), lng: Number(l.Lon), phone: l.Phone, address: l.Address }))
+                return (
+                  <div className="h-[600px] w-full">
+                    {mapped.length > 0 ? (
+                      <LeafletMap
+                        savedLocations={mapped}
+                        fitToSavedLocations
+                        zoom={6}
+                        center={[13.7563, 100.5018]}
+                        height="600px"
+                      />
+                    ) : (
+                      <div className="h-full flex flex-col items-center justify-center text-center">
+                        <MapPin className="w-12 h-12 text-muted-foreground mb-4 opacity-20" />
+                        <p className="text-muted-foreground font-black uppercase tracking-wide text-xs">ยังไม่มีสถานที่ที่มีพิกัดให้แสดงบนแผนที่</p>
+                      </div>
+                    )}
+                  </div>
+                )
+              })()}
             </div>
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">

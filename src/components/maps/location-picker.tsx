@@ -19,7 +19,7 @@ import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 import { Loader2, MapPin, Search as SearchIcon, Check, Crosshair, Sparkles, Navigation, Globe } from 'lucide-react'
 import { cn } from '@/lib/utils'
-import { searchPlacesGoogle, searchLocationWithAI, resolveGoogleMapsUrl, reverseGeocode as serverReverseGeocode } from '@/lib/ai/geocoding'
+import { searchPlacesGoogle, searchLocationWithAI, resolveGoogleMapsUrl, reverseGeocode as serverReverseGeocode, placesAutocompleteGoogle, placeDetailsGoogle } from '@/lib/ai/geocoding'
 
 // Thailand centroid — default view when no point is chosen yet.
 const TH_CENTER: [number, number] = [13.7563, 100.5018]
@@ -58,6 +58,7 @@ type Suggestion = {
   lat: number
   lng: number
   source?: 'ai' | 'coordinate' | 'google_maps' | 'google' | 'osm'
+  placeId?: string // when set, coords are resolved lazily via Place Details on pick
 }
 
 export type PickedLocation = { name: string; lat: number; lng: number }
@@ -138,6 +139,11 @@ export default function LocationPicker({
 
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const abortRef = useRef<AbortController | null>(null)
+  // Autocomplete session token — keeps all keystrokes + the final Place Details
+  // call billed as one cheap Autocomplete session. Rotated after each pick.
+  const sessionTokenRef = useRef<string>('')
+  const newSessionToken = () =>
+    (typeof crypto !== 'undefined' && crypto.randomUUID) ? crypto.randomUUID() : `${Date.now()}-${Math.random()}`
 
   // Reset state each time the dialog is (re)opened.
   useEffect(() => {
@@ -147,6 +153,7 @@ export default function LocationPicker({
       setPoint(hasInitial ? [parsedLat, parsedLng] : null)
       setSuggestions([])
       setShowList(false)
+      sessionTokenRef.current = newSessionToken()
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open])
@@ -238,7 +245,27 @@ export default function LocationPicker({
       try {
         const results: Suggestion[] = []
 
-        // 3.0 Google Places (New) — most accurate & fastest
+        // 3.0a Google Places Autocomplete (New) — cheapest per keystroke.
+        // Coords are resolved lazily on pick (placeId set, lat/lng = 0).
+        const acResults = await placesAutocompleteGoogle(q, sessionTokenRef.current).catch(() => [])
+
+        if (ctrl.signal.aborted) return
+
+        if (acResults && acResults.length > 0) {
+          setSuggestions(acResults.slice(0, 8).map((p) => ({
+            label: p.primary,
+            address: p.secondary,
+            lat: 0,
+            lng: 0,
+            source: 'google' as const,
+            placeId: p.placeId,
+          })))
+          setShowList(true)
+          setSearching(false)
+          return
+        }
+
+        // 3.0b Google Places Text Search — fallback if Autocomplete returns nothing
         const googleResults = await searchPlacesGoogle(q).catch(() => [])
 
         if (ctrl.signal.aborted) return
@@ -355,12 +382,32 @@ export default function LocationPicker({
     }
   }, [query, open])
 
-  const pickSuggestion = (s: Suggestion) => {
-    setPoint([s.lat, s.lng])
+  const pickSuggestion = async (s: Suggestion) => {
     setName(s.label)
     setQuery(s.label)
     setShowList(false)
     setSuggestions([])
+
+    // Autocomplete predictions carry no coords — resolve them now (closes the
+    // billing session), then start a fresh token for the next search.
+    if (s.placeId && (!s.lat || !s.lng)) {
+      setReverseLoading(true)
+      try {
+        const details = await placeDetailsGoogle(s.placeId, sessionTokenRef.current)
+        if (details) {
+          setPoint([details.lat, details.lng])
+          setName(details.name || s.label)
+        } else {
+          // fall back to reverse geocode only if we somehow got coords elsewhere
+        }
+      } finally {
+        setReverseLoading(false)
+        sessionTokenRef.current = newSessionToken()
+      }
+      return
+    }
+
+    setPoint([s.lat, s.lng])
   }
 
   const pickOnMap = (lat: number, lng: number) => {
