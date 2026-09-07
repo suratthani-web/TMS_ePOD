@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useRef } from "react"
 import { useRouter } from "next/navigation"
 import { createClient } from "@/utils/supabase/client"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
@@ -183,9 +183,12 @@ export function JobDialog({
   }
 
   // 2. State Declarations
+  // Guards the init effect so it re-populates the form only on open / job change,
+  // not on every parent re-render (which used to wipe typed dates).
+  const lastInitKeyRef = useRef<string | null>(null)
   const [formData, setFormData] = useState({
     Job_ID: job?.Job_ID || '', // Empty for new jobs to allow manual entry or auto-gen
-    Plan_Date: job?.Pickup_Date || job?.Plan_Date || defaultDate || new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Bangkok' }),
+    Plan_Date: job?.Plan_Date || job?.Pickup_Date || defaultDate || new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Bangkok' }),
     Delivery_Date: job?.Delivery_Date || defaultDate || new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Bangkok' }),
     Customer_ID: job?.Customer_ID || '',
     Customer_Name: job?.Customer_Name || '',
@@ -483,9 +486,22 @@ export function JobDialog({
   // Centralized State Sync: Handles Create/Edit transitions and Data Population
   // Comprehensive State Sync when dialog opens
   useEffect(() => {
-    if (!show) return;
+    if (!show) {
+      // Allow the form to re-initialize the next time the dialog opens.
+      lastInitKeyRef.current = null
+      return;
+    }
 
     const syncMode = job ? 'edit' : mode;
+
+    // Re-initialize the form ONLY when the dialog opens or the target job
+    // changes — NOT on every parent re-render. Previously any re-render that
+    // handed us a new `job`/`defaultDate` object identity re-ran this effect and
+    // reset formData to its defaults (today), silently wiping the pickup date the
+    // admin had just typed. Guard on a stable key so user edits survive.
+    const initKey = `${syncMode}|${job?.Job_ID || 'new'}`
+    if (lastInitKeyRef.current === initKey) return
+    lastInitKeyRef.current = initKey
 
     const populateFromJob = (targetJob: Job) => {
       const masterRoute = routes.find(r => r.Route_Name === targetJob.Route_Name)

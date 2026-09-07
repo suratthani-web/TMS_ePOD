@@ -227,7 +227,7 @@ export default function ContainerDashboard() {
                                                             <MapPin size={12} /> {job.Dest_Location || '-'}
                                                         </div>
                                                         <div className="flex items-center gap-3 text-[11px] font-black">
-                                                            <span className="inline-flex items-center gap-1 text-emerald-500"><Calendar size={11} /> รับ {fmtDateTH(job.Pickup_Date || job.Plan_Date)}</span>
+                                                            <span className="inline-flex items-center gap-1 text-emerald-500"><Calendar size={11} /> รับ {fmtDateTH(job.Plan_Date || job.Pickup_Date)}</span>
                                                             {job.Delivery_Date && (
                                                                 <span className="inline-flex items-center gap-1 text-primary"><Calendar size={11} /> ส่ง {fmtDateTH(job.Delivery_Date)}</span>
                                                             )}

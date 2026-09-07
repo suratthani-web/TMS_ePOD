@@ -105,7 +105,7 @@ export function JobDetailClient({ job, success, initialTab = 'mission' }: JobDet
                             <MapPin size={16} className="text-emerald-600 shrink-0" />
                             <div className="min-w-0">
                                 <p className="text-[10px] font-bold text-emerald-700/70 uppercase tracking-widest">วันรับ</p>
-                                <p className="text-sm font-bold text-foreground truncate">{fmtDateTH(job?.Pickup_Date || job?.Plan_Date)}</p>
+                                <p className="text-sm font-bold text-foreground truncate">{fmtDateTH(job?.Plan_Date || job?.Pickup_Date)}</p>
                             </div>
                         </div>
                         <div className="flex-1 flex items-center gap-2 p-3 bg-primary/10 rounded-2xl border border-primary/20">

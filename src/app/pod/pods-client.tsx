@@ -165,7 +165,7 @@ export default function PODPage({ pods, stats, count, limit, searchParams }: POD
                   <td className="px-4 py-3">
                     <div className="flex flex-col gap-0.5">
                        <span className="text-[11px] font-black text-emerald-500 uppercase tracking-tight italic">
-                          รับ {pod.Pickup_Date ? new Date(pod.Pickup_Date).toLocaleDateString('th-TH') : (pod.Plan_Date ? new Date(pod.Plan_Date).toLocaleDateString('th-TH') : "N/A")}
+                          รับ {pod.Plan_Date ? new Date(pod.Plan_Date).toLocaleDateString('th-TH') : (pod.Pickup_Date ? new Date(pod.Pickup_Date).toLocaleDateString('th-TH') : "N/A")}
                        </span>
                        <span className="text-[11px] font-black text-primary uppercase tracking-tight italic">
                           ส่ง {pod.Delivery_Date ? new Date(pod.Delivery_Date).toLocaleDateString('th-TH') : "N/A"}
