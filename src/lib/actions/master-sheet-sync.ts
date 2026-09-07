@@ -3,6 +3,35 @@ import 'server-only'
 import { createAdminClient } from '@/utils/supabase/server'
 import { getSheetsClient } from '@/lib/google-sheets'
 import { getFuelPriceNumber } from '@/lib/actions/fuel-actions'
+import { getActiveSheetMappings, type SheetMapEntry } from '@/lib/supabase/sheet-mapping'
+
+// Customer→sheet mapping loaded from the Customer_Sheet_Map table, cached in
+// memory (60s TTL). Falls back to [] so resolveCustId/getJobTabName use their
+// hardcoded defaults when the table is empty or unreachable. Call
+// ensureSheetMap() before building rows / resolving a tab.
+let sheetMapCache: SheetMapEntry[] = []
+let sheetMapCacheAt = 0
+const SHEET_MAP_TTL_MS = 60_000
+
+async function ensureSheetMap(): Promise<void> {
+  if (Date.now() - sheetMapCacheAt < SHEET_MAP_TTL_MS && sheetMapCache.length > 0) return
+  const rows = await getActiveSheetMappings()
+  if (rows.length > 0) {
+    sheetMapCache = rows
+    sheetMapCacheAt = Date.now()
+  }
+}
+
+// First mapping whose (comma-separated) keywords appear in the job's id/name.
+function matchSheetMap(job: { Customer_ID?: unknown; Customer_Name?: unknown }): SheetMapEntry | null {
+  const idStr = String(job.Customer_ID || '').toLowerCase()
+  const nameStr = String(job.Customer_Name || '').toLowerCase()
+  for (const m of sheetMapCache) {
+    const kws = m.keywords.split(',').map(k => k.trim().toLowerCase()).filter(Boolean)
+    if (kws.some(k => idStr.includes(k) || nameStr.includes(k))) return m
+  }
+  return null
+}
 
 // Test sheet by default; set MASTER_SHEET_ID to swap to the real one.
 const SHEET_ID = process.env.MASTER_SHEET_ID || '1PELYgiHBeIuweu64cctWV3kK0LIyIBqednrsUx5maWg'
@@ -326,6 +355,11 @@ function jobsMissingFromLedger(
 // numeric code stripped from "CUST-9910", else default 20).
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 function resolveCustId(job: any): number | string {
+    // DB mapping (Customer_Sheet_Map) wins so new customers can be added from the
+    // settings UI without a code change; hardcoded keywords below stay as fallback.
+    const mapped = matchSheetMap(job)
+    if (mapped && mapped.masterCode != null) return mapped.masterCode
+
     const idStr = String(job.Customer_ID || '').toLowerCase()
     const nameStr = String(job.Customer_Name || '').toLowerCase()
     if (idStr.includes('unicord') || idStr.includes('ยูนิคอร์ด') || nameStr.includes('unicord') || nameStr.includes('ยูนิคอร์ด')) return 2
@@ -333,6 +367,7 @@ function resolveCustId(job: any): number | string {
     if (idStr.includes('ยังค์มีดี') || idStr.includes('youngmede') || nameStr.includes('ยังค์มีดี') || nameStr.includes('youngmede')) return 109
     if (idStr.includes('อินไลน์') || idStr.includes('inline') || nameStr.includes('อินไลน์') || nameStr.includes('inline')) return 60
     if (idStr.includes('คิวพลัส') || idStr.includes('qplus') || nameStr.includes('คิวพลัส') || nameStr.includes('qplus')) return 55
+    if (idStr.includes('เอ็ม โกลบอล') || idStr.includes('m global') || idStr.includes('ซอร์สซิ่ง') || nameStr.includes('เอ็ม โกลบอล') || nameStr.includes('m global') || nameStr.includes('ซอร์สซิ่ง')) return 127
     if (idStr.includes('siam') || idStr.includes('สยามรุ่งเรือง') || nameStr.includes('siam') || nameStr.includes('สยามรุ่งเรือง')) return 20
     if (idStr.includes('pcg') || nameStr.includes('pcg')) return 125
     const code = masterCustomerCode(job.Customer_ID)
@@ -464,6 +499,15 @@ export function getJobTabName(
       .replace(/บริษัท|จำกัด\(มหาชน\)|จำกัด|ห้างหุ้นส่วนจำกัด|หจก\./g, '')
       .replace(/[\s\(\)\-\.,_]/g, '')
       .trim()
+  }
+
+  // DB mapping wins: if this customer maps to a Sheet_Tab, route there (matching
+  // the real tab by loose includes so "ยูนิคอร์ด" matches "ยูนิคอร์ด (รวม)").
+  const mapped = matchSheetMap(job)
+  if (mapped?.sheetTab) {
+    const wanted = mapped.sheetTab.toLowerCase()
+    const dbTab = existingTabs.find(t => t.toLowerCase().includes(wanted) || wanted.includes(t.toLowerCase()))
+    if (dbTab) return dbTab
   }
 
   const normCustName = job.Customer_Name ? cleanStr(String(job.Customer_Name)) : ''
@@ -633,6 +677,7 @@ async function applyMasterRowFormat(sheets: SheetsClient, updatedRange: string |
 
 export async function appendJobToMaster(jobId: string): Promise<{ success: boolean; error?: string; skipped?: boolean }> {
   try {
+    await ensureSheetMap()
     const supabase = createAdminClient()
     const { data: job, error } = await supabase.from('Jobs_Main').select('*').eq('Job_ID', jobId).single()
     if (error || !job) return { success: false, error: 'Job not found' }
@@ -709,6 +754,7 @@ export async function verifyAndBackfillHistorical(
       return { success: false, error: 'Start date must not be after end date' }
     }
 
+    await ensureSheetMap()
     const supabase = createAdminClient()
 
     // Supabase caps a single request at ~1000 rows (server max-rows), so page
@@ -862,6 +908,7 @@ export async function backfillMasterSheet(
       return { success: false, error: 'Start date must not be after end date' }
     }
 
+    await ensureSheetMap()
     const supabase = createAdminClient()
     const PAGE = 1000
     const jobs: MasterJob[] = []

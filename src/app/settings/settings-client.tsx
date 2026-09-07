@@ -61,6 +61,7 @@ const settingsSections = [
       { labelKey: "settings.items.fleet_standards", descKey: "settings.items.fleet_standards_desc", path: "/settings/fleet-standards", permKey: "settings.items.fleet_standards" },
       { labelKey: "navigation.esg_settings", descKey: "navigation.esg_settings_desc", path: "/settings/esg", permKey: "settings.items.fleet_standards" },
       { labelKey: "settings.items.expense_types", descKey: "settings.items.expense_types_desc", path: "/settings/expense-types", permKey: "settings.items.expense_types" },
+      { labelKey: "settings.items.sheet_mapping", descKey: "settings.items.sheet_mapping_desc", path: "/settings/sheet-mapping", permKey: "settings.items.expense_types" },
     ]
   },
   {

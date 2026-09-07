@@ -33,6 +33,9 @@ const CUSTOMER_PRESETS: Record<string, { code: string; color: string; bg: string
   "inline": { code: "#60", color: "text-cyan-500", bg: "bg-cyan-500/10", border: "border-cyan-500/20" },
   "คิวพลัส": { code: "#55", color: "text-rose-500", bg: "bg-rose-500/10", border: "border-rose-500/20" },
   "qplus": { code: "#55", color: "text-rose-500", bg: "bg-rose-500/10", border: "border-rose-500/20" },
+  "เอ็ม โกลบอล": { code: "#127", color: "text-indigo-500", bg: "bg-indigo-500/10", border: "border-indigo-500/20" },
+  "m global": { code: "#127", color: "text-indigo-500", bg: "bg-indigo-500/10", border: "border-indigo-500/20" },
+  "ซอร์สซิ่ง": { code: "#127", color: "text-indigo-500", bg: "bg-indigo-500/10", border: "border-indigo-500/20" },
 }
 
 export function CustomerSummaryWidget({ customers = [], isAdminUser = false }: CustomerSummaryWidgetProps) {
