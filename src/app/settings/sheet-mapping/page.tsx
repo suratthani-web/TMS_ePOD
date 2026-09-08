@@ -52,6 +52,16 @@ export default function SheetMappingPage() {
 
   const cancel = () => { setEditingId(null); setShowAdd(false); setDraft(emptyDraft) }
 
+  // Suggest the next sort order = (highest specific order, ignoring the
+  // default-fallback rows at 900+) + 10, so a new customer is simply appended
+  // and the admin never has to invent a number.
+  const nextSortOrder = () => {
+    const specific = rows.map(r => r.sortOrder).filter(o => o < 900)
+    return (specific.length ? Math.max(...specific) : 90) + 10
+  }
+
+  const openAdd = () => { setShowAdd(true); setDraft({ ...emptyDraft, sortOrder: nextSortOrder() }) }
+
   const validate = (d: Draft) => {
     if (!d.label.trim()) { toast.warning("กรอกชื่อลูกค้า/กลุ่ม"); return false }
     if (!d.keywords.trim()) { toast.warning("กรอกคีย์เวิร์ดอย่างน้อย 1 คำ"); return false }
@@ -104,7 +114,7 @@ export default function SheetMappingPage() {
         <Input value={draft.sheetTab ?? ""} onChange={(e) => setDraft({ ...draft, sheetTab: e.target.value })} placeholder="ยูนิคอร์ด" />
       </div>
       <div className="md:col-span-1 space-y-1">
-        <Label className="text-xs font-bold text-muted-foreground uppercase">ลำดับ</Label>
+        <Label className="text-xs font-bold text-muted-foreground uppercase" title="ลำดับการจับคู่ — เลขน้อยจับก่อน ระบบเติมให้อัตโนมัติ ไม่ต้องแก้เว้นแต่คีย์เวิร์ดซ้อนกับรายอื่น">ลำดับ (อัตโนมัติ)</Label>
         <Input type="number" value={draft.sortOrder} onChange={(e) => setDraft({ ...draft, sortOrder: Number(e.target.value) || 100 })} />
       </div>
       <div className="md:col-span-1 flex gap-1 justify-end">
@@ -132,7 +142,7 @@ export default function SheetMappingPage() {
             </div>
           </div>
           {!showAdd && !editingId && (
-            <PremiumButton onClick={() => { setShowAdd(true); setDraft(emptyDraft) }} className="h-11 px-6 rounded-xl bg-primary text-white font-black uppercase tracking-widest text-[11px]">
+            <PremiumButton onClick={openAdd} className="h-11 px-6 rounded-xl bg-primary text-white font-black uppercase tracking-widest text-[11px]">
               <Plus size={18} className="mr-2" /> เพิ่มลูกค้า
             </PremiumButton>
           )}
@@ -184,7 +194,7 @@ export default function SheetMappingPage() {
         </div>
 
         <p className="text-xs text-muted-foreground px-1">
-          หมายเหตุ: ลำดับน้อยจับคู่ก่อน (ใส่ลูกค้าเฉพาะเจาะจงเลขน้อย, ลูกค้า default เลขมาก) • แท็บว่าง = ใช้ fallback (ยูนิคอร์ด) • ระบบ cache 60 วินาที
+          หมายเหตุ: <b>ลำดับเติมให้อัตโนมัติ</b> — ปกติไม่ต้องแก้ ปรับก็ต่อเมื่อคีย์เวิร์ดลูกค้าใหม่ซ้อนกับอีกราย (ให้ตั้งเลขน้อยกว่าตัวที่กว้างกว่าเพื่อจับก่อน) • แท็บว่าง = ใช้ fallback (ยูนิคอร์ด) • ระบบ cache 60 วินาที
         </p>
       </div>
     </DashboardLayout>

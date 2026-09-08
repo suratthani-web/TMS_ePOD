@@ -50,8 +50,8 @@ self.addEventListener("push", function (event) {
 
   const options = {
     body: data.body || "มีรายการอัปเดตใหม่ในระบบ",
-    icon: "/logo-tactical.png",
-    badge: "/logo-tactical.png",
+    icon: "/icon-192.png",
+    badge: "/icon-192.png",
     vibrate,
     requireInteraction: notifType === "sos" || notifType === "new_job",  // Persistent for critical events
     silent: false,
