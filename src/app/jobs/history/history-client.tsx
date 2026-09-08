@@ -163,38 +163,80 @@ export function HistoryClient({
             return
         }
 
-        // Prepare data for Excel
-        const exportData = allJobs.map(job => {
-            let origin = (job.Origin_Location || '').trim()
-            let dest = (job.Dest_Location || '').trim()
-            
-            // Fallback for Route Name
-            if ((!origin || !dest) && job.Route_Name) {
-                const parts = job.Route_Name.split(/[-→/]/)
-                if (parts.length >= 2) {
-                    if (!origin) origin = parts[0].trim()
-                    if (!dest) dest = parts.slice(1).join(' - ').trim()
-                }
+        // จุดหมาย (ดรอป) ตามลำดับ — multi-drop เก็บใน original_destinations_json
+        // ไม่งั้น fallback split "→" จาก Dest_Location (รูปแบบเดียวกับ master-sheet-sync)
+        const parseDrops = (job: Job): string[] => {
+            let v: unknown = (job as Record<string, unknown>).original_destinations_json
+            if (typeof v === 'string') { try { v = JSON.parse(v) } catch { v = null } }
+            if (Array.isArray(v)) {
+                const names = v.map(d => String((d as { name?: unknown })?.name ?? '').trim()).filter(Boolean)
+                if (names.length > 0) return names
             }
+            if (job.Dest_Location) return String(job.Dest_Location).split('→').map(s => s.trim()).filter(Boolean)
+            return []
+        }
+        // ต้นทางแถวหลัก = จุดแรก
+        const parseOrigin = (job: Job): string => {
+            let v: unknown = (job as Record<string, unknown>).original_origins_json
+            if (typeof v === 'string') { try { v = JSON.parse(v) } catch { v = null } }
+            if (Array.isArray(v) && v.length > 0) {
+                const n = String((v[0] as { name?: unknown })?.name ?? '').trim()
+                if (n) return n
+            }
+            if (job.Origin_Location) return String(job.Origin_Location).split('→')[0].trim()
+            return job.Route_Name ? String(job.Route_Name).split(/[-→/]/)[0].trim() : ''
+        }
 
-            return {
+        // หมายเหตุ/ปัญหา = เหตุผลงานไม่สำเร็จ (⚠️) + หมายเหตุงาน (Notes) จากที่มีอยู่แล้ว
+        const buildRemark = (job: Job): string => {
+            const failed = String((job as Record<string, unknown>).Failed_Reason || '').trim()
+            const notes = String((job as Record<string, unknown>).Notes || '').trim()
+            const parts: string[] = []
+            if (failed) parts.push(`⚠️ ${failed}`)
+            if (notes) parts.push(notes)
+            return parts.join(' | ')
+        }
+
+        const HEADERS = ['Job ID', 'Plan Date', 'Customer', 'Origin', 'Destination', 'Vehicle', 'Driver', 'Total Qty', 'Distance (KM)', 'Verification', 'หมายเหตุ/ปัญหา'] as const
+        type Row = Record<(typeof HEADERS)[number], string | number>
+        const blankRow = (): Row => Object.fromEntries(HEADERS.map(h => [h, ''])) as Row
+
+        // Prepare data for Excel — main row carries full info (origin/vehicle/driver/
+        // qty/distance) with the first drop; each additional drop becomes a light
+        // sub-row (date + customer + its destination only) so totals aren't
+        // double-counted — matching the MASTER sheet writer's multi-drop format.
+        const exportData: Row[] = []
+        for (const job of allJobs) {
+            const drops = parseDrops(job)
+            const origin = parseOrigin(job)
+            const firstDrop = drops[0] || (job.Dest_Location || '').trim()
+
+            exportData.push({
                 'Job ID': job.Job_ID,
-                'Status': job.Job_Status,
-                'Plan Date': job.Plan_Date,
-                'Customer': job.Customer_Name,
-                'Route': job.Route_Name,
+                'Plan Date': job.Plan_Date || '',
+                'Customer': job.Customer_Name || '',
                 'Origin': origin,
-                'Destination': dest,
-                'Vehicle': job.Vehicle_Plate,
-                'Driver': job.Driver_Name,
+                'Destination': firstDrop,
+                'Vehicle': job.Vehicle_Plate || '',
+                'Driver': job.Driver_Name || '',
                 'Total Qty': job.Loaded_Qty || 0,
                 'Distance (KM)': job.Est_Distance_KM || 0,
-                'Verification': job.Verification_Status || 'Pending'
+                'Verification': job.Verification_Status || 'Pending',
+                'หมายเหตุ/ปัญหา': buildRemark(job),
+            })
+
+            // Sub-rows for the remaining drops
+            for (let i = 1; i < drops.length; i++) {
+                const sub = blankRow()
+                sub['Plan Date'] = job.Plan_Date || ''
+                sub['Customer'] = job.Customer_Name || ''
+                sub['Destination'] = drops[i]
+                exportData.push(sub)
             }
-        })
+        }
 
         const wb = XLSX.utils.book_new()
-        const ws = XLSX.utils.json_to_sheet(exportData)
+        const ws = XLSX.utils.json_to_sheet(exportData, { header: HEADERS as unknown as string[] })
         XLSX.utils.book_append_sheet(wb, ws, "Mission History")
         XLSX.writeFile(wb, `mission_history_${todayTH()}.xlsx`)
     } catch (error) {
