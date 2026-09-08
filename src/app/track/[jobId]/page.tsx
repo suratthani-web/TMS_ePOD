@@ -144,8 +144,8 @@ export default async function TrackingPage(props: { params: Promise<{ jobId: str
             </div>
         </div>
 
-        {/* Map Container */}
-        {job.lastLocation && (
+        {/* Map Container — hidden when the customer has live tracking turned off */}
+        {job.lastLocation && job.showLiveTracking !== false && (
             <div className="bg-white border border-slate-200 overflow-hidden shadow-sm rounded-3xl group transition-all duration-500">
                 <div className="px-6 py-4 border-b border-slate-200 flex justify-between items-center bg-slate-50/50">
                     <div className="flex items-center gap-2 text-slate-900 font-bold text-sm uppercase tracking-wider">

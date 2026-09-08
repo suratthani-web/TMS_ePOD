@@ -2,6 +2,7 @@
 
 import { createClient, createAdminClient } from "@/utils/supabase/server";
 import { getUserBranchId, getCustomerId } from "@/lib/permissions";
+import { getCustomerShowLiveTracking } from "@/lib/supabase/customers";
 
 export interface PublicJobDetails {
   jobId: string;
@@ -50,6 +51,8 @@ export interface PublicJobDetails {
   sensorVerified?: string;
   sensorMaxElevationDiff?: number;
   sensorTotalStepsUpward?: number;
+  // false = ลูกค้ารายนี้ปิดการแสดงตำแหน่งรถ → หน้า track ต้องซ่อนแผนที่
+  showLiveTracking?: boolean;
 }
 
 type PublicJobRow = {
@@ -294,9 +297,14 @@ export async function getPublicJobDetails(
     }
   }
 
+  // Per-customer toggle: subcontracted-vehicle customers hide the live map.
+  const custId = (job as { Customer_ID?: string | null }).Customer_ID
+  const showLiveTracking = custId ? await getCustomerShowLiveTracking(custId) : true
+
   return {
     ...mapJobToPublicDetails(job),
-    lastLocation
+    lastLocation,
+    showLiveTracking
   };
 }
 
