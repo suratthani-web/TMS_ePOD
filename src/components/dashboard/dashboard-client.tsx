@@ -93,6 +93,8 @@ interface DashboardClientProps {
     initialEnd?: string
     allCustomers?: any[]
     isAdminUser?: boolean
+    // ปิด = ซ่อนแผนที่ตำแหน่งรถ + ปุ่มติดตามสด บนหน้าลูกค้า (ตั้งค่ารายลูกค้า)
+    showLiveTracking?: boolean
 }
 
 export function DashboardClient({ 
@@ -113,8 +115,11 @@ export function DashboardClient({
     initialStart = "",
     initialEnd = "",
     allCustomers = [],
-    isAdminUser = false
+    isAdminUser = false,
+    showLiveTracking = true
 }: DashboardClientProps) {
+    // ลูกค้าที่ถูกปิดการแสดงตำแหน่งรถ → ซ่อนแผนที่ live + ปุ่มติดตามสด (แอดมินเห็นเสมอ)
+    const hideLiveTracking = customerMode && !showLiveTracking
     const { t, language } = useLanguage()
     const router = useRouter()
     const [isRequestDialogOpen, setIsRequestDialogOpen] = useState(false)
@@ -296,7 +301,7 @@ export function DashboardClient({
             {/* Ongoing missions (customer) — active jobs that carry across days.
                 These won't appear in "งานวันนี้" when their Plan_Date isn't today,
                 so surface them here so the customer always sees what's on the road. */}
-            {customerMode && activeJobs && activeJobs.length > 0 && (
+            {customerMode && !hideLiveTracking && activeJobs && activeJobs.length > 0 && (
                 <button
                     onClick={() => router.push('/dashboard/tracking')}
                     className="w-full text-left group relative overflow-hidden rounded-3xl border border-primary/20 bg-primary/5 hover:bg-primary/10 transition-all shadow-sm p-6 flex items-center gap-5"
@@ -337,7 +342,8 @@ export function DashboardClient({
                 animate="show"
                 className="grid grid-cols-1 lg:grid-cols-12 gap-6"
             >
-                {/* 1. Live Map Tracker */}
+                {/* 1. Live Map Tracker — hidden for customers with tracking turned off */}
+                {!hideLiveTracking && (
                 <motion.div variants={item} className="lg:col-span-8 h-[500px] glass-panel rounded-3xl relative group border border-border shadow-sm overflow-hidden transition-all duration-300">
                     <div className="absolute inset-0 z-0">
                         <DashboardMap drivers={fleetStatus} allJobs={heatmapJobs} activeJobs={activeJobs} />
@@ -349,9 +355,10 @@ export function DashboardClient({
                         </div>
                     </div>
                 </motion.div>
- 
-                {/* 2. Operational KPIs (Right) */}
-                <div className="lg:col-span-4 space-y-6 flex flex-col">
+                )}
+
+                {/* 2. Operational KPIs (Right) — spans full width when the map is hidden */}
+                <div className={cn("space-y-6 flex flex-col", hideLiveTracking ? "lg:col-span-12" : "lg:col-span-4")}>
                     {/* Performance Analytics Column */}
                     <motion.div variants={item} className="flex-1 bg-card rounded-3xl p-8 flex flex-col justify-center items-center text-center border border-border shadow-sm hover:border-primary/30 transition-all">
                         <div className="w-20 h-20 rounded-2xl bg-emerald-500/10 flex items-center justify-center mb-6 border border-emerald-500/20 group-hover:scale-105 transition-all duration-500">

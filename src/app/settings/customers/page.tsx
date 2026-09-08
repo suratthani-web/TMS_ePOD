@@ -436,6 +436,31 @@ export default function CustomersSettingsPage() {
                       </div>
                     </div>
 
+                    {/* Show live vehicle tracking on the customer dashboard */}
+                    <div className="p-6 rounded-[2rem] border-2 border-cyan-500/20 bg-cyan-500/5 flex items-center justify-between shadow-lg">
+                      <div className="space-y-1">
+                        <Label className="text-lg font-black uppercase tracking-wide text-cyan-600 dark:text-cyan-400 flex items-center gap-2">
+                          <span className="w-2.5 h-2.5 rounded-full bg-cyan-500 animate-pulse" />
+                          แสดงตำแหน่งรถให้ลูกค้าเห็น (Live Tracking)
+                        </Label>
+                        <p className="text-sm text-muted-foreground font-bold italic leading-none opacity-80">
+                          เปิด = ลูกค้าเห็นแผนที่ตำแหน่งรถสดบนแดชบอร์ด • ปิดสำหรับลูกค้าที่ใช้รถสังกัด/พิกัดค้างที่เดิม จะซ่อนแผนที่และปุ่มติดตามสดให้
+                        </p>
+                      </div>
+                      <div className="flex items-center gap-3">
+                        <span className={cn("text-xs font-black uppercase tracking-wider px-3 py-1 rounded-full border", (formData.Show_Live_Tracking !== false) ? "bg-cyan-500/10 border-cyan-500/30 text-cyan-500" : "bg-slate-500/10 border-slate-500/30 text-slate-400")}>
+                          {(formData.Show_Live_Tracking !== false) ? "แสดง (On)" : "ซ่อน (Off)"}
+                        </span>
+                        <input
+                          type="checkbox"
+                          id="Show_Live_Tracking"
+                          checked={formData.Show_Live_Tracking !== false}
+                          onChange={(e) => updateForm("Show_Live_Tracking", e.target.checked)}
+                          className="w-8 h-8 rounded-lg border-border bg-muted text-cyan-600 focus:ring-cyan-500/40 cursor-pointer accent-cyan-500"
+                        />
+                      </div>
+                    </div>
+
                     {/* Stair Climb Sensor Toggle Feature */}
                     <div className="p-6 rounded-[2rem] border-2 border-primary/20 bg-primary/5 flex items-center justify-between shadow-lg">
                       <div className="space-y-1">

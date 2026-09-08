@@ -21,6 +21,25 @@ export type Customer = {
   Incentive_Sensor_Check?: boolean | null
   Line_Notify_Disabled?: boolean | null
   Require_Scan?: boolean | null
+  // แสดงตำแหน่งรถ (แผนที่ live) บนหน้าแดชบอร์ดลูกค้าไหม — ปิดสำหรับลูกค้าที่ใช้รถสังกัด
+  // ซึ่งพิกัดค้างอยู่ที่เดิม (default = แสดง)
+  Show_Live_Tracking?: boolean | null
+}
+
+// อ่านค่า flag แสดงตำแหน่งรถของลูกค้ารายเดียว (server-to-server). default = true
+export async function getCustomerShowLiveTracking(customerId: string): Promise<boolean> {
+  try {
+    const supabase = createAdminClient()
+    const { data } = await supabase
+      .from('Master_Customers')
+      .select('Show_Live_Tracking')
+      .eq('Customer_ID', customerId)
+      .maybeSingle()
+    // null/undefined → ถือว่าแสดง (ค่าเริ่มต้น)
+    return data?.Show_Live_Tracking !== false
+  } catch {
+    return true
+  }
 }
 
 // Get all customers

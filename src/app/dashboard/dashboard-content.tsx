@@ -1,7 +1,7 @@
 import { DashboardClient } from "@/components/dashboard/dashboard-client"
 import { getExecutiveDashboardUnified, getProfitHeatmapData } from "@/lib/supabase/financial-analytics"
 import { getSOSDriverIds } from "@/lib/supabase/sos"
-import { getCustomerName } from "@/lib/supabase/customers"
+import { getCustomerName, getCustomerShowLiveTracking } from "@/lib/supabase/customers"
 import { getMarketplaceJobs, getTodayJobStats, getLiveActiveJobs } from "@/lib/supabase/jobs"
 import { getDriverStats } from "@/lib/supabase/drivers"
 import { isCustomer, getCustomerId, isAdmin, getUserBranchId } from "@/lib/permissions"
@@ -163,6 +163,13 @@ export async function DashboardContent({ searchParams }: DashboardContentProps) 
     )
   }
 
+  // Per-customer toggle: hide the live vehicle map for customers whose vehicles
+  // are subcontracted (GPS position stays stale). Admins always see it.
+  let showLiveTracking = true
+  if (customerMode && custId) {
+    showLiveTracking = await getCustomerShowLiveTracking(custId).catch(() => true)
+  }
+
   const initialKPI = await getLiveKPIData(currentBranchId).catch(() => undefined)
 
   return (
@@ -191,6 +198,7 @@ export async function DashboardContent({ searchParams }: DashboardContentProps) 
         initialEnd={end}
         allCustomers={allCustomers || []}
         isAdminUser={isAdminUser}
+        showLiveTracking={showLiveTracking}
       />
     </div>
   )
