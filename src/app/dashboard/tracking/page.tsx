@@ -2,8 +2,7 @@ import { getActiveJobs } from "@/lib/actions/tracking-actions"
 import { TrackingHubClient } from "@/components/tracking/tracking-hub-client"
 import { Suspense } from "react"
 import { Loader2 } from "lucide-react"
-import { hasPermission, isCustomer, getCustomerId } from "@/lib/permissions"
-import { getCustomerShowLiveTracking } from "@/lib/supabase/customers"
+import { hasPermission } from "@/lib/permissions"
 import { redirect } from "next/navigation"
 
 export const dynamic = 'force-dynamic'
@@ -13,15 +12,10 @@ export default async function CustomerTrackingPage() {
   if (!canAccess) {
     redirect('/dashboard')
   }
-
-  // Customers with live tracking turned off must not reach the tracking hub
-  // (their vehicle position is stale/misleading). Admins are unaffected.
-  if (await isCustomer()) {
-    const custId = await getCustomerId()
-    if (custId && !(await getCustomerShowLiveTracking(custId))) {
-      redirect('/dashboard')
-    }
-  }
+  // NOTE: customers with live tracking turned off are NOT blocked here — the hub
+  // still shows their job list/statuses/POD; only the live map is hidden inside
+  // TrackingHubClient (per-job showLiveTracking flag). Redirecting made the menu
+  // look dead ("กดแล้วเงียบ").
 
   const activeJobs = await getActiveJobs(true) // Customer mode true
 

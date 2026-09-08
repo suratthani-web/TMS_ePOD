@@ -328,8 +328,10 @@ export function TrackingHubClient({ initialActiveJobs, customerMode = false }: T
 
                 {/* Map and status */}
                 <div className="p-8 lg:p-10 space-y-10">
+                    {/* Live map hidden for customers whose live tracking is turned off */}
+                    {selectedJob.showLiveTracking !== false && (
                     <div className="aspect-[21/9] rounded-[2rem] border border-border/40 overflow-hidden shadow-lg relative min-h-[350px]">
-                        <TrackingMap 
+                        <TrackingMap
                             lastLocation={selectedJob.lastLocation}
                             driverName={selectedJob.driverName}
                             status={selectedJob.status}
@@ -338,6 +340,7 @@ export function TrackingHubClient({ initialActiveJobs, customerMode = false }: T
                             vehiclePlate={selectedJob.vehiclePlate}
                         />
                     </div>
+                    )}
 
                     <div className="grid grid-cols-2 md:grid-cols-5 gap-4 relative py-6">
                         <div className="absolute top-1/2 left-10 right-10 h-0.5 bg-muted -translate-y-1/2 z-0 hidden md:block" />
