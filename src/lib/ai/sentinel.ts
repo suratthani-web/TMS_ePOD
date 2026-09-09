@@ -218,19 +218,25 @@ export async function checkComplianceAndMaintenance(): Promise<SentinelAlert[]> 
       })
     }
 
-    // Service Interval Mileage Check
+    // Service Interval Mileage Check — push-worthy so admins get a notification
+    // (not just a dashboard card). 'high' = at/over the target (overdue), 'medium'
+    // when still approaching within 500 km; both are pushed via the high-severity
+    // path below because reaching a service interval is actionable.
     const curMil = Number(v.Current_Mileage) || 0
     const nextSvc = Number(v.Next_Service_Mileage) || 0
     if (nextSvc > 0 && curMil >= nextSvc - 500) {
+      const reached = curMil >= nextSvc
       alerts.push({
         category: 'compliance',
-        severity: 'medium',
-        title: `🔧 ถึงรอบเปลี่ยนถ่ายน้ำมันเครื่อง/เช็กระยะ (${plate})`,
-        message: `รถทะเบียน ${plate} ไมล์ปัจจุบัน ${curMil.toLocaleString()} กม. ใกล้/ถึงรอบเช็กระยะที่ ${nextSvc.toLocaleString()} กม.`,
+        severity: 'high',
+        title: reached
+          ? `🔧 ถึงรอบเช็กระยะแล้ว (${plate})`
+          : `🔧 ใกล้ถึงรอบเช็กระยะ (${plate})`,
+        message: `รถทะเบียน ${plate} ไมล์ปัจจุบัน ${curMil.toLocaleString()} กม. ${reached ? 'ถึง/เลย' : 'ใกล้ถึง'}รอบเช็กระยะที่ ${nextSvc.toLocaleString()} กม. (เหลือ ${Math.max(0, nextSvc - curMil).toLocaleString()} กม.)`,
         targetId: plate,
         branchId: v.Branch_ID,
         actionUrl: '/maintenance',
-        details: { plate, currentMileage: curMil, targetMileage: nextSvc }
+        details: { plate, currentMileage: curMil, targetMileage: nextSvc, reached }
       })
     }
   }
