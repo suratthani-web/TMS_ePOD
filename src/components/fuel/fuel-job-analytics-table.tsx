@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useMemo } from "react"
 import { 
   Briefcase, 
   Calendar, 
@@ -111,9 +111,76 @@ export function FuelJobAnalyticsTable({ data }: { data: FuelIntelligenceSummary 
     j.routeName.toLowerCase().includes(search.toLowerCase())
   )
 
-  const filteredDaily = data.dailyAggregations.filter(d => d.date.includes(search))
-  const filteredWeekly = data.weeklyAggregations.filter(w => w.week.includes(search))
-  const filteredMonthly = data.monthlyAggregations.filter(m => m.month.includes(search))
+  // Period tables are fleet-wide (keyed by date), so a plate/customer search used
+  // to wipe them out (it was matched against the date string). Now: no search →
+  // full server aggregations; a date-like search → server rows whose period
+  // contains it; otherwise (plate/job/customer/driver) → re-aggregate the
+  // already-filtered jobs so the period tables reflect that search too.
+  const weekKeyOf = (isoDate: string): string => {
+    const d = new Date(isoDate)
+    const startOfYear = new Date(d.getFullYear(), 0, 1)
+    const pastDays = (d.getTime() - startOfYear.getTime()) / 86400000
+    const weekNum = Math.ceil((pastDays + startOfYear.getDay() + 1) / 7)
+    return `${d.getFullYear()}-W${weekNum.toString().padStart(2, '0')}`
+  }
+
+  type DailyRow = typeof data.dailyAggregations[number]
+  type WeeklyRow = typeof data.weeklyAggregations[number]
+  type MonthlyRow = typeof data.monthlyAggregations[number]
+  const round = (n: number) => +n.toFixed(2)
+
+  const derived = useMemo(() => {
+    const dayMap = new Map<string, DailyRow>()
+    for (const j of filteredJobs) {
+      const date = String(j.planDate || '').slice(0, 10)
+      if (!date) continue
+      const c: DailyRow = dayMap.get(date) || { date, totalJobs: 0, totalDistanceKm: 0, totalRefueledLiters: 0, totalConsumedLiters: 0, totalFuelCost: 0, avgKmPerLiter: 0, avgCostPerKm: 0, totalRevenue: 0, totalProfit: 0, vehiclesCount: 0 }
+      c.totalJobs += 1
+      c.totalDistanceKm += j.distanceKm
+      c.totalConsumedLiters += j.allocatedLiters
+      c.totalFuelCost += j.allocatedFuelCost
+      c.totalRevenue += j.revenue
+      c.totalProfit += j.netProfit
+      dayMap.set(date, c)
+    }
+    const daily: DailyRow[] = Array.from(dayMap.values()).map(d => ({
+      ...d,
+      totalDistanceKm: round(d.totalDistanceKm),
+      totalConsumedLiters: round(d.totalConsumedLiters),
+      totalFuelCost: round(d.totalFuelCost),
+      totalRevenue: round(d.totalRevenue),
+      totalProfit: round(d.totalProfit),
+      avgKmPerLiter: d.totalConsumedLiters > 0 ? round(d.totalDistanceKm / d.totalConsumedLiters) : 0,
+      avgCostPerKm: d.totalDistanceKm > 0 ? round(d.totalFuelCost / d.totalDistanceKm) : 0,
+    })).sort((a, b) => b.date.localeCompare(a.date))
+
+    const weeklyMap = new Map<string, WeeklyRow>()
+    const monthlyMap = new Map<string, MonthlyRow>()
+    for (const d of daily) {
+      const wk = weekKeyOf(d.date)
+      const w: WeeklyRow = weeklyMap.get(wk) || { week: wk, totalJobs: 0, totalDistanceKm: 0, totalFuelCost: 0, totalLiters: 0, avgKmPerLiter: 0, totalRevenue: 0, totalProfit: 0 }
+      w.totalJobs += d.totalJobs; w.totalDistanceKm += d.totalDistanceKm; w.totalFuelCost += d.totalFuelCost; w.totalLiters += d.totalConsumedLiters; w.totalRevenue += d.totalRevenue; w.totalProfit += d.totalProfit
+      weeklyMap.set(wk, w)
+
+      const mk = d.date.slice(0, 7)
+      const m: MonthlyRow = monthlyMap.get(mk) || { month: mk, totalJobs: 0, totalDistanceKm: 0, totalFuelCost: 0, totalLiters: 0, avgKmPerLiter: 0, totalRevenue: 0, totalProfit: 0 }
+      m.totalJobs += d.totalJobs; m.totalDistanceKm += d.totalDistanceKm; m.totalFuelCost += d.totalFuelCost; m.totalLiters += d.totalConsumedLiters; m.totalRevenue += d.totalRevenue; m.totalProfit += d.totalProfit
+      monthlyMap.set(mk, m)
+    }
+    const finishWeek = (w: WeeklyRow): WeeklyRow => ({ ...w, totalDistanceKm: round(w.totalDistanceKm), totalFuelCost: round(w.totalFuelCost), totalLiters: round(w.totalLiters), totalRevenue: round(w.totalRevenue), totalProfit: round(w.totalProfit), avgKmPerLiter: w.totalLiters > 0 ? round(w.totalDistanceKm / w.totalLiters) : 0 })
+    const finishMonth = (m: MonthlyRow): MonthlyRow => ({ ...m, totalDistanceKm: round(m.totalDistanceKm), totalFuelCost: round(m.totalFuelCost), totalLiters: round(m.totalLiters), totalRevenue: round(m.totalRevenue), totalProfit: round(m.totalProfit), avgKmPerLiter: m.totalLiters > 0 ? round(m.totalDistanceKm / m.totalLiters) : 0 })
+    return {
+      daily,
+      weekly: Array.from(weeklyMap.values()).map(finishWeek).sort((a, b) => b.week.localeCompare(a.week)),
+      monthly: Array.from(monthlyMap.values()).map(finishMonth).sort((a, b) => b.month.localeCompare(a.month)),
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [filteredJobs])
+
+  const q = search.trim()
+  const filteredDaily = !q ? data.dailyAggregations : ((): DailyRow[] => { const byDate = data.dailyAggregations.filter(d => d.date.includes(q)); return byDate.length > 0 ? byDate : derived.daily })()
+  const filteredWeekly = !q ? data.weeklyAggregations : ((): WeeklyRow[] => { const byP = data.weeklyAggregations.filter(w => w.week.includes(q)); return byP.length > 0 ? byP : derived.weekly })()
+  const filteredMonthly = !q ? data.monthlyAggregations : ((): MonthlyRow[] => { const byP = data.monthlyAggregations.filter(m => m.month.includes(q)); return byP.length > 0 ? byP : derived.monthly })()
 
   return (
     <div className="space-y-6">
