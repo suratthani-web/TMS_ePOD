@@ -956,7 +956,8 @@ export async function createBulkJobs(
   // Strip container-only fields before saving to Jobs_Main to prevent DB schema errors
   const containerFields = [
     'container_no', 'seal_no', 'container_size', 'shipping_line', 
-    'vessel_voyage', 'lfd_demurrage', 'lfd_detention', 'target_temperature'
+    'vessel_voyage', 'lfd_demurrage', 'lfd_detention', 'target_temperature',
+    'booking_no', 'container_subtype', 'pickup_empty_date', 'port_closing_datetime'
   ]
   const jobsMainData = finalizedData.map(j => {
       const cleanJob = { ...j }

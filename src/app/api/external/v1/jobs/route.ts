@@ -47,7 +47,10 @@ export async function POST(req: NextRequest) {
             cargo_type,
             items_list,
             parcel_barcode,
-            box_count
+            box_count,
+            vehicle_plate, // optional: pre-assigned company vehicle (checker picked it)
+            driver_name,   // optional: assigned driver name
+            stops          // optional: multi-drop destinations [{stop_number,recipient_name,phone,address,notes}]
         } = body
 
         // Validation
