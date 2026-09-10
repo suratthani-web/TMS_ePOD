@@ -284,6 +284,103 @@ export function HistoryClient({
     return () => clearTimeout(timer)
   }, [fromInput, toInput, router, pathname])
 
+  function getJobStatusBadgeInfo(job: Job): { label: string; color: string } {
+    const status = job.Job_Status || 'New'
+
+    // Extract destinations
+    let destinations: Array<{ name?: string; stop_type?: string }> = []
+    try {
+      const raw = (job as Record<string, unknown>).original_destinations_json
+      const parsed = typeof raw === 'string' ? JSON.parse(raw) : raw
+      if (Array.isArray(parsed)) destinations = parsed
+    } catch {}
+
+    const completedDrops = job.Signature_Url ? job.Signature_Url.split(',').filter(Boolean).length : 0
+    const totalDrops = destinations.length > 0 ? destinations.length : 1
+    const currentDropIndex = Math.min(completedDrops + 1, totalDrops)
+    const currentDestIndex = Math.min(completedDrops, totalDrops - 1)
+    const currentStopType = destinations[currentDestIndex]?.stop_type
+
+    if (status === 'Arrived Dropoff') {
+      if (currentStopType === 'load') {
+        return {
+          label: totalDrops > 1 ? `ถึงจุดโหลดสินค้า (${currentDropIndex}/${totalDrops})` : 'ถึงจุดโหลดสินค้า',
+          color: 'text-amber-500 bg-amber-500/10 border-amber-500/30'
+        }
+      }
+      if (currentStopType === 'return') {
+        return {
+          label: totalDrops > 1 ? `ถึงจุดคืนตู้ (${currentDropIndex}/${totalDrops})` : 'ถึงจุดคืนตู้',
+          color: 'text-blue-500 bg-blue-500/10 border-blue-500/30'
+        }
+      }
+      return {
+        label: totalDrops > 1 ? `ถึงจุดส่ง (${currentDropIndex}/${totalDrops})` : 'ถึงจุดส่งสินค้า',
+        color: 'text-indigo-500 bg-indigo-500/10 border-indigo-500/30'
+      }
+    }
+
+    if (status === 'Arrived Pickup') {
+      return {
+        label: job.job_type === 'container' ? 'ถึงลานตู้' : 'ถึงจุดรับสินค้า',
+        color: 'text-cyan-500 bg-cyan-500/10 border-cyan-500/30'
+      }
+    }
+
+    if (status === 'Picked Up') {
+      return {
+        label: job.job_type === 'container' ? 'รับตู้แล้ว' : 'รับสินค้าแล้ว',
+        color: 'text-accent bg-accent/20 border-accent/30'
+      }
+    }
+
+    if (status === 'In Transit' || status === 'In Progress') {
+      if (currentStopType === 'load') {
+        return {
+          label: totalDrops > 1 ? `กำลังไปจุดโหลด (${currentDropIndex}/${totalDrops})` : 'กำลังไปจุดโหลด',
+          color: 'text-amber-500 bg-amber-500/10 border-amber-500/30'
+        }
+      }
+      if (currentStopType === 'return') {
+        return {
+          label: totalDrops > 1 ? `กำลังไปจุดคืนตู้ (${currentDropIndex}/${totalDrops})` : 'กำลังไปจุดคืนตู้',
+          color: 'text-blue-500 bg-blue-500/10 border-blue-500/30'
+        }
+      }
+      return {
+        label: totalDrops > 1 ? `กำลังจัดส่ง (${currentDropIndex}/${totalDrops})` : 'กำลังจัดส่ง',
+        color: 'text-accent bg-accent/20 border-accent/30'
+      }
+    }
+
+    if (status === 'Accepted') {
+      return { label: 'คนขับรับงาน', color: 'text-blue-500 bg-blue-500/10 border-blue-500/20' }
+    }
+    if (status === 'Assigned') {
+      return { label: 'จัดรถแล้ว', color: 'text-primary bg-primary/20 border-primary/30' }
+    }
+    if (status === 'New') {
+      return { label: 'รอเริ่มงาน', color: 'text-primary bg-primary/10 border-primary/20' }
+    }
+    if (['Delivered', 'Completed', 'Complete'].includes(status)) {
+      return { label: 'ส่งสำเร็จ', color: 'text-emerald-500 bg-emerald-500/10 border-emerald-500/20' }
+    }
+    if (status === 'Verified') {
+      return { label: 'ตรวจผ่านแล้ว', color: 'text-primary bg-primary/20 border-primary/30' }
+    }
+    if (status === 'Rejected') {
+      return { label: 'ปฏิเสธ/แก้ไข', color: 'text-rose-500 bg-rose-500/10 border-rose-500/20' }
+    }
+    if (status === 'SOS') {
+      return { label: 'ฉุกเฉิน (SOS)', color: 'text-rose-600 bg-rose-500/20 border-rose-500/40' }
+    }
+    if (['Cancelled', 'Failed'].includes(status)) {
+      return { label: 'ยกเลิก', color: 'text-muted-foreground bg-muted/50 border-border/10' }
+    }
+
+    return { label: status, color: 'bg-muted/50 text-muted-foreground border-border/10' }
+  }
+
   const statusConfig: Record<string, { label: string; color: string; icon: React.ReactNode }> = {
     New: { label: t('common.pending'), color: "text-primary bg-primary/10 border-primary/20", icon: <Package size={14} /> },
     Assigned: { label: t('common.pending'), color: "text-primary bg-primary/20 border-primary/30", icon: <Truck size={14} /> },
@@ -642,13 +739,18 @@ export function HistoryClient({
 
                             {/* Section 7: Job Status Badge */}
                             <div className="flex justify-center shrink-0">
-                                <span className={cn(
-                                    "inline-flex items-center gap-1.5 px-3 py-1 rounded-xl text-[9px] font-black uppercase tracking-widest border shadow-lg transition-all duration-500 group-hover/row:scale-105",
-                                    statusConfig[job.Job_Status || '']?.color || 'bg-muted/50 text-muted-foreground border-border/10'
-                                )}>
-                                    <span className="w-1 h-1 rounded-full bg-current animate-pulse" />
-                                    {statusConfig[job.Job_Status || '']?.label || job.Job_Status}
-                                </span>
+                                {(() => {
+                                    const badge = getJobStatusBadgeInfo(job)
+                                    return (
+                                        <span className={cn(
+                                            "inline-flex items-center gap-1.5 px-3 py-1 rounded-xl text-[9px] font-black uppercase tracking-widest border shadow-lg transition-all duration-500 group-hover/row:scale-105",
+                                            badge.color
+                                        )}>
+                                            <span className="w-1 h-1 rounded-full bg-current animate-pulse" />
+                                            {badge.label}
+                                        </span>
+                                    )
+                                })()}
                             </div>
 
                             {/* Section 8: Actions */}

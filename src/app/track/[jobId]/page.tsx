@@ -63,14 +63,42 @@ export default async function TrackingPage(props: { params: Promise<{ jobId: str
 
   const getCurrentStepIndex = () => {
     const status = job.status
-    if (['Delivered', 'Completed', 'Complete'].includes(status)) return 4
-    if (status === 'In Transit') return 3
-    if (status === 'Picked Up') return 2
-    if (status === 'Assigned') return 1
+    if (['Delivered', 'Completed', 'Complete', 'Verified'].includes(status)) return 4
+    if (['In Transit', 'Arrived Dropoff', 'In Progress'].includes(status)) return 3
+    if (['Picked Up', 'Arrived Pickup'].includes(status)) return 2
+    if (['Assigned', 'Confirmed', 'Accepted'].includes(status)) return 1
     return 0
   }
 
+  const getStatusBadgeInfo = () => {
+    const status = job.status
+    if (['Delivered', 'Completed', 'Complete', 'Verified'].includes(status)) {
+      return { label: 'ส่งงานสำเร็จ (COMPLETED)', cls: 'bg-emerald-50 text-emerald-600 border-emerald-200' }
+    }
+    if (status === 'Arrived Dropoff') {
+      const isLoad = job.originalDestinations?.[0]?.stop_type === 'load'
+      return { 
+        label: job.container ? (isLoad ? 'ถึงจุดโหลดสินค้า' : 'ถึงจุดคืนตู้/ส่งสินค้า') : 'ถึงจุดส่งสินค้า (ARRIVED DROP)', 
+        cls: 'bg-indigo-50 text-indigo-600 border-indigo-200' 
+      }
+    }
+    if (status === 'In Transit') {
+      return { label: 'กำลังจัดส่ง (IN TRANSIT)', cls: 'bg-amber-50 text-amber-600 border-amber-200' }
+    }
+    if (status === 'Arrived Pickup') {
+      return { label: job.container ? 'ถึงลานตู้ (ARRIVED PICKUP)' : 'ถึงจุดรับสินค้า (ARRIVED PICKUP)', cls: 'bg-cyan-50 text-cyan-600 border-cyan-200' }
+    }
+    if (status === 'Picked Up') {
+      return { label: job.container ? 'รับตู้แล้ว (PICKED UP)' : 'รับสินค้าแล้ว (PICKED UP)', cls: 'bg-blue-50 text-blue-600 border-blue-200' }
+    }
+    if (['Assigned', 'Confirmed', 'Accepted'].includes(status)) {
+      return { label: 'จัดรถแล้ว (ASSIGNED)', cls: 'bg-purple-50 text-purple-600 border-purple-200' }
+    }
+    return { label: status.toUpperCase(), cls: 'bg-indigo-50 text-indigo-600 border-indigo-200' }
+  }
+
   const currentStepIndex = getCurrentStepIndex()
+  const statusBadge = getStatusBadgeInfo()
 
   return (
     <div className="max-w-4xl mx-auto space-y-6 pb-20 px-2 sm:px-4 md:px-6">
@@ -89,11 +117,9 @@ export default async function TrackingPage(props: { params: Promise<{ jobId: str
                     </div>
                     <Badge className={cn(
                         "px-6 py-2 rounded-xl text-base font-bold uppercase tracking-wide border shadow-sm transition-all duration-700",
-                        currentStepIndex === 4 
-                        ? 'bg-emerald-50 text-emerald-600 border-emerald-200' 
-                        : 'bg-indigo-50 text-indigo-600 border-indigo-200'
+                        statusBadge.cls
                     )}>
-                        {job.status.toUpperCase()}
+                        {statusBadge.label}
                     </Badge>
                 </div>
 
@@ -204,38 +230,160 @@ export default async function TrackingPage(props: { params: Promise<{ jobId: str
                 </div>
             </section>
 
+            {/* Container Information Card */}
+            {job.container && (
+                <section className="bg-white border border-slate-200 rounded-3xl p-6 sm:p-8 shadow-sm space-y-6">
+                    <div className="flex items-center justify-between">
+                        <h3 className="text-lg font-bold text-slate-900 border-l-4 border-indigo-600 pl-4 uppercase tracking-tight">ข้อมูลตู้สินค้า (Container)</h3>
+                        {job.container.containerSubtype && (
+                            <Badge className="bg-indigo-50 text-indigo-700 border-indigo-200 font-bold uppercase text-xs">
+                                {job.container.containerSubtype === 'export' ? 'ตู้ส่งออก (Export)' : 'ตู้นำเข้า (Import)'}
+                            </Badge>
+                        )}
+                    </div>
+                    
+                    <div className="grid grid-cols-2 gap-4">
+                        <div className="bg-slate-50 p-4 rounded-2xl border border-slate-100">
+                            <p className="text-[10px] font-bold uppercase text-slate-400 mb-1 tracking-wider">หมายเลขตู้ (Container No.)</p>
+                            <p className="text-base font-black text-slate-900 font-mono">{job.container.containerNo || '-'}</p>
+                        </div>
+                        <div className="bg-slate-50 p-4 rounded-2xl border border-slate-100">
+                            <p className="text-[10px] font-bold uppercase text-slate-400 mb-1 tracking-wider">เบอร์ซีล (Seal No.)</p>
+                            <p className="text-base font-black text-indigo-600 font-mono">{job.container.sealNo || '-'}</p>
+                        </div>
+                        <div className="bg-slate-50 p-4 rounded-2xl border border-slate-100">
+                            <p className="text-[10px] font-bold uppercase text-slate-400 mb-1 tracking-wider">ขนาดตู้</p>
+                            <p className="text-sm font-bold text-slate-800">{job.container.containerSize || '-'}</p>
+                        </div>
+                        <div className="bg-slate-50 p-4 rounded-2xl border border-slate-100">
+                            <p className="text-[10px] font-bold uppercase text-slate-400 mb-1 tracking-wider">สายเรือ (Shipping Line)</p>
+                            <p className="text-sm font-bold text-slate-800">{job.container.shippingLine || '-'}</p>
+                        </div>
+                    </div>
+
+                    {job.container.vesselVoyage && (
+                        <div className="p-4 bg-slate-50/70 rounded-2xl border border-slate-100 flex items-center justify-between">
+                            <p className="text-xs font-bold text-slate-500">เรือ / เที่ยว (Vessel / Voyage)</p>
+                            <p className="text-sm font-black text-slate-900">{job.container.vesselVoyage}</p>
+                        </div>
+                    )}
+
+                    {job.container.portClosingDatetime && (
+                        <div className="p-4 bg-rose-50/50 rounded-2xl border border-rose-100 flex items-center justify-between">
+                            <p className="text-xs font-bold text-rose-600">Port Closing</p>
+                            <p className="text-sm font-black text-rose-700">
+                                {new Date(job.container.portClosingDatetime).toLocaleString('th-TH', { 
+                                    day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' 
+                                })} น.
+                            </p>
+                        </div>
+                    )}
+                </section>
+            )}
+
             {/* Photos & Evidence */}
-            {(job.pickupPhotos.length > 0 || job.podPhotos.length > 0 || job.signature || job.pickupSignature) && (
-                <section className="bg-white border border-slate-200 rounded-3xl p-6 sm:p-8 shadow-sm space-y-8">
+            {(job.pickupPhotos.length > 0 || job.podPhotos.length > 0 || job.signature || job.pickupSignature || job.container) && (
+                <section className={cn("bg-white border border-slate-200 rounded-3xl p-6 sm:p-8 shadow-sm space-y-8", job.container ? "md:col-span-2" : "")}>
                     <h3 className="text-lg font-bold text-slate-900 border-l-4 border-emerald-500 pl-4 uppercase tracking-tight">หลักฐานการขนส่ง</h3>
 
                     <div className="space-y-8">
                         {/* Pickup Evidence Section */}
-                        {(job.pickupPhotos.length > 0 || job.pickupSignature) && (
+                        {(job.pickupPhotos.length > 0 || job.pickupSignature || job.container?.conditionPhotos || job.container?.eirGateOutUrl) && (
                             <div className="space-y-6 pb-6 border-b border-slate-100">
                                 <div className="flex items-center gap-2">
                                     <div className="w-2 h-2 rounded-full bg-indigo-500" />
-                                    <p className="text-xs font-black text-slate-500 uppercase tracking-[0.2em]">หลักฐานการรับสินค้า (Pickup)</p>
+                                    <p className="text-xs font-black text-slate-500 uppercase tracking-[0.2em]">
+                                        {job.container ? "หลักฐานการรับตู้ & สภาพตู้ (Pickup / EIR)" : "หลักฐานการรับสินค้า (Pickup)"}
+                                    </p>
                                 </div>
-                                
-                                {job.pickupPhotos.length > 0 && (
-                                    <div className="grid grid-cols-2 gap-3">
-                                        {job.pickupPhotos.map((url, i) => (
-                                            <a 
-                                                key={i} 
-                                                href={url} 
-                                                target="_blank" 
-                                                rel="noreferrer" 
-                                                className="aspect-video relative rounded-xl overflow-hidden border border-slate-100 bg-slate-50 shadow-inner group cursor-pointer block"
-                                            >
-                                                <Image src={url} alt={`Pickup ${i + 1}`} fill sizes="(max-width: 768px) 50vw, 300px" className="object-cover transition-transform group-hover:scale-105" />
-                                                <div className="absolute inset-0 bg-black/20 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                                                    <ExternalLink size={20} className="text-white" />
-                                                </div>
-                                            </a>
-                                        ))}
+
+                                {/* Container Inspection Photos (5-7 points) */}
+                                {job.container?.conditionPhotos && Object.keys(job.container.conditionPhotos).length > 0 && (
+                                    <div className="space-y-3">
+                                        <p className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">
+                                            🔍 รูปถ่ายสภาพตู้สินค้า ({Object.keys(job.container.conditionPhotos).length} รูป)
+                                        </p>
+                                        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-3">
+                                            {Object.entries(job.container.conditionPhotos).map(([pointKey, url]) => {
+                                                const labels: Record<string, string> = {
+                                                    front: 'ด้านหน้า',
+                                                    back: 'ด้านหลัง',
+                                                    left: 'ด้านซ้าย',
+                                                    right: 'ด้านขวา',
+                                                    seal: 'ซีลตู้ / ล็อค',
+                                                    roof: 'หลังคาตู้',
+                                                    floor: 'พื้นตู้ด้านใน',
+                                                }
+                                                const pointLabel = labels[pointKey] || pointKey
+                                                return (
+                                                    <div key={pointKey} className="space-y-1">
+                                                        <a 
+                                                            href={url} 
+                                                            target="_blank" 
+                                                            rel="noreferrer" 
+                                                            className="aspect-video relative rounded-xl overflow-hidden border border-slate-200 bg-slate-50 shadow-inner group cursor-pointer block"
+                                                        >
+                                                            <Image src={url} alt={pointLabel} fill sizes="(max-width: 768px) 50vw, 200px" className="object-cover transition-transform group-hover:scale-105" />
+                                                            <div className="absolute inset-0 bg-black/20 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                                                                <ExternalLink size={18} className="text-white" />
+                                                            </div>
+                                                            <span className="absolute bottom-1.5 left-1.5 px-2 py-0.5 bg-black/70 backdrop-blur-sm text-white text-[10px] font-bold rounded-md">
+                                                                {pointLabel}
+                                                            </span>
+                                                        </a>
+                                                    </div>
+                                                )
+                                            })}
+                                        </div>
                                     </div>
                                 )}
+
+                                {/* EIR Gate-out Photo */}
+                                {job.container?.eirGateOutUrl && (
+                                    <div className="space-y-2">
+                                        <p className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">📄 ใบรับตู้ (EIR Gate-Out)</p>
+                                        <a 
+                                            href={job.container.eirGateOutUrl} 
+                                            target="_blank" 
+                                            rel="noreferrer" 
+                                            className="aspect-video max-w-xs relative rounded-xl overflow-hidden border border-slate-200 bg-slate-50 shadow-inner group cursor-pointer block"
+                                        >
+                                            <Image src={job.container.eirGateOutUrl} alt="EIR Gate Out" fill sizes="(max-width: 768px) 100vw, 320px" className="object-cover transition-transform group-hover:scale-105" />
+                                            <div className="absolute inset-0 bg-black/20 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                                                <ExternalLink size={20} className="text-white" />
+                                            </div>
+                                        </a>
+                                    </div>
+                                )}
+                                
+                                {/* Other General Pickup Photos (excluding condition/eir already displayed above) */}
+                                {(() => {
+                                    const displayedSet = new Set(Object.values(job.container?.conditionPhotos || {}));
+                                    if (job.container?.eirGateOutUrl) displayedSet.add(job.container.eirGateOutUrl);
+                                    const remaining = job.pickupPhotos.filter(u => !displayedSet.has(u));
+                                    if (remaining.length === 0) return null;
+                                    return (
+                                        <div className="space-y-2">
+                                            {job.container && <p className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">รูปถ่ายการรับสินค้าอื่นๆ</p>}
+                                            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                                                {remaining.map((url, i) => (
+                                                    <a 
+                                                        key={i} 
+                                                        href={url} 
+                                                        target="_blank" 
+                                                        rel="noreferrer" 
+                                                        className="aspect-video relative rounded-xl overflow-hidden border border-slate-100 bg-slate-50 shadow-inner group cursor-pointer block"
+                                                    >
+                                                        <Image src={url} alt={`Pickup ${i + 1}`} fill sizes="(max-width: 768px) 50vw, 300px" className="object-cover transition-transform group-hover:scale-105" />
+                                                        <div className="absolute inset-0 bg-black/20 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                                                            <ExternalLink size={20} className="text-white" />
+                                                        </div>
+                                                    </a>
+                                                ))}
+                                            </div>
+                                        </div>
+                                    )
+                                })()}
 
                                 {job.pickupSignature && (
                                     <div className="space-y-3">
@@ -328,6 +476,22 @@ export default async function TrackingPage(props: { params: Promise<{ jobId: str
                                                         </div>
                                                     </a>
                                                 ))}
+                                            </div>
+                                        )}
+                                        {job.container?.eirGateInUrl && (
+                                            <div className="space-y-2">
+                                                <p className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">📄 ใบคืนตู้ (EIR Gate-In)</p>
+                                                <a 
+                                                    href={job.container.eirGateInUrl} 
+                                                    target="_blank" 
+                                                    rel="noreferrer" 
+                                                    className="aspect-video max-w-xs relative rounded-xl overflow-hidden border border-slate-200 bg-slate-50 shadow-inner group cursor-pointer block"
+                                                >
+                                                    <Image src={job.container.eirGateInUrl} alt="EIR Gate In" fill sizes="(max-width: 768px) 100vw, 320px" className="object-cover transition-transform group-hover:scale-105" />
+                                                    <div className="absolute inset-0 bg-black/20 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                                                        <ExternalLink size={20} className="text-white" />
+                                                    </div>
+                                                </a>
                                             </div>
                                         )}
                                     </>

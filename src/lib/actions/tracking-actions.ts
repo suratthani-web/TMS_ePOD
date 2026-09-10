@@ -53,6 +53,29 @@ export interface PublicJobDetails {
   sensorTotalStepsUpward?: number;
   // false = ลูกค้ารายนี้ปิดการแสดงตำแหน่งรถ → หน้า track ต้องซ่อนแผนที่
   showLiveTracking?: boolean;
+  jobType?: string | null;
+  originalDestinations?: Array<{
+    name?: string;
+    lat?: string | number;
+    lng?: string | number;
+    so_no?: string;
+    stop_type?: string;
+    [key: string]: unknown;
+  }>;
+  container?: {
+    containerNo?: string | null;
+    sealNo?: string | null;
+    containerSize?: string | null;
+    shippingLine?: string | null;
+    vesselVoyage?: string | null;
+    eirGateInUrl?: string | null;
+    eirGateOutUrl?: string | null;
+    conditionPhotos?: Record<string, string> | null;
+    bookingNo?: string | null;
+    containerSubtype?: string | null;
+    pickupEmptyDate?: string | null;
+    portClosingDatetime?: string | null;
+  } | null;
 }
 
 type PublicJobRow = {
@@ -108,6 +131,9 @@ type PublicJobRow = {
   Sensor_Max_Elevation_Diff?: number
   Sensor_TotalStepsUpward?: number
   Sensor_Total_Steps_Upward?: number
+  job_type?: string | null
+  original_destinations_json?: unknown
+  container?: unknown
 }
 
 export async function submitJobFeedback(
@@ -154,19 +180,23 @@ export async function getActiveJobs(
   const today = new Intl.DateTimeFormat('sv-SE', { timeZone: 'Asia/Bangkok' }).format(now);
   
   // Define active statuses for the Radar
-  const activeStatuses = ["Assigned", "Picked Up", "In Transit", "Arrived", "SOS", "En Route", "En-Route", "In Progress", "Pending", "Completed", "Delivered", "New"];
+  const activeStatuses = [
+    "New", "Pending", "Draft", "Assigned", "Confirmed", "Accepted",
+    "Arrived Pickup", "Picked Up", "In Transit", "Arrived Dropoff",
+    "Arrived", "In Progress", "En Route", "En-Route", "SOS", "Completed", "Delivered"
+  ];
 
   let dbQuery = supabase
     .from("Jobs_Main")
-    .select("*")
+    .select("*, container:jobs_container(*)")
     .in("Job_Status", activeStatuses)
-    .eq("Plan_Date", today); 
+    .or(`Plan_Date.eq.${today},Job_Status.in.("In Transit","Arrived Dropoff","Arrived Pickup","Picked Up","In Progress","SOS")`); 
 
   // Apply Branch Filtering for Admin (Non-Customer Mode)
   if (!customerMode) {
     const branchId = await getUserBranchId();
     if (branchId && branchId !== 'All') {
-      dbQuery = dbQuery.eq("Branch_ID", branchId);
+      dbQuery = dbQuery.or(`Branch_ID.eq.${branchId},Branch_ID.eq.All,Branch_ID.is.null`);
     }
   }
 
@@ -199,7 +229,7 @@ export async function getPublicJobDetails(
   // 1. Try exact match on the full unsplit jobId first to support manually entered keys containing commas
   const { data: exactJobs, error: exactError } = await supabase
     .from("Jobs_Main")
-    .select("*")
+    .select("*, container:jobs_container(*)")
     .eq("Job_ID", decodedJobId)
     .order('Created_At', { ascending: false });
 
@@ -212,7 +242,7 @@ export async function getPublicJobDetails(
 
     const { data: splitJobs, error: splitError } = await supabase
       .from("Jobs_Main")
-      .select("*")
+      .select("*, container:jobs_container(*)")
       .in("Job_ID", tokens)
       .order('Created_At', { ascending: false });
 
@@ -230,14 +260,14 @@ export async function getPublicJobDetails(
         
         const textQuery = supabase
           .from("Jobs_Main")
-          .select("*")
+          .select("*, container:jobs_container(*)")
           .or(textConditions.join(','))
           .order('Created_At', { ascending: false });
 
         const jsonQueries = tokens.map(token => 
           supabase
             .from("Jobs_Main")
-            .select("*")
+            .select("*, container:jobs_container(*)")
             .contains("original_destinations_json", [{ so_no: token }])
             .order('Created_At', { ascending: false })
         );
@@ -309,6 +339,54 @@ export async function getPublicJobDetails(
 }
 
 function mapJobToPublicDetails(job: PublicJobRow): PublicJobDetails {
+    const rawContainer = Array.isArray(job.container)
+      ? (job.container[0] as Record<string, unknown> | null | undefined)
+      : (job.container as Record<string, unknown> | null | undefined);
+
+    let conditionPhotos: Record<string, string> = {};
+    if (rawContainer?.container_condition_json) {
+      if (typeof rawContainer.container_condition_json === 'string') {
+        try {
+          conditionPhotos = JSON.parse(rawContainer.container_condition_json);
+        } catch {
+          conditionPhotos = {};
+        }
+      } else if (typeof rawContainer.container_condition_json === 'object') {
+        conditionPhotos = rawContainer.container_condition_json as Record<string, string>;
+      }
+    }
+
+    // Combine pickup photos: Pickup_Photo_Url + EIR gate out + condition photos
+    const pickupPhotoSet = new Set<string>();
+    if (job.Pickup_Photo_Url) {
+      job.Pickup_Photo_Url.split(",").map(u => u.trim()).filter(Boolean).forEach(u => pickupPhotoSet.add(u));
+    }
+    if (rawContainer?.eir_gate_out_url && typeof rawContainer.eir_gate_out_url === 'string') {
+      pickupPhotoSet.add(rawContainer.eir_gate_out_url);
+    }
+    Object.values(conditionPhotos).filter(Boolean).forEach(u => {
+      if (typeof u === 'string') pickupPhotoSet.add(u);
+    });
+
+    // Combine POD photos: Photo_Proof_Url + EIR gate in
+    const podPhotoList = (job.Photo_Proof_Url ? job.Photo_Proof_Url.split(",").filter(Boolean) : [])
+      .filter((u: string) => !u.includes("FLOOR_CLIMB"));
+    const podPhotoSet = new Set<string>(podPhotoList);
+    if (rawContainer?.eir_gate_in_url && typeof rawContainer.eir_gate_in_url === 'string') {
+      podPhotoSet.add(rawContainer.eir_gate_in_url);
+    }
+
+    // Destinations
+    let destinations: Array<{ name?: string; lat?: string | number; lng?: string | number; so_no?: string; stop_type?: string }> = [];
+    if (job.original_destinations_json) {
+      try {
+        const parsed = typeof job.original_destinations_json === 'string'
+          ? JSON.parse(job.original_destinations_json)
+          : job.original_destinations_json;
+        if (Array.isArray(parsed)) destinations = parsed;
+      } catch {}
+    }
+
     return {
         jobId: job.Job_ID,
         trackingCode: job.Job_ID,
@@ -324,12 +402,11 @@ function mapJobToPublicDetails(job: PublicJobRow): PublicJobDetails {
         deliveryDate: (job.Delivery_Date && job.Actual_Delivery_Time) 
           ? `${job.Delivery_Date}T${job.Actual_Delivery_Time}`
           : (job.Actual_Delivery_Time || null),
-        pickupPhotos: job.Pickup_Photo_Url ? job.Pickup_Photo_Url.split(",").filter(Boolean) : [],
+        pickupPhotos: Array.from(pickupPhotoSet),
         // The floor-climb slip lives in its own column now; older jobs kept it
         // inline in Photo_Proof_Url (identified by a "_FLOOR_CLIMB" filename).
         // Surface it separately and keep it out of the generic POD photo grid.
-        podPhotos: (job.Photo_Proof_Url ? job.Photo_Proof_Url.split(",").filter(Boolean) : [])
-          .filter((u: string) => !u.includes("FLOOR_CLIMB")),
+        podPhotos: Array.from(podPhotoSet),
         // All floor-climb slips (one per drop). Prefer the dedicated column; fall
         // back to any "_FLOOR_CLIMB" files still living in Photo_Proof_Url (old jobs).
         floorClimbUrls: (job.Floor_Climb_Url
@@ -366,5 +443,21 @@ function mapJobToPublicDetails(job: PublicJobRow): PublicJobDetails {
         sensorVerified: job.Sensor_Verified,
         sensorMaxElevationDiff: job.Sensor_Max_Elevation_Diff,
         sensorTotalStepsUpward: job.Sensor_Total_Steps_Upward,
+        jobType: job.job_type || null,
+        originalDestinations: destinations,
+        container: rawContainer ? {
+          containerNo: (rawContainer.container_no as string) || null,
+          sealNo: (rawContainer.seal_no as string) || null,
+          containerSize: (rawContainer.container_size as string) || null,
+          shippingLine: (rawContainer.shipping_line as string) || null,
+          vesselVoyage: (rawContainer.vessel_voyage as string) || null,
+          eirGateInUrl: (rawContainer.eir_gate_in_url as string) || null,
+          eirGateOutUrl: (rawContainer.eir_gate_out_url as string) || null,
+          conditionPhotos: Object.keys(conditionPhotos).length > 0 ? conditionPhotos : null,
+          bookingNo: (rawContainer.booking_no as string) || null,
+          containerSubtype: (rawContainer.container_subtype as string) || null,
+          pickupEmptyDate: (rawContainer.pickup_empty_date as string) || null,
+          portClosingDatetime: (rawContainer.port_closing_datetime as string) || null,
+        } : null,
     };
 }

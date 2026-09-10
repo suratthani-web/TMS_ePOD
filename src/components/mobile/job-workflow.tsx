@@ -10,6 +10,7 @@ interface JobWorkflowProps {
   totalDrop?: number
   completedDrops?: number
   jobType?: 'normal' | 'container' | null
+  currentStopType?: 'load' | 'return' | 'drop' | string | null
   className?: string
 }
 
@@ -21,7 +22,7 @@ const STEPS: { status: JobStep; label: string; icon: React.ElementType; descript
   { status: 'Completed', label: 'สำเร็จ', icon: Package, description: 'ส่งมอบเรียบร้อย' }
 ]
 
-export function JobWorkflow({ currentStatus, totalDrop = 1, completedDrops = 0, jobType = 'normal', className }: JobWorkflowProps) {
+export function JobWorkflow({ currentStatus, totalDrop = 1, completedDrops = 0, jobType = 'normal', currentStopType, className }: JobWorkflowProps) {
   // Normalize status
   const normalizedStatus = (currentStatus === 'New' || currentStatus === 'Assigned') ? 'Pending' : currentStatus as string
   
@@ -46,13 +47,32 @@ export function JobWorkflow({ currentStatus, totalDrop = 1, completedDrops = 0, 
           const isActive = index === currentIndex && !['Completed', 'Verified', 'Rejected'].includes(normalizedStatus)
           const StepIcon = step.icon
 
+          let stepLabel = step.label
           let stepDescription = step.description
-          if (isMultiDrop) {
-              if (step.status === 'Arrived Dropoff') {
-                  stepDescription = `จุดส่ง (${completedDrops}/${totalDrop})`
-              } else if (step.status === 'In Transit' && isActive) {
-                  stepDescription = `กำลังเดินทางไปจุดที่ ${currentDropIndex}`
-              }
+
+          if (step.status === 'Arrived Pickup' && jobType === 'container') {
+            stepLabel = 'รับตู้เปล่า'
+            stepDescription = 'ถึงลานตู้ (ถ่าย EIR)'
+          }
+
+          if (step.status === 'Arrived Dropoff') {
+            if (currentStopType === 'load') {
+              stepLabel = 'โหลดสินค้า'
+              stepDescription = isMultiDrop ? `จุดโหลด (${completedDrops}/${totalDrop})` : 'ถึงจุดโหลดสินค้า'
+            } else if (currentStopType === 'return') {
+              stepLabel = 'คืนตู้'
+              stepDescription = isMultiDrop ? `จุดคืนตู้ (${completedDrops}/${totalDrop})` : 'ถึงจุดคืนตู้ (ถ่าย EIR)'
+            } else if (isMultiDrop) {
+              stepDescription = `จุดส่ง (${completedDrops}/${totalDrop})`
+            }
+          } else if (step.status === 'In Transit' && isActive) {
+            if (currentStopType === 'load') {
+              stepDescription = `กำลังเดินทางไปจุดโหลด (${currentDropIndex}/${totalDrop})`
+            } else if (currentStopType === 'return') {
+              stepDescription = `กำลังเดินทางไปจุดคืนตู้ (${currentDropIndex}/${totalDrop})`
+            } else if (isMultiDrop) {
+              stepDescription = `กำลังเดินทางไปจุดที่ ${currentDropIndex}`
+            }
           }
 
           return (
@@ -76,7 +96,7 @@ export function JobWorkflow({ currentStatus, totalDrop = 1, completedDrops = 0, 
                      "text-sm font-bold uppercase tracking-wide",
                      isActive ? "text-primary" : isCompleted ? "text-emerald-600" : "text-muted-foreground"
                    )}>
-                     {step.label} {isMultiDrop && step.status === 'Arrived Dropoff' && isActive && `(จุดที่ ${currentDropIndex})`}
+                     {stepLabel} {isMultiDrop && step.status === 'Arrived Dropoff' && isActive && `(จุดที่ ${currentDropIndex})`}
                    </h4>
                    {isActive && (
                       <span className="bg-primary/10 text-primary text-[10px] font-black px-2 py-0.5 rounded-full animate-pulse">

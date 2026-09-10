@@ -62,6 +62,9 @@ export function JobActionButton({ job }: JobActionButtonProps) {
   const completedDrops = job.Signature_Url ? job.Signature_Url.split(',').filter(Boolean).length : 0
   const isMultiDrop = totalDrop > 1
   const currentDropIndex = Math.min(completedDrops + 1, totalDrop)
+  const currentDestIndex = Math.min(completedDrops, totalDrop - 1)
+  const currentDest = Array.isArray(job.original_destinations_json) ? job.original_destinations_json[currentDestIndex] : null
+  const currentStopType = currentDest?.stop_type as 'load' | 'return' | 'drop' | undefined
 
   const handleStatusUpdate = async (newStatus: string) => {
     const today = startOfDay(new Date())
@@ -173,13 +176,25 @@ export function JobActionButton({ job }: JobActionButtonProps) {
       
       case 'Picked Up':
       case 'In Transit':
-          label = isMultiDrop ? `ถึงจุดส่งที่ ${currentDropIndex}` : "ถึงจุดส่งสินค้า"
+          if (currentStopType === 'load') {
+              label = isMultiDrop ? `ถึงจุดโหลดสินค้า (จุดที่ ${currentDropIndex})` : "ถึงจุดโหลดสินค้า"
+          } else if (currentStopType === 'return') {
+              label = isMultiDrop ? `ถึงจุดคืนตู้ (จุดที่ ${currentDropIndex})` : "ถึงจุดคืนตู้"
+          } else {
+              label = isMultiDrop ? `ถึงจุดส่งที่ ${currentDropIndex}` : "ถึงจุดส่งสินค้า"
+          }
           variant = "secondary"
           action = () => handleStatusUpdate('Arrived Dropoff')
           break
 
       case 'Arrived Dropoff':
-          label = isMultiDrop ? `บันทึกส่งงาน (จุดที่ ${currentDropIndex})` : "บันทึกส่งงาน"
+          if (currentStopType === 'load') {
+              label = isMultiDrop ? `บันทึกโหลดสินค้า (จุดที่ ${currentDropIndex})` : "บันทึกโหลดสินค้า"
+          } else if (currentStopType === 'return') {
+              label = isMultiDrop ? `บันทึกคืนตู้ (จุดที่ ${currentDropIndex})` : "บันทึกคืนตู้ (ถ่าย EIR)"
+          } else {
+              label = isMultiDrop ? `บันทึกส่งงาน (จุดที่ ${currentDropIndex})` : "บันทึกส่งงาน"
+          }
           variant = "primary"
           action = handlePOD
           break
@@ -256,8 +271,21 @@ export function JobActionButton({ job }: JobActionButtonProps) {
                             {currentStatus === 'Assigned' || currentStatus === 'New' ? 'กรุณากด "เริ่มงาน" เพื่อเริ่มงาน' : 
                                 currentStatus === 'Accepted' ? 'เดินทางไปยังจุดรับสินค้า' :
                                 currentStatus === 'Arrived Pickup' ? (job.job_type === 'container' ? 'ถึงลานตู้แล้ว กรุณาถ่ายรูป EIR และสภาพตู้' : 'ถึงจุดรับแล้ว กรุณาถ่ายรูปรับสินค้า') :
-                                currentStatus === 'Picked Up' || currentStatus === 'In Transit' ? (isMultiDrop ? `กำลังเดินทางไปจุดที่ ${currentDropIndex}` : 'กำลังเดินทางไปยังจุดหมาย') :
-                                currentStatus === 'Arrived Dropoff' ? (isMultiDrop ? `ถึงจุดส่งที่ ${currentDropIndex} แล้ว บันทึกส่งงาน` : 'ถึงที่หมายแล้ว บันทึกส่งงาน') :
+                                currentStatus === 'Picked Up' || currentStatus === 'In Transit' ? (
+                                    isMultiDrop 
+                                        ? (currentStopType === 'load' ? `กำลังเดินทางไปจุดโหลดสินค้า (จุดที่ ${currentDropIndex})` :
+                                           currentStopType === 'return' ? `กำลังเดินทางไปจุดคืนตู้ (จุดที่ ${currentDropIndex})` :
+                                           `กำลังเดินทางไปจุดที่ ${currentDropIndex}`)
+                                        : (currentStopType === 'load' ? 'กำลังเดินทางไปจุดโหลดสินค้า' :
+                                           currentStopType === 'return' ? 'กำลังเดินทางไปจุดคืนตู้' : 'กำลังเดินทางไปยังจุดหมาย')
+                                ) :
+                                currentStatus === 'Arrived Dropoff' ? (
+                                    currentStopType === 'load' 
+                                        ? (isMultiDrop ? `ถึงจุดโหลดสินค้าที่ ${currentDropIndex} แล้ว บันทึกโหลดสินค้า` : 'ถึงจุดโหลดสินค้าแล้ว บันทึกโหลดสินค้า')
+                                        : currentStopType === 'return'
+                                        ? (isMultiDrop ? `ถึงจุดคืนตู้ที่ ${currentDropIndex} แล้ว ถ่ายใบ EIR คืนตู้` : 'ถึงจุดคืนตู้แล้ว ถ่ายใบ EIR คืนตู้')
+                                        : (isMultiDrop ? `ถึงจุดส่งที่ ${currentDropIndex} แล้ว บันทึกส่งงาน` : 'ถึงที่หมายแล้ว บันทึกส่งงาน')
+                                ) :
                                 'อยู่ระหว่างดำเนินงาน'}
                         </h4>
                         
@@ -271,7 +299,9 @@ export function JobActionButton({ job }: JobActionButtonProps) {
                                     />
                                     </div>
                                     <span className="text-[10px] font-bold text-muted-foreground whitespace-nowrap">
-                                    จุดส่ง {completedDrops}/{totalDrop}
+                                    {currentStopType === 'load' ? `จุดโหลด ${completedDrops}/${totalDrop}` :
+                                     currentStopType === 'return' ? `จุดคืนตู้ ${completedDrops}/${totalDrop}` :
+                                     `จุดส่ง ${completedDrops}/${totalDrop}`}
                                     </span>
                             </div>
                         )}
@@ -279,13 +309,21 @@ export function JobActionButton({ job }: JobActionButtonProps) {
                         {/* Destination Name for current stop */}
                         {(currentStatus === 'In Transit' || currentStatus === 'Arrived Dropoff' || currentStatus === 'Picked Up') && (
                             <div className="mt-2 space-y-1">
-                                <p className="text-xs font-medium text-muted-foreground line-clamp-1">
-                                    จุดหมาย: {
-                                        isMultiDrop 
-                                            ? (Array.isArray(job.original_destinations_json) ? job.original_destinations_json[currentDropIndex - 1]?.name : 'ไม่ระบุ')
-                                            : (job.Dest_Location as string || 'ไม่ระบุ')
-                                    }
-                                </p>
+                                <div className="flex items-center gap-2">
+                                    <p className="text-xs font-medium text-muted-foreground line-clamp-1">
+                                        จุดหมาย: {
+                                            isMultiDrop 
+                                                ? (Array.isArray(job.original_destinations_json) ? job.original_destinations_json[currentDropIndex - 1]?.name : 'ไม่ระบุ')
+                                                : (job.Dest_Location as string || 'ไม่ระบุ')
+                                        }
+                                    </p>
+                                    {currentStopType === 'load' && (
+                                        <span className="px-1.5 py-0.5 rounded bg-amber-500/10 text-amber-500 text-[10px] font-bold shrink-0">📦 โหลดสินค้า</span>
+                                    )}
+                                    {currentStopType === 'return' && (
+                                        <span className="px-1.5 py-0.5 rounded bg-blue-500/10 text-blue-500 text-[10px] font-bold shrink-0">🚛 คืนตู้</span>
+                                    )}
+                                </div>
                                 {(() => {
                                     const currentSO = isMultiDrop 
                                         ? (Array.isArray(job.original_destinations_json) ? job.original_destinations_json[currentDropIndex - 1]?.so_no : undefined)

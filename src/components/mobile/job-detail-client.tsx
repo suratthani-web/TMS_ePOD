@@ -122,14 +122,25 @@ export function JobDetailClient({ job, success, initialTab = 'mission' }: JobDet
                             <MapPin size={18} className="text-accent shrink-0 mt-0.5" />
                             <div className="flex-1 min-w-0">
                                 <p className="text-xs font-medium text-muted-foreground mb-1">จุดหมายปัจจุบัน</p>
-                                <p className="text-sm font-bold text-foreground leading-snug">
+                                <div className="flex items-center gap-2 flex-wrap">
+                                    <p className="text-sm font-bold text-foreground leading-snug">
+                                        {(() => {
+                                            const completedDrops = job?.Signature_Url ? job.Signature_Url.split(',').filter(Boolean).length : 0
+                                            const totalDrop = Array.isArray(destinations) ? destinations.length : 1
+                                            const currentDropIndex = Math.min(completedDrops, totalDrop - 1)
+                                            return destinations[currentDropIndex]?.name || job?.Dest_Location || job?.Route_Name
+                                        })()}
+                                    </p>
                                     {(() => {
                                         const completedDrops = job?.Signature_Url ? job.Signature_Url.split(',').filter(Boolean).length : 0
                                         const totalDrop = Array.isArray(destinations) ? destinations.length : 1
                                         const currentDropIndex = Math.min(completedDrops, totalDrop - 1)
-                                        return destinations[currentDropIndex]?.name || job?.Dest_Location || job?.Route_Name
+                                        const stopType = destinations[currentDropIndex]?.stop_type
+                                        if (stopType === 'load') return <span className="px-1.5 py-0.5 rounded bg-amber-500/10 text-amber-500 text-[10px] font-bold">📦 โหลดสินค้า</span>
+                                        if (stopType === 'return') return <span className="px-1.5 py-0.5 rounded bg-blue-500/10 text-blue-500 text-[10px] font-bold">🚛 คืนตู้</span>
+                                        return null
                                     })()}
-                                </p>
+                                </div>
                             </div>
                             <NavigationButton job={job} />
                         </div>
@@ -142,16 +153,22 @@ export function JobDetailClient({ job, success, initialTab = 'mission' }: JobDet
                                         <Activity size={10} className="group-open:rotate-180 transition-transform" />
                                     </summary>
                                     <div className="mt-3 space-y-2 max-h-32 overflow-y-auto custom-scrollbar pr-2">
-                                        {destinations.map((d: { name?: string; address?: string }, i: number) => (
+                                        {destinations.map((d: { name?: string; address?: string; stop_type?: string }, i: number) => (
                                             <div key={i} className="flex items-center gap-2 text-xs">
                                                 <div className={cn(
-                                                    "w-1.5 h-1.5 rounded-full",
+                                                    "w-1.5 h-1.5 rounded-full shrink-0",
                                                     i < (job?.Signature_Url?.split(',').filter(Boolean).length || 0) ? "bg-emerald-500" : "bg-muted-foreground/30"
                                                 )} />
                                                 <span className={cn(
-                                                    "truncate",
+                                                    "truncate flex-1",
                                                     i < (job?.Signature_Url?.split(',').filter(Boolean).length || 0) ? "text-muted-foreground line-through" : "text-foreground font-medium"
                                                 )}>{d.name}</span>
+                                                {d.stop_type === 'load' && (
+                                                    <span className="px-1 py-0.5 bg-amber-500/10 text-amber-500 text-[9px] font-bold rounded shrink-0">📦 โหลด</span>
+                                                )}
+                                                {d.stop_type === 'return' && (
+                                                    <span className="px-1 py-0.5 bg-blue-500/10 text-blue-500 text-[9px] font-bold rounded shrink-0">🚛 คืนตู้</span>
+                                                )}
                                             </div>
                                         ))}
                                     </div>
@@ -204,12 +221,21 @@ export function JobDetailClient({ job, success, initialTab = 'mission' }: JobDet
                         <Activity size={20} className="text-primary" />
                         สถานะปัจจุบัน
                     </h3>
-                    <JobWorkflow 
-                        currentStatus={job.Job_Status} 
-                        totalDrop={destinations.length} 
-                        completedDrops={job.Signature_Url ? job.Signature_Url.split(',').filter(Boolean).length : 0}
-                        jobType={job.job_type}
-                    />
+                    {(() => {
+                        const completedDrops = job.Signature_Url ? job.Signature_Url.split(',').filter(Boolean).length : 0
+                        const totalDrop = Array.isArray(destinations) ? destinations.length : 1
+                        const currentDropIndex = Math.min(completedDrops, Math.max(totalDrop - 1, 0))
+                        const currentStopType = destinations[currentDropIndex]?.stop_type
+                        return (
+                            <JobWorkflow 
+                                currentStatus={job.Job_Status} 
+                                totalDrop={destinations.length} 
+                                completedDrops={completedDrops}
+                                jobType={job.job_type}
+                                currentStopType={currentStopType}
+                            />
+                        )
+                    })()}
                 </div>
 
                 {/* Container Specific Info */}

@@ -431,7 +431,7 @@ export default function JobCompletePage() {
 
   return (
     <div className="min-h-full bg-slate-950 pb-24 pt-20 px-4">
-      <MobileHeader title={isContainer ? "คืนตู้ (Gate-In EIR)" : "ส่งงาน (POD)"} showBack />
+      <MobileHeader title={isContainer ? "คืนตู้ (Gate-In EIR)" : (_currentStopType === 'load' ? `โหลดสินค้า (จุดที่ ${_doneDrops + 1})` : "ส่งงาน (POD)")} showBack />
 
       {/* Hidden Report Container for html2canvas rendering */}
       {job && (
@@ -480,7 +480,7 @@ export default function JobCompletePage() {
       <div className="space-y-6">
         <section>
             <h2 className="text-muted-foreground font-bold mb-2">
-                {isContainer ? "1. ถ่ายรูปใบ EIR ขาเข้า (คืนตู้)" : "1. ถ่ายรูปสินค้า"}
+                {isContainer ? "1. ถ่ายรูปใบ EIR ขาเข้า (คืนตู้)" : (_currentStopType === 'load' ? "1. ถ่ายรูปสินค้าที่โหลด / เอกสารกำกับ" : "1. ถ่ายรูปสินค้า")}
             </h2>
             <CameraInput onImagesChange={setPhotos} maxImages={isContainer ? 2 : 5} />
             
@@ -603,6 +603,7 @@ export default function JobCompletePage() {
                 <section>
                 <h2 className="text-muted-foreground font-bold mb-2">
                     {isContainer ? "2. ลายเซ็นเจ้าหน้าที่ลานตู้ (ผู้รับตู้)" : 
+                     _currentStopType === 'load' ? "2. ลายเซ็นผู้ปล่อยสินค้า / ผู้โหลด" :
                      (job && job.Price_Per_Unit && Number(job.Price_Per_Unit) > 0 && (!job.Price_Cust_Total || Number(job.Price_Cust_Total) === 0) ? "3. ลายเซ็นผู้รับ" : "2. ลายเซ็นผู้รับ")}
                 </h2>
                 <SignaturePad onSave={setSignature} />
@@ -613,19 +614,19 @@ export default function JobCompletePage() {
                 disabled={loading}
                 className="w-full h-16 bg-gradient-to-r from-blue-600 via-indigo-600 to-blue-700 shadow-blue-500/30 text-white font-black text-lg shadow-xl transition-all duration-300 rounded-2xl active:scale-95"
             >
-                {isContainer ? "ยืนยันการคืนตู้" : "ยืนยันการส่งงาน"}
+                {isContainer ? "ยืนยันการคืนตู้" : (_currentStopType === 'load' ? `ยืนยันการโหลดสินค้า (จุดที่ ${_doneDrops + 1})` : "ยืนยันการส่งงาน")}
             </Button>
             
             {/* Validation Feedback */}
             <div className="text-center space-y-1">
                 {photos.length === 0 && (
                     <p className="text-lg font-bold text-red-400 animate-pulse">
-                        {isContainer ? "* กรุณาถ่ายรูปใบ EIR อย่างน้อย 1 รูป" : "* กรุณาถ่ายรูปสินค้าอย่างน้อย 1 รูป"}
+                        {isContainer ? "* กรุณาถ่ายรูปใบ EIR อย่างน้อย 1 รูป" : (_currentStopType === 'load' ? "* กรุณาถ่ายรูปสินค้าหรือเอกสารอย่างน้อย 1 รูป" : "* กรุณาถ่ายรูปสินค้าอย่างน้อย 1 รูป")}
                     </p>
                 )}
                 {!signature && (
                     <p className="text-lg font-bold text-red-400 animate-pulse">
-                        {isContainer ? "* กรุณาลงลายเซ็นเจ้าหน้าที่ลานตู้" : "* กรุณาลงลายเซ็นผู้รับ"}
+                        {isContainer ? "* กรุณาลงลายเซ็นเจ้าหน้าที่ลานตู้" : (_currentStopType === 'load' ? "* กรุณาลงลายเซ็นผู้ควบคุมการโหลด / ผู้ปล่อยสินค้า" : "* กรุณาลงลายเซ็นผู้รับ")}
                     </p>
                 )}
             </div>

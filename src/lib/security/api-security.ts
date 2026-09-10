@@ -1,4 +1,4 @@
-import { createClient } from '@/utils/supabase/server'
+import { createAdminClient } from '@/utils/supabase/server'
 
 /**
  * Validates an API Key against the Master_API_Keys table.
@@ -12,7 +12,7 @@ export async function validateApiKey(apiKey: string) {
     // Strip 'Bearer ' if present
     const cleanKey = apiKey.startsWith('Bearer ') ? apiKey.substring(7) : apiKey
 
-    const supabase = await createClient()
+    const supabase = createAdminClient()
     
     const { data, error } = await supabase
         .from('Master_API_Keys')
