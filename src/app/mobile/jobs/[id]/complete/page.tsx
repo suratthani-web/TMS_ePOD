@@ -54,7 +54,29 @@ export default function JobCompletePage() {
   // duplicate POD submission (creating a phantom extra drop that prematurely
   // closes a multi-drop job). A ref set synchronously closes that window.
   const submittingRef = useRef(false)
-  const isContainer = job?.job_type === 'container'
+  // Container "คืนตู้/EIR" mode applies ONLY to the final drop. A 3-stop container
+  // job (รับตู้เปล่า → โหลด → คืน) has the load point as an ordinary POD drop and
+  // only the last drop (คืนตู้) captures the EIR gate-in. Single-destination
+  // container jobs still evaluate true on their one and only drop.
+  const isContainerJob = job?.job_type === 'container'
+  const _containerDrops = (() => {
+    try {
+      const v = typeof job?.original_destinations_json === 'string'
+        ? JSON.parse(job.original_destinations_json)
+        : job?.original_destinations_json
+      return Array.isArray(v) ? v : []
+    } catch { return [] }
+  })()
+  const _dropCount = _containerDrops.length > 0
+    ? _containerDrops.length
+    : (job?.Dest_Location ? String(job.Dest_Location).split('→').map(s => s.trim()).filter(Boolean).length : 1)
+  const _doneDrops = job?.Signature_Url ? job.Signature_Url.split(',').filter(Boolean).length : 0
+  // Prefer the explicit per-drop stop_type set at creation ('return' = คืนตู้/EIR);
+  // fall back to "last drop = return" for jobs created before stop types existed.
+  const _hasStopTypes = _containerDrops.some((d: { stop_type?: string }) => d?.stop_type)
+  const _currentStopType = (_containerDrops[_doneDrops] as { stop_type?: string } | undefined)?.stop_type
+  const _isLastDrop = _doneDrops >= Math.max(_dropCount, 1) - 1
+  const isContainer = isContainerJob && (_hasStopTypes ? _currentStopType === 'return' : _isLastDrop)
 
   useEffect(() => {
     if (params.id) {

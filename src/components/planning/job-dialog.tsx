@@ -53,6 +53,8 @@ type LocationPoint = {
   lat: string
   lng: string
   so_no?: string
+  // งานตู้: ระบุชนิดจุด — 'load' โหลดสินค้า, 'return' คืนตู้ (ถ่าย EIR), undefined = ส่งปกติ
+  stop_type?: 'load' | 'return' | 'drop'
 }
 
 type ExtraCost = {
@@ -1915,6 +1917,29 @@ export function JobDialog({
                                     locations={allLocations}
                                     className="bg-background border-input text-xl h-14"
                                 />
+                                {formData.job_type === 'container' && (
+                                    <div className="flex items-center gap-2">
+                                        <span className="text-sm font-bold text-muted-foreground shrink-0">ชนิดจุด:</span>
+                                        {([
+                                            { v: 'load', label: '📦 โหลดสินค้า' },
+                                            { v: 'return', label: '🚛 คืนตู้ (EIR)' },
+                                        ] as const).map(opt => (
+                                            <button
+                                                key={opt.v}
+                                                type="button"
+                                                onClick={() => updateDestination(index, 'stop_type', dest.stop_type === opt.v ? '' : opt.v)}
+                                                className={cn(
+                                                    "px-3 h-10 rounded-lg text-sm font-black border transition-all",
+                                                    dest.stop_type === opt.v
+                                                        ? (opt.v === 'return' ? "bg-amber-500 text-white border-amber-500" : "bg-indigo-500 text-white border-indigo-500")
+                                                        : "bg-background text-muted-foreground border-input hover:bg-muted"
+                                                )}
+                                            >
+                                                {opt.label}
+                                            </button>
+                                        ))}
+                                    </div>
+                                )}
                                 <div className="flex flex-wrap gap-4">
                                     <div className="flex-[2] min-w-[200px]">
                                         <Input
