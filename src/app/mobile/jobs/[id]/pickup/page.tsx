@@ -344,6 +344,30 @@ export default function JobPickupPage() {
                 </>
             ) : (
                 <>
+                    {/* Cargo & Target Barcode Summary Card */}
+                    <div className="bg-card rounded-3xl p-5 border border-border shadow-sm space-y-3">
+                        <div className="flex items-center justify-between">
+                            <span className="text-[10px] font-black uppercase tracking-widest text-primary bg-primary/10 px-2.5 py-1 rounded-lg">
+                                📦 ข้อมูลพัสดุ / สินค้าที่ต้องรับ
+                            </span>
+                            <span className="text-xs font-bold text-muted-foreground">{job?.Job_ID}</span>
+                        </div>
+                        <div className="space-y-1">
+                            <p className="text-sm font-black text-foreground">{job?.Customer_Name || 'ไม่ระบุชื่อลูกค้า'}</p>
+                            <p className="text-xs text-muted-foreground">ปลายทาง: {job?.Dest_Location || '-'}</p>
+                        </div>
+                        {job?.Cargo_Type && (
+                            <div className="p-3 bg-muted/40 rounded-2xl border border-border/50 text-xs font-bold text-foreground">
+                                <span className="text-muted-foreground font-medium">รายการ: </span>{job.Cargo_Type}
+                            </div>
+                        )}
+                        {job?.Notes && (
+                            <div className="p-3 bg-amber-500/10 border border-amber-500/20 rounded-2xl text-xs text-amber-600 font-medium leading-relaxed">
+                                {job.Notes}
+                            </div>
+                        )}
+                    </div>
+
                     <div className="space-y-4">
                         <Label className="text-xs font-black uppercase tracking-widest flex items-center gap-2">
                             <Camera size={16} className="text-primary" /> รูปถ่ายสินค้าขณะรับ

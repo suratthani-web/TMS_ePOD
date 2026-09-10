@@ -42,7 +42,12 @@ export async function POST(req: NextRequest) {
             wms_order_no,
             job_id,
             tracking_no,
-            notes
+            notes,
+            weight_kg,
+            cargo_type,
+            items_list,
+            parcel_barcode,
+            box_count
         } = body
 
         // Validation
@@ -67,22 +72,28 @@ export async function POST(req: NextRequest) {
         // Construct enriched notes
         const notesParts: string[] = []
         if (wms_order_no) notesParts.push(`[WMS: ${wms_order_no}]`)
+        if (parcel_barcode || tracking_no) notesParts.push(`บาร์โค้ด: ${parcel_barcode || tracking_no}`)
         if (items) notesParts.push(`สินค้า: ${items}`)
         if (notes) notesParts.push(String(notes).trim())
         if (customer_phone) notesParts.push(`เบอร์ผู้รับ: ${customer_phone}`)
         const combinedNotes = notesParts.length > 0 ? notesParts.join(' | ') : null
 
+        const effectiveCargoType = cargo_type || (items ? (String(items).length > 60 ? String(items).substring(0, 57) + '...' : String(items)) : 'พัสดุทั่วไป')
+        const effectiveWeight = weight_kg ? Number(weight_kg) : null
+
         // Insert new job into Jobs_Main, handling potential duplicate Job_ID gracefully
         let finalJobId = effectiveJobId
         let data: any = null
 
-        const jobPayload = {
+        const jobPayload: Record<string, unknown> = {
             Job_ID: finalJobId,
             Customer_ID: customer_id,
             Customer_Name: customer_name || customer_id,
             Origin_Location: pickup_address,
             Dest_Location: delivery_address,
             Vehicle_Type: vehicle_type || '4-Wheel',
+            Cargo_Type: effectiveCargoType,
+            ...(effectiveWeight ? { Weight_Kg: effectiveWeight } : {}),
             Plan_Date: plan_date || todayTH(),
             Job_Status: 'New',
             Notes: combinedNotes,
@@ -101,6 +112,8 @@ export async function POST(req: NextRequest) {
                     Origin_Location: pickup_address,
                     Dest_Location: delivery_address,
                     Vehicle_Type: vehicle_type || '4-Wheel',
+                    Cargo_Type: effectiveCargoType,
+                    ...(effectiveWeight ? { Weight_Kg: effectiveWeight } : {}),
                     Notes: combinedNotes,
                     ...(branch_id ? { Branch_ID: branch_id } : {})
                 })
