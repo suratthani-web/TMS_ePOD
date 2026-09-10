@@ -20,13 +20,14 @@ export async function POST(req: NextRequest) {
         }
 
         const body = await req.json()
-        const { 
-            customer_id, 
-            pickup_address, 
-            delivery_address, 
-            items, 
+        const {
+            customer_id,
+            pickup_address,
+            delivery_address,
+            items,
             vehicle_type,
-            plan_date 
+            plan_date,
+            branch_id // optional: scope the job to a specific branch (e.g. 'HQ')
         } = body
 
         // Validation
@@ -47,7 +48,10 @@ export async function POST(req: NextRequest) {
                 Vehicle_Type: vehicle_type,
                 Plan_Date: plan_date || todayTH(),
                 Job_Status: 'New',
-                Source: 'Enterprise_API'
+                Source: 'Enterprise_API',
+                // Additive: only set when the caller provides it; omitting keeps the
+                // previous behaviour (Branch_ID stays null = visible to all branches).
+                ...(branch_id ? { Branch_ID: branch_id } : {})
             }])
             .select()
 
