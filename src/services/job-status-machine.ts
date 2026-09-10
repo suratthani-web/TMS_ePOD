@@ -175,6 +175,18 @@ export async function transitionJobStatus(
       });
     }
 
+    // Trigger WMS webhook if job originated from WMS / Enterprise API (Auto-Close with POD)
+    if (['In Transit', 'Picked Up', 'Delivered', 'Completed'].includes(nextStatus)) {
+      after(async () => {
+        try {
+          const { sendWmsStatusWebhook } = await import('@/lib/integrations/wms-webhook');
+          await sendWmsStatusWebhook(jobId, isCompleted(nextStatus) ? 'job.completed' : 'job.status_updated');
+        } catch (err) {
+          console.error('[JobStatusMachine] WMS webhook trigger failed:', err);
+        }
+      });
+    }
+
     // Notify admins in-app (Web Push). This is the single chokepoint every status
     // change flows through, so admins get the notification whether the driver
     // finished via POD upload (submitJobPOD), the status button (updateJobStatus)
