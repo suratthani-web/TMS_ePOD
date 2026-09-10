@@ -303,12 +303,6 @@ export function JobDialog({
     parseJson((job?.extra_costs || job?.extra_costs_json) as string | unknown[], []) as ExtraCost[]
   )
 
-  // Container details & inspection photos state
-  const [containerData, setContainerData] = useState<any>(() => {
-    const raw = (job as any)?.container
-    return Array.isArray(raw) ? raw[0] : raw || null
-  })
-
   // Fuel Suggestion State
   const [fuelPrice, setFuelPrice] = useState<number | null>(null)
   const [fuelPriceTomorrow, setFuelPriceTomorrow] = useState<number | null>(null)
@@ -650,8 +644,6 @@ export function JobDialog({
       const targetContainer = Array.isArray((targetJob as any)?.container)
         ? (targetJob as any).container[0]
         : (targetJob as any)?.container
-
-      setContainerData(targetContainer || null)
 
       const newFormData = {
         Job_ID: syncMode === 'edit' ? (targetJob.Job_ID || '') : generateJobId(),
@@ -1796,86 +1788,6 @@ export function JobDialog({
                         className="bg-background border-input text-xl h-14"
                     />
                 </div>
-
-                {/* Container Inspection Photos & EIR Preview */}
-                {(() => {
-                    let condPhotos: Record<string, string> = {}
-                    if (containerData?.container_condition_json) {
-                        if (typeof containerData.container_condition_json === 'string') {
-                            try { condPhotos = JSON.parse(containerData.container_condition_json) } catch {}
-                        } else if (typeof containerData.container_condition_json === 'object') {
-                            condPhotos = containerData.container_condition_json as Record<string, string>
-                        }
-                    }
-                    const condKeys: { key: string; label: string }[] = [
-                        { key: 'front', label: 'ด้านหน้า (Front)' },
-                        { key: 'back', label: 'ด้านหลัง (Back)' },
-                        { key: 'left', label: 'ด้านซ้าย (Left)' },
-                        { key: 'right', label: 'ด้านขวา (Right)' },
-                        { key: 'top', label: 'หลังคา (Roof)' },
-                        { key: 'floor', label: 'พื้นตู้ (Floor)' },
-                        { key: 'seal', label: 'ซีล (Seal)' },
-                    ]
-                    const hasCondPhotos = Object.values(condPhotos).some(Boolean)
-                    const eirOut = containerData?.eir_gate_out_url || (job?.Pickup_Photo_Url ? job.Pickup_Photo_Url.split(',')[0] : null)
-                    const eirIn = containerData?.eir_gate_in_url || (job?.Photo_Proof_Url ? job.Photo_Proof_Url.split(',')[0] : null)
-
-                    if (!hasCondPhotos && !eirOut && !eirIn) return null
-
-                    return (
-                        <div className="space-y-4 p-5 rounded-2xl bg-muted/40 border border-border">
-                            <Label className="text-primary text-xl font-black uppercase tracking-tight flex items-center gap-2">
-                                <Package className="w-5 h-5" /> หลักฐานตรวจสภาพตู้ (7 จุด) และใบรับ-คืนตู้ (EIR)
-                            </Label>
-                            
-                            {/* EIR Receipts */}
-                            {(eirOut || eirIn) && (
-                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                                    {eirOut && (
-                                        <div className="p-3 bg-background rounded-xl border border-border space-y-2">
-                                            <span className="text-xs font-bold text-muted-foreground uppercase">ใบรับตู้ (EIR Gate-Out)</span>
-                                            <a href={eirOut} target="_blank" rel="noopener noreferrer" className="block relative aspect-video rounded-lg overflow-hidden border border-border group bg-muted">
-                                                {/* eslint-disable-next-line @next/next/no-img-element */}
-                                                <img src={eirOut} alt="EIR Gate Out" className="w-full h-full object-cover group-hover:scale-105 transition-transform" />
-                                            </a>
-                                        </div>
-                                    )}
-                                    {eirIn && (
-                                        <div className="p-3 bg-background rounded-xl border border-border space-y-2">
-                                            <span className="text-xs font-bold text-muted-foreground uppercase">ใบรับ/คืนตู้ (EIR Gate-In)</span>
-                                            <a href={eirIn} target="_blank" rel="noopener noreferrer" className="block relative aspect-video rounded-lg overflow-hidden border border-border group bg-muted">
-                                                {/* eslint-disable-next-line @next/next/no-img-element */}
-                                                <img src={eirIn} alt="EIR Gate In" className="w-full h-full object-cover group-hover:scale-105 transition-transform" />
-                                            </a>
-                                        </div>
-                                    )}
-                                </div>
-                            )}
-
-                            {/* 7-Point Container Condition */}
-                            {hasCondPhotos && (
-                                <div className="space-y-2 pt-2">
-                                    <span className="text-xs font-bold text-muted-foreground uppercase">รูปถ่ายตรวจสภาพตู้ 7 จุด (Inspection)</span>
-                                    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
-                                        {condKeys.map(({ key, label }) => {
-                                            const url = condPhotos[key]
-                                            if (!url) return null
-                                            return (
-                                                <div key={key} className="space-y-1">
-                                                    <span className="text-[11px] font-bold text-slate-500 block truncate">{label}</span>
-                                                    <a href={url} target="_blank" rel="noopener noreferrer" className="block relative aspect-square rounded-lg overflow-hidden border border-border group bg-background">
-                                                        {/* eslint-disable-next-line @next/next/no-img-element */}
-                                                        <img src={url} alt={label} className="w-full h-full object-cover group-hover:scale-105 transition-transform" />
-                                                    </a>
-                                                </div>
-                                            )
-                                        })}
-                                    </div>
-                                </div>
-                            )}
-                        </div>
-                    )
-                })()}
             </div>
           )}
 
