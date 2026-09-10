@@ -308,7 +308,7 @@ async function sendDeliveryCompletionNotification(jobId: string) {
     // Fetch job details
     const { data: job, error: jobErr } = await supabase
       .from('Jobs_Main')
-      .select('Job_ID, Customer_Name, Route_Name, Driver_Name, Vehicle_Plate, Vehicle_Type, Est_Distance_KM, Weight_Kg, Photo_Proof_Url, Signature_Url, Customer_ID, Branch_ID, Actual_Delivery_Time, Delivery_Date, Delivery_Notified_At, original_destinations_json, POD_Drops_Json')
+      .select('Job_ID, Customer_Name, Route_Name, Driver_Name, Vehicle_Plate, Vehicle_Type, Est_Distance_KM, Weight_Kg, Photo_Proof_Url, Signature_Url, Customer_ID, Branch_ID, Actual_Delivery_Time, Delivery_Date, Delivery_Notified_At, original_destinations_json, POD_Drops_Json, job_type, container:jobs_container(*)')
       .eq('Job_ID', jobId)
       .single();
 
@@ -450,6 +450,31 @@ async function sendDeliveryCompletionNotification(jobId: string) {
       ].join('\n')
     }
 
+    // Container jobs: append a container-info block (เลขตู้/ซีล/สายเรือ/Booking) and
+    // the EIR gate-in (คืนตู้) evidence link. Normal jobs get none of this.
+    let containerText = ''
+    if (job.job_type === 'container') {
+      const rawC = (job as { container?: unknown }).container
+      const c = (Array.isArray(rawC) ? rawC[0] : rawC) as Record<string, unknown> | null | undefined
+      if (c) {
+        const line = (label: string, val: unknown) => {
+          const v = String(val ?? '').trim()
+          return v ? `   ${label}: ${v}` : ''
+        }
+        const eir = String(c.eir_gate_in_url ?? '').trim()
+        containerText = [
+          ``,
+          `🚢 ข้อมูลตู้คอนเทนเนอร์:`,
+          line('เลขตู้', c.container_no),
+          line('ซีล', c.seal_no),
+          line('ขนาด', c.container_size),
+          line('สายเรือ', c.shipping_line),
+          line('Booking', c.booking_no),
+          eir ? `   📄 หลักฐานคืนตู้ (EIR Gate-In): ${eir}` : '',
+        ].filter(Boolean).join('\n')
+      }
+    }
+
     const message = [
       `📦 [ยืนยันการส่งมอบสินค้าสำเร็จ]`,
       `--------------------------------`,
@@ -460,7 +485,8 @@ async function sendDeliveryCompletionNotification(jobId: string) {
       ``,
       `📦 รายการจุดส่ง (${dropCount} ดรอป):`,
       dropText + flatPhotoText,
-      carbonText,
+      ...(containerText ? [containerText] : []),
+      ...(carbonText ? [carbonText] : []),
       ``,
       `🌐 ติดตามสถานะและเอกสารเพิ่มเติม:`,
       `🔗 ${appUrl}/track/${job.Job_ID}`

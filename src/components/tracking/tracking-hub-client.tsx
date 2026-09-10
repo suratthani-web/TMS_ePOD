@@ -119,12 +119,15 @@ export function TrackingHubClient({ initialActiveJobs, customerMode = false }: T
     { key: 'Completed', label: 'ส่งสำเร็จ', icon: <CheckCircle2 size={14} /> },
   ]
 
+  // Keep this in sync with the public /track page's mapping so the admin hub and
+  // the customer view never show a different step for the same job. Granular
+  // sub-statuses (arrived pickup/dropoff) collapse into their parent step.
   const getCurrentStepIndex = (status: string) => {
     const s = status?.toLowerCase()
-    if (['delivered', 'completed', 'complete', 'success'].includes(s)) return 4
-    if (s === 'in transit' || s === 'en route' || s === 'en-route' || s === 'arrived') return 3
-    if (s === 'picked up') return 2
-    if (s === 'assigned') return 1
+    if (['delivered', 'completed', 'complete', 'success', 'verified', 'billed', 'paid'].includes(s)) return 4
+    if (['in transit', 'arrived dropoff', 'in progress', 'en route', 'en-route', 'arrived'].includes(s)) return 3
+    if (['picked up', 'arrived pickup'].includes(s)) return 2
+    if (['assigned', 'confirmed', 'accepted'].includes(s)) return 1
     return 0
   }
 
