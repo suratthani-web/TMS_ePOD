@@ -73,6 +73,7 @@ export async function POST(req: NextRequest) {
                 Plan_Date: plan_date || todayTH(),
                 Job_Status: 'New',
                 Notes: combinedNotes,
+                Created_At: new Date().toISOString(),
                 // Additive: only set when caller provides it
                 ...(branch_id ? { Branch_ID: branch_id } : {})
             }])
