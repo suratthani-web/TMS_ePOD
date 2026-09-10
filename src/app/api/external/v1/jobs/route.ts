@@ -40,6 +40,7 @@ export async function POST(req: NextRequest) {
             plan_date,
             branch_id, // optional: scope the job to a specific branch (e.g. 'URT', 'HQ')
             wms_order_no,
+            job_id,
             tracking_no,
             notes
         } = body
@@ -50,7 +51,18 @@ export async function POST(req: NextRequest) {
         }
 
         const supabase = createAdminClient()
-        const effectiveJobId = generateJobId()
+        
+        // Derive Job ID: use explicitly supplied job_id, or map from wms_order_no (e.g. ORD-2026-8008 -> JOB-2026-8008)
+        let effectiveJobId = (job_id && String(job_id).trim()) || ''
+        if (!effectiveJobId && wms_order_no) {
+            const clean = String(wms_order_no).trim()
+            effectiveJobId = clean.startsWith('ORD-')
+                ? clean.replace(/^ORD-/, 'JOB-')
+                : (clean.startsWith('JOB-') ? clean : `JOB-${clean}`)
+        }
+        if (!effectiveJobId) {
+            effectiveJobId = generateJobId()
+        }
 
         // Construct enriched notes
         const notesParts: string[] = []
@@ -60,26 +72,55 @@ export async function POST(req: NextRequest) {
         if (customer_phone) notesParts.push(`เบอร์ผู้รับ: ${customer_phone}`)
         const combinedNotes = notesParts.length > 0 ? notesParts.join(' | ') : null
 
-        // Insert new job into Jobs_Main
-        const { data, error } = await supabase
-            .from('Jobs_Main')
-            .insert([{
-                Job_ID: effectiveJobId,
-                Customer_ID: customer_id,
-                Customer_Name: customer_name || customer_id,
-                Origin_Location: pickup_address,
-                Dest_Location: delivery_address,
-                Vehicle_Type: vehicle_type || '',
-                Plan_Date: plan_date || todayTH(),
-                Job_Status: 'New',
-                Notes: combinedNotes,
-                Created_At: new Date().toISOString(),
-                // Additive: only set when caller provides it
-                ...(branch_id ? { Branch_ID: branch_id } : {})
-            }])
-            .select()
+        // Insert new job into Jobs_Main, handling potential duplicate Job_ID gracefully
+        let finalJobId = effectiveJobId
+        let data: any = null
 
-        if (error) throw error
+        const jobPayload = {
+            Job_ID: finalJobId,
+            Customer_ID: customer_id,
+            Customer_Name: customer_name || customer_id,
+            Origin_Location: pickup_address,
+            Dest_Location: delivery_address,
+            Vehicle_Type: vehicle_type || '4-Wheel',
+            Plan_Date: plan_date || todayTH(),
+            Job_Status: 'New',
+            Notes: combinedNotes,
+            Created_At: new Date().toISOString(),
+            ...(branch_id ? { Branch_ID: branch_id } : {})
+        }
+
+        const insertRes = await supabase.from('Jobs_Main').insert([jobPayload]).select()
+        if (insertRes.error && (insertRes.error.code === '23505' || String(insertRes.error.message).includes('duplicate') || String(insertRes.error.message).includes('unique'))) {
+            // Already exists: update existing job if still New
+            const updateRes = await supabase
+                .from('Jobs_Main')
+                .update({
+                    Customer_ID: customer_id,
+                    Customer_Name: customer_name || customer_id,
+                    Origin_Location: pickup_address,
+                    Dest_Location: delivery_address,
+                    Vehicle_Type: vehicle_type || '4-Wheel',
+                    Notes: combinedNotes,
+                    ...(branch_id ? { Branch_ID: branch_id } : {})
+                })
+                .eq('Job_ID', finalJobId)
+                .select()
+            if (updateRes.data && updateRes.data.length > 0) {
+                data = updateRes.data
+            } else {
+                // Suffix fallback
+                finalJobId = `${effectiveJobId}-${Math.floor(1000 + Math.random() * 9000)}`
+                jobPayload.Job_ID = finalJobId
+                const retryRes = await supabase.from('Jobs_Main').insert([jobPayload]).select()
+                if (retryRes.error) throw retryRes.error
+                data = retryRes.data
+            }
+        } else if (insertRes.error) {
+            throw insertRes.error
+        } else {
+            data = insertRes.data
+        }
 
         const createdJob = data[0]
         const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://tms-e-pod.vercel.app'
