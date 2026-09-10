@@ -10,7 +10,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { updateJob, createBulkJobs, deleteJob } from "@/app/planning/actions"
+import { updateJob, createBulkJobs, deleteJob, getFreshJob } from "@/app/planning/actions"
 import { CustomerAutocomplete } from "@/components/customer-autocomplete"
 import { LocationAutocomplete } from "@/components/location-autocomplete"
 import { VehicleAutocomplete } from "@/components/vehicle-autocomplete"
@@ -188,6 +188,10 @@ export function JobDialog({
   // Guards the init effect so it re-populates the form only on open / job change,
   // not on every parent re-render (which used to wipe typed dates).
   const lastInitKeyRef = useRef<string | null>(null)
+  const initialContainer = Array.isArray((job as any)?.container)
+    ? (job as any).container[0]
+    : (job as any)?.container
+
   const [formData, setFormData] = useState({
     Job_ID: job?.Job_ID || '', // Empty for new jobs to allow manual entry or auto-gen
     Plan_Date: job?.Plan_Date || job?.Pickup_Date || defaultDate || new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Bangkok' }),
@@ -222,18 +226,18 @@ export function JobDialog({
     Loaded_Qty: job?.Loaded_Qty || '',
     job_type: (job as any)?.job_type || 'normal',
     chassis_plate: (job as any)?.chassis_plate || '',
-    container_no: (job as any)?.container?.container_no || '',
-    seal_no: (job as any)?.container?.seal_no || '',
-    container_size: (job as any)?.container?.container_size || '',
-    shipping_line: (job as any)?.container?.shipping_line || '',
-    vessel_voyage: (job as any)?.container?.vessel_voyage || '',
-    lfd_demurrage: (job as any)?.container?.lfd_demurrage || '',
-    lfd_detention: (job as any)?.container?.lfd_detention || '',
-    target_temperature: (job as any)?.container?.target_temperature || '',
-    booking_no: (job as any)?.container?.booking_no || '',
-    container_subtype: (job as any)?.container?.container_subtype || 'import',
-    pickup_empty_date: (job as any)?.container?.pickup_empty_date || '',
-    port_closing_datetime: (job as any)?.container?.port_closing_datetime ? (job as any).container.port_closing_datetime.slice(0, 16) : '',
+    container_no: initialContainer?.container_no || '',
+    seal_no: initialContainer?.seal_no || '',
+    container_size: initialContainer?.container_size || '',
+    shipping_line: initialContainer?.shipping_line || '',
+    vessel_voyage: initialContainer?.vessel_voyage || '',
+    lfd_demurrage: initialContainer?.lfd_demurrage || '',
+    lfd_detention: initialContainer?.lfd_detention || '',
+    target_temperature: initialContainer?.target_temperature || '',
+    booking_no: initialContainer?.booking_no || '',
+    container_subtype: initialContainer?.container_subtype || 'import',
+    pickup_empty_date: initialContainer?.pickup_empty_date || '',
+    port_closing_datetime: initialContainer?.port_closing_datetime ? initialContainer.port_closing_datetime.slice(0, 16) : '',
   })
 
   // แตกสตริงเส้นทางหลายจุดที่ถูก join ด้วยลูกศร (legacy) เป็นหลายแถว + ตัดซ้ำ
@@ -298,6 +302,12 @@ export function JobDialog({
   const [extraCosts, setExtraCosts] = useState<ExtraCost[]>(
     parseJson((job?.extra_costs || job?.extra_costs_json) as string | unknown[], []) as ExtraCost[]
   )
+
+  // Container details & inspection photos state
+  const [containerData, setContainerData] = useState<any>(() => {
+    const raw = (job as any)?.container
+    return Array.isArray(raw) ? raw[0] : raw || null
+  })
 
   // Fuel Suggestion State
   const [fuelPrice, setFuelPrice] = useState<number | null>(null)
@@ -575,12 +585,13 @@ export function JobDialog({
               name: destName, 
               lat, 
               lng, 
-              so_no: parsedDestinations[lastIndex]?.so_no || '' 
+              so_no: parsedDestinations[lastIndex]?.so_no || '',
+              stop_type: parsedDestinations[lastIndex]?.stop_type
             }
             if (parsedDestinations.length > 0) parsedDestinations[lastIndex] = fallbackDest
             else parsedDestinations = [fallbackDest]
         } else {
-            parsedDestinations = [{ name: '', lat: '', lng: '', so_no: '' }]
+            parsedDestinations = [{ name: '', lat: '', lng: '', so_no: '', stop_type: undefined }]
         }
       }
 
@@ -610,7 +621,8 @@ export function JobDialog({
           name: d.name || '',
           lat,
           lng,
-          so_no: d.so_no !== null && d.so_no !== undefined ? String(d.so_no) : ''
+          so_no: d.so_no !== null && d.so_no !== undefined ? String(d.so_no) : '',
+          stop_type: d.stop_type
         }
       })
 
@@ -635,6 +647,12 @@ export function JobDialog({
       setAssignments(initialAssignments)
 
       const firstAssign = initialAssignments[0]
+      const targetContainer = Array.isArray((targetJob as any)?.container)
+        ? (targetJob as any).container[0]
+        : (targetJob as any)?.container
+
+      setContainerData(targetContainer || null)
+
       const newFormData = {
         Job_ID: syncMode === 'edit' ? (targetJob.Job_ID || '') : generateJobId(),
         Plan_Date: targetJob.Plan_Date || targetJob.Pickup_Date || defaultDate || new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Bangkok' }),
@@ -666,18 +684,18 @@ export function JobDialog({
         Loaded_Qty: targetJob.Loaded_Qty !== null && targetJob.Loaded_Qty !== undefined ? targetJob.Loaded_Qty : '',
         job_type: (targetJob as any)?.job_type || 'normal',
         chassis_plate: (targetJob as any)?.chassis_plate || '',
-        container_no: (targetJob as any)?.container?.container_no || '',
-        seal_no: (targetJob as any)?.container?.seal_no || '',
-        container_size: (targetJob as any)?.container?.container_size || '',
-        shipping_line: (targetJob as any)?.container?.shipping_line || '',
-        vessel_voyage: (targetJob as any)?.container?.vessel_voyage || '',
-        lfd_demurrage: (targetJob as any)?.container?.lfd_demurrage || '',
-        lfd_detention: (targetJob as any)?.container?.lfd_detention || '',
-        target_temperature: (targetJob as any)?.container?.target_temperature || '',
-        booking_no: (targetJob as any)?.container?.booking_no || '',
-        container_subtype: (targetJob as any)?.container?.container_subtype || 'import',
-        pickup_empty_date: (targetJob as any)?.container?.pickup_empty_date || '',
-        port_closing_datetime: (targetJob as any)?.container?.port_closing_datetime ? (targetJob as any).container.port_closing_datetime.slice(0, 16) : '',
+        container_no: targetContainer?.container_no || '',
+        seal_no: targetContainer?.seal_no || '',
+        container_size: targetContainer?.container_size || '',
+        shipping_line: targetContainer?.shipping_line || '',
+        vessel_voyage: targetContainer?.vessel_voyage || '',
+        lfd_demurrage: targetContainer?.lfd_demurrage || '',
+        lfd_detention: targetContainer?.lfd_detention || '',
+        target_temperature: targetContainer?.target_temperature || '',
+        booking_no: targetContainer?.booking_no || '',
+        container_subtype: targetContainer?.container_subtype || 'import',
+        pickup_empty_date: targetContainer?.pickup_empty_date || '',
+        port_closing_datetime: targetContainer?.port_closing_datetime ? targetContainer.port_closing_datetime.slice(0, 16) : '',
       }
       setFormData(newFormData)
     }
@@ -689,12 +707,7 @@ export function JobDialog({
       if (job.Job_ID) {
         const fetchFresh = async () => {
           try {
-            const supabase = createClient()
-            const { data: freshJob } = await supabase
-              .from('Jobs_Main')
-              .select('*')
-              .eq('Job_ID', job.Job_ID)
-              .single()
+            const freshJob = await getFreshJob(job.Job_ID)
             if (freshJob && isMounted) {
               populateFromJob(freshJob as Job)
             }
@@ -1783,6 +1796,86 @@ export function JobDialog({
                         className="bg-background border-input text-xl h-14"
                     />
                 </div>
+
+                {/* Container Inspection Photos & EIR Preview */}
+                {(() => {
+                    let condPhotos: Record<string, string> = {}
+                    if (containerData?.container_condition_json) {
+                        if (typeof containerData.container_condition_json === 'string') {
+                            try { condPhotos = JSON.parse(containerData.container_condition_json) } catch {}
+                        } else if (typeof containerData.container_condition_json === 'object') {
+                            condPhotos = containerData.container_condition_json as Record<string, string>
+                        }
+                    }
+                    const condKeys: { key: string; label: string }[] = [
+                        { key: 'front', label: 'ด้านหน้า (Front)' },
+                        { key: 'back', label: 'ด้านหลัง (Back)' },
+                        { key: 'left', label: 'ด้านซ้าย (Left)' },
+                        { key: 'right', label: 'ด้านขวา (Right)' },
+                        { key: 'top', label: 'หลังคา (Roof)' },
+                        { key: 'floor', label: 'พื้นตู้ (Floor)' },
+                        { key: 'seal', label: 'ซีล (Seal)' },
+                    ]
+                    const hasCondPhotos = Object.values(condPhotos).some(Boolean)
+                    const eirOut = containerData?.eir_gate_out_url || (job?.Pickup_Photo_Url ? job.Pickup_Photo_Url.split(',')[0] : null)
+                    const eirIn = containerData?.eir_gate_in_url || (job?.Photo_Proof_Url ? job.Photo_Proof_Url.split(',')[0] : null)
+
+                    if (!hasCondPhotos && !eirOut && !eirIn) return null
+
+                    return (
+                        <div className="space-y-4 p-5 rounded-2xl bg-muted/40 border border-border">
+                            <Label className="text-primary text-xl font-black uppercase tracking-tight flex items-center gap-2">
+                                <Package className="w-5 h-5" /> หลักฐานตรวจสภาพตู้ (7 จุด) และใบรับ-คืนตู้ (EIR)
+                            </Label>
+                            
+                            {/* EIR Receipts */}
+                            {(eirOut || eirIn) && (
+                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                    {eirOut && (
+                                        <div className="p-3 bg-background rounded-xl border border-border space-y-2">
+                                            <span className="text-xs font-bold text-muted-foreground uppercase">ใบรับตู้ (EIR Gate-Out)</span>
+                                            <a href={eirOut} target="_blank" rel="noopener noreferrer" className="block relative aspect-video rounded-lg overflow-hidden border border-border group bg-muted">
+                                                {/* eslint-disable-next-line @next/next/no-img-element */}
+                                                <img src={eirOut} alt="EIR Gate Out" className="w-full h-full object-cover group-hover:scale-105 transition-transform" />
+                                            </a>
+                                        </div>
+                                    )}
+                                    {eirIn && (
+                                        <div className="p-3 bg-background rounded-xl border border-border space-y-2">
+                                            <span className="text-xs font-bold text-muted-foreground uppercase">ใบรับ/คืนตู้ (EIR Gate-In)</span>
+                                            <a href={eirIn} target="_blank" rel="noopener noreferrer" className="block relative aspect-video rounded-lg overflow-hidden border border-border group bg-muted">
+                                                {/* eslint-disable-next-line @next/next/no-img-element */}
+                                                <img src={eirIn} alt="EIR Gate In" className="w-full h-full object-cover group-hover:scale-105 transition-transform" />
+                                            </a>
+                                        </div>
+                                    )}
+                                </div>
+                            )}
+
+                            {/* 7-Point Container Condition */}
+                            {hasCondPhotos && (
+                                <div className="space-y-2 pt-2">
+                                    <span className="text-xs font-bold text-muted-foreground uppercase">รูปถ่ายตรวจสภาพตู้ 7 จุด (Inspection)</span>
+                                    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
+                                        {condKeys.map(({ key, label }) => {
+                                            const url = condPhotos[key]
+                                            if (!url) return null
+                                            return (
+                                                <div key={key} className="space-y-1">
+                                                    <span className="text-[11px] font-bold text-slate-500 block truncate">{label}</span>
+                                                    <a href={url} target="_blank" rel="noopener noreferrer" className="block relative aspect-square rounded-lg overflow-hidden border border-border group bg-background">
+                                                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                                                        <img src={url} alt={label} className="w-full h-full object-cover group-hover:scale-105 transition-transform" />
+                                                    </a>
+                                                </div>
+                                            )
+                                        })}
+                                    </div>
+                                </div>
+                            )}
+                        </div>
+                    )
+                })()}
             </div>
           )}
 

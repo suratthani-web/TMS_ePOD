@@ -16,13 +16,25 @@ import {
   Eye,
   ClipboardList,
   ExternalLink,
-  FileX
+  FileX,
+  ShieldCheck,
+  Ship
 } from "lucide-react"
 import Image from "next/image"
 import Link from "next/link"
 import { Job } from "@/lib/supabase/jobs"
 import { useEffect, useState } from "react"
 import dynamic from "next/dynamic"
+
+const CONDITION_KEYS = [
+  { key: 'front', label: '1. ด้านหน้าตู้ (Front)' },
+  { key: 'back', label: '2. ด้านหลังตู้ (Back)' },
+  { key: 'left', label: '3. ด้านซ้ายตู้ (Left)' },
+  { key: 'right', label: '4. ด้านขวาตู้ (Right)' },
+  { key: 'top', label: '5. ด้านบนหลังคา (Roof)' },
+  { key: 'floor', label: '6. พื้นตู้ (Floor)' },
+  { key: 'seal', label: '7. ซีลตู้สินค้า (Seal)' },
+]
 import { getJobGPSData } from "@/lib/actions/gps-actions"
 import { cn } from "@/lib/utils"
 import { useLanguage } from "@/components/providers/language-provider"
@@ -76,8 +88,32 @@ export function JobSummaryDialog({ open, onOpenChange, job, routes }: JobSummary
 
   if (!job) return null
 
-  const pickupPhotos = job.Pickup_Photo_Url ? job.Pickup_Photo_Url.split(',').filter(Boolean) : []
-  const podPhotos = job.Photo_Proof_Url ? job.Photo_Proof_Url.split(',').filter(Boolean) : []
+  const rawContainer = (job as any).container
+  const containerData = Array.isArray(rawContainer) ? rawContainer[0] : rawContainer
+
+  let conditionPhotos: Record<string, string> = {}
+  if (containerData?.container_condition_json) {
+    if (typeof containerData.container_condition_json === 'string') {
+      try { conditionPhotos = JSON.parse(containerData.container_condition_json) } catch {}
+    } else if (typeof containerData.container_condition_json === 'object') {
+      conditionPhotos = containerData.container_condition_json as Record<string, string>
+    }
+  }
+
+  const conditionUrls = Object.values(conditionPhotos).filter((u): u is string => typeof u === 'string' && u.length > 0)
+  const eirGateOut = containerData?.eir_gate_out_url || null
+  const eirGateIn = containerData?.eir_gate_in_url || null
+
+  const rawPickupPhotos = job.Pickup_Photo_Url ? job.Pickup_Photo_Url.split(',').map(s => s.trim()).filter(Boolean) : []
+  const extraPickup = [eirGateOut, ...conditionUrls].filter((u): u is string => Boolean(u))
+  const pickupPhotos = Array.from(new Set([...rawPickupPhotos, ...extraPickup]))
+
+  const rawPodPhotos = job.Photo_Proof_Url ? job.Photo_Proof_Url.split(',').map(s => s.trim()).filter(Boolean) : []
+  const extraPod = [eirGateIn].filter((u): u is string => Boolean(u))
+  const podPhotos = Array.from(new Set([...rawPodPhotos, ...extraPod]))
+
+  const hasConditionPhotos = conditionUrls.length > 0 || Boolean(eirGateOut) || Boolean(eirGateIn)
+  const totalInspectionPhotos = conditionUrls.length + (eirGateOut ? 1 : 0) + (eirGateIn ? 1 : 0)
   
   const gpsPoints = gpsData?.route || []
   const latestLocation = gpsData?.latest
@@ -234,6 +270,80 @@ export function JobSummaryDialog({ open, onOpenChange, job, routes }: JobSummary
                     </div>
                 </section>
 
+                {/* Container Info Section */}
+                {(job.job_type === 'container' || containerData) && (
+                  <section className="space-y-4">
+                    <div className="flex items-center gap-2 text-foreground font-black border-l-4 border-amber-500 pl-3 uppercase tracking-wider text-xl">
+                      <Package size={18} className="text-amber-500" />
+                      <span>ข้อมูลตู้สินค้า (Container Info)</span>
+                      <span className="text-xs font-bold uppercase px-2 py-0.5 rounded bg-amber-500/10 text-amber-600 border border-amber-500/20">
+                        {containerData?.container_subtype === 'export' ? 'ส่งออก (Export)' : 'นำเข้า (Import)'}
+                      </span>
+                    </div>
+                    <div className="bg-muted rounded-xl p-4 border border-border grid grid-cols-2 sm:grid-cols-3 gap-y-4 gap-x-4 shadow-sm text-sm">
+                      <div>
+                        <p className="text-xs font-black uppercase text-slate-500 mb-0.5">หมายเลขตู้ (Container No)</p>
+                        <p className="text-lg font-black text-slate-900">{containerData?.container_no || '-'}</p>
+                      </div>
+                      <div>
+                        <p className="text-xs font-black uppercase text-slate-500 mb-0.5">เบอร์ซีล (Seal No)</p>
+                        <p className="text-lg font-black text-slate-900">{containerData?.seal_no || '-'}</p>
+                      </div>
+                      <div>
+                        <p className="text-xs font-black uppercase text-slate-500 mb-0.5">ขนาดตู้ (Size)</p>
+                        <p className="text-lg font-black text-slate-900">{containerData?.container_size || '-'}</p>
+                      </div>
+                      <div>
+                        <p className="text-xs font-black uppercase text-slate-500 mb-0.5">สายเรือ (Shipping Line)</p>
+                        <p className="text-lg font-black text-slate-900">{containerData?.shipping_line || '-'}</p>
+                      </div>
+                      <div>
+                        <p className="text-xs font-black uppercase text-slate-500 mb-0.5">เที่ยวเรือ (Vessel/Voyage)</p>
+                        <p className="text-lg font-black text-slate-900">{containerData?.vessel_voyage || '-'}</p>
+                      </div>
+                      <div>
+                        <p className="text-xs font-black uppercase text-slate-500 mb-0.5">ประเภทสินค้า (Cargo Type)</p>
+                        <p className="text-lg font-black text-slate-900">{job.Cargo_Type || '-'}</p>
+                      </div>
+                      {containerData?.booking_no && (
+                        <div>
+                          <p className="text-xs font-black uppercase text-slate-500 mb-0.5">Booking No</p>
+                          <p className="text-lg font-black text-slate-900">{containerData.booking_no}</p>
+                        </div>
+                      )}
+                      {job.chassis_plate && (
+                        <div>
+                          <p className="text-xs font-black uppercase text-slate-500 mb-0.5">ทะเบียนหาง (Chassis)</p>
+                          <p className="text-lg font-black text-slate-900">{job.chassis_plate}</p>
+                        </div>
+                      )}
+                      {containerData?.container_subtype === 'export' ? (
+                        <>
+                          <div>
+                            <p className="text-xs font-black uppercase text-slate-500 mb-0.5">วันรับตู้เปล่า</p>
+                            <p className="text-lg font-black text-emerald-600">{containerData?.pickup_empty_date || '-'}</p>
+                          </div>
+                          <div>
+                            <p className="text-xs font-black uppercase text-slate-500 mb-0.5">ปิดรับตู้ (Port Closing)</p>
+                            <p className="text-lg font-black text-rose-600">{containerData?.port_closing_datetime ? containerData.port_closing_datetime.replace('T', ' ') : '-'}</p>
+                          </div>
+                        </>
+                      ) : (
+                        <>
+                          <div>
+                            <p className="text-xs font-black uppercase text-slate-500 mb-0.5">LFD ท่าเรือ (Demurrage)</p>
+                            <p className="text-lg font-black text-amber-600">{containerData?.lfd_demurrage || '-'}</p>
+                          </div>
+                          <div>
+                            <p className="text-xs font-black uppercase text-slate-500 mb-0.5">LFD คืนตู้ (Detention)</p>
+                            <p className="text-lg font-black text-amber-600">{containerData?.lfd_detention || '-'}</p>
+                          </div>
+                        </>
+                      )}
+                    </div>
+                  </section>
+                )}
+
                 <section className="space-y-4">
                     <div className="flex items-center gap-2 text-foreground font-black border-l-4 border-emerald-500 pl-3 uppercase tracking-wider text-xl">
                         <MapPin size={18} className="text-emerald-500" />
@@ -286,6 +396,83 @@ export function JobSummaryDialog({ open, onOpenChange, job, routes }: JobSummary
                 )}
               </div>
             </section>
+
+            {/* 7-Point Container Inspection Section */}
+            {hasConditionPhotos && (
+              <section className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <h3 className="text-xl font-black text-foreground flex items-center gap-2 border-l-4 border-amber-500 pl-3 uppercase tracking-wider">
+                    <Package size={16} className="text-amber-500" />
+                    รูปตรวจสภาพตู้ 7 จุด (7-Point Inspection) & EIR
+                  </h3>
+                  <span className="text-base font-bold text-muted-foreground font-bold uppercase no-print">
+                    {t('reports.photo_count', { count: totalInspectionPhotos })}
+                  </span>
+                </div>
+
+                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
+                  {/* EIR Gate-Out */}
+                  {eirGateOut && (
+                    <div className="space-y-1.5">
+                      <div className="flex items-center gap-1.5 text-xs font-bold text-amber-600 uppercase">
+                        <FileText size={13} />
+                        <span className="truncate">ใบรับตู้ EIR Gate-Out</span>
+                      </div>
+                      <div 
+                        className="relative aspect-[4/3] rounded-xl overflow-hidden border border-amber-500/30 bg-muted group cursor-pointer" 
+                        onClick={() => setPreviewUrl(eirGateOut)}
+                      >
+                        <Image src={eirGateOut} alt="EIR Gate-Out" fill className="object-cover transition-transform duration-500 hover:scale-110" />
+                        <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                          <ExternalLink size={20} className="text-white" />
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* EIR Gate-In */}
+                  {eirGateIn && (
+                    <div className="space-y-1.5">
+                      <div className="flex items-center gap-1.5 text-xs font-bold text-indigo-600 uppercase">
+                        <FileText size={13} />
+                        <span className="truncate">ใบรับ/คืนตู้ EIR Gate-In</span>
+                      </div>
+                      <div 
+                        className="relative aspect-[4/3] rounded-xl overflow-hidden border border-indigo-500/30 bg-muted group cursor-pointer" 
+                        onClick={() => setPreviewUrl(eirGateIn)}
+                      >
+                        <Image src={eirGateIn} alt="EIR Gate-In" fill className="object-cover transition-transform duration-500 hover:scale-110" />
+                        <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                          <ExternalLink size={20} className="text-white" />
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* 7 Condition Checkpoints */}
+                  {CONDITION_KEYS.map(({ key, label }) => {
+                    const url = conditionPhotos[key]
+                    if (!url) return null
+                    return (
+                      <div key={key} className="space-y-1.5">
+                        <div className="text-xs font-bold text-slate-500 uppercase truncate">
+                          {label}
+                        </div>
+                        <div 
+                          className="relative aspect-[4/3] rounded-xl overflow-hidden border border-border bg-muted group cursor-pointer" 
+                          onClick={() => setPreviewUrl(url)}
+                        >
+                          <Image src={url} alt={label} fill className="object-cover transition-transform duration-500 hover:scale-110" />
+                          <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                            <ExternalLink size={20} className="text-white" />
+                          </div>
+                        </div>
+                      </div>
+                    )
+                  })}
+                </div>
+              </section>
+            )}
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
               {/* Pickup Info */}

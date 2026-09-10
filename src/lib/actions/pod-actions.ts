@@ -506,6 +506,12 @@ export async function submitJobPickup(jobId: string, formData: FormData) {
             })
             .eq('job_id', jobId)
         
+        const conditionUrls = Object.values(conditionMap).filter(Boolean)
+        const allPickupPhotos = Array.from(new Set([...photoUrls, ...conditionUrls]))
+        if (allPickupPhotos.length > 0) {
+            updateData.Pickup_Photo_Url = allPickupPhotos.join(',')
+        }
+        
         updateData.Notes = `[AUTO] ตู้: ${containerNo} / ซีล: ${sealNo}`
     } else {
         const signatureFile = formData.get("signature") as File

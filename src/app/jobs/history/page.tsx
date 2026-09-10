@@ -22,7 +22,7 @@ export default async function JobHistoryPage(props: Props) {
   const currentBranchId = branch === 'All' ? undefined : branch
 
   const page = Number(searchParams.page) || 1
-  const query = (searchParams.q as string) || ''
+  const query = (searchParams.q as string) || (searchParams.id as string) || ''
   const dateFrom = (searchParams.from as string) || ''
   const dateTo = (searchParams.to as string) || ''
   const status = (searchParams.status as string) || ''

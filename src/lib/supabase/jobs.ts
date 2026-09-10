@@ -181,7 +181,7 @@ export async function getLiveActiveJobs(branchId?: string, customerId?: string |
         
         let query = supabase
             .from('Jobs_Main')
-            .select('*')
+            .select('*, container:jobs_container(*)')
             .in('Job_Status', ['Assigned', 'Confirmed', 'Picked Up', 'In Transit', 'Arrived', 'SOS'])
 
         if (customerId) {

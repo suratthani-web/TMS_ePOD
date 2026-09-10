@@ -17,6 +17,7 @@ import { appendJobToMaster } from '@/lib/actions/master-sheet-sync'
 import { getSession } from '@/lib/session'
 import { resolveDistanceKm } from '@/lib/ai/distance'
 import { resolvePcgPrice, PCG_CUSTOMER_ID } from '@/lib/pricing/pcg-rate-card'
+import { getJobById } from '@/lib/supabase/jobs'
 
 export type JobFormData = {
   Job_ID: string
@@ -574,6 +575,7 @@ export async function createBulkJobs(
     normalized.Volume_Cbm = getValue(['Volume_Cbm', 'volume', 'ปริมาตร', 'คิว'])
     normalized.Price_Cust_Total = getValue(['Price_Cust_Total', 'price', 'รายได้', 'ราคาขาย', 'ราคาลูกค้า'])
     normalized.Cost_Driver_Total = getValue(['Cost_Driver_Total', 'cost', 'ต้นทุน', 'ค่ารถ', 'จ่ายคนขับ', 'ค่าเที่ยว'])
+    normalized.Cargo_Type = getValue(['Cargo_Type', 'cargo_type', 'ประเภทสินค้า', 'สินค้า', 'ชนิดสินค้า'])
     normalized.Notes = getValue(['Notes', 'remark', 'หมายเหตุ'])
     normalized.Ref_No = getValue(['Ref_No', 'so', 'do', 'เลขที่อ้างอิง'])
     normalized.Branch_ID = getValue(['Branch_ID', 'branch', 'สาขา'])
@@ -600,6 +602,10 @@ export async function createBulkJobs(
     normalized.lfd_demurrage = getValue(['lfd_demurrage', 'LFD Demurrage'])
     normalized.lfd_detention = getValue(['lfd_detention', 'LFD Detention'])
     normalized.target_temperature = getValue(['target_temperature', 'อุณหภูมิเป้าหมาย'])
+    normalized.booking_no = getValue(['booking_no', 'เลข booking', 'booking', 'เลขบุ๊คกิ้ง', 'บุ๊คกิ้ง', 'เลขใบจอง'])
+    normalized.container_subtype = getValue(['container_subtype', 'ประเภทงานตู้', 'ชนิดงานตู้', 'subtype'])
+    normalized.pickup_empty_date = getValue(['pickup_empty_date', 'วันเริ่มรับตู้เปล่า', 'วันรับตู้เปล่า', 'วันรับตู้', 'pickup_empty'])
+    normalized.port_closing_datetime = getValue(['port_closing_datetime', 'port_closing', 'closing', 'clossing', 'กำหนดปิดรับตู้', 'ปิดรับตู้', 'วันปิดรับตู้'])
 
     // Multi-Origin & Destination Detection
     const origins: { name: string, lat: number | null, lng: number | null }[] = []
@@ -849,6 +855,7 @@ export async function createBulkJobs(
       Vehicle_Plate: vehiclePlate || null,
       Vehicle_Type: vehicle?.Vehicle_Type || (data.Vehicle_Type as string) || '4-Wheel',
       Job_Status: (data.Job_Status as string) || 'New',
+      Cargo_Type: (data.Cargo_Type as string) || (j.Cargo_Type as string) || null,
       Notes: data.Notes as string || null,
       Price_Cust_Total: Number(data.Price_Cust_Total) || 0,
       Cost_Driver_Total: Number(data.Cost_Driver_Total) || 0,
@@ -878,14 +885,18 @@ export async function createBulkJobs(
     // Add raw container fields back to the object so handleContainerData can find them
     const fullJobData: Partial<JobFormData> = {
         ...sanitized,
-        container_no: data.container_no as string | null | undefined,
-        seal_no: data.seal_no as string | null | undefined,
-        container_size: data.container_size as string | null | undefined,
-        shipping_line: data.shipping_line as string | null | undefined,
-        vessel_voyage: data.vessel_voyage as string | null | undefined,
-        lfd_demurrage: data.lfd_demurrage as string | null | undefined,
-        lfd_detention: data.lfd_detention as string | null | undefined,
-        target_temperature: data.target_temperature as string | number | null | undefined
+        container_no: (data.container_no ?? j.container_no) as string | null | undefined,
+        seal_no: (data.seal_no ?? j.seal_no) as string | null | undefined,
+        container_size: (data.container_size ?? j.container_size) as string | null | undefined,
+        shipping_line: (data.shipping_line ?? j.shipping_line) as string | null | undefined,
+        vessel_voyage: (data.vessel_voyage ?? j.vessel_voyage) as string | null | undefined,
+        lfd_demurrage: (data.lfd_demurrage ?? j.lfd_demurrage) as string | null | undefined,
+        lfd_detention: (data.lfd_detention ?? j.lfd_detention) as string | null | undefined,
+        target_temperature: (data.target_temperature ?? j.target_temperature) as string | number | null | undefined,
+        booking_no: (data.booking_no ?? j.booking_no) as string | null | undefined,
+        container_subtype: (data.container_subtype ?? j.container_subtype) as string | null | undefined,
+        pickup_empty_date: (normalizeDate(data.pickup_empty_date) || (data.pickup_empty_date as string) || (j.pickup_empty_date as string)) as string | null | undefined,
+        port_closing_datetime: (data.port_closing_datetime ?? j.port_closing_datetime) as string | null | undefined,
     }
     
     if (typeof sanitized.Price_Cust_Total === 'string') fullJobData.Price_Cust_Total = parseFloat(sanitized.Price_Cust_Total) || 0
@@ -1613,4 +1624,8 @@ export async function publishAllDrafts(date: string, branchId?: string) {
         console.error('[Actions] publishAllDrafts error:', e)
         return { success: false, error: { message: e instanceof Error ? e.message : "Internal Server Error" } }
     }
+}
+
+export async function getFreshJob(jobId: string) {
+    return await getJobById(jobId)
 }
