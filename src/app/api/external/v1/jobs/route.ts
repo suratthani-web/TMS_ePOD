@@ -88,6 +88,14 @@ export async function POST(req: NextRequest) {
         let finalJobId = effectiveJobId
         let data: any = null
 
+        // Optional pre-assignment + multi-drop (all additive; only set when supplied)
+        const assign: Record<string, unknown> = {}
+        if (vehicle_plate) assign.Vehicle_Plate = String(vehicle_plate).trim()
+        if (driver_name) assign.Driver_Name = String(driver_name).trim()
+        if (Array.isArray(stops) && stops.length > 0) {
+            assign.original_destinations_json = JSON.stringify(stops)
+        }
+
         const jobPayload: Record<string, unknown> = {
             Job_ID: finalJobId,
             Customer_ID: customer_id,
@@ -101,7 +109,8 @@ export async function POST(req: NextRequest) {
             Job_Status: 'New',
             Notes: combinedNotes,
             Created_At: new Date().toISOString(),
-            ...(branch_id ? { Branch_ID: branch_id } : {})
+            ...(branch_id ? { Branch_ID: branch_id } : {}),
+            ...assign
         }
 
         const insertRes = await supabase.from('Jobs_Main').insert([jobPayload]).select()
@@ -118,7 +127,8 @@ export async function POST(req: NextRequest) {
                     Cargo_Type: effectiveCargoType,
                     ...(effectiveWeight ? { Weight_Kg: effectiveWeight } : {}),
                     Notes: combinedNotes,
-                    ...(branch_id ? { Branch_ID: branch_id } : {})
+                    ...(branch_id ? { Branch_ID: branch_id } : {}),
+                    ...assign
                 })
                 .eq('Job_ID', finalJobId)
                 .select()
