@@ -90,7 +90,30 @@ export async function POST(req: NextRequest) {
 
         // Optional pre-assignment + multi-drop (all additive; only set when supplied)
         const assign: Record<string, unknown> = {}
-        if (vehicle_plate) assign.Vehicle_Plate = String(vehicle_plate).trim()
+        if (vehicle_plate) {
+            const plate = String(vehicle_plate).trim()
+            assign.Vehicle_Plate = plate
+            // Auto-resolve the real driver account from the plate so the job is
+            // properly assigned (driver app, Sub_ID, cost calc). Additive: if the
+            // plate isn't in Master_Drivers, we just keep the plate/name text.
+            try {
+                const { data: drv } = await supabase
+                    .from('Master_Drivers')
+                    .select('Driver_ID, Driver_Name, Sub_ID, Vehicle_Type')
+                    .ilike('Vehicle_Plate', plate)
+                    .limit(1)
+                    .maybeSingle()
+                if (drv) {
+                    if (drv.Driver_ID) assign.Driver_ID = drv.Driver_ID
+                    if (drv.Driver_Name) assign.Driver_Name = drv.Driver_Name
+                    if (drv.Sub_ID !== null && drv.Sub_ID !== undefined) assign.Sub_ID = drv.Sub_ID
+                    if (!vehicle_type && drv.Vehicle_Type) assign.Vehicle_Type = drv.Vehicle_Type
+                }
+            } catch (e) {
+                console.warn('[external jobs] driver resolve by plate failed:', e)
+            }
+        }
+        // Explicit driver_name from the caller always wins over the resolved one.
         if (driver_name) assign.Driver_Name = String(driver_name).trim()
         if (Array.isArray(stops) && stops.length > 0) {
             assign.original_destinations_json = JSON.stringify(stops)
