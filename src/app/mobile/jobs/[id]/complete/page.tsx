@@ -35,6 +35,10 @@ export default function JobCompletePage() {
   const [reconciled, setReconciled] = useState<ReconciledItem[]>([])
   const [requireScan, setRequireScan] = useState(false)
   const [loading, setLoading] = useState(false)
+  // Immediate press feedback: flips true the instant a valid submit starts, so
+  // the driver sees the button react during the ~1s report-capture window before
+  // the full loading screen appears. `loading` alone was too late.
+  const [submitting, setSubmitting] = useState(false)
   const [completed, setCompleted] = useState(false)
 
   // Extra Service / Floor Climb Modal State
@@ -80,10 +84,14 @@ export default function JobCompletePage() {
 
   useEffect(() => {
     if (params.id) {
-        getJobScans(params.id).then(setReconciled).catch(() => {})
         getScanRequirement(params.id).then(setRequireScan).catch(() => {})
         getJobDetails(params.id).then(j => {
             setJob(j)
+            // Only load the item checklist for the drop currently being delivered
+            // (= number of signatures already captured), so a multi-drop job
+            // doesn't show every drop's items at once.
+            const dropIdx = j?.Signature_Url ? j.Signature_Url.split(',').filter(Boolean).length : 0
+            getJobScans(params.id, dropIdx).then(setReconciled).catch(() => {})
             // User requested to remove the default suggested number to prevent accidental submission
             // if (j?.Loaded_Qty) {
             //     setLoadedQty(j.Loaded_Qty.toString())
@@ -171,6 +179,7 @@ export default function JobCompletePage() {
 
     // Lock now — validations passed and we're committed to submitting.
     submittingRef.current = true
+    setSubmitting(true) // immediate visual feedback on the button
 
     // NOTE: do NOT setLoading(true) yet. The loading screen is an early-return
     // that unmounts the off-screen report DOM, which nulls reportRef/
@@ -385,6 +394,7 @@ export default function JobCompletePage() {
         }
     } finally {
         setLoading(false)
+        setSubmitting(false)
         // Release the in-flight lock so a genuinely rejected submission can be
         // retried. On success/offline the completed screen replaces the form,
         // so the button is gone regardless.
@@ -609,12 +619,16 @@ export default function JobCompletePage() {
                 <SignaturePad onSave={setSignature} />
                 </section>
         <div className="space-y-3">
-            <Button 
+            <Button
                 onClick={handleSubmit}
-                disabled={loading}
-                className="w-full h-16 bg-gradient-to-r from-blue-600 via-indigo-600 to-blue-700 shadow-blue-500/30 text-white font-black text-lg shadow-xl transition-all duration-300 rounded-2xl active:scale-95"
+                disabled={loading || submitting}
+                className="w-full h-16 bg-gradient-to-r from-blue-600 via-indigo-600 to-blue-700 shadow-blue-500/30 text-white font-black text-lg shadow-xl transition-all duration-300 rounded-2xl active:scale-95 disabled:opacity-70 disabled:cursor-not-allowed gap-2"
             >
-                {isContainer ? "ยืนยันการคืนตู้" : (_currentStopType === 'load' ? `ยืนยันการโหลดสินค้า (จุดที่ ${_doneDrops + 1})` : "ยืนยันการส่งงาน")}
+                {submitting ? (
+                    <><Loader2 className="animate-spin" size={22} /> กำลังส่ง...</>
+                ) : (
+                    isContainer ? "ยืนยันการคืนตู้" : (_currentStopType === 'load' ? `ยืนยันการโหลดสินค้า (จุดที่ ${_doneDrops + 1})` : "ยืนยันการส่งงาน")
+                )}
             </Button>
             
             {/* Validation Feedback */}

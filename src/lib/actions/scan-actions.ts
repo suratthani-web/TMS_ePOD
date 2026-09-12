@@ -14,19 +14,25 @@ export interface ReconciledItem {
  * ดึง scan ของงานมารวมยอด "รับ vs ส่ง" ต่อชิ้น (จัดกลุ่มด้วย code; ถ้าไม่มี code ใช้ label)
  * ใช้เป็น checklist ตอนส่ง: ชิ้นไหนรับมากี่ชิ้น ส่งไปแล้วกี่ชิ้น เหลือเท่าไร
  */
-export async function getJobScans(jobId: string): Promise<ReconciledItem[]> {
+export async function getJobScans(jobId: string, dropIndex?: number | null): Promise<ReconciledItem[]> {
   jobId = decodeURIComponent(jobId)
   const supabase = createAdminClient()
 
   const { data, error } = await supabase
     .from("Job_Scans")
-    .select("phase, code, label, qty")
+    .select("phase, code, label, qty, drop_index")
     .eq("Job_ID", jobId)
 
   if (error || !data) return []
 
+  const rows = (data as Array<{ phase: string; code: string | null; label: string | null; qty: number; drop_index: number | null }>)
+    // Filter to the drop currently being delivered so a multi-drop job shows
+    // only that drop's items. Rows with a null drop_index are unassigned to a
+    // drop (single-drop / legacy) and show on every drop.
+    .filter(row => dropIndex == null || row.drop_index == null || Number(row.drop_index) === dropIndex)
+
   const map = new Map<string, ReconciledItem>()
-  for (const row of data as Array<{ phase: string; code: string | null; label: string | null; qty: number }>) {
+  for (const row of rows) {
     const code = row.code?.trim() || null
     const label = row.label?.trim() || code || "(ไม่ระบุ)"
     const key = code || `label:${label}`
