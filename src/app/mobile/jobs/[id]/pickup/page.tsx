@@ -14,7 +14,7 @@ import { getJobDetails } from "@/app/mobile/jobs/actions"
 import { getScanRequirement } from "@/lib/actions/scan-actions"
 import { Job } from "@/lib/supabase/jobs"
 import type { JobContainer } from "@/types/database"
-import { Loader2, Box, Info, Camera, ShieldCheck, ChevronRight } from "lucide-react"
+import { Loader2, Box, Info, Camera, ShieldCheck, ChevronRight, ChevronDown, StickyNote } from "lucide-react"
 import html2canvas from "html2canvas"
 import { withTimeout } from "@/lib/utils/with-timeout"
 import { QuantityStepper } from "@/components/mobile/quantity-stepper"
@@ -38,6 +38,7 @@ export default function JobPickupPage() {
   const [completed, setCompleted] = useState(false)
   const [loading, setLoading] = useState(false)
   const [jobLoaded, setJobLoaded] = useState(false)
+  const [showNotes, setShowNotes] = useState(false)
   
   // Container Fields overrides (Driver can update if needed)
   const [containerNo, setContainerNo] = useState("")
@@ -358,12 +359,29 @@ export default function JobPickupPage() {
                         </div>
                         {job?.Cargo_Type && (
                             <div className="p-3 bg-muted/40 rounded-2xl border border-border/50 text-xs font-bold text-foreground">
-                                <span className="text-muted-foreground font-medium">รายการ: </span>{job.Cargo_Type}
+                                <span className="text-muted-foreground font-medium">รายการ: </span>
+                                <span className="line-clamp-2">{job.Cargo_Type}</span>
                             </div>
                         )}
+                        {/* Notes carry the raw WMS trace + driver load logs — noisy and
+                            worse with long item names. Collapse by default; tap to view. */}
                         {job?.Notes && (
-                            <div className="p-3 bg-amber-500/10 border border-amber-500/20 rounded-2xl text-xs text-amber-600 font-medium leading-relaxed">
-                                {job.Notes}
+                            <div className="rounded-2xl border border-amber-500/20 overflow-hidden">
+                                <button
+                                    type="button"
+                                    onClick={() => setShowNotes(v => !v)}
+                                    className="w-full flex items-center justify-between gap-2 px-3 py-2 bg-amber-500/10 text-amber-600 text-xs font-bold"
+                                >
+                                    <span className="flex items-center gap-1.5">
+                                        <StickyNote size={13} /> หมายเหตุงาน (จาก WMS)
+                                    </span>
+                                    <ChevronDown size={15} className={cn("transition-transform", showNotes && "rotate-180")} />
+                                </button>
+                                {showNotes && (
+                                    <div className="px-3 py-2.5 bg-amber-500/5 text-[11px] text-amber-700/90 font-medium leading-relaxed whitespace-pre-line break-words">
+                                        {job.Notes}
+                                    </div>
+                                )}
                             </div>
                         )}
                     </div>

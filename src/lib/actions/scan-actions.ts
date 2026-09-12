@@ -122,22 +122,28 @@ export async function getScanRequirement(jobId: string): Promise<boolean> {
     .select("Customer_ID")
     .eq("Job_ID", jobId)
     .single()
-  // Jobs that arrive with a per-item pickup manifest (e.g. WMS cross-dock) must
-  // be scanned at delivery regardless of the customer flag.
+
+  // The customer's Require_Scan flag is authoritative: if the job is linked to a
+  // real customer, honor its ON/OFF exactly (turning it off must actually stop
+  // forcing a scan — even for WMS cross-dock jobs that carry a pickup manifest).
+  if (job?.Customer_ID) {
+    const { data: cust } = await supabase
+      .from("Master_Customers")
+      .select("Require_Scan")
+      .eq("Customer_ID", job.Customer_ID)
+      .maybeSingle()
+    if (cust) return !!cust.Require_Scan
+  }
+
+  // Fallback for jobs with no linked customer record (e.g. an unmatched WMS
+  // job): if a per-item pickup manifest was seeded, keep requiring a scan so the
+  // items can still be reconciled at delivery.
   const { count: pickupCount } = await supabase
     .from("Job_Scans")
     .select("*", { count: "exact", head: true })
     .eq("Job_ID", jobId)
     .eq("phase", "pickup")
-  if ((pickupCount ?? 0) > 0) return true
-
-  if (!job?.Customer_ID) return false
-  const { data: cust } = await supabase
-    .from("Master_Customers")
-    .select("Require_Scan")
-    .eq("Customer_ID", job.Customer_ID)
-    .single()
-  return !!cust?.Require_Scan
+  return (pickupCount ?? 0) > 0
 }
 
 export interface JobScanSummary {
