@@ -122,6 +122,15 @@ export async function getScanRequirement(jobId: string): Promise<boolean> {
     .select("Customer_ID")
     .eq("Job_ID", jobId)
     .single()
+  // Jobs that arrive with a per-item pickup manifest (e.g. WMS cross-dock) must
+  // be scanned at delivery regardless of the customer flag.
+  const { count: pickupCount } = await supabase
+    .from("Job_Scans")
+    .select("*", { count: "exact", head: true })
+    .eq("Job_ID", jobId)
+    .eq("phase", "pickup")
+  if ((pickupCount ?? 0) > 0) return true
+
   if (!job?.Customer_ID) return false
   const { data: cust } = await supabase
     .from("Master_Customers")

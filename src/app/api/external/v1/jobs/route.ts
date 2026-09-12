@@ -172,6 +172,32 @@ export async function POST(req: NextRequest) {
         }
 
         const createdJob = data[0]
+
+        // Seed the per-item "pickup" manifest into Job_Scans so the driver app can
+        // reconcile each item at delivery (received-at-dock vs delivered-per-drop).
+        // Additive & non-fatal: WMS sends items_list [{code,label,qty,drop}].
+        if (Array.isArray(items_list) && items_list.length > 0) {
+            try {
+                const scanRows = items_list
+                    .filter((it: any) => (it?.code && String(it.code).trim()) || (it?.label && String(it.label).trim()))
+                    .map((it: any) => ({
+                        Job_ID: createdJob.Job_ID,
+                        drop_index: it.drop != null ? Number(it.drop) - 1 : null, // WMS drop is 1-based; TMS delivery drop_index is 0-based
+                        phase: 'pickup',
+                        code: it.code ? String(it.code).trim() : null,
+                        label: it.label ? String(it.label).trim() : null,
+                        qty: Number(it.qty) || 1,
+                        driver_id: (assign as any).Driver_ID || null,
+                    }))
+                if (scanRows.length > 0) {
+                    const { error: seedErr } = await supabase.from('Job_Scans').insert(scanRows)
+                    if (seedErr) console.error('[external jobs] pickup manifest seed error:', seedErr)
+                }
+            } catch (e) {
+                console.error('[external jobs] pickup manifest seed exception:', e)
+            }
+        }
+
         const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://tms-e-pod.vercel.app'
         const trackingUrl = `${appUrl}/track/${createdJob.Job_ID}`
 
