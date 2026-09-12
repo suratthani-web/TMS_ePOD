@@ -59,7 +59,49 @@ export async function POST(req: NextRequest) {
         }
 
         const supabase = createAdminClient()
-        
+
+        // Resolve the customer against Master_Customers so the rest of the loop
+        // (LINE delivery survey, customer billing, credit terms, tax info) links
+        // to the real customer record. WMS sends customer_id = the customer NAME
+        // string, not a TMS Customer_ID, so match by ID first, then by exact name.
+        // Additive & non-fatal: if nothing matches we keep whatever WMS sent.
+        let effectiveCustomerId = customer_id
+        let effectiveCustomerName = customer_name || customer_id
+        try {
+            const idCandidate = String(customer_id || '').trim()
+            const nameCandidate = String(customer_name || customer_id || '').trim()
+            // 1. Already a real Customer_ID?
+            const { data: byId } = await supabase.from('Master_Customers')
+                .select('Customer_ID, Customer_Name')
+                .eq('Customer_ID', idCandidate)
+                .maybeSingle()
+            if (byId?.Customer_ID) {
+                effectiveCustomerId = byId.Customer_ID
+                effectiveCustomerName = byId.Customer_Name || effectiveCustomerName
+            } else {
+                // 2. Resolve by exact (case-insensitive) name. Try the display name,
+                //    then the id-as-name (WMS puts the name in both). ilike with no
+                //    wildcards = case-insensitive exact match; avoid .or() because
+                //    Thai company names contain commas/parens that break its syntax.
+                let match: { Customer_ID: string; Customer_Name: string } | null = null
+                for (const cand of [nameCandidate, idCandidate]) {
+                    if (!cand || match) continue
+                    const { data: byName } = await supabase.from('Master_Customers')
+                        .select('Customer_ID, Customer_Name')
+                        .ilike('Customer_Name', cand)
+                        .limit(1)
+                        .maybeSingle()
+                    if (byName?.Customer_ID) match = byName as any
+                }
+                if (match) {
+                    effectiveCustomerId = match.Customer_ID
+                    effectiveCustomerName = match.Customer_Name
+                }
+            }
+        } catch (e) {
+            console.warn('[external jobs] customer resolve failed, keeping WMS-sent values:', e)
+        }
+
         // Derive Job ID: use explicitly supplied job_id, or map from wms_order_no (e.g. ORD-2026-8008 -> JOB-2026-8008)
         let effectiveJobId = (job_id && String(job_id).trim()) || ''
         if (!effectiveJobId && wms_order_no) {
@@ -121,8 +163,8 @@ export async function POST(req: NextRequest) {
 
         const jobPayload: Record<string, unknown> = {
             Job_ID: finalJobId,
-            Customer_ID: customer_id,
-            Customer_Name: customer_name || customer_id,
+            Customer_ID: effectiveCustomerId,
+            Customer_Name: effectiveCustomerName,
             Origin_Location: pickup_address,
             Dest_Location: delivery_address,
             Vehicle_Type: vehicle_type || '4-Wheel',
@@ -142,8 +184,8 @@ export async function POST(req: NextRequest) {
             const updateRes = await supabase
                 .from('Jobs_Main')
                 .update({
-                    Customer_ID: customer_id,
-                    Customer_Name: customer_name || customer_id,
+                    Customer_ID: effectiveCustomerId,
+                    Customer_Name: effectiveCustomerName,
                     Origin_Location: pickup_address,
                     Dest_Location: delivery_address,
                     Vehicle_Type: vehicle_type || '4-Wheel',
@@ -206,7 +248,7 @@ export async function POST(req: NextRequest) {
             const { sendPushToAdmins } = await import('@/lib/actions/push-actions')
             await sendPushToAdmins({
                 title: '📦 จองงานใหม่ (Enterprise API)',
-                body: `งาน ID: ${createdJob.Job_ID} • ${wms_order_no ? `ออเดอร์: ${wms_order_no} • ` : ''}ลูกค้า: ${customer_name || customer_id}`,
+                body: `งาน ID: ${createdJob.Job_ID} • ${wms_order_no ? `ออเดอร์: ${wms_order_no} • ` : ''}ลูกค้า: ${effectiveCustomerName}`,
                 url: `/jobs`,
                 type: 'standard'
             }, null)
