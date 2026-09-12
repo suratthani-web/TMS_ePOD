@@ -200,3 +200,29 @@ export async function getJobScanSummary(jobId: string): Promise<JobScanSummary> 
     hasData: true,
   }
 }
+
+/**
+ * Driver confirms the actual quantity loaded onto the truck (cross-dock).
+ * The checker's manifest (pickup scans) is the expected total; the driver taps
+ * confirm in the TMS app when the loader has counted. Records a stamped note on
+ * the job for the admin trail. Additive — does not change the scan reconcile.
+ */
+export async function confirmLoadedCount(jobId: string, actualQty: number): Promise<{ ok: boolean; expected: number; actual: number; match: boolean; error?: string }> {
+  try {
+    jobId = decodeURIComponent(jobId)
+    const supabase = createAdminClient()
+    const { data: rows } = await supabase
+      .from("Job_Scans").select("qty").eq("Job_ID", jobId).eq("phase", "pickup")
+    const expected = (rows || []).reduce((s: number, r: { qty: number | null }) => s + (Number(r.qty) || 0), 0)
+    const actual = Number(actualQty) || 0
+    const match = actual === expected
+    const stamp = `[คนขับยืนยันโหลด ${actual}/${expected} ชิ้น${match ? "" : " ⚠️ไม่ตรง"} @ ${new Date().toISOString()}]`
+    const { data: job } = await supabase.from("Jobs_Main").select("Notes").eq("Job_ID", jobId).single()
+    const notes = `${job?.Notes ? job.Notes + " " : ""}${stamp}`.trim()
+    const { error } = await supabase.from("Jobs_Main").update({ Notes: notes }).eq("Job_ID", jobId)
+    if (error) return { ok: false, expected, actual, match, error: error.message }
+    return { ok: true, expected, actual, match }
+  } catch (e) {
+    return { ok: false, expected: 0, actual: actualQty, match: false, error: e instanceof Error ? e.message : "error" }
+  }
+}

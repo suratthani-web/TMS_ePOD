@@ -1,6 +1,7 @@
 import { getDriverSession } from "@/lib/actions/auth-actions"
 import { redirect } from "next/navigation"
 import { getJobById } from "@/lib/supabase/jobs"
+import { getJobScanSummary } from "@/lib/actions/scan-actions"
 import { JobDetailClient } from "@/components/mobile/job-detail-client"
 
 export const dynamic = 'force-dynamic'
@@ -30,8 +31,16 @@ export default async function JobDetailPage(props: Props) {
   }
 
   const initialTab = (searchParams.tab as string) || 'mission';
-  
+
+  // Cross-dock: the checker's manifest (pickup scans) gives the expected load qty
+  // the driver confirms in-app.
+  let expectedLoadQty = 0;
+  try {
+    const summary = await getJobScanSummary(params.id);
+    expectedLoadQty = summary.totalReceived || 0;
+  } catch { /* ignore */ }
+
   return (
-    <JobDetailClient job={job} success={success} initialTab={initialTab} />
+    <JobDetailClient job={job} success={success} initialTab={initialTab} expectedLoadQty={expectedLoadQty} />
   )
 }

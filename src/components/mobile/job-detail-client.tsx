@@ -23,14 +23,16 @@ import { parseISO, isAfter, startOfDay } from "date-fns"
 import { ContainerTempForm } from "@/components/mobile/container-temp-form"
 import { Dialog, DialogContent } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
+import { confirmLoadedCount } from "@/lib/actions/scan-actions"
 
 interface JobDetailClientProps {
     job: Job
     success?: string
     initialTab?: string
+    expectedLoadQty?: number
 }
 
-export function JobDetailClient({ job, success, initialTab = 'mission' }: JobDetailClientProps) {
+export function JobDetailClient({ job, success, initialTab = 'mission', expectedLoadQty = 0 }: JobDetailClientProps) {
     const router = useRouter()
     const pathname = usePathname()
     
@@ -38,6 +40,21 @@ export function JobDetailClient({ job, success, initialTab = 'mission' }: JobDet
     const [activeTab, setActiveTab] = useState<'mission' | 'info'>(initialTab as 'mission' | 'info')
     const [mounted, setMounted] = useState(false)
     const [showTempModal, setShowTempModal] = useState(false)
+    // Cross-dock: driver confirms the actual loaded quantity vs the checker's manifest.
+    const [loadQty, setLoadQty] = useState(expectedLoadQty)
+    const [loadConfirmed, setLoadConfirmed] = useState(false)
+    const [confirmingLoad, setConfirmingLoad] = useState(false)
+    const doConfirmLoad = async () => {
+        setConfirmingLoad(true)
+        try {
+            const r = await confirmLoadedCount(job.Job_ID, Number(loadQty) || 0)
+            if (!r.ok) { toast.error(r.error || "ยืนยันไม่สำเร็จ"); return }
+            setLoadConfirmed(true)
+            toast.success(r.match ? `ยืนยันโหลด ${r.actual} ชิ้น ตรงกับที่เช็คเกอร์ส่ง` : `บันทึกแล้ว: โหลด ${r.actual}/${r.expected} ชิ้น (ไม่ตรง)`)
+        } catch (e) {
+            toast.error(e instanceof Error ? e.message : "เกิดข้อผิดพลาด")
+        } finally { setConfirmingLoad(false) }
+    }
 
     useEffect(() => {
         setMounted(true)
@@ -212,6 +229,27 @@ export function JobDetailClient({ job, success, initialTab = 'mission' }: JobDet
                     <div className="p-5 bg-amber-50/50 border border-amber-200/50 rounded-2xl">
                         <p className="text-xs font-semibold text-amber-700 mb-2">หมายเหตุจากแอดมิน</p>
                         <p className="text-sm text-amber-900 font-medium">{job.Notes}</p>
+                    </div>
+                )}
+
+                {/* Cross-dock: driver confirms the loaded quantity vs the checker's manifest */}
+                {expectedLoadQty > 0 && (
+                    <div className={`p-5 rounded-2xl border ${loadConfirmed ? 'bg-emerald-50 border-emerald-200' : 'bg-blue-50 border-blue-200'}`}>
+                        <p className="text-xs font-bold text-blue-700 mb-1">ยืนยันจำนวนที่โหลดขึ้นรถ</p>
+                        <p className="text-sm text-slate-600 mb-3">เช็คเกอร์ส่งมา <strong className="text-blue-700">{expectedLoadQty}</strong> ชิ้น — ให้คนขึ้นของนับจริง แล้วกดยืนยัน</p>
+                        {loadConfirmed ? (
+                            <p className="text-sm font-bold text-emerald-700">✓ ยืนยันแล้ว: {loadQty} ชิ้น</p>
+                        ) : (
+                            <div className="flex items-center gap-2">
+                                <input type="number" inputMode="numeric" value={loadQty}
+                                    onChange={e => setLoadQty(Number(e.target.value))}
+                                    className="w-24 h-11 text-center text-lg font-bold rounded-xl border border-slate-300 bg-white outline-none" />
+                                <span className="text-sm text-slate-500">ชิ้น</span>
+                                <Button onClick={doConfirmLoad} disabled={confirmingLoad} className="ml-auto font-bold">
+                                    {confirmingLoad ? 'กำลังยืนยัน...' : 'ยืนยันจำนวน'}
+                                </Button>
+                            </div>
+                        )}
                     </div>
                 )}
 
