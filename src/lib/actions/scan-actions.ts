@@ -112,9 +112,16 @@ export async function getJobsScanStatus(jobIds: string[]): Promise<Record<string
 }
 
 /**
- * งานนี้ต้องบังคับสแกนไหม (ตาม flag ของลูกค้า Master_Customers.Require_Scan)
+ * งานนี้ต้องบังคับสแกนไหม — แยกตามช่วงงาน:
+ *  - phase 'pickup' (ตอนรับ): ยึดตาม flag ลูกค้า Master_Customers.Require_Scan เท่านั้น
+ *    (ปิด = ไม่บังคับ) ไม่บังคับจาก manifest เพื่อให้คนขับรับของได้เร็ว
+ *  - phase 'delivery' (ตอนส่ง): บังคับสแกนถ้ามี pickup manifest (cross-dock ต้อง
+ *    reconcile รายชิ้นตอนส่ง) หรือ flag ลูกค้าเปิด
  */
-export async function getScanRequirement(jobId: string): Promise<boolean> {
+export async function getScanRequirement(
+  jobId: string,
+  phase: "pickup" | "delivery" = "delivery"
+): Promise<boolean> {
   jobId = decodeURIComponent(jobId)
   const supabase = createAdminClient()
   const { data: job } = await supabase
@@ -123,21 +130,24 @@ export async function getScanRequirement(jobId: string): Promise<boolean> {
     .eq("Job_ID", jobId)
     .single()
 
-  // The customer's Require_Scan flag is authoritative: if the job is linked to a
-  // real customer, honor its ON/OFF exactly (turning it off must actually stop
-  // forcing a scan — even for WMS cross-dock jobs that carry a pickup manifest).
+  // Resolve the customer's explicit flag (null = no linked customer record).
+  let customerFlag: boolean | null = null
   if (job?.Customer_ID) {
     const { data: cust } = await supabase
       .from("Master_Customers")
       .select("Require_Scan")
       .eq("Customer_ID", job.Customer_ID)
       .maybeSingle()
-    if (cust) return !!cust.Require_Scan
+    if (cust) customerFlag = !!cust.Require_Scan
   }
 
-  // Fallback for jobs with no linked customer record (e.g. an unmatched WMS
-  // job): if a per-item pickup manifest was seeded, keep requiring a scan so the
-  // items can still be reconciled at delivery.
+  // Pickup: the customer flag is authoritative — OFF means the driver can
+  // receive without scanning, even for WMS cross-dock jobs.
+  if (phase === "pickup") return customerFlag === true
+
+  // Delivery: the customer flag ON forces it; otherwise a seeded per-item
+  // pickup manifest still forces a scan so the items are reconciled at drop-off.
+  if (customerFlag === true) return true
   const { count: pickupCount } = await supabase
     .from("Job_Scans")
     .select("*", { count: "exact", head: true })

@@ -50,7 +50,7 @@ export default function JobPickupPage() {
 
   useEffect(() => {
     if (params.id) {
-        getScanRequirement(params.id).then(setRequireScan).catch(() => {})
+        getScanRequirement(params.id, "pickup").then(setRequireScan).catch(() => {})
         getJobDetails(params.id).then(j => {
             setJob(j)
             if (j?.container) {

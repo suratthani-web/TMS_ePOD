@@ -45,9 +45,9 @@ export async function submitJobPOD(jobId: string, formData: FormData) {
       return { error: "ไม่พบลายเซ็น (กรุณาเซ็นใหม่)" }
   }
 
-  // C: บังคับสแกน (ตามลูกค้า) — ตอนส่งต้องมีการสแกนสินค้าอย่างน้อย 1 รายการ
+  // C: บังคับสแกน (ตอนส่ง) — งาน cross-dock (มี manifest) ต้อง reconcile รายชิ้น
   if (formData.get("job_type") !== "container") {
-    const requireScan = await getScanRequirement(jobId)
+    const requireScan = await getScanRequirement(jobId, "delivery")
     if (requireScan) {
       let scanCount = 0
       try { const p = JSON.parse((formData.get("delivery_scans") as string) || "[]"); scanCount = Array.isArray(p) ? p.length : 0 } catch {}
@@ -442,9 +442,9 @@ export async function submitJobPickup(jobId: string, formData: FormData) {
   const photoCount = parseInt(formData.get("photo_count") as string || "0")
   const timestamp = Date.now()
 
-  // C: บังคับสแกน (ตามลูกค้า) — งานสินค้าทั่วไปต้องมีลาเบลอย่างน้อย 1 รายการ
+  // C: บังคับสแกน (ตอนรับ) — ยึดตาม flag ลูกค้าเท่านั้น (ปิด = รับได้โดยไม่ต้องสแกน)
   if (!isContainer) {
-    const requireScan = await getScanRequirement(jobId)
+    const requireScan = await getScanRequirement(jobId, "pickup")
     if (requireScan) {
       let scanCount = 0
       try { const p = JSON.parse((formData.get("scanned_items") as string) || "[]"); scanCount = Array.isArray(p) ? p.length : 0 } catch {}
