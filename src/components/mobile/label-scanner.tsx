@@ -17,6 +17,7 @@ export interface ScannedItem {
   code: string | null // raw scanned string; null = ใส่มือ/ไม่มีลาเบล
   label: string       // ชื่อที่คนอ่านได้
   qty: number
+  via?: 'scan' | 'manual' // ที่มาของจำนวน: สแกนจริง vs กดใส่มือ (ใช้บังคับสแกน)
 }
 
 interface LabelScannerProps {

@@ -159,9 +159,10 @@ export default function JobCompletePage() {
         })
         return
     }
-    if (!isContainer && requireScan && deliveryItems.length === 0) {
+    // Force-scan means a REAL scan — manual +/- entries (via:'manual') don't count.
+    if (!isContainer && requireScan && !deliveryItems.some(it => it.via === 'scan')) {
         toast.error("ต้องสแกนสินค้าตอนส่ง", {
-            description: "ลูกค้ารายนี้กำหนดให้ต้องสแกนลาเบลสินค้าก่อนปิดงาน"
+            description: "ลูกค้ารายนี้กำหนดให้สแกนลาเบลสินค้าจริง (กดใส่จำนวนด้วยมือไม่นับ)"
         })
         return
     }
@@ -292,7 +293,7 @@ export default function JobCompletePage() {
         if (deliveryItems.length > 0) {
             const dropIndex = job?.Signature_Url ? job.Signature_Url.split(',').filter(Boolean).length : 0
             formData.append("delivery_scans", JSON.stringify(
-                deliveryItems.map(it => ({ code: it.code, label: it.label, qty: it.qty }))
+                deliveryItems.map(it => ({ code: it.code, label: it.label, qty: it.qty, via: it.via }))
             ))
             formData.append("scan_drop_index", String(dropIndex))
         }
@@ -377,7 +378,7 @@ export default function JobCompletePage() {
             // พา delivery scans ไปกับ offline queue ด้วย
             if (deliveryItems.length > 0) {
                 offlineData.delivery_scans = JSON.stringify(
-                    deliveryItems.map(it => ({ code: it.code, label: it.label, qty: it.qty }))
+                    deliveryItems.map(it => ({ code: it.code, label: it.label, qty: it.qty, via: it.via }))
                 )
                 offlineData.scan_drop_index = String(job?.Signature_Url ? job.Signature_Url.split(',').filter(Boolean).length : 0)
             }
@@ -588,6 +589,7 @@ export default function JobCompletePage() {
                         reconciled={reconciled}
                         items={deliveryItems}
                         onChange={setDeliveryItems}
+                        requireScan={requireScan}
                     />
                 </section>
                 )}

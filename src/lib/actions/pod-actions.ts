@@ -49,10 +49,15 @@ export async function submitJobPOD(jobId: string, formData: FormData) {
   if (formData.get("job_type") !== "container") {
     const requireScan = await getScanRequirement(jobId, "delivery")
     if (requireScan) {
+      // Count only REAL scans — manual +/- entries (via:'manual') must not
+      // satisfy the mandate. Legacy payloads without `via` still count (back-compat).
       let scanCount = 0
-      try { const p = JSON.parse((formData.get("delivery_scans") as string) || "[]"); scanCount = Array.isArray(p) ? p.length : 0 } catch {}
+      try {
+        const p = JSON.parse((formData.get("delivery_scans") as string) || "[]")
+        scanCount = Array.isArray(p) ? p.filter((it: { via?: string }) => it?.via !== "manual").length : 0
+      } catch {}
       if (scanCount === 0) {
-        return { error: "ลูกค้ารายนี้กำหนดให้ต้องสแกนสินค้าตอนส่งก่อนปิดงาน" }
+        return { error: "ลูกค้ารายนี้กำหนดให้สแกนลาเบลสินค้าจริงตอนส่ง (กดใส่จำนวนด้วยมือไม่นับ)" }
       }
     }
   }

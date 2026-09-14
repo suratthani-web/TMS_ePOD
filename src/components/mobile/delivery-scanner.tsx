@@ -11,12 +11,13 @@ interface DeliveryScannerProps {
   reconciled: ReconciledItem[]     // รับ + ส่งไปแล้ว (ทุกดรอป) จาก server
   items: ScannedItem[]             // การส่งของ "ดรอปนี้"
   onChange: (items: ScannedItem[]) => void
+  requireScan?: boolean            // บังคับสแกน → ปิดการกดเพิ่มจำนวนด้วยมือ
 }
 
 const uid = () => `${Date.now()}_${Math.random().toString(36).slice(2, 8)}`
 const keyOf = (code: string | null, label: string) => code?.trim() || `label:${label.trim()}`
 
-export function DeliveryScanner({ reconciled, items, onChange }: DeliveryScannerProps) {
+export function DeliveryScanner({ reconciled, items, onChange, requireScan = false }: DeliveryScannerProps) {
   const [scanOpen, setScanOpen] = useState(false)
   const [expanded, setExpanded] = useState(false)
 
@@ -28,15 +29,17 @@ export function DeliveryScanner({ reconciled, items, onChange }: DeliveryScanner
   const thisDropQty = (key: string) =>
     items.filter(it => keyOf(it.code, it.label) === key).reduce((s, it) => s + (Number(it.qty) || 0), 0)
 
-  const bump = (code: string | null, label: string, delta: number) => {
+  const bump = (code: string | null, label: string, delta: number, via: 'scan' | 'manual' = 'manual') => {
     const key = keyOf(code, label)
     const existing = items.find(it => keyOf(it.code, it.label) === key)
     if (existing) {
       const q = existing.qty + delta
       if (q <= 0) onChange(items.filter(it => it.id !== existing.id))
-      else onChange(items.map(it => it.id === existing.id ? { ...it, qty: q } : it))
+      // A real scan on an item promotes it to via:'scan' (satisfies the mandate);
+      // a manual +/- never downgrades an already-scanned item.
+      else onChange(items.map(it => it.id === existing.id ? { ...it, qty: q, via: via === 'scan' ? 'scan' : it.via } : it))
     } else if (delta > 0) {
-      onChange([...items, { id: uid(), code: code?.trim() || null, label: label.trim(), qty: delta }])
+      onChange([...items, { id: uid(), code: code?.trim() || null, label: label.trim(), qty: delta, via }])
     }
   }
 
@@ -44,7 +47,7 @@ export function DeliveryScanner({ reconciled, items, onChange }: DeliveryScanner
     const code = raw.trim()
     if (!code) return
     const match = reconciled.find(r => r.code === code)
-    bump(code, match?.label || code, 1)
+    bump(code, match?.label || code, 1, 'scan')
     toast.success(match ? `✓ ${match.label}` : `นอกรายการ · ${code}`, { duration: 1200 })
     try { navigator.vibrate?.(60) } catch {}
   }
@@ -86,6 +89,11 @@ export function DeliveryScanner({ reconciled, items, onChange }: DeliveryScanner
         className="w-full h-14 rounded-2xl font-black gap-2 shadow-lg active:scale-95">
         <ScanLine size={20} /> สแกนสินค้าที่ส่ง
       </Button>
+      {requireScan && (
+        <p className="text-[11px] font-bold text-amber-400 flex items-center gap-1.5">
+          <AlertTriangle size={12} /> ลูกค้ารายนี้บังคับสแกน — ต้องสแกนลาเบลจริง (กดใส่จำนวนด้วยมือไม่ได้)
+        </p>
+      )}
 
       {/* Checklist ของที่รับมา */}
       {hasReceived && (
@@ -118,8 +126,9 @@ export function DeliveryScanner({ reconciled, items, onChange }: DeliveryScanner
                     <Minus size={14} />
                   </button>
                   <span className="w-8 text-center font-black text-sm text-foreground">{here}</span>
-                  <button type="button" onClick={() => bump(r.code, r.label, 1)}
-                    className="w-8 h-8 rounded-lg bg-primary/20 text-primary flex items-center justify-center active:scale-90">
+                  <button type="button" onClick={() => bump(r.code, r.label, 1)} disabled={requireScan}
+                    title={requireScan ? "ลูกค้ารายนี้บังคับสแกน — กดปุ่มสแกนเพื่อเพิ่ม" : undefined}
+                    className="w-8 h-8 rounded-lg bg-primary/20 text-primary flex items-center justify-center active:scale-90 disabled:opacity-30 disabled:active:scale-100">
                     <Plus size={14} />
                   </button>
                 </div>
@@ -145,8 +154,9 @@ export function DeliveryScanner({ reconciled, items, onChange }: DeliveryScanner
                   <Minus size={14} />
                 </button>
                 <span className="w-8 text-center font-black text-sm text-foreground">{it.qty}</span>
-                <button type="button" onClick={() => bump(it.code, it.label, 1)}
-                  className="w-8 h-8 rounded-lg bg-primary/20 text-primary flex items-center justify-center active:scale-90">
+                <button type="button" onClick={() => bump(it.code, it.label, 1)} disabled={requireScan}
+                  title={requireScan ? "ลูกค้ารายนี้บังคับสแกน — กดปุ่มสแกนเพื่อเพิ่ม" : undefined}
+                  className="w-8 h-8 rounded-lg bg-primary/20 text-primary flex items-center justify-center active:scale-90 disabled:opacity-30 disabled:active:scale-100">
                   <Plus size={14} />
                 </button>
               </div>
