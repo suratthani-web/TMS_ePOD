@@ -6,8 +6,8 @@ import { motion, AnimatePresence } from "framer-motion"
 import { MobileHeader } from "@/components/mobile/mobile-header"
 import { 
     MapPin, Phone, User, CheckCircle, 
-    Info, Activity, Navigation, 
-    TrendingUp, Target, Copy, Thermometer
+    Info, Activity, Navigation,
+    TrendingUp, Target, Copy, Thermometer, ChevronDown, StickyNote
 } from "lucide-react"
 import { JobActionButton } from "@/components/mobile/job-action-button"
 import { JobWorkflow } from "@/components/mobile/job-workflow"
@@ -30,9 +30,11 @@ interface JobDetailClientProps {
     success?: string
     initialTab?: string
     expectedLoadQty?: number
+    loadAlreadyConfirmed?: boolean
+    confirmedLoadQty?: number
 }
 
-export function JobDetailClient({ job, success, initialTab = 'mission', expectedLoadQty = 0 }: JobDetailClientProps) {
+export function JobDetailClient({ job, success, initialTab = 'mission', expectedLoadQty = 0, loadAlreadyConfirmed = false, confirmedLoadQty = 0 }: JobDetailClientProps) {
     const router = useRouter()
     const pathname = usePathname()
     
@@ -40,9 +42,12 @@ export function JobDetailClient({ job, success, initialTab = 'mission', expected
     const [activeTab, setActiveTab] = useState<'mission' | 'info'>(initialTab as 'mission' | 'info')
     const [mounted, setMounted] = useState(false)
     const [showTempModal, setShowTempModal] = useState(false)
+    const [showNotes, setShowNotes] = useState(false)
     // Cross-dock: driver confirms the actual loaded quantity vs the checker's manifest.
-    const [loadQty, setLoadQty] = useState(expectedLoadQty)
-    const [loadConfirmed, setLoadConfirmed] = useState(false)
+    const [loadQty, setLoadQty] = useState(confirmedLoadQty || expectedLoadQty)
+    // Persisted: if the driver already confirmed (stamp/Loaded_Qty on the job),
+    // start in the confirmed state so it doesn't ask again after a refresh.
+    const [loadConfirmed, setLoadConfirmed] = useState(loadAlreadyConfirmed)
     const [confirmingLoad, setConfirmingLoad] = useState(false)
     const doConfirmLoad = async () => {
         setConfirmingLoad(true)
@@ -213,6 +218,29 @@ export function JobDetailClient({ job, success, initialTab = 'mission', expected
                     })()}
                 </div>
 
+                {/* Cross-dock: driver confirms the loaded quantity — do it when
+                    loading at the pickup point, before leaving for the first drop. */}
+                {expectedLoadQty > 0 && (
+                    <div className={`p-5 rounded-2xl border ${loadConfirmed ? 'bg-emerald-50 border-emerald-200' : 'bg-blue-50 border-blue-200'}`}>
+                        <p className="text-xs font-bold text-blue-700 mb-1">ยืนยันจำนวนที่โหลดขึ้นรถ</p>
+                        <p className="text-[11px] text-slate-500 mb-2">👉 กดตอน<strong>ขึ้นของที่จุดรับ</strong> (นับของจริงก่อนออกรถ) ไม่ใช่ตอนเริ่มงาน</p>
+                        {loadConfirmed ? (
+                            <p className="text-sm font-bold text-emerald-700">✓ ยืนยันแล้ว: {loadQty} ชิ้น (แตะแก้ได้ถ้านับใหม่)</p>
+                        ) : (
+                            <p className="text-sm text-slate-600 mb-3">เช็คเกอร์ส่งมา <strong className="text-blue-700">{expectedLoadQty}</strong> ชิ้น — ให้คนขึ้นของนับจริง แล้วกดยืนยัน</p>
+                        )}
+                        <div className="flex items-center gap-2 mt-2">
+                            <input type="number" inputMode="numeric" value={loadQty}
+                                onChange={e => { setLoadQty(Number(e.target.value)); if (loadConfirmed) setLoadConfirmed(false); }}
+                                className="w-24 h-11 text-center text-lg font-bold rounded-xl border border-slate-300 bg-white outline-none" />
+                            <span className="text-sm text-slate-500">ชิ้น</span>
+                            <Button onClick={doConfirmLoad} disabled={confirmingLoad || loadConfirmed} className="ml-auto font-bold disabled:opacity-60">
+                                {confirmingLoad ? 'กำลังยืนยัน...' : loadConfirmed ? '✓ ยืนยันแล้ว' : 'ยืนยันจำนวน'}
+                            </Button>
+                        </div>
+                    </div>
+                )}
+
                 {/* จัดลำดับการส่ง (multi-drop) — คนขับเลือกจุดถัดไปเองได้ */}
                 {Array.isArray(destinations) && destinations.length > 1 &&
                  !['Completed', 'Verified', 'Rejected'].includes(job?.Job_Status) && (
@@ -225,29 +253,20 @@ export function JobDetailClient({ job, success, initialTab = 'mission', expected
                     </div>
                 )}
 
+                {/* หมายเหตุจากแอดมิน — ยุบไว้ กันรกหน้าจอ (ส่วนใหญ่เป็น trace อัตโนมัติ) */}
                 {job?.Notes && (
-                    <div className="p-5 bg-amber-50/50 border border-amber-200/50 rounded-2xl">
-                        <p className="text-xs font-semibold text-amber-700 mb-2">หมายเหตุจากแอดมิน</p>
-                        <p className="text-sm text-amber-900 font-medium">{job.Notes}</p>
-                    </div>
-                )}
-
-                {/* Cross-dock: driver confirms the loaded quantity vs the checker's manifest */}
-                {expectedLoadQty > 0 && (
-                    <div className={`p-5 rounded-2xl border ${loadConfirmed ? 'bg-emerald-50 border-emerald-200' : 'bg-blue-50 border-blue-200'}`}>
-                        <p className="text-xs font-bold text-blue-700 mb-1">ยืนยันจำนวนที่โหลดขึ้นรถ</p>
-                        <p className="text-sm text-slate-600 mb-3">เช็คเกอร์ส่งมา <strong className="text-blue-700">{expectedLoadQty}</strong> ชิ้น — ให้คนขึ้นของนับจริง แล้วกดยืนยัน</p>
-                        {loadConfirmed ? (
-                            <p className="text-sm font-bold text-emerald-700">✓ ยืนยันแล้ว: {loadQty} ชิ้น</p>
-                        ) : (
-                            <div className="flex items-center gap-2">
-                                <input type="number" inputMode="numeric" value={loadQty}
-                                    onChange={e => setLoadQty(Number(e.target.value))}
-                                    className="w-24 h-11 text-center text-lg font-bold rounded-xl border border-slate-300 bg-white outline-none" />
-                                <span className="text-sm text-slate-500">ชิ้น</span>
-                                <Button onClick={doConfirmLoad} disabled={confirmingLoad} className="ml-auto font-bold">
-                                    {confirmingLoad ? 'กำลังยืนยัน...' : 'ยืนยันจำนวน'}
-                                </Button>
+                    <div className="rounded-2xl border border-amber-200/50 overflow-hidden">
+                        <button
+                            type="button"
+                            onClick={() => setShowNotes(v => !v)}
+                            className="w-full flex items-center justify-between gap-2 px-4 py-2.5 bg-amber-50/50 text-amber-700 text-xs font-semibold"
+                        >
+                            <span className="flex items-center gap-1.5"><StickyNote size={13} /> หมายเหตุจากแอดมิน</span>
+                            <ChevronDown size={15} className={cn("transition-transform", showNotes && "rotate-180")} />
+                        </button>
+                        {showNotes && (
+                            <div className="px-4 py-3 bg-amber-50/30 text-sm text-amber-900 font-medium whitespace-pre-line break-words">
+                                {job.Notes}
                             </div>
                         )}
                     </div>

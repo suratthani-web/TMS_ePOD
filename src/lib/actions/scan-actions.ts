@@ -249,8 +249,13 @@ export async function confirmLoadedCount(jobId: string, actualQty: number): Prom
     const match = actual === expected
     const stamp = `[คนขับยืนยันโหลด ${actual}/${expected} ชิ้น${match ? "" : " ⚠️ไม่ตรง"} @ ${new Date().toISOString()}]`
     const { data: job } = await supabase.from("Jobs_Main").select("Notes").eq("Job_ID", jobId).single()
-    const notes = `${job?.Notes ? job.Notes + " " : ""}${stamp}`.trim()
-    const { error } = await supabase.from("Jobs_Main").update({ Notes: notes }).eq("Job_ID", jobId)
+    // Strip any previous confirm stamp so re-confirming replaces it instead of
+    // piling up multiple stamps in the note.
+    const prevNotes = String(job?.Notes || "").replace(/\s*\[คนขับยืนยันโหลด[^\]]*\]/g, "").trim()
+    const notes = `${prevNotes ? prevNotes + " " : ""}${stamp}`.trim()
+    // Persist Loaded_Qty too so the app can tell the load was already confirmed
+    // (survives refresh) — the note stamp alone isn't a reliable flag.
+    const { error } = await supabase.from("Jobs_Main").update({ Notes: notes, Loaded_Qty: actual }).eq("Job_ID", jobId)
     if (error) return { ok: false, expected, actual, match, error: error.message }
     return { ok: true, expected, actual, match }
   } catch (e) {

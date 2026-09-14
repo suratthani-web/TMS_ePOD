@@ -40,7 +40,18 @@ export default async function JobDetailPage(props: Props) {
     expectedLoadQty = summary.totalReceived || 0;
   } catch { /* ignore */ }
 
+  // Was the load already confirmed? (stamp in Notes or a persisted Loaded_Qty)
+  const loadAlreadyConfirmed = /คนขับยืนยันโหลด/.test(String(job.Notes || '')) || Number(job.Loaded_Qty || 0) > 0;
+  const confirmedLoadQty = Number(job.Loaded_Qty || 0) || 0;
+
   return (
-    <JobDetailClient job={job} success={success} initialTab={initialTab} expectedLoadQty={expectedLoadQty} />
+    <JobDetailClient
+      job={job}
+      success={success}
+      initialTab={initialTab}
+      expectedLoadQty={expectedLoadQty}
+      loadAlreadyConfirmed={loadAlreadyConfirmed}
+      confirmedLoadQty={confirmedLoadQty}
+    />
   )
 }
