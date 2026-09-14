@@ -547,11 +547,12 @@ export async function submitJobPickup(jobId: string, formData: FormData) {
 
     if (error) throw error
 
-    // Item-level scans (append-only). รับดรอปเดียว → drop_index = null
+    // Item-level scans (append-only). Per-drop self-pickup carries drop_index
+    // per item; a single-drop / legacy payload without it stores null.
     const scannedRaw = formData.get("scanned_items") as string | null
     if (scannedRaw) {
         try {
-            const parsed = JSON.parse(scannedRaw) as Array<{ code: string | null; label: string; qty: number }>
+            const parsed = JSON.parse(scannedRaw) as Array<{ code: string | null; label: string; qty: number; drop_index?: number | null }>
             if (Array.isArray(parsed) && parsed.length > 0) {
                 const { data: jobRow } = await supabase
                     .from('Jobs_Main')
@@ -563,7 +564,7 @@ export async function submitJobPickup(jobId: string, formData: FormData) {
                     .filter(it => (it.code && it.code.trim()) || (it.label && it.label.trim()))
                     .map(it => ({
                         Job_ID: jobId,
-                        drop_index: null,
+                        drop_index: (it.drop_index == null || Number.isNaN(Number(it.drop_index))) ? null : Number(it.drop_index),
                         phase: 'pickup',
                         code: it.code?.trim() || null,
                         label: it.label?.trim() || null,

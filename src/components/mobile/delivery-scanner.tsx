@@ -43,11 +43,22 @@ export function DeliveryScanner({ reconciled, items, onChange, requireScan = fal
     }
   }
 
+  // Normalize codes so a physical barcode still matches the manifest even with
+  // minor differences (whitespace, case, leading zeros) — the common reason a
+  // scan "ไม่ตัดยอด": raw scan != stored code exactly, so it fell to นอกรายการ.
+  const norm = (s: string | null) => (s || '').trim().toLowerCase().replace(/\s+/g, '').replace(/^0+(?=\d)/, '')
   const addScanned = (raw: string) => {
     const code = raw.trim()
     if (!code) return
-    const match = reconciled.find(r => r.code === code)
-    bump(code, match?.label || code, 1, 'scan')
+    const n = norm(code)
+    const match =
+      reconciled.find(r => r.code && norm(r.code) === n) ||
+      reconciled.find(r => r.code && (norm(r.code).includes(n) || n.includes(norm(r.code)))) ||
+      reconciled.find(r => !r.code && norm(r.label) === n)
+    // Count against the matched row's OWN code/label so the key lines up with the
+    // checklist (bumping with the raw scan would create a separate นอกรายการ row).
+    if (match) bump(match.code, match.label, 1, 'scan')
+    else bump(code, code, 1, 'scan')
     toast.success(match ? `✓ ${match.label}` : `นอกรายการ · ${code}`, { duration: 1200 })
     try { navigator.vibrate?.(60) } catch {}
   }

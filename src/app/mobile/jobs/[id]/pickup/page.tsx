@@ -30,7 +30,8 @@ export default function JobPickupPage() {
   const router = useRouter()
   const params = useParams<{ id: string }>()
   const [photos, setPhotos] = useState<File[]>([])
-  const [scannedItems, setScannedItems] = useState<ScannedItem[]>([])
+  // Per-drop pickup scans (key = 0-based drop index). Single-drop jobs use key 0.
+  const [scannedByDrop, setScannedByDrop] = useState<Record<number, ScannedItem[]>>({})
   const [requireScan, setRequireScan] = useState(false)
   const [conditionPhotos, setConditionPhotos] = useState<Record<string, File>>({})
   const [signature, setSignature] = useState<Blob | null>(null)
@@ -82,6 +83,20 @@ export default function JobPickupPage() {
 
   const isContainer = job?.job_type === 'container'
 
+  // Destinations → per-drop scan sections (self-pickup / cross-dock).
+  const drops = useMemo(() => {
+    try {
+      const v = typeof job?.original_destinations_json === 'string'
+        ? JSON.parse(job.original_destinations_json)
+        : job?.original_destinations_json
+      return Array.isArray(v) ? v : []
+    } catch { return [] }
+  }, [job])
+  const dropCount = Math.max(drops.length, 1)
+  const allScanned = Object.values(scannedByDrop).flat()
+  const setDropItems = (dropIdx: number, items: ScannedItem[]) =>
+    setScannedByDrop(prev => ({ ...prev, [dropIdx]: items }))
+
   // Refined Validation Logic
   const getValidationErrors = () => {
     const errors: string[] = []
@@ -101,7 +116,7 @@ export default function JobPickupPage() {
         if (!signature) {
             errors.push("กรุณาลงลายเซ็นผู้ส่งของ")
         }
-        if (requireScan && scannedItems.length === 0) {
+        if (requireScan && allScanned.length === 0) {
             errors.push("ลูกค้ารายนี้กำหนดให้ต้องสแกนลาเบลสินค้าตอนรับ")
         }
         const needsQty = (job?.Price_Per_Unit && Number(job.Price_Per_Unit) > 0) &&
@@ -164,10 +179,13 @@ export default function JobPickupPage() {
         formData.append("photo_count", photos.length.toString())
 
         // Item-level scans (รับดรอปเดียว → drop_index = null ฝั่ง server)
-        if (scannedItems.length > 0) {
-            formData.append("scanned_items", JSON.stringify(
-                scannedItems.map(it => ({ code: it.code, label: it.label, qty: it.qty }))
-            ))
+        // Flatten per-drop scans, tagging each with its drop_index so delivery
+        // can reconcile per drop. Single-drop jobs send drop_index 0.
+        const flatScans = Object.entries(scannedByDrop).flatMap(([di, items]) =>
+            items.map(it => ({ code: it.code, label: it.label, qty: it.qty, drop_index: Number(di) }))
+        );
+        if (flatScans.length > 0) {
+            formData.append("scanned_items", JSON.stringify(flatScans))
         }
         
         if (isContainer) {
@@ -396,12 +414,30 @@ export default function JobPickupPage() {
                         />
                     </div>
 
-                    <div className="border-t border-border pt-2">
-                        <LabelScanner
-                            items={scannedItems}
-                            onChange={setScannedItems}
-                            title="สแกนลาเบลสินค้าที่รับ"
-                        />
+                    <div className="border-t border-border pt-2 space-y-4">
+                        {requireScan && (
+                            <p className="text-[11px] font-bold text-amber-500">
+                                * จุดรับนี้ให้คนขับสแกนรับเอง — ยิงสแกนสินค้าให้ครบก่อนบันทึก{dropCount > 1 ? ' (แยกตามดรอป)' : ''}
+                            </p>
+                        )}
+                        {dropCount > 1 ? (
+                            drops.map((d: { name?: string; address?: string }, di: number) => (
+                                <div key={di} className="rounded-2xl border border-border p-3 space-y-2">
+                                    <div className="text-xs font-black text-primary">📍 ดรอปที่ {di + 1}{d?.name ? ` · ${d.name}` : ''}</div>
+                                    <LabelScanner
+                                        items={scannedByDrop[di] || []}
+                                        onChange={(items) => setDropItems(di, items)}
+                                        title={`สแกนสินค้าที่รับ — ดรอป ${di + 1}`}
+                                    />
+                                </div>
+                            ))
+                        ) : (
+                            <LabelScanner
+                                items={scannedByDrop[0] || []}
+                                onChange={(items) => setDropItems(0, items)}
+                                title="สแกนลาเบลสินค้าที่รับ"
+                            />
+                        )}
                     </div>
 
                     {(job?.Price_Per_Unit && Number(job.Price_Per_Unit) > 0) && (!job?.Price_Cust_Total || Number(job.Price_Cust_Total) === 0) && (

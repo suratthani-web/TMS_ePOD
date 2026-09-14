@@ -132,9 +132,13 @@ export async function getScanRequirement(
   const supabase = createAdminClient()
   const { data: job } = await supabase
     .from("Jobs_Main")
-    .select("Customer_ID")
+    .select("*")
     .eq("Job_ID", jobId)
     .single()
+
+  // Per-job override: a pickup point with no checker ("คนขับสแกนรับเอง") forces the
+  // driver to scan at pickup regardless of the customer's flag.
+  if (phase === "pickup" && job?.Driver_Self_Pickup) return true
 
   // Resolve the customer's explicit flag for THIS phase (null = no linked
   // customer). Pickup and delivery are configured independently; each falls back

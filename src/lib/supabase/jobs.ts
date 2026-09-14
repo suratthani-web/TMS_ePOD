@@ -88,6 +88,8 @@ export type Job = {
   Verified_At?: string | null
   Loaded_Qty?: number | null
   Price_Per_Unit?: number | null
+  // งานที่จุดรับไม่มีเช็คเกอร์ → คนขับสแกนรับเอง (บังคับสแกนตอนรับเฉพาะงานนี้)
+  Driver_Self_Pickup?: boolean | null
   job_type?: 'normal' | 'container' | null
   chassis_plate?: string | null
   container?: {

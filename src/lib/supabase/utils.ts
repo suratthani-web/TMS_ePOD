@@ -16,7 +16,7 @@ export const sanitizeJobData = (data: Record<string, unknown>) => {
         'Loaded_Qty', 'Est_Distance_KM',
         'Requires_Incentive_Check', 'Incentive_Claimed', 'Sensor_Verified',
         'Sensor_Max_Elevation_Diff', 'Sensor_Total_Steps_Upward', 'Sensor_Logs_Json',
-        'job_type', 'chassis_plate'
+        'job_type', 'chassis_plate', 'Driver_Self_Pickup'
     ]
     
     const numericKeys = [

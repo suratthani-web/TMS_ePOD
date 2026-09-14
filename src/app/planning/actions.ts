@@ -55,6 +55,7 @@ export type JobFormData = {
   Round?: string | number | null
   Loaded_Qty?: number | string | null
   Price_Per_Unit?: number | null
+  Driver_Self_Pickup?: boolean | null
   // Container Fields
   job_type?: 'normal' | 'container' | null
   chassis_plate?: string | null

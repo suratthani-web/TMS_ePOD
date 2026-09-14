@@ -224,6 +224,7 @@ export function JobDialog({
     Price_Cust_Extra: job?.Price_Cust_Extra || '',
     Cost_Driver_Extra: job?.Cost_Driver_Extra || '',
     Loaded_Qty: job?.Loaded_Qty || '',
+    Driver_Self_Pickup: (job as any)?.Driver_Self_Pickup || false,
     job_type: (job as any)?.job_type || 'normal',
     chassis_plate: (job as any)?.chassis_plate || '',
     container_no: initialContainer?.container_no || '',
@@ -674,6 +675,7 @@ export function JobDialog({
         Delivery_Lat: targetJob.Delivery_Lat || null,
         Delivery_Lon: targetJob.Delivery_Lon || null,
         Loaded_Qty: targetJob.Loaded_Qty !== null && targetJob.Loaded_Qty !== undefined ? targetJob.Loaded_Qty : '',
+        Driver_Self_Pickup: (targetJob as any)?.Driver_Self_Pickup || false,
         job_type: (targetJob as any)?.job_type || 'normal',
         chassis_plate: (targetJob as any)?.chassis_plate || '',
         container_no: targetContainer?.container_no || '',
@@ -740,6 +742,7 @@ export function JobDialog({
         Delivery_Lat: null,
         Delivery_Lon: null,
         Loaded_Qty: '',
+        Driver_Self_Pickup: false,
         job_type: 'normal',
         chassis_plate: '',
         container_no: '',
@@ -2118,6 +2121,21 @@ export function JobDialog({
           {/* Tab: มอบหมาย */}
           {activeTab === 'assign' && (
             <div className="space-y-4">
+              {/* Driver self-pickup: pickup point has no checker → the driver must
+                  scan items himself when loading (forces pickup scan for this job). */}
+              <label className="flex items-start gap-3 p-4 rounded-xl border border-amber-500/30 bg-amber-500/5 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={!!formData.Driver_Self_Pickup}
+                  onChange={(e) => setFormData({ ...formData, Driver_Self_Pickup: e.target.checked })}
+                  className="w-5 h-5 mt-0.5 accent-amber-500 cursor-pointer"
+                />
+                <div>
+                  <div className="text-sm font-bold text-amber-600">คนขับสแกนรับเอง (จุดรับไม่มีเช็คเกอร์)</div>
+                  <div className="text-xs text-muted-foreground">เปิดเมื่อจุดรับไม่มีเช็คเกอร์ประจำ — คนขับต้องยิงสแกนสินค้าตอนขึ้นของเอง (แยกตามดรอป) ก่อนออกรถ</div>
+                </div>
+              </label>
+
               {/* Assignment List */}
               {assignments.map((assignment, index: number) => (
                 <div key={index} className="p-4 bg-muted/30 rounded-lg border border-border relative group">
@@ -2337,7 +2355,7 @@ export function JobDialog({
                                 />
                                 {assignment.Vehicle_Plate && vehicles.find(v => v.Vehicle_Plate === assignment.Vehicle_Plate)?.Driver_ID === assignment.Driver_ID && assignment.Driver_ID && (
                                     <div className="absolute -top-3 right-4 bg-emerald-500 text-white text-[10px] px-2 py-0.5 rounded-full font-black flex items-center gap-1 shadow-sm animate-in zoom-in-50">
-                                        <LinkIcon className="w-2.5 h-2.5" /> {t('jobs.dialog.linked') || 'LINKED'}
+                                        <LinkIcon className="w-2.5 h-2.5" /> ผูกทะเบียน
                                     </div>
                                 )}
                             </div>
@@ -2386,7 +2404,7 @@ export function JobDialog({
                                 />
                                 {assignment.Driver_ID && drivers.find(d => d.Driver_ID === assignment.Driver_ID)?.Vehicle_Plate === assignment.Vehicle_Plate && assignment.Vehicle_Plate && (
                                     <div className="absolute -top-3 right-4 bg-emerald-500 text-white text-[10px] px-2 py-0.5 rounded-full font-black flex items-center gap-1 shadow-sm animate-in zoom-in-50">
-                                        <LinkIcon className="w-2.5 h-2.5" /> {t('jobs.dialog.linked') || 'LINKED'}
+                                        <LinkIcon className="w-2.5 h-2.5" /> ผูกทะเบียน
                                     </div>
                                 )}
                             </div>
