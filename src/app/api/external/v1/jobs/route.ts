@@ -50,7 +50,9 @@ export async function POST(req: NextRequest) {
             box_count,
             vehicle_plate, // optional: pre-assigned company vehicle (checker picked it)
             driver_name,   // optional: assigned driver name
-            stops          // optional: multi-drop destinations [{stop_number,recipient_name,phone,address,notes}]
+            stops,         // optional: multi-drop destinations [{stop_number,recipient_name,phone,address,notes}]
+            pickup_lat,    // optional: pickup point coordinates (checker's chosen origin)
+            pickup_lon
         } = body
 
         // Validation
@@ -159,6 +161,11 @@ export async function POST(req: NextRequest) {
         if (driver_name) assign.Driver_Name = String(driver_name).trim()
         if (Array.isArray(stops) && stops.length > 0) {
             assign.original_destinations_json = JSON.stringify(stops)
+        }
+        // Pickup point coordinates (origin pin) from the checker's chosen point.
+        if (pickup_lat != null && pickup_lon != null && !Number.isNaN(Number(pickup_lat)) && !Number.isNaN(Number(pickup_lon))) {
+            assign.Pickup_Lat = Number(pickup_lat)
+            assign.Pickup_Lon = Number(pickup_lon)
         }
 
         const jobPayload: Record<string, unknown> = {
