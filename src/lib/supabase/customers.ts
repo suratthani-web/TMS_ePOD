@@ -20,7 +20,9 @@ export type Customer = {
   Price_Per_Unit?: number | null
   Incentive_Sensor_Check?: boolean | null
   Line_Notify_Disabled?: boolean | null
-  Require_Scan?: boolean | null
+  Require_Scan?: boolean | null // legacy: ใช้เป็น fallback ของทั้งรับ+ส่ง
+  Require_Scan_Pickup?: boolean | null   // บังคับสแกนตอนรับ
+  Require_Scan_Delivery?: boolean | null // บังคับสแกนตอนส่ง
   // แสดงตำแหน่งรถ (แผนที่ live) บนหน้าแดชบอร์ดลูกค้าไหม — ปิดสำหรับลูกค้าที่ใช้รถสังกัด
   // ซึ่งพิกัดค้างอยู่ที่เดิม (default = แสดง)
   Show_Live_Tracking?: boolean | null
@@ -136,7 +138,10 @@ export async function createCustomer(customerData: Partial<Customer>) {
         Price_Per_Unit: customerData.Price_Per_Unit || 0,
         Incentive_Sensor_Check: (customerData as { Incentive_Sensor_Check?: boolean }).Incentive_Sensor_Check || false,
         Line_Notify_Disabled: customerData.Line_Notify_Disabled || false,
-        Require_Scan: customerData.Require_Scan || false
+        Require_Scan: customerData.Require_Scan || false,
+        // Separate pickup/delivery scan mandates; fall back to the legacy flag.
+        Require_Scan_Pickup: customerData.Require_Scan_Pickup ?? customerData.Require_Scan ?? false,
+        Require_Scan_Delivery: customerData.Require_Scan_Delivery ?? customerData.Require_Scan ?? false
       })
       .select()
       .single()

@@ -411,29 +411,42 @@ export default function CustomersSettingsPage() {
                       </div>
                     </div>
 
-                    {/* Require Barcode Scan Toggle Feature */}
-                    <div className="p-6 rounded-[2rem] border-2 border-indigo-500/20 bg-indigo-500/5 flex items-center justify-between shadow-lg">
+                    {/* Require Barcode Scan — separate pickup / delivery toggles */}
+                    <div className="p-6 rounded-[2rem] border-2 border-indigo-500/20 bg-indigo-500/5 shadow-lg space-y-4">
                       <div className="space-y-1">
                         <Label className="text-lg font-black uppercase tracking-wide text-indigo-600 dark:text-indigo-400 flex items-center gap-2">
                           <span className="w-2.5 h-2.5 rounded-full bg-indigo-500 animate-pulse" />
                           บังคับสแกนลาเบลสินค้า (Require Scan)
                         </Label>
                         <p className="text-sm text-muted-foreground font-bold italic leading-none opacity-80">
-                          เปิด = งานของลูกค้ารายนี้ต้องสแกนลาเบลสินค้าตอนรับและตอนส่ง มิฉะนั้นจะบันทึก/ปิดงานไม่ได้ (ใช้ตรวจว่าของรับ-ส่งครบและถูก)
+                          เลือกเปิด/ปิดแยกตอนรับและตอนส่งได้อิสระ — เปิดจุดไหน งานของลูกค้ารายนี้จะต้องสแกนลาเบลจริงในจุดนั้นก่อนบันทึก/ปิดงาน (กดใส่จำนวนด้วยมือไม่นับ)
                         </p>
                       </div>
-                      <div className="flex items-center gap-3">
-                        <span className={cn("text-xs font-black uppercase tracking-wider px-3 py-1 rounded-full border", formData.Require_Scan ? "bg-indigo-500/10 border-indigo-500/30 text-indigo-500" : "bg-slate-500/10 border-slate-500/30 text-slate-400")}>
-                          {formData.Require_Scan ? "บังคับ (On)" : "ไม่บังคับ (Off)"}
-                        </span>
-                        <input
-                          type="checkbox"
-                          id="Require_Scan"
-                          checked={!!formData.Require_Scan}
-                          onChange={(e) => updateForm("Require_Scan", e.target.checked)}
-                          className="w-8 h-8 rounded-lg border-border bg-muted text-indigo-600 focus:ring-indigo-500/40 cursor-pointer accent-indigo-500"
-                        />
-                      </div>
+
+                      {([
+                        { key: "Require_Scan_Pickup" as const, label: "ตอนรับสินค้า (Pickup)" },
+                        { key: "Require_Scan_Delivery" as const, label: "ตอนส่งสินค้า (Delivery)" },
+                      ]).map(({ key, label }) => {
+                        // Effective value: the phase column, falling back to the legacy flag.
+                        const val = (formData[key] ?? formData.Require_Scan) ?? false
+                        return (
+                          <div key={key} className="flex items-center justify-between gap-3 pl-1">
+                            <span className="text-base font-black text-foreground">{label}</span>
+                            <div className="flex items-center gap-3">
+                              <span className={cn("text-xs font-black uppercase tracking-wider px-3 py-1 rounded-full border", val ? "bg-indigo-500/10 border-indigo-500/30 text-indigo-500" : "bg-slate-500/10 border-slate-500/30 text-slate-400")}>
+                                {val ? "บังคับ (On)" : "ไม่บังคับ (Off)"}
+                              </span>
+                              <input
+                                type="checkbox"
+                                id={key}
+                                checked={!!val}
+                                onChange={(e) => updateForm(key, e.target.checked)}
+                                className="w-8 h-8 rounded-lg border-border bg-muted text-indigo-600 focus:ring-indigo-500/40 cursor-pointer accent-indigo-500"
+                              />
+                            </div>
+                          </div>
+                        )
+                      })}
                     </div>
 
                     {/* Show live vehicle tracking on the customer dashboard */}

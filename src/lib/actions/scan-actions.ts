@@ -136,24 +136,33 @@ export async function getScanRequirement(
     .eq("Job_ID", jobId)
     .single()
 
-  // Resolve the customer's explicit flag (null = no linked customer record).
+  // Resolve the customer's explicit flag for THIS phase (null = no linked
+  // customer). Pickup and delivery are configured independently; each falls back
+  // to the legacy Require_Scan when its own column is unset (pre-migration).
+  // select('*') so a not-yet-migrated table (missing the new columns) doesn't
+  // error the whole query — the fields just read as undefined → legacy fallback.
   let customerFlag: boolean | null = null
   if (job?.Customer_ID) {
     const { data: cust } = await supabase
       .from("Master_Customers")
-      .select("Require_Scan")
+      .select("*")
       .eq("Customer_ID", job.Customer_ID)
       .maybeSingle()
-    if (cust) customerFlag = !!cust.Require_Scan
+    if (cust) {
+      const phaseFlag = phase === "pickup" ? cust.Require_Scan_Pickup : cust.Require_Scan_Delivery
+      customerFlag = phaseFlag != null ? !!phaseFlag : !!cust.Require_Scan
+    }
   }
 
   // Pickup: the customer flag is authoritative — OFF means the driver can
   // receive without scanning, even for WMS cross-dock jobs.
   if (phase === "pickup") return customerFlag === true
 
-  // Delivery: the customer flag ON forces it; otherwise a seeded per-item
-  // pickup manifest still forces a scan so the items are reconciled at drop-off.
+  // Delivery: the customer flag ON forces it; if the customer has no linked
+  // record at all, a seeded per-item pickup manifest still forces a scan so the
+  // items are reconciled at drop-off. An explicit delivery OFF is respected.
   if (customerFlag === true) return true
+  if (customerFlag === false) return false
   const { count: pickupCount } = await supabase
     .from("Job_Scans")
     .select("*", { count: "exact", head: true })
