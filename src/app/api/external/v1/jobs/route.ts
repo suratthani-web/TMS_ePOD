@@ -52,7 +52,9 @@ export async function POST(req: NextRequest) {
             driver_name,   // optional: assigned driver name
             stops,         // optional: multi-drop destinations [{stop_number,recipient_name,phone,address,notes}]
             pickup_lat,    // optional: pickup point coordinates (checker's chosen origin)
-            pickup_lon
+            pickup_lon,
+            delivery_lat,  // optional: destination coordinates (checker's chosen drop)
+            delivery_lon
         } = body
 
         // Validation
@@ -166,6 +168,11 @@ export async function POST(req: NextRequest) {
         if (pickup_lat != null && pickup_lon != null && !Number.isNaN(Number(pickup_lat)) && !Number.isNaN(Number(pickup_lon))) {
             assign.Pickup_Lat = Number(pickup_lat)
             assign.Pickup_Lon = Number(pickup_lon)
+        }
+        // Destination pin (main drop). Per-stop coords ride along in stops → original_destinations_json.
+        if (delivery_lat != null && delivery_lon != null && !Number.isNaN(Number(delivery_lat)) && !Number.isNaN(Number(delivery_lon))) {
+            assign.Delivery_Lat = Number(delivery_lat)
+            assign.Delivery_Lon = Number(delivery_lon)
         }
 
         const jobPayload: Record<string, unknown> = {
