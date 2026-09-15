@@ -157,3 +157,32 @@ export async function submitVehicleCheck(formData: FormData) {
     return { success: false, message: err instanceof Error ? err.message : "Internal Server Error" }
   }
 }
+
+/**
+ * งานของคนขับที่ "ยังต้องทำ" วันนี้ — ใช้เตือนเป็นระยะในแอป
+ *  - notStarted: จ่ายงานแล้วแต่ยังไม่กดรับ/เริ่ม
+ *  - inProgress: เริ่มแล้วแต่ยังไม่ปิดงาน (ยังไม่ส่ง POD)
+ */
+export async function getDriverReminder(driverId: string): Promise<{ total: number; notStarted: number; inProgress: number }> {
+  const empty = { total: 0, notStarted: 0, inProgress: 0 }
+  try {
+    if (!driverId) return empty
+    const supabase = createAdminClient()
+    const { todayTH } = await import('@/lib/utils/date-th')
+    const NOT_STARTED = ['New', 'Assigned', 'Confirmed']
+    const IN_PROGRESS = ['Accepted', 'Arrived Pickup', 'Picked Up', 'In Transit', 'In Progress', 'Arrived Dropoff']
+    const { data } = await supabase
+      .from('Jobs_Main')
+      .select('Job_Status')
+      .eq('Driver_ID', driverId)
+      .gte('Plan_Date', todayTH())
+      .in('Job_Status', [...NOT_STARTED, ...IN_PROGRESS])
+    const rows = data || []
+    const notStarted = rows.filter(r => NOT_STARTED.includes(r.Job_Status as string)).length
+    const inProgress = rows.length - notStarted
+    return { total: rows.length, notStarted, inProgress }
+  } catch (e) {
+    console.error('[getDriverReminder]', e)
+    return empty
+  }
+}

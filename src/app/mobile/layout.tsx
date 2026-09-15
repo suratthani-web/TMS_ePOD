@@ -10,6 +10,7 @@ import { SessionStabilizer } from "@/components/mobile/session-stabilizer"
 import { SWUpdater } from "@/components/mobile/sw-updater"
 import { PresenceManager } from "@/components/mobile/presence-manager"
 import { RealtimeJobsTrigger } from "@/components/mobile/realtime-jobs-trigger"
+import { JobReminder } from "@/components/mobile/job-reminder"
 
 export default async function MobileLayout({
   children,
@@ -28,6 +29,7 @@ export default async function MobileLayout({
       {session && <PermissionRequester driverId={session.driverId} />}
       {session?.driverId && <PresenceManager driverId={session.driverId} />}
       {session?.driverId && <RealtimeJobsTrigger driverId={session.driverId} />}
+      {session?.driverId && <JobReminder driverId={session.driverId} />}
       
       {/* pt เผื่อ safe-area (รอยบาก) จุดเดียว → เนื้อหาทุกหน้าเคลียร์ fixed MobileHeader
           บนเครื่องไม่มีรอยบาก safe-area=0 จึงไม่กระทบ layout เดิม */}
