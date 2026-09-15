@@ -3,6 +3,9 @@
 import { Job } from "@/lib/supabase/jobs"
 import { forwardRef } from "react"
 
+type DropInfo = { name?: string; recipient_name?: string; phone?: string; address?: string; stop_type?: string }
+type DeliveredItem = { code?: string | null; label?: string; qty?: number }
+
 type Props = {
   job: Job
   photos: string[] // Object URLs
@@ -17,9 +20,19 @@ type Props = {
     approverName?: string
     notes?: string
   } | null
+  // Multi-drop: render this specific drop's recipient + items only.
+  drop?: DropInfo | null
+  dropIndex?: number       // 0-based
+  totalDrops?: number
+  deliveryItems?: DeliveredItem[]
 }
 
-export const PodReport = forwardRef<HTMLDivElement, Props>(({ job, photos, signature, extraServiceData }, ref) => {
+export const PodReport = forwardRef<HTMLDivElement, Props>(({ job, photos, signature, extraServiceData, drop, dropIndex, totalDrops, deliveryItems }, ref) => {
+  const isMulti = (totalDrops || 0) > 1
+  const dropName = drop?.recipient_name || drop?.name || ""
+  const dropAddr = drop?.address || ""
+  const dropPhone = drop?.phone || ""
+  const scanned = (deliveryItems || []).filter(it => (it.label || it.code))
   return (
     <div ref={ref} className="bg-white text-black p-8 font-sans w-[800px] mx-auto">
       {/* Header */}
@@ -30,7 +43,10 @@ export const PodReport = forwardRef<HTMLDivElement, Props>(({ job, photos, signa
         </div>
         <div className="text-right">
             <h2 className="text-xl font-bold">{extraServiceData?.soNo || job.Job_ID}</h2>
-            <p className="text-xl">{new Date().toLocaleDateString('th-TH', { 
+            {isMulti && dropIndex != null && (
+              <p className="text-lg font-bold text-blue-700 mt-1">ดรอปที่ {dropIndex + 1} / {totalDrops}</p>
+            )}
+            <p className="text-xl">{new Date().toLocaleDateString('th-TH', {
                 year: 'numeric', month: 'long', day: 'numeric', 
                 hour: '2-digit', minute: '2-digit' 
             })}</p>
@@ -64,8 +80,15 @@ export const PodReport = forwardRef<HTMLDivElement, Props>(({ job, photos, signa
                     <p>{job.Origin_Location || "-"}</p>
                 </div>
                 <div>
-                    <span className="text-gray-400 text-lg font-bold block">ปลายทาง (Destination)</span>
-                    <p className="font-medium">{extraServiceData?.storeName || job.Dest_Location || "-"}</p>
+                    <span className="text-gray-400 text-lg font-bold block">ปลายทาง (Destination){isMulti && dropIndex != null ? ` · ดรอปที่ ${dropIndex + 1}` : ""}</span>
+                    {dropName || dropAddr ? (
+                        <>
+                            {dropName && <p className="font-bold">{dropName}{dropPhone ? ` (${dropPhone})` : ""}</p>}
+                            {dropAddr && <p className="font-medium">{dropAddr}</p>}
+                        </>
+                    ) : (
+                        <p className="font-medium">{extraServiceData?.storeName || job.Dest_Location || "-"}</p>
+                    )}
                 </div>
             </div>
         </div>
@@ -84,12 +107,23 @@ export const PodReport = forwardRef<HTMLDivElement, Props>(({ job, photos, signa
                 </tr>
             </thead>
             <tbody className="divide-y divide-slate-200">
-                <tr>
-                    <td className="p-2 text-center">1</td>
-                    <td className="p-2">{job.Route_Name || "สินค้าทั่วไป (General Cargo)"}</td>
-                    <td className="p-2 text-right">{job.Total_Drop || 1} Drop</td>
-                    <td className="p-2 text-center text-emerald-600 font-bold">ส่งสำเร็จ</td>
-                </tr>
+                {scanned.length > 0 ? (
+                    scanned.map((it, i) => (
+                        <tr key={i}>
+                            <td className="p-2 text-center">{i + 1}</td>
+                            <td className="p-2">{it.label || it.code}{it.code && it.label && it.label !== it.code ? <span className="text-gray-400 text-base"> · {it.code}</span> : null}</td>
+                            <td className="p-2 text-right">{it.qty || 1}</td>
+                            <td className="p-2 text-center text-emerald-600 font-bold">ส่งสำเร็จ</td>
+                        </tr>
+                    ))
+                ) : (
+                    <tr>
+                        <td className="p-2 text-center">1</td>
+                        <td className="p-2">{job.Route_Name || "สินค้าทั่วไป (General Cargo)"}</td>
+                        <td className="p-2 text-right">{isMulti && dropIndex != null ? `ดรอปที่ ${dropIndex + 1}` : `${job.Total_Drop || 1} Drop`}</td>
+                        <td className="p-2 text-center text-emerald-600 font-bold">ส่งสำเร็จ</td>
+                    </tr>
+                )}
                 {extraServiceData && (extraServiceData.movedQty || 0) > 0 && (
                     <tr>
                         <td className="p-2 text-center">2</td>

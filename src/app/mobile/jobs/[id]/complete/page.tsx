@@ -458,12 +458,16 @@ export default function JobCompletePage() {
                      signature={signatureUrl}
                  />
              ) : (
-                 <PodReport 
-                    ref={reportRef} 
-                    job={job} 
+                 <PodReport
+                    ref={reportRef}
+                    job={job}
                     photos={photoUrls}
                     signature={signatureUrl}
-                    extraServiceData={extraServiceData} 
+                    extraServiceData={extraServiceData}
+                    drop={_containerDrops[_doneDrops] || null}
+                    dropIndex={_doneDrops}
+                    totalDrops={_containerDrops.length || 1}
+                    deliveryItems={deliveryItems}
                  />
              )}
              {extraServiceData && (
