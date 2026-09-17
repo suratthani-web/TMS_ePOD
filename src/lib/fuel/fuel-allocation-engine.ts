@@ -259,26 +259,34 @@ export async function getFuelIntelligenceAnalytics(
     const bucketKey = `${plate}|${date}`;
     const bucket = vehicleDayFuel.get(bucketKey);
 
-    let dist: number;
+    // In TMS operations, each job's physical distance is its planned/system route distance (estDist).
+    // It must not be overwritten by an odometer slice from partial refuels.
+    const dist = estDist;
+
     let consumedLiters: number;
     let fuelCost: number;
     let kmPerLiter: number;
 
-    if (bucket && bucket.liters > 0) {
-      // Real allocation from the day's actual refuel bill(s).
-      const dayEst = dayEstDistance.get(bucketKey) || 0;
-      const count = dayTripCount.get(bucketKey) || 1;
-      const share = dayEst > 0 ? estDist / dayEst : 1 / count;
-      dist = +(bucket.km * share).toFixed(2);
-      consumedLiters = +(bucket.liters * share).toFixed(2);
-      fuelCost = +(bucket.cost * share).toFixed(2);
-      kmPerLiter = consumedLiters > 0 ? +(dist / consumedLiters).toFixed(2) : eff.kmPerLiter;
+    // Use vehicle efficiency baseline or day-specific actual consumption rate if plausible
+    if (bucket && bucket.km > 0 && bucket.liters > 0) {
+      const dayKmPerLiter = +(bucket.km / bucket.liters).toFixed(2);
+      const dayUnitPrice = bucket.cost > 0 ? +(bucket.cost / bucket.liters).toFixed(2) : eff.avgUnitPrice;
+
+      // Plausibility guard for day-level km/L (between MIN_KMPL and MAX_KMPL)
+      if (dayKmPerLiter >= MIN_KMPL && dayKmPerLiter <= MAX_KMPL) {
+        kmPerLiter = dayKmPerLiter;
+        consumedLiters = dist > 0 ? +(dist / kmPerLiter).toFixed(2) : 0;
+        fuelCost = dist > 0 ? +(consumedLiters * dayUnitPrice).toFixed(2) : 0;
+      } else {
+        kmPerLiter = eff.kmPerLiter;
+        consumedLiters = dist > 0 ? +(dist / eff.kmPerLiter).toFixed(2) : 0;
+        fuelCost = dist > 0 ? +(consumedLiters * eff.avgUnitPrice).toFixed(2) : 0;
+      }
     } else {
       // Fallback: no matching bill this day → vehicle baseline on estimated distance.
-      dist = estDist;
+      kmPerLiter = eff.kmPerLiter;
       consumedLiters = dist > 0 ? +(dist / eff.kmPerLiter).toFixed(2) : 0;
       fuelCost = dist > 0 ? +(consumedLiters * eff.avgUnitPrice).toFixed(2) : 0;
-      kmPerLiter = eff.kmPerLiter;
     }
     const fuelCostPerKm = dist > 0 ? +(fuelCost / dist).toFixed(2) : 0;
 
