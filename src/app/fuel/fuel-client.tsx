@@ -35,14 +35,14 @@ import { PremiumButton } from "@/components/ui/premium-button"
 import { Badge } from "@/components/ui/badge"
 import { cn } from "@/lib/utils"
 import { useLanguage } from "@/components/providers/language-provider"
-import type { FuelLog } from "@/lib/supabase/fuel"
+import type { FuelLog, EnrichedFuelLog } from "@/lib/supabase/fuel"
 import type { FuelAnalytics } from "@/lib/supabase/fuel-analytics"
 import type { Driver } from "@/lib/supabase/drivers"
 import type { Branch } from "@/lib/supabase/branches"
 import type { FuelIntelligenceSummary } from "@/lib/fuel/fuel-allocation-engine"
 
 type FuelClientProps = {
-  logs: (FuelLog & { Km_Per_Liter?: number; Price_Per_Liter?: number; Delta_Km?: number })[]
+  logs: EnrichedFuelLog[]
   count: number
   drivers: Driver[]
   vehicles: { Vehicle_Plate?: string | null; Vehicle_Type?: string | null }[]
@@ -423,12 +423,13 @@ export function FuelClient({
                             "ทะเบียนรถ": l.Vehicle_Plate || '-',
                             "พนักงานขับรถ": l.Driver_Name || '-',
                             "สถานี/ปั๊มน้ำมัน": l.Station_Name || '-',
+                            "ประเภท": l.Trip_Fill_Type === 'enroute' ? 'เติมระหว่างทาง' : 'เติมจบงาน',
                             "เลขไมล์ (กม.)": l.Odometer || '',
                             "ระยะทางช่วงนี้ (กม.)": l.Delta_Km || '',
                             "จำนวนลิตร": l.Liters || 0,
                             "ราคาต่อลิตร (บาท/ลิตร)": l.Price_Per_Liter || 0,
                             "ยอดรวมเงิน (บาท)": l.Price_Total || 0,
-                            "อัตราสิ้นเปลือง (km/L)": l.Km_Per_Liter || '',
+                            "อัตราสิ้นเปลือง (km/L)": l.Trip_Fill_Type === 'enroute' ? 'รอจบงาน' : (l.Km_Per_Liter || ''),
                             "สถานะ": l.Status || 'Pending',
                             "ลิงก์รูปภาพ": l.Photo_Url || ''
                         }))}
@@ -509,7 +510,14 @@ export function FuelClient({
                             <td className="px-4 py-3.5 text-right font-black text-foreground">
                               {log.Odometer ? log.Odometer.toLocaleString() : '-'}
                               {log.Delta_Km && log.Delta_Km > 0 ? (
-                                <p className="text-[9px] text-muted-foreground font-normal">+{log.Delta_Km.toLocaleString()} กม.</p>
+                                <div className="text-[9px] text-muted-foreground font-normal">
+                                  +{log.Delta_Km.toLocaleString()} กม.
+                                  {log.Trip_Fill_Type !== 'enroute' && (log.Enroute_Count || 0) > 0 && (
+                                    <span className="block text-[8px] text-primary/80 font-medium leading-tight">
+                                      (รวม {log.Enroute_Count} บิลระหว่างทาง)
+                                    </span>
+                                  )}
+                                </div>
                               ) : null}
                             </td>
                             <td className="px-4 py-3.5 text-right font-bold text-cyan-400">
@@ -524,12 +532,22 @@ export function FuelClient({
                               </span>
                             </td>
                             <td className="px-4 py-3.5 text-right">
-                              {log.Km_Per_Liter && log.Km_Per_Liter > 0 ? (
-                                <span className={cn(
-                                  "px-2 py-0.5 rounded text-[10px] font-black",
-                                  log.Km_Per_Liter >= 8 ? "bg-emerald-500/10 text-emerald-400" :
-                                  log.Km_Per_Liter >= 5 ? "bg-amber-500/10 text-amber-400" : "bg-rose-500/10 text-rose-400"
-                                )}>
+                              {log.Trip_Fill_Type === 'enroute' ? (
+                                <span 
+                                  className="px-2 py-0.5 rounded text-[10px] font-bold bg-amber-500/10 text-amber-500 border border-amber-500/20 inline-block"
+                                  title="เติมระหว่างทาง ไม่คำนวณเดี่ยว ระบบจะนำระยะทางและลิตรมารวมคำนวณกับการเติมจบงาน"
+                                >
+                                  รอจบงาน
+                                </span>
+                              ) : log.Km_Per_Liter && log.Km_Per_Liter > 0 ? (
+                                <span 
+                                  className={cn(
+                                    "px-2 py-0.5 rounded text-[10px] font-black inline-block",
+                                    log.Km_Per_Liter >= 8 ? "bg-emerald-500/10 text-emerald-400" :
+                                    log.Km_Per_Liter >= 5 ? "bg-amber-500/10 text-amber-400" : "bg-rose-500/10 text-rose-400"
+                                  )}
+                                  title={(log.Enroute_Count || 0) > 0 ? `รอบนี้รวมระหว่างทาง ${log.Enroute_Count} รายการ (ใช้น้ำมันรวม ${log.Cycle_Liters?.toFixed(1)} L / ${log.Delta_Km} กม.)` : undefined}
+                                >
                                   {log.Km_Per_Liter.toFixed(1)}
                                 </span>
                               ) : (

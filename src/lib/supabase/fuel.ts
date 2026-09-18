@@ -87,17 +87,99 @@ export async function suggestFillType(
   }
 }
 
-// Helper to get previous log for efficiency calculation
-async function getPreviousLog(supabase: SupabaseClient, vehiclePlate: string, currentDate: string) {
-  const { data } = await supabase
+export type EnrichedFuelLog = FuelLog & {
+  Driver_Name?: string
+  Price_Per_Liter?: number
+  Delta_Km?: number
+  Km_Per_Liter?: number
+  Efficiency_Status?: string
+  Capacity_Status?: string
+  Tank_Capacity?: number
+  Cycle_Liters?: number
+  Enroute_Count?: number
+}
+
+// Helper to calculate cycle-aware distance and fuel efficiency:
+// - If 'enroute' (เติมระหว่างทาง): records incremental km since previous stop,
+//   but DOES NOT compute KM/L individually (waits to accumulate with the closing fill).
+// - If 'end' (เติมจบงาน): looks back to find the previous anchor fill,
+//   accumulating all intervening enroute liters and distances to compute true full-to-full KM/L.
+async function getCycleForLog(supabase: SupabaseClient, log: FuelLog) {
+  if (!log.Vehicle_Plate || !log.Date_Time || !log.Odometer) {
+    return { deltaKm: 0, kmPerLiter: 0, cycleLiters: log.Liters || 0, enrouteCount: 0, efficiencyStatus: 'Normal' }
+  }
+
+  const isEnroute = log.Trip_Fill_Type === 'enroute'
+
+  // Fetch prior logs for this vehicle before current Date_Time
+  const { data: priorLogs } = await supabase
     .from('Fuel_Logs')
-    .select('Odometer, Liters')
-    .eq('Vehicle_Plate', vehiclePlate)
-    .lt('Date_Time', currentDate)
+    .select('Log_ID, Date_Time, Odometer, Liters, Price_Total, Trip_Fill_Type')
+    .eq('Vehicle_Plate', log.Vehicle_Plate)
+    .lt('Date_Time', log.Date_Time)
     .order('Date_Time', { ascending: false })
-    .limit(1)
-    .maybeSingle()
-  return data
+    .limit(10)
+
+  if (!priorLogs || priorLogs.length === 0) {
+    return { deltaKm: 0, kmPerLiter: 0, cycleLiters: log.Liters || 0, enrouteCount: 0, efficiencyStatus: 'Normal' }
+  }
+
+  if (isEnroute) {
+    // For enroute fills: show incremental km from immediately preceding log,
+    // but DO NOT compute km/L yet (must accumulate with the closing fill).
+    const prevOdo = priorLogs[0]?.Odometer
+    const incrementalDist = (prevOdo && log.Odometer > prevOdo) ? (log.Odometer - prevOdo) : 0
+    return {
+      deltaKm: incrementalDist,
+      kmPerLiter: 0, // Cannot calculate individually
+      cycleLiters: log.Liters || 0,
+      enrouteCount: 0,
+      efficiencyStatus: 'Normal'
+    }
+  }
+
+  // Closing fill ('end' or null): find all preceding enroute fills back to previous anchor
+  let anchorOdo: number | null = null
+  let accumEnrouteLiters = 0
+  let enrouteCount = 0
+
+  for (const p of priorLogs) {
+    if (p.Trip_Fill_Type === 'enroute') {
+      accumEnrouteLiters += (Number(p.Liters) || 0)
+      enrouteCount++
+    } else {
+      anchorOdo = Number(p.Odometer) || null
+      break
+    }
+  }
+
+  // If all prior logs in the fetched window were enroute, use the earliest log's odometer as anchor
+  if (anchorOdo === null && priorLogs.length > 0) {
+    anchorOdo = Number(priorLogs[priorLogs.length - 1].Odometer) || null
+  }
+
+  const cycleLiters = (Number(log.Liters) || 0) + accumEnrouteLiters
+  let deltaKm = 0
+  let kmPerLiter = 0
+  let efficiencyStatus = 'Normal'
+
+  if (anchorOdo && log.Odometer > anchorOdo) {
+    deltaKm = log.Odometer - anchorOdo
+    if (deltaKm > 0 && cycleLiters > 0) {
+      kmPerLiter = +(deltaKm / cycleLiters).toFixed(2)
+
+      if (kmPerLiter < 5) efficiencyStatus = 'Critical'
+      else if (kmPerLiter < 8) efficiencyStatus = 'Warning'
+    }
+  }
+
+  return {
+    deltaKm,
+    kmPerLiter,
+    cycleLiters,
+    enrouteCount,
+    efficiencyStatus
+  }
 }
 
 // ดึงบันทึกเติมน้ำมันทั้งหมด (pagination + search + date filter + vehicle filter + branch filter)
@@ -109,7 +191,7 @@ export async function getAllFuelLogs(
   endDate?: string,
   selectedVehicles?: string[],
   providedBranchId?: string
-): Promise<{ data: (FuelLog & { Km_Per_Liter?: number; Price_Per_Liter?: number; Delta_Km?: number })[], count: number }> {
+): Promise<{ data: EnrichedFuelLog[], count: number }> {
   try {
     const supabase = createAdminClient()
     const offset = (page - 1) * limit
@@ -195,31 +277,12 @@ export async function getAllFuelLogs(
 
     // Enrich logs with Driver Name, Efficiency, Price_Per_Liter, Delta_Km, and alerts
     const enrichedLogs = await Promise.all(logs?.map(async (log) => {
-      let kmPerLiter = 0
-      let deltaKm = 0
-      let efficiencyStatus = 'Normal' // Normal, Warning, Critical
-      let capacityStatus = 'Normal'   // Normal, Overflow
-
       // Check Tank Capacity Overflow
       const tankCapacity = vehicleMap.get(log.Vehicle_Plate) || 50 // Default 50L if missing
-      if (log.Liters > tankCapacity * 1.1) { // Allow 10% overflow buffer
-          capacityStatus = 'Overflow'
-      }
+      const capacityStatus = (log.Liters > tankCapacity * 1.1) ? 'Overflow' : 'Normal'
 
-      if (log.Vehicle_Plate && log.Date_Time && log.Odometer && log.Liters) {
-         const prevLog = await getPreviousLog(supabase, log.Vehicle_Plate, log.Date_Time)
-         if (prevLog && prevLog.Odometer) {
-            const distance = log.Odometer - prevLog.Odometer
-            if (distance > 0 && log.Liters > 0) {
-                deltaKm = distance
-                kmPerLiter = +(distance / log.Liters).toFixed(2)
-                
-                // Efficiency Alerts
-                if (kmPerLiter < 5) efficiencyStatus = 'Critical'
-                else if (kmPerLiter < 8) efficiencyStatus = 'Warning'
-            }
-         }
-      }
+      // Cycle-aware distance and efficiency calculation
+      const cycle = await getCycleForLog(supabase, log)
 
       const pricePerLiter = (log.Price_Total && log.Liters && log.Liters > 0)
         ? +(log.Price_Total / log.Liters).toFixed(2)
@@ -233,9 +296,11 @@ export async function getAllFuelLogs(
           || plateJobDriverMap.get(log.Vehicle_Plate)
           || 'ไม่ระบุคนขับ',
         Price_Per_Liter: pricePerLiter,
-        Delta_Km: deltaKm,
-        Km_Per_Liter: kmPerLiter,
-        Efficiency_Status: efficiencyStatus,
+        Delta_Km: cycle.deltaKm,
+        Km_Per_Liter: cycle.kmPerLiter,
+        Cycle_Liters: cycle.cycleLiters,
+        Enroute_Count: cycle.enrouteCount,
+        Efficiency_Status: cycle.efficiencyStatus,
         Capacity_Status: capacityStatus,
         Tank_Capacity: tankCapacity
       }
