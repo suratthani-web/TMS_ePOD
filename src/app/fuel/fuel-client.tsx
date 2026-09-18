@@ -521,7 +521,12 @@ export function FuelClient({
                               ) : null}
                             </td>
                             <td className="px-4 py-3.5 text-right font-bold text-cyan-400">
-                              {log.Liters?.toFixed(2)} L
+                              <div>{log.Liters?.toFixed(2)} L</div>
+                              {log.Trip_Fill_Type !== 'enroute' && (log.Enroute_Count || 0) > 0 && log.Cycle_Liters ? (
+                                <div className="text-[9px] text-muted-foreground font-normal">
+                                  (รวม {log.Cycle_Liters.toFixed(2)} L)
+                                </div>
+                              ) : null}
                             </td>
                             <td className="px-4 py-3.5 text-right font-black text-foreground">
                               ฿{log.Price_Per_Liter ? log.Price_Per_Liter.toFixed(2) : "0.00"}
