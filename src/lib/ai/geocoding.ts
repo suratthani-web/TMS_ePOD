@@ -295,23 +295,43 @@ export async function resolveGoogleMapsUrl(url: string): Promise<{ lat: number; 
   if (!url || !url.trim().startsWith('http')) return null;
   const cleanUrl = url.trim();
 
-  // 1. Direct Regex checks on URL string
-  const latLngAt = cleanUrl.match(/@(-?\d+\.\d+)\s*,\s*(-?\d+\.\d+)/);
-  if (latLngAt) {
-    return { lat: parseFloat(latLngAt[1]), lng: parseFloat(latLngAt[2]) };
+  // Helper to extract place name from Google Maps URL: /maps/place/{Name}/...
+  const extractPlaceName = (rawUrl: string): string | undefined => {
+    const m = rawUrl.match(/\/maps\/place\/([^/@?]+)/);
+    if (m && m[1]) {
+      try {
+        return decodeURIComponent(m[1].replace(/\+/g, ' '));
+      } catch {}
+    }
+    return undefined;
+  };
+
+  const placeName = extractPlaceName(cleanUrl);
+
+  // Helper to extract coordinates prioritizing exact PIN location over camera position (@lat,lng)
+  const extractPinCoords = (rawUrl: string) => {
+    // 1. PIN LOCATION in Google Maps data parameter: !3d{lat}!4d{lng} (Most accurate for place pins)
+    const m3d = rawUrl.match(/!3d(-?\d+\.\d+)!4d(-?\d+\.\d+)/);
+    if (m3d) {
+      return { lat: parseFloat(m3d[1]), lng: parseFloat(m3d[2]) };
+    }
+
+    // 2. Query param pin: ?q=lat,lng or query=lat,lng or ll=lat,lng
+    const queryMatch = rawUrl.match(/[?&](?:q|ll|query)=(-?\d+\.\d+)\s*,\s*(-?\d+\.\d+)/);
+    if (queryMatch) {
+      return { lat: parseFloat(queryMatch[1]), lng: parseFloat(queryMatch[2]) };
+    }
+
+    return null;
+  };
+
+  // 1. Check direct URL for exact PIN coordinates
+  const directPin = extractPinCoords(cleanUrl);
+  if (directPin) {
+    return { ...directPin, name: placeName };
   }
 
-  const m3d = cleanUrl.match(/!3d(-?\d+\.\d+)!4d(-?\d+\.\d+)/);
-  if (m3d) {
-    return { lat: parseFloat(m3d[1]), lng: parseFloat(m3d[2]) };
-  }
-
-  const queryMatch = cleanUrl.match(/[?&](?:q|ll|query)=(-?\d+\.\d+)\s*,\s*(-?\d+\.\d+)/);
-  if (queryMatch) {
-    return { lat: parseFloat(queryMatch[1]), lng: parseFloat(queryMatch[2]) };
-  }
-
-  // 2. If it's a short URL (maps.app.goo.gl or goo.gl/maps), fetch redirect destination
+  // 2. If it's a short URL (maps.app.goo.gl or goo.gl/maps) or redirectable URL, fetch redirect destination
   if (cleanUrl.includes('maps.app.goo.gl') || cleanUrl.includes('goo.gl/maps') || cleanUrl.includes('maps.google.com') || cleanUrl.includes('google.com/maps')) {
     try {
       const response = await fetch(cleanUrl, {
@@ -324,29 +344,46 @@ export async function resolveGoogleMapsUrl(url: string): Promise<{ lat: number; 
       });
 
       const finalUrl = response.url || '';
-      
-      // Try regex on final redirected URL
-      const finalAt = finalUrl.match(/@(-?\d+\.\d+)\s*,\s*(-?\d+\.\d+)/);
-      if (finalAt) return { lat: parseFloat(finalAt[1]), lng: parseFloat(finalAt[2]) };
+      const redirectedName = extractPlaceName(finalUrl) || placeName;
 
-      const final3d = finalUrl.match(/!3d(-?\d+\.\d+)!4d(-?\d+\.\d+)/);
-      if (final3d) return { lat: parseFloat(final3d[1]), lng: parseFloat(final3d[2]) };
-
-      const finalQuery = finalUrl.match(/[?&](?:q|ll|query)=(-?\d+\.\d+)\s*,\s*(-?\d+\.\d+)/);
-      if (finalQuery) return { lat: parseFloat(finalQuery[1]), lng: parseFloat(finalQuery[2]) };
+      // Check redirected URL for pin coordinates
+      const redirectedPin = extractPinCoords(finalUrl);
+      if (redirectedPin) {
+        return { ...redirectedPin, name: redirectedName };
+      }
 
       // Try parsing HTML content for coordinates / meta tags
       const html = await response.text();
-      const metaMatch = html.match(/content="https:\/\/maps\.google\.com\/maps\/api\/staticmap\?[^"]*center=(-?\d+\.\d+)%2C(-?\d+\.\d+)/i) 
-                     || html.match(/itemprop="latitude"\s+content="(-?\d+\.\d+)"[\s\S]*?itemprop="longitude"\s+content="(-?\d+\.\d+)"/i)
-                     || html.match(/\/@(-?\d+\.\d+),(-?\d+\.\d+),/);
 
+      // Check itemprop or static map
+      const itemPropLat = html.match(/itemprop="latitude"\s+content="(-?\d+\.\d+)"/i);
+      const itemPropLng = html.match(/itemprop="longitude"\s+content="(-?\d+\.\d+)"/i);
+      if (itemPropLat && itemPropLng) {
+        return { lat: parseFloat(itemPropLat[1]), lng: parseFloat(itemPropLng[1]), name: redirectedName };
+      }
+
+      const metaMatch = html.match(/content="https:\/\/maps\.google\.com\/maps\/api\/staticmap\?[^"]*center=(-?\d+\.\d+)%2C(-?\d+\.\d+)/i);
       if (metaMatch) {
-        return { lat: parseFloat(metaMatch[1]), lng: parseFloat(metaMatch[2]) };
+        return { lat: parseFloat(metaMatch[1]), lng: parseFloat(metaMatch[2]), name: redirectedName };
+      }
+
+      const titleMatch = html.match(/<meta property="og:title" content="([^"]+)"/i) || html.match(/<title>([^<]+)<\/title>/i);
+      const pageTitle = titleMatch ? titleMatch[1].replace(/ - Google Maps.*$/i, '').trim() : redirectedName;
+
+      // Fallback: only use camera center (@lat,lng) if no pin was found in URL or HTML
+      const finalAt = finalUrl.match(/@(-?\d+\.\d+)\s*,\s*(-?\d+\.\d+)/);
+      if (finalAt) {
+        return { lat: parseFloat(finalAt[1]), lng: parseFloat(finalAt[2]), name: pageTitle };
       }
     } catch (err) {
       console.warn('[resolveGoogleMapsUrl] Follow redirect error:', err);
     }
+  }
+
+  // 3. Fallback to @lat,lng from original URL as absolute last resort
+  const latLngAt = cleanUrl.match(/@(-?\d+\.\d+)\s*,\s*(-?\d+\.\d+)/);
+  if (latLngAt) {
+    return { lat: parseFloat(latLngAt[1]), lng: parseFloat(latLngAt[2]), name: placeName };
   }
 
   return null;

@@ -209,19 +209,26 @@ export async function getFuelIntelligenceAnalytics(
     let startOdo = sorted[0].Odometer as number; // anchor (fill before the first cycle)
     let accumLiters = 0;
     let accumCost = 0;
+    let cycleDates: string[] = [];
+
     for (let i = 1; i < sorted.length; i++) {
       const curr = sorted[i];
       accumLiters += curr.Liters;
       accumCost += curr.Price_Total || curr.Liters * (eff?.avgUnitPrice || 38);
+      const currDate = (curr.Date_Time || '').slice(0, 10);
+      if (currDate && !cycleDates.includes(currDate)) {
+        cycleDates.push(currDate);
+      }
+
       if (!isClosing(curr)) continue; // enroute → keep accumulating, don't close
 
       const km = (curr.Odometer as number) - startOdo;
       if (km > 0 && accumLiters > 0) {
         const kmpl = km / accumLiters;
         if (kmpl >= MIN_KMPL && kmpl <= MAX_KMPL) { // guard odometer typos / partial fills
-          const date = (curr.Date_Time || '').slice(0, 10);
-          if (date) {
-            const key = `${plate}|${date}`;
+          // Attribute cycle efficiency to all dates spanned by this cycle
+          for (const d of cycleDates) {
+            const key = `${plate}|${d}`;
             const b = vehicleDayFuel.get(key) || { km: 0, liters: 0, cost: 0 };
             b.km += km;
             b.liters += accumLiters;
@@ -234,6 +241,7 @@ export async function getFuelIntelligenceAnalytics(
       startOdo = curr.Odometer as number;
       accumLiters = 0;
       accumCost = 0;
+      cycleDates = [];
     }
   });
 
