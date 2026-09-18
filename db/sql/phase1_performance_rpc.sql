@@ -88,15 +88,15 @@ BEGIN
     -- 1. Aggregate Financials
     SELECT 
         jsonb_build_object(
-            'revenue', COALESCE(SUM("Price_Cust_Total"::NUMERIC), 0),
+            'revenue', COALESCE(SUM("Price_Cust_Total"::NUMERIC), 0) + COALESCE(SUM("Price_Cust_Extra"::NUMERIC), 0),
             'driver_cost', COALESCE(SUM("Cost_Driver_Total"::NUMERIC), 0),
-            'extra_cost', COALESCE(SUM("Price_Cust_Extra"::NUMERIC), 0) + COALESCE(SUM("Cost_Driver_Extra"::NUMERIC), 0),
+            'extra_cost', COALESCE(SUM("Cost_Driver_Extra"::NUMERIC), 0),
             'job_count', COUNT(*)
         )
     INTO final_financial
     FROM public."Jobs_Main"
-    WHERE "Plan_Date" >= start_date AND "Plan_Date" <= end_date
-    AND "Job_Status" IN ('Completed', 'Delivered', 'Finished', 'Closed', 'เสร็จสิ้น', 'เรียบร้อย', 'ส่งสำเร็จ', 'ปิดงาน')
+    WHERE "Plan_Date"::DATE >= start_date::DATE AND "Plan_Date"::DATE <= end_date::DATE
+    AND "Job_Status" IN ('Completed', 'Delivered', 'Finished', 'Closed', 'เสร็จสิ้น', 'เรียบร้อย', 'ส่งสำเร็จ', 'ปิดงาน', 'Verified', 'Billed', 'Paid', 'ยืนยันแล้ว', 'ตรวจสอบแล้ว', 'วางบิลแล้ว', 'จ่ายแล้ว', 'ชำระแล้ว')
     AND (filter_branch_id IS NULL OR "Branch_ID" = filter_branch_id)
     AND (filter_customer_id IS NULL OR "Customer_ID" = filter_customer_id);
 
@@ -107,12 +107,12 @@ BEGIN
     FROM (
         SELECT 
             "Plan_Date" as date,
-            SUM("Price_Cust_Total"::NUMERIC) as revenue,
-            SUM("Cost_Driver_Total"::NUMERIC) + SUM("Price_Cust_Extra"::NUMERIC) + SUM("Cost_Driver_Extra"::NUMERIC) as cost,
+            SUM("Price_Cust_Total"::NUMERIC) + COALESCE(SUM("Price_Cust_Extra"::NUMERIC), 0) as revenue,
+            SUM("Cost_Driver_Total"::NUMERIC) + COALESCE(SUM("Cost_Driver_Extra"::NUMERIC), 0) as cost,
             COUNT(*) as job_count
         FROM public."Jobs_Main"
-        WHERE "Plan_Date" >= start_date AND "Plan_Date" <= end_date
-        AND "Job_Status" IN ('Completed', 'Delivered', 'Finished', 'Closed', 'เสร็จสิ้น', 'เรียบร้อย', 'ส่งสำเร็จ', 'ปิดงาน')
+        WHERE "Plan_Date"::DATE >= start_date::DATE AND "Plan_Date"::DATE <= end_date::DATE
+        AND "Job_Status" IN ('Completed', 'Delivered', 'Finished', 'Closed', 'เสร็จสิ้น', 'เรียบร้อย', 'ส่งสำเร็จ', 'ปิดงาน', 'Verified', 'Billed', 'Paid', 'ยืนยันแล้ว', 'ตรวจสอบแล้ว', 'วางบิลแล้ว', 'จ่ายแล้ว', 'ชำระแล้ว')
         AND (filter_branch_id IS NULL OR "Branch_ID" = filter_branch_id)
         AND (filter_customer_id IS NULL OR "Customer_ID" = filter_customer_id)
         GROUP BY "Plan_Date"
@@ -126,7 +126,7 @@ BEGIN
     FROM (
         SELECT "Job_Status" as status, COUNT(*) as count
         FROM public."Jobs_Main"
-        WHERE "Plan_Date" >= start_date AND "Plan_Date" <= end_date
+        WHERE "Plan_Date"::DATE >= start_date::DATE AND "Plan_Date"::DATE <= end_date::DATE
         AND (filter_branch_id IS NULL OR "Branch_ID" = filter_branch_id)
         AND (filter_customer_id IS NULL OR "Customer_ID" = filter_customer_id)
         GROUP BY "Job_Status"

@@ -11,7 +11,8 @@ import {
     getEffectiveBranchId,
     getThaiMonthBoundaries,
     getThaiNow,
-    fetchAllRows
+    fetchAllRows,
+    parseExtraCosts
 } from './analytics-helpers'
 import { CO2_COEFFICIENTS } from '../utils/esg-utils'
 import { getCarbonFactors } from '@/lib/actions/carbon-factors'
@@ -106,7 +107,7 @@ export async function getExecutiveDashboardUnified(branchId?: string, startDate?
             return fetchAllRows(() => {
                 let query = supabase
                     .from('Jobs_Main')
-                    .select('Price_Cust_Total, Cost_Driver_Total, Price_Cust_Extra, Cost_Driver_Extra, Job_Status, Plan_Date, Est_Distance_KM, Loaded_Qty')
+                    .select('Price_Cust_Total, Cost_Driver_Total, Price_Cust_Extra, Cost_Driver_Extra, extra_costs_json, extra_costs, Job_Status, Plan_Date, Est_Distance_KM, Loaded_Qty')
                     .gte('Plan_Date', start)
                     .lte('Plan_Date', end)
                 if (finalCustomerId) query = query.eq('Customer_ID', finalCustomerId)
@@ -121,17 +122,42 @@ export async function getExecutiveDashboardUnified(branchId?: string, startDate?
             fetchRange(sDatePrev, eDatePrev)
         ])
 
-        const calcStats = (jobs: { Job_Status?: string | null, Price_Cust_Total?: number | null, Cost_Driver_Total?: number | null, Price_Cust_Extra?: number | null, Cost_Driver_Extra?: number | null, Plan_Date?: string | null, Est_Distance_KM?: number | null, Loaded_Qty?: number | null }[]) => {
-            const revenue = jobs.filter(j => REVENUE_STATUSES.includes(j.Job_Status || '')).reduce((sum, j) => sum + (Number(j.Price_Cust_Total) || 0) + (Number(j.Price_Cust_Extra) || 0), 0)
-            const revenuePipeline = jobs.filter(j => PIPELINE_STATUSES.includes(j.Job_Status || '')).reduce((sum, j) => sum + (Number(j.Price_Cust_Total) || 0) + (Number(j.Price_Cust_Extra) || 0), 0)
-            const cost = jobs.filter(j => REVENUE_STATUSES.includes(j.Job_Status || '')).reduce((sum, j) => sum + (Number(j.Cost_Driver_Total) || 0) + (Number(j.Cost_Driver_Extra) || 0), 0)
-            const distance = jobs.reduce((sum, j) => sum + (Number(j.Est_Distance_KM) || 0), 0)
-            const totalQty = jobs.reduce((sum, j) => sum + (Number(j.Loaded_Qty) || 0), 0)
-            return { revenue, revenuePipeline, cost, profit: revenue - cost, distance, count: jobs.length, totalQty }
+        const calcStats = (jobs: { Job_Status?: string | null, Price_Cust_Total?: number | null, Cost_Driver_Total?: number | null, Price_Cust_Extra?: number | null, Cost_Driver_Extra?: number | null, extra_costs_json?: unknown, extra_costs?: unknown, Plan_Date?: string | null, Est_Distance_KM?: number | null, Loaded_Qty?: number | null }[]) => {
+            let revenue = 0
+            let revenuePipeline = 0
+            let driverCost = 0
+            let extraCost = 0
+            let distance = 0
+            let totalQty = 0
+
+            for (const j of jobs) {
+                const dist = Number(j.Est_Distance_KM) || 0
+                const qty = Number(j.Loaded_Qty) || 0
+                distance += dist
+                totalQty += qty
+
+                const extraItems = parseExtraCosts(j.extra_costs_json ?? j.extra_costs)
+                const extraDriver = extraItems.reduce((s, c) => s + (Number(c?.cost_driver) || 0), 0)
+                const extraCharge = extraItems.reduce((s, c) => s + (Number(c?.charge_cust) || 0), 0)
+
+                const jobRev = (Number(j.Price_Cust_Total) || 0) + (Number(j.Price_Cust_Extra) || 0) + extraCharge
+                const jobDriver = (Number(j.Cost_Driver_Total) || 0)
+                const jobExtra = (Number(j.Cost_Driver_Extra) || 0) + extraDriver
+
+                if (REVENUE_STATUSES.includes(j.Job_Status || '')) {
+                    revenue += jobRev
+                    driverCost += jobDriver
+                    extraCost += jobExtra
+                } else if (PIPELINE_STATUSES.includes(j.Job_Status || '')) {
+                    revenuePipeline += jobRev
+                }
+            }
+            const totalBaseCost = driverCost + extraCost
+            return { revenue, revenuePipeline, cost: totalBaseCost, driverCost, extraCost, profit: revenue - totalBaseCost, distance, count: jobs.length, totalQty }
         }
 
-        const curr = isRestricted ? { revenue: 0, revenuePipeline: 0, cost: 0, profit: 0, distance: 0, count: 0, totalQty: 0 } : calcStats(currJobs)
-        const prev = isRestricted ? { revenue: 0, revenuePipeline: 0, cost: 0, profit: 0, distance: 0, count: 0, totalQty: 0 } : calcStats(prevJobs)
+        const curr = isRestricted ? { revenue: 0, revenuePipeline: 0, cost: 0, driverCost: 0, extraCost: 0, profit: 0, distance: 0, count: 0, totalQty: 0 } : calcStats(currJobs)
+        const prev = isRestricted ? { revenue: 0, revenuePipeline: 0, cost: 0, driverCost: 0, extraCost: 0, profit: 0, distance: 0, count: 0, totalQty: 0 } : calcStats(prevJobs)
 
         const calculateGrowth = (c: number, p: number) => {
             if (p <= 0) return c > 0 ? 100 : 0
@@ -182,16 +208,20 @@ export async function getExecutiveDashboardUnified(branchId?: string, startDate?
 
         // Trend calculation
         const trendMap: Record<string, { total: number, completed: number, revenue: number, cost: number }> = {}
-        currJobs.forEach((j: { Job_Status?: string | null, Price_Cust_Total?: number | null, Cost_Driver_Total?: number | null, Price_Cust_Extra?: number | null, Cost_Driver_Extra?: number | null, Plan_Date?: string | null, Est_Distance_KM?: number | null, Loaded_Qty?: number | null, Weight_Kg?: number | null, Volume_Cbm?: number | null, Vehicle_Type?: string | null, Customer_Name?: string | null, Branch_ID?: string | null, Vehicle_Plate?: string | null }) => {
+        currJobs.forEach((j: { Job_Status?: string | null, Price_Cust_Total?: number | null, Cost_Driver_Total?: number | null, Price_Cust_Extra?: number | null, Cost_Driver_Extra?: number | null, extra_costs_json?: unknown, extra_costs?: unknown, Plan_Date?: string | null }) => {
             const d = j.Plan_Date ? String(j.Plan_Date).split('T')[0] : 'Unknown'
             if (d !== 'Unknown') {
                 if (!trendMap[d]) trendMap[d] = { total: 0, completed: 0, revenue: 0, cost: 0 }
                 trendMap[d].total++
                 // REVENUE_STATUSES รวม Verified/Billed/Paid แล้ว → นับสำเร็จ + รายได้ตรงกัน
                 if (REVENUE_STATUSES.includes(j.Job_Status || '')) {
+                    const extraItems = parseExtraCosts(j.extra_costs_json ?? j.extra_costs)
+                    const extraDriver = extraItems.reduce((s, c) => s + (Number(c?.cost_driver) || 0), 0)
+                    const extraCharge = extraItems.reduce((s, c) => s + (Number(c?.charge_cust) || 0), 0)
+
                     trendMap[d].completed++
-                    trendMap[d].revenue += (Number(j.Price_Cust_Total) || 0)
-                    trendMap[d].cost += (Number(j.Cost_Driver_Total) || 0) + (Number(j.Price_Cust_Extra) || 0) + (Number(j.Cost_Driver_Extra) || 0)
+                    trendMap[d].revenue += (Number(j.Price_Cust_Total) || 0) + (Number(j.Price_Cust_Extra) || 0) + extraCharge
+                    trendMap[d].cost += (Number(j.Cost_Driver_Total) || 0) + (Number(j.Cost_Driver_Extra) || 0) + extraDriver
                 }
             }
         })
@@ -204,7 +234,7 @@ export async function getExecutiveDashboardUnified(branchId?: string, startDate?
 
         // Status Distribution
         const statusMap: Record<string, number> = {}
-        currJobs.forEach((j: { Job_Status?: string | null, Price_Cust_Total?: number | null, Cost_Driver_Total?: number | null, Price_Cust_Extra?: number | null, Cost_Driver_Extra?: number | null, Plan_Date?: string | null, Est_Distance_KM?: number | null, Loaded_Qty?: number | null, Weight_Kg?: number | null, Volume_Cbm?: number | null, Vehicle_Type?: string | null, Customer_Name?: string | null, Branch_ID?: string | null, Vehicle_Plate?: string | null }) => {
+        currJobs.forEach((j: { Job_Status?: string | null }) => {
             const s = j.Job_Status || 'Unknown'
             statusMap[s] = (statusMap[s] || 0) + 1
         })
@@ -244,8 +274,8 @@ export async function getExecutiveDashboardUnified(branchId?: string, startDate?
                 revenuePipeline: curr.revenuePipeline,
                 cost: { 
                     total: totalCostManual, 
-                    driver: curr.cost, 
-                    extra: 0, 
+                    driver: curr.driverCost, 
+                    extra: curr.extraCost, 
                     fuel: fuelCost, 
                     maintenance: maintCost,
                     predictedFuel: predictedFuelCost,

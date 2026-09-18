@@ -5,6 +5,7 @@ import { getUserBranchId, isSuperAdmin, isAdmin } from "@/lib/permissions"
 import { cookies } from "next/headers"
 import type { FuelLog } from "@/lib/supabase/fuel"
 import type { Job } from "@/lib/supabase/jobs"
+import { parseExtraCosts } from "@/lib/supabase/analytics-helpers"
 
 export interface JobFuelAllocation {
   jobId: string;
@@ -105,7 +106,7 @@ export async function getFuelIntelligenceAnalytics(
   // 1. Fetch Completed / In-Transit Jobs
   let jobsQuery = supabase
     .from('Jobs_Main')
-    .select('Job_ID, Plan_Date, Customer_Name, Route_Name, Origin_Location, Dest_Location, Driver_Name, Vehicle_Plate, Job_Status, Price_Cust_Total, Cost_Driver_Total, Price_Cust_Extra, Cost_Driver_Extra, Est_Distance_KM, Loaded_Qty')
+    .select('Job_ID, Plan_Date, Customer_Name, Route_Name, Origin_Location, Dest_Location, Driver_Name, Vehicle_Plate, Job_Status, Price_Cust_Total, Cost_Driver_Total, Price_Cust_Extra, Cost_Driver_Extra, Est_Distance_KM, Loaded_Qty, extra_costs_json, extra_costs')
     .in('Job_Status', ['Completed', 'Delivered', 'Finished', 'Closed', 'Billed', 'Paid', 'Verified', 'In Transit'])
     .gte('Plan_Date', start)
     .lte('Plan_Date', end)
@@ -298,8 +299,12 @@ export async function getFuelIntelligenceAnalytics(
     }
     const fuelCostPerKm = dist > 0 ? +(fuelCost / dist).toFixed(2) : 0;
 
-    const revenue = (Number(j.Price_Cust_Total) || 0) + (Number(j.Price_Cust_Extra) || 0);
-    const driverCost = (Number(j.Cost_Driver_Total) || 0) + (Number(j.Cost_Driver_Extra) || 0);
+    const extraItems = parseExtraCosts(j.extra_costs_json ?? j.extra_costs);
+    const extraItemsDriver = extraItems.reduce((s, c) => s + (Number(c?.cost_driver) || 0), 0);
+    const extraItemsCharge = extraItems.reduce((s, c) => s + (Number(c?.charge_cust) || 0), 0);
+
+    const revenue = (Number(j.Price_Cust_Total) || 0) + (Number(j.Price_Cust_Extra) || 0) + extraItemsCharge;
+    const driverCost = (Number(j.Cost_Driver_Total) || 0) + (Number(j.Cost_Driver_Extra) || 0) + extraItemsDriver;
     const netProfit = +(revenue - driverCost - fuelCost).toFixed(2);
     const profitMarginPct = revenue > 0 ? +((netProfit / revenue) * 100).toFixed(1) : 0;
 

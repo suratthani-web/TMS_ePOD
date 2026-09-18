@@ -44,6 +44,23 @@ export const REVENUE_STATUSES = [
     'Billed', 'Paid', 'billed', 'paid', 'วางบิลแล้ว', 'วางบิล', 'จ่ายแล้ว', 'ชำระแล้ว', 'จ่ายเงินแล้ว'
 ]
 
+export type ExtraCostItem = {
+    item_name?: string
+    charge_cust?: number | string
+    cost_driver?: number | string
+    notes?: string
+}
+
+export function parseExtraCosts(raw: unknown): ExtraCostItem[] {
+    if (!raw) return []
+    try {
+        const arr = Array.isArray(raw) ? raw : JSON.parse(String(raw))
+        return Array.isArray(arr) ? arr : []
+    } catch {
+        return []
+    }
+}
+
 // "In-progress" statuses for pipeline revenue
 export const PIPELINE_STATUSES = [
     'Requested', 'Pending', 'Confirmed', 'Picked Up', 'In Transit', 'Ongoing', 'On Route', 'Assigned',
