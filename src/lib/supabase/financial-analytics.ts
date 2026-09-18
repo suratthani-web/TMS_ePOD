@@ -423,13 +423,17 @@ export async function getExecutiveDashboardUnified(branchId?: string, startDate?
     if (!canViewProfit) {
         return {
             financial: { revenue: 0, revenuePipeline: 0, cost: { total: 0, driver: 0, extra: 0, fuel: 0, maintenance: 0, predictedFuel: 0, predictedMaintenance: 0 }, netProfit: 0, profitMargin: 0 },
-            trend: (currentData?.trend || []).map((t: { date: string, job_count?: number, completed_count?: number, revenue?: number, cost?: number }) => ({
-                date: t.date,
-                total: Number(t.job_count) || 0,
-                completed: Number(t.completed_count) || 0,
-                revenue: 0,
-                cost: 0
-            })),
+            trend: (currentData?.trend || []).map((t: { date: string, job_count?: number, completed_count?: number, total_count?: number, total_jobs?: number, completed_jobs?: number, total?: number, completed?: number, revenue?: number, cost?: number }) => {
+                const completed = Number(t.completed ?? t.completed_count ?? t.completed_jobs ?? t.job_count) || 0
+                const total = Number(t.total ?? t.total_count ?? t.total_jobs ?? t.job_count) || 0
+                return {
+                    date: t.date,
+                    total: Math.max(total, completed),
+                    completed: completed,
+                    revenue: 0,
+                    cost: 0
+                }
+            }),
             statusDist: Object.entries(currentData?.status_dist || {}).map(([name, value]) => ({ name, value: Number(value) })),
             kpi: {
                 revenue: { current: 0, previous: 0, growth: 0, target: 250000, attainment: 0 },
@@ -459,13 +463,17 @@ export async function getExecutiveDashboardUnified(branchId?: string, startDate?
             netProfit,
             profitMargin: margin
         },
-        trend: (currentData?.trend || []).map((t: { date: string, job_count?: number, completed_count?: number, revenue?: number, cost?: number }) => ({
-            date: t.date,
-            total: Number(t.job_count) || 0,
-            completed: Number(t.completed_count) || 0,
-            revenue: Number(t.revenue) || 0,
-            cost: Number(t.cost) || 0
-        })),
+        trend: (currentData?.trend || []).map((t: { date: string, job_count?: number, completed_count?: number, total_count?: number, total_jobs?: number, completed_jobs?: number, total?: number, completed?: number, revenue?: number, cost?: number }) => {
+            const completed = Number(t.completed ?? t.completed_count ?? t.completed_jobs ?? t.job_count) || 0
+            const total = Number(t.total ?? t.total_count ?? t.total_jobs ?? t.job_count) || 0
+            return {
+                date: t.date,
+                total: Math.max(total, completed),
+                completed: completed,
+                revenue: Number(t.revenue) || 0,
+                cost: Number(t.cost) || 0
+            }
+        }),
         statusDist: Object.entries(currentData?.status_dist || {}).map(([name, value]) => ({ name, value: Number(value) })),
         kpi: {
             revenue: { current: revenue, previous: prevRevenue, growth: calculateGrowth(revenue, prevRevenue), target: 250000, attainment: (revenue / 250000) * 100 },
