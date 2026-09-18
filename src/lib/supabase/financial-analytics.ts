@@ -107,7 +107,7 @@ export async function getExecutiveDashboardUnified(branchId?: string, startDate?
             return fetchAllRows(() => {
                 let query = supabase
                     .from('Jobs_Main')
-                    .select('Price_Cust_Total, Cost_Driver_Total, Price_Cust_Extra, Cost_Driver_Extra, extra_costs_json, extra_costs, Job_Status, Plan_Date, Est_Distance_KM, Loaded_Qty')
+                    .select('Price_Cust_Total, Cost_Driver_Total, Price_Cust_Extra, Cost_Driver_Extra, extra_costs_json, Job_Status, Plan_Date, Est_Distance_KM, Loaded_Qty')
                     .gte('Plan_Date', start)
                     .lte('Plan_Date', end)
                 if (finalCustomerId) query = query.eq('Customer_ID', finalCustomerId)
@@ -122,7 +122,7 @@ export async function getExecutiveDashboardUnified(branchId?: string, startDate?
             fetchRange(sDatePrev, eDatePrev)
         ])
 
-        const calcStats = (jobs: { Job_Status?: string | null, Price_Cust_Total?: number | null, Cost_Driver_Total?: number | null, Price_Cust_Extra?: number | null, Cost_Driver_Extra?: number | null, extra_costs_json?: unknown, extra_costs?: unknown, Plan_Date?: string | null, Est_Distance_KM?: number | null, Loaded_Qty?: number | null }[]) => {
+        const calcStats = (jobs: { Job_Status?: string | null, Price_Cust_Total?: number | null, Cost_Driver_Total?: number | null, Price_Cust_Extra?: number | null, Cost_Driver_Extra?: number | null, extra_costs_json?: unknown, Plan_Date?: string | null, Est_Distance_KM?: number | null, Loaded_Qty?: number | null }[]) => {
             let revenue = 0
             let revenuePipeline = 0
             let driverCost = 0
@@ -136,7 +136,7 @@ export async function getExecutiveDashboardUnified(branchId?: string, startDate?
                 distance += dist
                 totalQty += qty
 
-                const extraItems = parseExtraCosts(j.extra_costs_json ?? j.extra_costs)
+                const extraItems = parseExtraCosts(j.extra_costs_json)
                 const extraDriver = extraItems.reduce((s, c) => s + (Number(c?.cost_driver) || 0), 0)
                 const extraCharge = extraItems.reduce((s, c) => s + (Number(c?.charge_cust) || 0), 0)
 
@@ -208,14 +208,14 @@ export async function getExecutiveDashboardUnified(branchId?: string, startDate?
 
         // Trend calculation
         const trendMap: Record<string, { total: number, completed: number, revenue: number, cost: number }> = {}
-        currJobs.forEach((j: { Job_Status?: string | null, Price_Cust_Total?: number | null, Cost_Driver_Total?: number | null, Price_Cust_Extra?: number | null, Cost_Driver_Extra?: number | null, extra_costs_json?: unknown, extra_costs?: unknown, Plan_Date?: string | null }) => {
+        currJobs.forEach((j: { Job_Status?: string | null, Price_Cust_Total?: number | null, Cost_Driver_Total?: number | null, Price_Cust_Extra?: number | null, Cost_Driver_Extra?: number | null, extra_costs_json?: unknown, Plan_Date?: string | null }) => {
             const d = j.Plan_Date ? String(j.Plan_Date).split('T')[0] : 'Unknown'
             if (d !== 'Unknown') {
                 if (!trendMap[d]) trendMap[d] = { total: 0, completed: 0, revenue: 0, cost: 0 }
                 trendMap[d].total++
                 // REVENUE_STATUSES รวม Verified/Billed/Paid แล้ว → นับสำเร็จ + รายได้ตรงกัน
                 if (REVENUE_STATUSES.includes(j.Job_Status || '')) {
-                    const extraItems = parseExtraCosts(j.extra_costs_json ?? j.extra_costs)
+                    const extraItems = parseExtraCosts(j.extra_costs_json)
                     const extraDriver = extraItems.reduce((s, c) => s + (Number(c?.cost_driver) || 0), 0)
                     const extraCharge = extraItems.reduce((s, c) => s + (Number(c?.charge_cust) || 0), 0)
 

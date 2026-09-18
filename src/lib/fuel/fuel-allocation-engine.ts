@@ -106,7 +106,7 @@ export async function getFuelIntelligenceAnalytics(
   // 1. Fetch Completed / In-Transit Jobs
   let jobsQuery = supabase
     .from('Jobs_Main')
-    .select('Job_ID, Plan_Date, Customer_Name, Route_Name, Origin_Location, Dest_Location, Driver_Name, Vehicle_Plate, Job_Status, Price_Cust_Total, Cost_Driver_Total, Price_Cust_Extra, Cost_Driver_Extra, Est_Distance_KM, Loaded_Qty, extra_costs_json, extra_costs')
+    .select('Job_ID, Plan_Date, Customer_Name, Route_Name, Origin_Location, Dest_Location, Driver_Name, Vehicle_Plate, Job_Status, Price_Cust_Total, Cost_Driver_Total, Price_Cust_Extra, Cost_Driver_Extra, Est_Distance_KM, Loaded_Qty, extra_costs_json')
     .in('Job_Status', ['Completed', 'Delivered', 'Finished', 'Closed', 'Billed', 'Paid', 'Verified', 'In Transit'])
     .gte('Plan_Date', start)
     .lte('Plan_Date', end)
@@ -299,7 +299,7 @@ export async function getFuelIntelligenceAnalytics(
     }
     const fuelCostPerKm = dist > 0 ? +(fuelCost / dist).toFixed(2) : 0;
 
-    const extraItems = parseExtraCosts(j.extra_costs_json ?? j.extra_costs);
+    const extraItems = parseExtraCosts(j.extra_costs_json);
     const extraItemsDriver = extraItems.reduce((s, c) => s + (Number(c?.cost_driver) || 0), 0);
     const extraItemsCharge = extraItems.reduce((s, c) => s + (Number(c?.charge_cust) || 0), 0);
 
