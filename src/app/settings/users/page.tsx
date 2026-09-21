@@ -171,7 +171,12 @@ export default function UserSettingsPage() {
                 result = await createUser(payload as UserData)
             }
             if (result.success) {
-                toast.success(editingUser ? "แก้ไขข้อมูลเรียบร้อย" : "สร้างผู้ใช้งานเรียบร้อย")
+                const renamed = (result as { renamed?: boolean }).renamed
+                toast.success(
+                    renamed
+                        ? `เปลี่ยนชื่อผู้ใช้เป็น "${formData.Username}" แล้ว — แจ้งให้ล็อกอินด้วยชื่อใหม่`
+                        : (editingUser ? "แก้ไขข้อมูลเรียบร้อย" : "สร้างผู้ใช้งานเรียบร้อย")
+                )
                 setIsDialogOpen(false)
                 loadData()
             } else {
@@ -360,12 +365,16 @@ export default function UserSettingsPage() {
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 sm:gap-10">
                              <div className="space-y-3">
                                 <Label className="text-sm sm:text-base font-bold font-black text-muted-foreground uppercase tracking-widest ml-2 sm:ml-4">{t('settings_pages.users.dialog.username')}</Label>
-                                <Input 
-                                    value={formData.Username} 
-                                    onChange={e => setFormData({...formData, Username: e.target.value})} 
-                                    disabled={!!editingUser}
-                                    className="h-12 sm:h-14 rounded-2xl bg-muted border-border text-foreground disabled:opacity-50 font-black italic tracking-normal pl-6 shadow-inner" 
+                                <Input
+                                    value={formData.Username}
+                                    onChange={e => setFormData({...formData, Username: e.target.value})}
+                                    className="h-12 sm:h-14 rounded-2xl bg-muted border-border text-foreground disabled:opacity-50 font-black italic tracking-normal pl-6 shadow-inner"
                                 />
+                                {editingUser && (
+                                    <p className="text-[11px] font-bold text-amber-600 ml-2 sm:ml-4">
+                                        เปลี่ยนชื่อผู้ใช้ได้ — ผู้ใช้ต้องใช้ชื่อใหม่นี้ในการล็อกอินครั้งต่อไป
+                                    </p>
+                                )}
                             </div>
                             <div className="space-y-3">
                                 <Label className="text-sm sm:text-base font-bold font-black text-muted-foreground uppercase tracking-widest ml-2 sm:ml-4">{t('settings_pages.users.dialog.password')}</Label>

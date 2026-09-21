@@ -151,6 +151,25 @@ export async function updateUser(username: string, updates: Partial<UserData>) {
         Role: updates.Role
     }
 
+    // เปลี่ยนชื่อผู้ใช้ (username): username เป็น key ที่ใช้ล็อกอิน + อ้างในตารางอื่น
+    // (เช่น Push_Subscriptions.User_ID) จึงต้อง (1) กันชื่อซ้ำ (2) cascade ให้ตารางที่อ้าง
+    const newUsername = (updates.Username || '').trim()
+    const renaming = !!newUsername && newUsername !== username
+    if (renaming) {
+        if (/\s/.test(newUsername)) {
+            return { success: false, error: "ชื่อผู้ใช้ห้ามมีช่องว่าง" }
+        }
+        const { data: taken } = await supabase
+            .from("Master_Users")
+            .select("Username")
+            .eq("Username", newUsername)
+            .maybeSingle()
+        if (taken) {
+            return { success: false, error: "ชื่อผู้ใช้นี้มีอยู่ในระบบแล้ว กรุณาใช้ชื่ออื่น" }
+        }
+        updatePayload.Username = newUsername
+    }
+
     if (updates.Role) {
         updatePayload.Role_ID = ROLE_MAP[updates.Role] || 5
     }
@@ -177,11 +196,36 @@ export async function updateUser(username: string, updates: Partial<UserData>) {
         .eq("Username", username)
 
     if (error) {
-        return { success: false, error: error.message }
+        // 23505 = unique_violation (กันกรณี race กับชื่อซ้ำ)
+        const dup = (error as { code?: string }).code === '23505'
+        return { success: false, error: dup ? "ชื่อผู้ใช้นี้มีอยู่ในระบบแล้ว กรุณาใช้ชื่ออื่น" : error.message }
+    }
+
+    // Cascade: ย้ายการอ้างชื่อผู้ใช้เดิมไปชื่อใหม่ในตารางที่เก็บ username เป็น string
+    let selfRenamed = false
+    if (renaming) {
+        try {
+            await supabase.from("Push_Subscriptions").update({ User_ID: newUsername }).eq("User_ID", username)
+        } catch (e) { console.error('[updateUser] cascade Push_Subscriptions failed:', e) }
+
+        selfRenamed = session.username === username
+
+        await logActivity({
+            module: 'Settings',
+            action_type: 'UPDATE',
+            target_id: newUsername,
+            details: {
+                action: 'USERNAME_CHANGE',
+                updated_by: session.username,
+                from: username,
+                to: newUsername
+            }
+        })
     }
 
     revalidatePath("/settings/users")
-    return { success: true }
+    // selfRenamed = true → ผู้ใช้แก้ชื่อตัวเอง session เดิมจะใช้ไม่ได้ ต้องล็อกอินใหม่
+    return { success: true, renamed: renaming, selfRenamed }
 }
 
 export async function getCurrentUserRole() {
