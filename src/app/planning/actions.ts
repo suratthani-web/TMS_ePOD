@@ -122,6 +122,17 @@ export async function createJob(data: JobFormData) {
     return { success: false, message: `วันที่ส่ง (${data.Delivery_Date}) ก่อนวันที่รับ (${data.Plan_Date}) — ตรวจสอบวันรับ/วันส่ง` }
   }
 
+  // ลูกค้าสร้างงานเอง (ผ่านปุ่มขอรถบนปฏิทิน ฯลฯ ที่วิ่งเข้า createJob) → บังคับเป็น
+  // "คำขอ" (Requested) เสมอ และห้ามผูกคนขับ/ทะเบียนจากฝั่งลูกค้า เพื่อไม่ให้งานเข้า
+  // พูลประมูลและไม่ push หาคนขับ — ให้ไปอยู่หน้าวางแผน (แท็บคำขอ) ให้แอดมินจัดการเอง.
+  const createdByCustomer = await isCustomer()
+  if (createdByCustomer) {
+    data.Job_Status = 'Requested'
+    data.Driver_ID = ''
+    data.Driver_Name = ''
+    data.Vehicle_Plate = ''
+  }
+
   // Auto-assign Branch_ID if missing
   if (!data.Branch_ID || data.Branch_ID === 'All') {
     const fixedBranchId = await getFixedUserBranchId()
@@ -197,7 +208,10 @@ export async function createJob(data: JobFormData) {
 
       // Send notifications - ONLY if NOT a draft
       if (data.Job_Status !== 'Draft') {
-          if (data.Driver_ID) {
+          if (createdByCustomer) {
+              // ลูกค้าสร้าง → แจ้งแอดมินเท่านั้น ไม่ push คนขับ/ประมูล
+              try { await notifyAdminNewRequest(data.Job_ID, data.Customer_Name || 'ลูกค้า', data.Origin_Location, data.Dest_Location, data.Branch_ID ?? null) } catch (e) { console.error(e) }
+          } else if (data.Driver_ID) {
               try { await notifyDriverNewJob(data.Driver_ID, data.Job_ID, data.Customer_Name || 'ไม่ระบุ') } catch (e) { console.error(e) }
           } else {
               try { await notifyMarketplaceNewJob(data.Job_ID, data.Customer_Name || 'ไม่ระบุ') } catch (e) { console.error(e) }
@@ -227,7 +241,9 @@ export async function createJob(data: JobFormData) {
           }
 
           if (data.Job_Status !== 'Draft') {
-              if (data.Driver_ID) {
+              if (createdByCustomer) {
+                  try { await notifyAdminNewRequest(newId, data.Customer_Name || 'ลูกค้า', data.Origin_Location, data.Dest_Location, data.Branch_ID ?? null) } catch (e) { console.error(e) }
+              } else if (data.Driver_ID) {
                   try { await notifyDriverNewJob(data.Driver_ID, newId, data.Customer_Name || 'ไม่ระบุ') } catch (e) { console.error(e) }
               } else {
                   try { await notifyMarketplaceNewJob(newId, data.Customer_Name || 'ไม่ระบุ') } catch (e) { console.error(e) }
@@ -513,6 +529,10 @@ export async function createBulkJobs(
 ) {
   const isAdminUser = await isAdmin()
   const supabase = isAdminUser ? await createAdminClient() : await createClient()
+
+  // ลูกค้าสร้างงานเอง (ผ่าน JobDialog บนปฏิทิน ฯลฯ) → ทุกงานในชุดต้องเป็น "คำขอ"
+  // (Requested) ไม่ผูกคนขับ ไม่เข้าประมูล ไม่ push คนขับ — ให้แอดมินจัดการในหน้าวางแผน.
+  const createdByCustomer = await isCustomer()
 
   const userBranchId = await getUserBranchId()
   const isSuper = await isSuperAdmin()
@@ -851,11 +871,14 @@ export async function createBulkJobs(
         || (data.Origin_Location && data.Dest_Location
               ? `${String(data.Origin_Location).trim()} - ${String(data.Dest_Location).trim()}`
               : null),
-      Driver_ID: driverId || null,
-      Driver_Name: driver?.Driver_Name || null,
-      Vehicle_Plate: vehiclePlate || null,
+      Driver_ID: createdByCustomer ? null : (driverId || null),
+      Driver_Name: createdByCustomer ? null : (driver?.Driver_Name || null),
+      Vehicle_Plate: createdByCustomer ? null : (vehiclePlate || null),
       Vehicle_Type: vehicle?.Vehicle_Type || (data.Vehicle_Type as string) || '4-Wheel',
-      Job_Status: (data.Job_Status as string) || 'New',
+      // ลูกค้าสร้าง → บังคับ Requested เสมอ (ยกเว้น Draft) ไม่ให้กลายเป็น New เข้าประมูล
+      Job_Status: createdByCustomer
+        ? (data.Job_Status === 'Draft' ? 'Draft' : 'Requested')
+        : ((data.Job_Status as string) || 'New'),
       Cargo_Type: (data.Cargo_Type as string) || (j.Cargo_Type as string) || null,
       Notes: data.Notes as string || null,
       Price_Cust_Total: Number(data.Price_Cust_Total) || 0,
@@ -1058,6 +1081,32 @@ export async function createBulkJobs(
     }
   }
 
+  // ลูกค้าสร้างงาน → แจ้งแอดมิน (web push) แทนการ push หาคนขับ/ประมูล
+  if (createdByCustomer) {
+    try {
+      const publishable = finalizedData.filter(j => j.Job_Status !== 'Draft')
+      if (publishable.length > 0) {
+        const custName = publishable[0].Customer_Name || 'ลูกค้า'
+        if (publishable.length === 1) {
+          await notifyAdminNewRequest(
+            publishable[0].Job_ID!,
+            custName,
+            publishable[0].Origin_Location as string | undefined,
+            publishable[0].Dest_Location as string | undefined,
+            (publishable[0].Branch_ID as string) || effectiveBranchId
+          )
+        } else {
+          await notifyAdminNewRequestBatch(custName, publishable.length, effectiveBranchId)
+        }
+      }
+    } catch (e) { console.error('[createBulkJobs] notify admin failed:', e) }
+
+    revalidatePath('/planning')
+    revalidatePath('/dashboard')
+    revalidatePath('/jobs/history')
+    return { success: true, count: finalizedData.length, message: `ส่งคำขอ ${finalizedData.length} งานเรียบร้อย` }
+  }
+
   // Handle Notifications for the batch
   try {
       const assignedDrivers = new Set<string>()
@@ -1066,7 +1115,7 @@ export async function createBulkJobs(
       let sampleCustomer = ""
 
       const notiPromises: Promise<unknown>[] = []
-      
+
       finalizedData.forEach(j => {
           if (j.Driver_ID) {
               assignedDrivers.add(j.Driver_ID)
