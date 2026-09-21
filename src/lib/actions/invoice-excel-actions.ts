@@ -537,13 +537,19 @@ export async function exportInvoiceExcel(invoiceId: string) {
         const wRate = Number(finalDoc.WHT_Rate || 0)
         const wRateLabel = wRate > 0 ? `${wRate}%` : '1%'
         const whtLabelCell = whtRow.getCell(10)
-        whtLabelCell.value = ` หักภาษี ณ ที่จ่าย (WHT) ${wRateLabel}:`
+        whtLabelCell.value = `หักภาษี ณ ที่จ่าย (WHT) ${wRateLabel}:`
         whtLabelCell.font = { bold: true, size: 11, color: { argb: 'FFFF0000' } }
         whtLabelCell.alignment = { horizontal: 'right', vertical: 'middle' }
 
-        const whtAmount = calculatedGrandTotal * (Number(wRate || 1) / 100)
+        const totalBeforeTax = finalSubtotal - discountAmount
+        const whtAmount = (finalDoc.WHT_Amount && Number(finalDoc.WHT_Amount) > 0)
+            ? Number(finalDoc.WHT_Amount)
+            : totalBeforeTax * (Number(wRate || 1) / 100)
         const whtValueCell = whtRow.getCell(13)
-        whtValueCell.value = { formula: `M${gtRowIndex}*(${Number(wRate || 1)/100})`, result: whtAmount }
+        const whtFormula = vatRate > 0
+            ? `(M${summaryBaseRow}+M${discRowIndex})*(${Number(wRate || 1)/100})`
+            : `M${gtRowIndex}*(${Number(wRate || 1)/100})`
+        whtValueCell.value = { formula: whtFormula, result: whtAmount }
         whtValueCell.font = { bold: true, size: 11, color: { argb: 'FFFF0000' } }
         whtValueCell.numFmt = '#,##0.00'
         whtValueCell.alignment = { horizontal: 'right', vertical: 'middle' }
@@ -556,15 +562,20 @@ export async function exportInvoiceExcel(invoiceId: string) {
         const netRowIndex = summaryBaseRow + 6
         const netRow = worksheet.getRow(netRowIndex)
         netRow.height = 20
+        // Clear any ghost text shifted from original template row 30 (such as col 9 "จำนวนเงินรวมทั้งสิ้น (Grand Total)")
+        for (let c = 1; c <= 9; c++) {
+            netRow.getCell(c).value = null
+        }
         safeMergeCells(netRowIndex, 10, netRowIndex, 12)
 
         const netLabelCell = netRow.getCell(10)
-        netLabelCell.value = " ยอดจ่ายสุทธิ (Net Total):"
+        netLabelCell.value = "ยอดจ่ายสุทธิ (Net Total):"
         netLabelCell.font = { bold: true, size: 11 }
         netLabelCell.alignment = { horizontal: 'right', vertical: 'middle' }
 
+        const calculatedNetTotal = calculatedGrandTotal - whtAmount
         const netValueCell = netRow.getCell(13)
-        netValueCell.value = { formula: `M${gtRowIndex}+M${whtRowIndex}`, result: calculatedGrandTotal + whtAmount }
+        netValueCell.value = { formula: `M${gtRowIndex}-M${whtRowIndex}`, result: calculatedNetTotal }
         netValueCell.font = { bold: true, size: 11 }
         netValueCell.numFmt = '#,##0.00'
         netValueCell.alignment = { horizontal: 'right', vertical: 'middle' }

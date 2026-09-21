@@ -682,6 +682,54 @@ export async function notifyAdminJobStatus(driverId: string, driverName: string,
 }
 
 /**
+ * Notify: ลูกค้าสร้าง "คำขอ" งานเอง (customer self-service request).
+ * แจ้งแอดมินผ่าน web push เพื่อให้เข้าไปใส่ทะเบียน/คนขับในหน้าวางแผน (แท็บคำขอ)
+ * โดยไม่ต้องคอยเปิดหน้าเช็กเอง. Scope ตามสาขาของงาน (Super Admin เห็นทุกสาขา).
+ */
+export async function notifyAdminNewRequest(
+    jobId: string,
+    customerName: string,
+    origin?: string | null,
+    dest?: string | null,
+    branchId?: string | null
+) {
+    const route = [origin, dest].filter(Boolean).join(' → ')
+    const bodyLines = [
+        `👤 ${customerName || 'ไม่ระบุลูกค้า'}`,
+        route ? `🛣️ ${route}` : '',
+        `แตะเพื่อไปใส่ทะเบียน/คนขับ`,
+    ].filter(Boolean)
+
+    await sendPushToAdmins({
+        title: `🆕 คำขอใหม่จากลูกค้า — ${jobId}`,
+        body: bodyLines.join('\n'),
+        url: `/planning?view=requests&job=${jobId}`,
+        type: 'customer_request',
+        tag: `request_${jobId}`,
+    }, branchId)
+}
+
+/**
+ * Batch variant: ลูกค้าส่งคำขอหลายงานในครั้งเดียว (multi-drop / หลายคัน).
+ */
+export async function notifyAdminNewRequestBatch(
+    customerName: string,
+    jobCount: number,
+    branchId?: string | null
+) {
+    await sendPushToAdmins({
+        title: `🆕 คำขอใหม่จากลูกค้า — ${jobCount} งาน`,
+        body: [
+            `👤 ${customerName || 'ไม่ระบุลูกค้า'}`,
+            `📦 ${jobCount} งาน • แตะเพื่อไปใส่ทะเบียน/คนขับ`,
+        ].join('\n'),
+        url: `/planning?view=requests`,
+        type: 'customer_request',
+        tag: `request_batch_${Date.now()}`,
+    }, branchId)
+}
+
+/**
  * Notify: Driver Silent SOS (No Call)
  * Sends alerts to admins with location and driver info.
  */

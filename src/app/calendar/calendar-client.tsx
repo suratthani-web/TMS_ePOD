@@ -16,6 +16,7 @@ import {
 import { cn } from "@/lib/utils"
 import { CalendarJob, getJobsForMonth, getJobById } from "./actions"
 import { JobDialog } from "@/components/planning/job-dialog"
+import { JobSummaryDialog } from "@/components/jobs/job-summary-dialog"
 import { Driver } from "@/lib/supabase/drivers"
 import { Vehicle } from "@/lib/supabase/vehicles"
 import { Customer } from "@/lib/supabase/customers"
@@ -47,17 +48,19 @@ interface Props {
   customers: Customer[]
   routes: Route[]
   subcontractors: Subcontractor[]
+  isCustomerView?: boolean
 }
 
-export function CalendarClient({ 
-  initialJobs, 
-  initialYear, 
+export function CalendarClient({
+  initialJobs,
+  initialYear,
   initialMonth,
   drivers,
   vehicles,
   customers,
   routes,
-  subcontractors
+  subcontractors,
+  isCustomerView = false
 }: Props) {
   const { t, language } = useLanguage()
   const [year, setYear] = useState(initialYear)
@@ -70,6 +73,10 @@ export function CalendarClient({
   const [editingJob, setEditingJob] = useState<Job | null>(null)
   const [isEditOpen, setIsEditOpen] = useState(false)
   const [loadingEdit, setLoadingEdit] = useState(false)
+  // ลูกค้ากดงานจากปฏิทิน → เปิดหน้า "รายละเอียดงาน" แบบอ่านอย่างเดียว
+  // (ไม่ใช่หน้าแก้ไข) เพื่อกันลูกค้าแก้ไขงานเองโดยแอดมินไม่รู้
+  const [summaryJob, setSummaryJob] = useState<Job | null>(null)
+  const [isSummaryOpen, setIsSummaryOpen] = useState(false)
 
   const STATUS_LABELS: Record<string, string> = {
     Draft: t('common.pending'),
@@ -122,8 +129,14 @@ export function CalendarClient({
       setLoadingEdit(true)
       const fullJob = await getJobById(jobId)
       if (fullJob) {
-        setEditingJob(fullJob)
-        setIsEditOpen(true)
+        if (isCustomerView) {
+          // ลูกค้า: เปิดดูรายละเอียดอย่างเดียว แก้ไขไม่ได้
+          setSummaryJob(fullJob)
+          setIsSummaryOpen(true)
+        } else {
+          setEditingJob(fullJob)
+          setIsEditOpen(true)
+        }
       } else {
         toast.error(t('calendar.error_data'))
       }
@@ -383,6 +396,16 @@ export function CalendarClient({
         subcontractors={subcontractors}
         defaultDate={selectedDate || undefined}
       />
+
+       {/* Customer read-only detail */}
+       {summaryJob && (
+          <JobSummaryDialog
+            open={isSummaryOpen}
+            onOpenChange={setIsSummaryOpen}
+            job={summaryJob}
+            routes={routes}
+          />
+       )}
 
        {/* Edit Modal */}
        {editingJob && (

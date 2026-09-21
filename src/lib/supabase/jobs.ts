@@ -1362,12 +1362,16 @@ export async function getMarketplaceJobs(providedBranchId?: string, customerId?:
     const loggedInCustomerId = await getCustomerId()
     const finalCustomerId = customerId || loggedInCustomerId
 
+    // NOTE: 'Requested' = งานที่ลูกค้าสร้างเอง (customer request) — ตั้งใจไม่ให้เข้า
+    // พูลประมูล/Marketplace เพราะต้องการให้ไปอยู่หน้าวางแผน (แท็บคำขอ) ให้แอดมิน
+    // ใส่ทะเบียน/คนขับเองโดยตรง ไม่ต้องผ่านการเบิดของคนขับ. เมนูประมูลจึงเหลือเฉพาะ
+    // งานที่แอดมินสร้าง (New) หรือ Assigned ที่ยังไม่มีคนขับ.
     let dbQuery = supabase
       .from('Jobs_Main')
       .select('*')
-      .in('Job_Status', ['New', 'Requested', 'Assigned'])
+      .in('Job_Status', ['New', 'Assigned'])
       .is('Driver_ID', null)
-    
+
     // Logic:
     // 1. Filter by customer if logged in as customer or selected customer filter
     if (finalCustomerId) {

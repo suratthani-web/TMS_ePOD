@@ -19,10 +19,12 @@ export type JobBid = {
 export async function getUnassignedJobs() {
   const supabase = createAdminClient()
 
+  // ตัด 'Requested' (งานที่ลูกค้าสร้างเอง) ออกจากรายการงานให้คนขับเบิด — ให้ไปอยู่
+  // หน้าวางแผนงานให้แอดมินใส่ทะเบียนเอง ไม่ผ่านการประมูล (สอดคล้องกับ getMarketplaceJobs)
   const { data, error } = await supabase
     .from('Jobs_Main')
     .select('*')
-    .in('Job_Status', ['New', 'Requested', 'Assigned'])
+    .in('Job_Status', ['New', 'Assigned'])
     .is('Driver_ID', null)
     .order('Created_At', { ascending: false })
 

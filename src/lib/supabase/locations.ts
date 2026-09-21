@@ -125,7 +125,10 @@ export async function createLocation(loc: Partial<Location>) {
   }
 }
 
-// Update location by Location_ID (Name/PK ล็อกไม่ให้แก้ที่ UI)
+// Update location by Location_ID.
+// รองรับการแก้ "ชื่อสถานที่" ได้แล้ว — แต่ประวัติงานเก่า (Jobs_Main.Origin/Dest/Route_Name)
+// เก็บชื่อเป็น text copy จึงยังคงชื่อเดิมไว้ตามประวัติ ไม่ถูกเปลี่ยนตาม (โดยตั้งใจ).
+// ถ้าต้องการให้ประวัติเก่าเปลี่ยนชื่อตามด้วย ใช้ propagateLocationRename แยกต่างหาก.
 export async function updateLocation(locationId: string, loc: Partial<Location>) {
   try {
     const isAdminUser = await isAdmin()
@@ -138,6 +141,9 @@ export async function updateLocation(locationId: string, loc: Partial<Location>)
       Map_Link: loc.Map_Link ?? null,
       Address: loc.Address ?? null,
     }
+    // อนุญาตแก้ชื่อได้ (ถ้าส่งค่ามาและไม่ว่าง). ระวังชนกับ unique (Name, Branch_ID) —
+    // ถ้าซ้ำ Supabase จะคืน error ให้ UI แจ้งเตือน.
+    if (typeof loc.Name === 'string' && loc.Name.trim()) patch.Name = loc.Name.trim()
     if (loc.Branch_ID) patch.Branch_ID = loc.Branch_ID
 
     const { data, error } = await supabase
@@ -147,8 +153,39 @@ export async function updateLocation(locationId: string, loc: Partial<Location>)
       .select()
       .single()
 
-    if (error) return { success: false, error: error.message }
+    if (error) {
+      // 23505 = unique_violation (ชื่อ+สาขาซ้ำกับที่มีอยู่)
+      const dup = (error as { code?: string }).code === '23505'
+      return { success: false, error: dup ? 'มีสถานที่ชื่อนี้ในสาขาแล้ว กรุณาใช้ชื่ออื่น' : error.message }
+    }
     return { success: true, data }
+  } catch (e: unknown) {
+    return { success: false, error: e instanceof Error ? e.message : String(e) }
+  }
+}
+
+// (ทางเลือก) เปลี่ยนชื่อสถานที่ในประวัติงานเก่าให้ตรงกับชื่อใหม่ด้วย.
+// เรียกเฉพาะเมื่อแอดมินยืนยันว่าต้องการให้ประวัติเปลี่ยนตาม — อัปเดต
+// Origin_Location / Dest_Location ที่ match ชื่อเดิมแบบตรงตัว.
+// หมายเหตุ: Route_Name (เส้นทางหลายจุด "A → B") ไม่แตะ เพื่อกันพังสตริง multi-drop.
+export async function propagateLocationRename(oldName: string, newName: string, branchId?: string | null) {
+  try {
+    const isAdminUser = await isAdmin()
+    if (!isAdminUser) return { success: false, error: 'Unauthorized' }
+    const supabase = createAdminClient()
+    const oldTrim = (oldName || '').trim()
+    const newTrim = (newName || '').trim()
+    if (!oldTrim || !newTrim || oldTrim === newTrim) return { success: true, updated: 0 }
+
+    let originQ = supabase.from('Jobs_Main').update({ Origin_Location: newTrim }).eq('Origin_Location', oldTrim)
+    let destQ = supabase.from('Jobs_Main').update({ Dest_Location: newTrim }).eq('Dest_Location', oldTrim)
+    if (branchId && branchId !== 'All') {
+      originQ = originQ.eq('Branch_ID', branchId)
+      destQ = destQ.eq('Branch_ID', branchId)
+    }
+    const [o, d] = await Promise.all([originQ.select('Job_ID'), destQ.select('Job_ID')])
+    const updated = (o.data?.length || 0) + (d.data?.length || 0)
+    return { success: true, updated }
   } catch (e: unknown) {
     return { success: false, error: e instanceof Error ? e.message : String(e) }
   }

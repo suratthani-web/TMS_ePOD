@@ -40,6 +40,7 @@ import {
   updateLocation,
   deleteLocation,
   createBulkLocations,
+  propagateLocationRename,
   getBranches,
   Location,
 } from "@/lib/supabase/locations"
@@ -245,8 +246,26 @@ export default function RoutesPage() {
       }
 
       if (editingLocation?.Location_ID) {
+        const oldName = (editingLocation.Name || '').trim()
+        const newName = payload.Name || ''
         const result = await updateLocation(editingLocation.Location_ID, payload)
-        if (!result.success) throw result.error
+        if (!result.success) {
+          // แสดงข้อความจริง (เช่น ชื่อซ้ำ) แทน toast ทั่วไป
+          toast.error(typeof result.error === 'string' ? result.error : t('routes.toasts.save_error'))
+          setSaving(false)
+          return
+        }
+        // เปลี่ยนชื่อสำเร็จ + ชื่อเปลี่ยนจริง → ถามว่าจะให้ประวัติงานเก่าเปลี่ยนตามมั้ย
+        if (newName && oldName && newName !== oldName) {
+          const alsoHistory = confirm(
+            `เปลี่ยนชื่อเป็น "${newName}" แล้ว\n\nต้องการให้ประวัติงานเก่าที่ใช้ชื่อ "${oldName}" เปลี่ยนเป็นชื่อใหม่ตามด้วยหรือไม่?\n\n• ตกลง = อัปเดตประวัติเก่าให้เป็นชื่อใหม่\n• ยกเลิก = ประวัติเก่าคงชื่อเดิมไว้`
+          )
+          if (alsoHistory) {
+            const prop = await propagateLocationRename(oldName, newName, payload.Branch_ID || null)
+            if (prop.success) toast.success(`อัปเดตประวัติเก่า ${prop.updated ?? 0} งานเป็นชื่อใหม่แล้ว`)
+            else toast.error('อัปเดตประวัติเก่าไม่สำเร็จ: ' + (prop.error || ''))
+          }
+        }
       } else {
         const result = await createLocation(payload)
         if (!result.success) throw result.error
@@ -436,7 +455,6 @@ export default function RoutesPage() {
                     onChange={(e) => updateForm("Name", e.target.value)}
                     placeholder={t('routes.dialog.placeholder_name')}
                     className="h-16 bg-muted/50 border-border/5 text-foreground font-black rounded-2xl px-8 text-xl uppercase tracking-normal focus:bg-muted/80 transition-all"
-                    disabled={!!editingLocation}
                   />
                 </div>
                 <div className="space-y-4">

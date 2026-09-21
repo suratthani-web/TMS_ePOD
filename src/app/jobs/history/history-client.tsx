@@ -25,8 +25,18 @@ import {
   Zap,
   Eye,
   Loader2,
-  ExternalLink
+  ExternalLink,
+  ChevronDown,
+  FileSpreadsheet,
+  FileText
 } from "lucide-react"
+import { toast } from "sonner"
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
 import { ExcelExport } from "@/components/ui/excel-export"
 import { JobHistoryActions } from "@/components/jobs/job-history-actions"
 import { HistoryStatusFilter } from "@/components/jobs/history-status-filter"
@@ -137,10 +147,11 @@ export function HistoryClient({
   }
   const router = useRouter()
   const pathname = usePathname()
-  const [isExporting, setIsExporting] = useState(false)
+  const [isExporting, setIsExporting] = useState<false | 'xlsx' | 'csv'>(false)
 
-  const handleExportAll = async () => {
-    setIsExporting(true)
+  const handleExportAll = async (format: 'xlsx' | 'csv' = 'xlsx') => {
+    setIsExporting(format)
+    toast.loading(format === 'csv' ? "กำลังเตรียมข้อมูล CSV..." : "กำลังเตรียมข้อมูล Excel...", { id: "export-history" })
     try {
         // PostgREST hard-caps each query at 1000 rows, so a single big-limit call
         // silently returned only 1000 of the filtered jobs. Page through 1000 at a
@@ -159,7 +170,7 @@ export function HistoryClient({
         }
 
         if (!allJobs || allJobs.length === 0) {
-            alert("No data to export")
+            toast.error("ไม่พบข้อมูลสำหรับส่งออก", { id: "export-history" })
             return
         }
 
@@ -201,7 +212,7 @@ export function HistoryClient({
         type Row = Record<(typeof HEADERS)[number], string | number>
         const blankRow = (): Row => Object.fromEntries(HEADERS.map(h => [h, ''])) as Row
 
-        // Prepare data for Excel — main row carries full info (origin/vehicle/driver/
+        // Prepare data for Excel/CSV — main row carries full info (origin/vehicle/driver/
         // qty/distance) with the first drop; each additional drop becomes a light
         // sub-row (date + customer + its destination only) so totals aren't
         // double-counted — matching the MASTER sheet writer's multi-drop format.
@@ -235,13 +246,30 @@ export function HistoryClient({
             }
         }
 
-        const wb = XLSX.utils.book_new()
         const ws = XLSX.utils.json_to_sheet(exportData, { header: HEADERS as unknown as string[] })
-        XLSX.utils.book_append_sheet(wb, ws, "Mission History")
-        XLSX.writeFile(wb, `mission_history_${todayTH()}.xlsx`)
+
+        if (format === 'csv') {
+            const csv = XLSX.utils.sheet_to_csv(ws)
+            const blob = new Blob(["\uFEFF" + csv], { type: 'text/csv;charset=utf-8;' })
+            const url = URL.createObjectURL(blob)
+            const link = document.createElement("a")
+            link.href = url
+            link.download = `mission_history_${todayTH()}.csv`
+            link.style.visibility = 'hidden'
+            document.body.appendChild(link)
+            link.click()
+            document.body.removeChild(link)
+            URL.revokeObjectURL(url)
+            toast.success("ส่งออกไฟล์ CSV สำเร็จ", { id: "export-history" })
+        } else {
+            const wb = XLSX.utils.book_new()
+            XLSX.utils.book_append_sheet(wb, ws, "Mission History")
+            XLSX.writeFile(wb, `mission_history_${todayTH()}.xlsx`)
+            toast.success("ส่งออกไฟล์ Excel สำเร็จ", { id: "export-history" })
+        }
     } catch (error) {
         console.error("Export failed:", error)
-        alert("Failed to export data")
+        toast.error("เกิดข้อผิดพลาดในการส่งออกข้อมูล", { id: "export-history" })
     } finally {
         setIsExporting(false)
     }
@@ -422,18 +450,49 @@ export function HistoryClient({
             </PremiumButton>
           </Link>
           {canExport && (
-            <PremiumButton 
-                variant="secondary" 
-                className="h-11 px-6 rounded-xl bg-primary text-foreground shadow-lg text-xs font-black uppercase tracking-widest disabled:opacity-50"
-                onClick={handleExportAll}
-                disabled={isExporting}
-            >
-                {isExporting ? (
-                    <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> {t('common.loading')}...</>
-                ) : (
-                    <><Download className="w-4 h-4 mr-2" /> {t('common.download_report')}</>
-                )}
-            </PremiumButton>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <PremiumButton 
+                    variant="secondary" 
+                    className="h-11 px-5 rounded-xl bg-primary text-foreground shadow-lg text-xs font-black uppercase tracking-widest disabled:opacity-50 flex items-center gap-2"
+                    disabled={!!isExporting}
+                >
+                    {isExporting ? (
+                        <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> {t('common.loading')}...</>
+                    ) : (
+                        <>
+                          <Download className="w-4 h-4 mr-1.5" /> 
+                          {t('common.download_report')}
+                          <ChevronDown className="w-3.5 h-3.5 ml-1 opacity-70" />
+                        </>
+                    )}
+                </PremiumButton>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="bg-card/95 backdrop-blur-xl border-border min-w-[210px] p-1.5 rounded-2xl shadow-2xl z-50">
+                <DropdownMenuItem 
+                  onClick={() => handleExportAll('xlsx')} 
+                  disabled={!!isExporting}
+                  className="cursor-pointer font-bold text-xs flex items-center gap-3 py-2.5 px-3 rounded-xl hover:bg-primary/20 transition-colors"
+                >
+                  <FileSpreadsheet className="w-4 h-4 text-emerald-500 shrink-0" />
+                  <div className="flex flex-col text-left">
+                    <span className="text-foreground">Export Excel (.xlsx)</span>
+                    <span className="text-[10px] text-muted-foreground font-normal">ไฟล์สเปรดชีต Excel</span>
+                  </div>
+                </DropdownMenuItem>
+                <DropdownMenuItem 
+                  onClick={() => handleExportAll('csv')} 
+                  disabled={!!isExporting}
+                  className="cursor-pointer font-bold text-xs flex items-center gap-3 py-2.5 px-3 rounded-xl hover:bg-primary/20 transition-colors"
+                >
+                  <FileText className="w-4 h-4 text-sky-500 shrink-0" />
+                  <div className="flex flex-col text-left">
+                    <span className="text-foreground">Export CSV (.csv)</span>
+                    <span className="text-[10px] text-muted-foreground font-normal">ไฟล์ข้อความ Comma-Separated</span>
+                  </div>
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
           )}
         </div>
       </div>

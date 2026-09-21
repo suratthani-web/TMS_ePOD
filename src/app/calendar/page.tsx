@@ -4,7 +4,7 @@ import { DashboardLayout } from "@/components/layout/dashboard-layout"
 import { getJobsForMonth } from "./actions"
 import { CalendarClient } from "./calendar-client"
 import { getJobCreationData } from "../planning/actions"
-import { getUserBranchId } from "@/lib/permissions"
+import { getUserBranchId, isCustomer } from "@/lib/permissions"
 
 interface PageProps {
   searchParams: Promise<{
@@ -19,17 +19,19 @@ export default async function CalendarPage(props: PageProps) {
   const currentBranchId = branch === 'All' ? undefined : branch
 
   const now = new Date()
-  const [jobs, creationData] = await Promise.all([
+  const [jobs, creationData, customerView] = await Promise.all([
     getJobsForMonth(now.getFullYear(), now.getMonth() + 1, currentBranchId),
-    getJobCreationData(currentBranchId)
+    getJobCreationData(currentBranchId),
+    isCustomer()
   ])
 
   return (
     <DashboardLayout>
-      <CalendarClient 
-        initialJobs={jobs} 
-        initialYear={now.getFullYear()} 
-        initialMonth={now.getMonth() + 1} 
+      <CalendarClient
+        initialJobs={jobs}
+        initialYear={now.getFullYear()}
+        initialMonth={now.getMonth() + 1}
+        isCustomerView={customerView}
         {...creationData}
       />
     </DashboardLayout>

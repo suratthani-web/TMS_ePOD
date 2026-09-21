@@ -1,7 +1,8 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { useLanguage } from "@/components/providers/language-provider"
+import { LocationAutocomplete } from "@/components/location-autocomplete"
 import { todayTH } from "@/lib/utils/date-th"
 import { Calendar, MapPin, Package, StickyNote, Send, CheckCircle2, Plus, Trash2, Truck } from "lucide-react"
 import { motion, AnimatePresence } from "framer-motion"
@@ -17,7 +18,7 @@ import {
     DialogDescription,
     DialogFooter
 } from "@/components/ui/dialog"
-import { requestShipmentBatch } from "@/app/planning/actions"
+import { requestShipmentBatch, getCustomerOriginSuggestions } from "@/app/planning/actions"
 import { toast } from "sonner"
 
 interface RequestShipmentDialogProps {
@@ -45,6 +46,22 @@ export function RequestShipmentDialog({ open, onOpenChange }: RequestShipmentDia
         Notes: "",
     })
     const [stops, setStops] = useState<Stop[]>([emptyStop()])
+    // จุดรับ/จุดส่งที่ลูกค้าเคยใช้ (ดรอปดาวน์) — โหลดตอนเปิดฟอร์ม + prefill จุดรับล่าสุด
+    const [originOptions, setOriginOptions] = useState<string[]>([])
+    const [destOptions, setDestOptions] = useState<string[]>([])
+
+    useEffect(() => {
+        if (!open) return
+        let active = true
+        getCustomerOriginSuggestions().then(({ suggestions, lastUsed, destSuggestions }) => {
+            if (!active) return
+            setOriginOptions(suggestions)
+            setDestOptions(destSuggestions)
+            // ถ้ายังไม่ได้เลือกจุดรับ และมีจุดล่าสุด → เติมให้อัตโนมัติ (แก้ได้)
+            setHeader(p => p.Origin_Location ? p : (lastUsed ? { ...p, Origin_Location: lastUsed } : p))
+        }).catch(() => {})
+        return () => { active = false }
+    }, [open])
 
     const th = language === 'th'
     const totalJobs = stops.reduce((sum, s) => sum + (Number(s.Vehicles) || 1), 0)
@@ -148,11 +165,11 @@ export function RequestShipmentDialog({ open, onOpenChange }: RequestShipmentDia
                                     <Label className="text-sm font-black uppercase tracking-widest text-muted-foreground flex items-center gap-2">
                                         <MapPin size={14} className="text-emerald-500" /> {t('shipment.origin')}
                                     </Label>
-                                    <Input
-                                        placeholder={t('shipment.placeholder_origin')}
-                                        required
+                                    <LocationAutocomplete
                                         value={header.Origin_Location}
-                                        onChange={(e) => setHeader(p => ({ ...p, Origin_Location: e.target.value }))}
+                                        onChange={(val) => setHeader(p => ({ ...p, Origin_Location: val }))}
+                                        locations={originOptions}
+                                        placeholder={t('shipment.placeholder_origin')}
                                         className={fieldCls}
                                     />
                                 </div>
@@ -195,10 +212,11 @@ export function RequestShipmentDialog({ open, onOpenChange }: RequestShipmentDia
                                             )}
                                         </div>
                                         <div className="grid grid-cols-1 sm:grid-cols-[1fr_auto] gap-3">
-                                            <Input
+                                            <LocationAutocomplete
                                                 placeholder={t('shipment.placeholder_destination')}
                                                 value={stop.Dest_Location}
-                                                onChange={(e) => updateStop(idx, { Dest_Location: e.target.value })}
+                                                onChange={(val) => updateStop(idx, { Dest_Location: val })}
+                                                locations={destOptions}
                                                 className={fieldCls}
                                             />
                                             <div className="flex items-center gap-2 bg-muted/50 rounded-2xl border border-border/10 px-3 h-12 shrink-0">

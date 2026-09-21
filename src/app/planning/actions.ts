@@ -8,7 +8,7 @@ import { todayTH } from '@/lib/utils/date-th'
 import { getAllVehiclesFromTable } from '@/lib/supabase/vehicles'
 import { logActivity } from '@/lib/supabase/logs'
 import { getUserBranchId, getFixedUserBranchId } from '@/lib/permissions'
-import { notifyDriverNewJob, notifyMarketplaceNewJob, notifyDriverNewBatch } from '@/lib/actions/push-actions'
+import { notifyDriverNewJob, notifyMarketplaceNewJob, notifyDriverNewBatch, notifyAdminNewRequest, notifyAdminNewRequestBatch } from '@/lib/actions/push-actions'
 import { getCustomerId, getUserId, isCustomer, isSuperAdmin, isAdmin } from '@/lib/permissions'
 import { sanitizeJobData } from '@/lib/supabase/utils'
 import { getFuelPriceNumber, getSuggestedRate } from '@/lib/actions/fuel-actions'
@@ -1336,6 +1336,65 @@ export async function getJobCreationData(selectedBranchId?: string) {
   }
 }
 
+/**
+ * จุดรับ (Origin) + จุดส่ง (Dest) ที่ลูกค้ารายนี้เคยใช้ — เรียงตามความถี่แล้วตามด้วยล่าสุด.
+ * ใช้ทำดรอปดาวน์ในฟอร์มลูกค้าสร้างงาน (รองรับหลายดรอป): ลูกค้าส่วนใหญ่ใช้จุดเดิมซ้ำ ๆ
+ * จึงกรองด้วย "ประวัติของลูกค้าเอง" อัตโนมัติ ไม่ต้องตั้งกฎกรองเอง.
+ * คืน:
+ *   - suggestions / lastUsed        = จุดรับ (คงชื่อเดิมไว้เพื่อ backward-compat)
+ *   - destSuggestions               = จุดส่งที่เคยใช้ (มากสุดก่อน) — ใช้ร่วมกันทุกดรอป
+ */
+export async function getCustomerOriginSuggestions(): Promise<{
+  suggestions: string[]
+  lastUsed: string | null
+  destSuggestions: string[]
+}> {
+  try {
+    const supabase = createAdminClient()
+    let customerId = await getCustomerId()
+    if (!customerId) {
+      const userId = await getUserId()
+      if (userId) {
+        const { data: u } = await supabase.from('Master_Users').select('Customer_ID').eq('Username', userId).maybeSingle()
+        customerId = u?.Customer_ID || null
+      }
+    }
+    if (!customerId) return { suggestions: [], lastUsed: null, destSuggestions: [] }
+
+    // ดึงประวัติจุดรับ+จุดส่งล่าสุด (จำกัดพอประมาณ) แล้วนับความถี่ในหน่วยความจำ
+    const { data } = await supabase
+      .from('Jobs_Main')
+      .select('Origin_Location, Dest_Location, Created_At')
+      .eq('Customer_ID', customerId)
+      .order('Created_At', { ascending: false })
+      .limit(500)
+
+    const originCounts = new Map<string, number>()
+    const destCounts = new Map<string, number>()
+    let lastUsed: string | null = null
+    for (const row of (data || []) as { Origin_Location: string | null; Dest_Location: string | null }[]) {
+      const origin = (row.Origin_Location || '').trim()
+      if (origin) {
+        if (lastUsed === null) lastUsed = origin // แถวแรก = จุดรับล่าสุด
+        originCounts.set(origin, (originCounts.get(origin) || 0) + 1)
+      }
+      const dest = (row.Dest_Location || '').trim()
+      if (dest) destCounts.set(dest, (destCounts.get(dest) || 0) + 1)
+    }
+
+    const byFreqDesc = (m: Map<string, number>) =>
+      Array.from(m.entries()).sort((a, b) => b[1] - a[1]).map(([name]) => name)
+
+    return {
+      suggestions: byFreqDesc(originCounts),
+      lastUsed,
+      destSuggestions: byFreqDesc(destCounts),
+    }
+  } catch {
+    return { suggestions: [], lastUsed: null, destSuggestions: [] }
+  }
+}
+
 export async function requestShipment(data: {
   Plan_Date: string
   Origin_Location: string
@@ -1414,6 +1473,17 @@ export async function requestShipment(data: {
 
   revalidatePath('/dashboard')
   revalidatePath('/planning')
+
+  // แจ้งเตือนแอดมิน (web push) ว่ามีคำขอใหม่จากลูกค้า — ไม่บล็อกผลลัพธ์ถ้าส่งไม่ได้
+  try {
+    await notifyAdminNewRequest(
+      jobId,
+      customer?.Customer_Name || (userId ?? 'Unknown Customer'),
+      data.Origin_Location,
+      data.Dest_Location,
+      payload.Branch_ID
+    )
+  } catch (e) { console.error('[requestShipment] notify admin failed:', e) }
 
   // Log activity
   await logActivity({
@@ -1516,6 +1586,11 @@ export async function requestShipmentBatch(data: {
 
   revalidatePath('/dashboard')
   revalidatePath('/planning')
+
+  // แจ้งเตือนแอดมิน (web push) — คำขอชุดใหญ่ ส่งครั้งเดียวสรุปจำนวนงาน
+  try {
+    await notifyAdminNewRequestBatch(custName, rows.length, branch)
+  } catch (e) { console.error('[requestShipmentBatch] notify admin failed:', e) }
 
   await logActivity({
     module: 'Jobs',
