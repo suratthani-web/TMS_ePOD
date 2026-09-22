@@ -89,8 +89,17 @@ function guessTotal(grid: PayslipGrid): number | null {
 /** parse ทั้งไฟล์ฝั่ง browser -> รายการ sheet + grid */
 export function parseWorkbookClient(ab: ArrayBuffer): ClientSheet[] {
   const wb = XLSX.read(ab, { type: "array", sheetRows: ROW_CAP, cellDates: false, cellStyles: false })
+  // ข้ามชีตที่ถูกซ่อนใน Excel (Hidden=1 / VeryHidden=2) — มักเป็นของเก่า/พัง (#REF!)
+  // เพื่อให้หน้าอัปเห็นเฉพาะคนขับที่มองเห็นจริงในไฟล์ (ตรงกับที่ผู้ใช้เห็น)
+  const wbMeta = (wb.Workbook && wb.Workbook.Sheets) || []
+  const hiddenByName = new Map<string, number>()
+  wb.SheetNames.forEach((n, i) => {
+    const h = wbMeta[i]?.Hidden
+    if (h) hiddenByName.set(n, h)
+  })
   const out: ClientSheet[] = []
   for (const name of wb.SheetNames) {
+    if (hiddenByName.get(name)) continue
     const ws = wb.Sheets[name]
     if (!ws) continue
     const ref = ws["!ref"]
