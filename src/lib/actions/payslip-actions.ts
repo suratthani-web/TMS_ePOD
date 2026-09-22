@@ -375,31 +375,35 @@ export async function pushDriverPaymentToApp(
       .eq("Driver_Name", payment.Driver_Name)
       .maybeSingle()).data as { Driver_ID: string; Driver_Name?: string } | null
 
-    // ถ้าไม่เจอ ลองเป็น "สังกัด (รถร่วม)" — voucher สังกัดผูกเข้าบัญชี "เจ้าของสังกัด"
+    // ถ้าไม่เจอ ลองเป็น "สังกัด (รถร่วม)" — voucher สังกัดผูกกับ Sub_ID โดยตรง
+    // (เจ้าของสังกัดล็อกอินด้วย Sub_ID เห็นได้ ไม่ต้องมีบัญชีคนขับ)
+    let subId: string | null = null
     if (!driver?.Driver_ID) {
       const { data: sub } = await supabase
         .from("Master_Subcontractors")
         .select("Sub_ID, Sub_Name")
-        .eq("Sub_Name", payment.Driver_Name)
+        .or(`Sub_Name.eq.${payment.Driver_Name},Sub_ID.eq.${payment.Driver_Name}`)
         .maybeSingle()
       if (sub?.Sub_ID) {
+        subId = sub.Sub_ID
+        // ถ้ามีเจ้าของสังกัดที่เป็นคนขับด้วย ผูก Driver_ID ให้ด้วย (เขาเห็นทั้งสองทาง)
         const { data: owner } = await supabase
           .from("Master_Drivers")
-          .select("Driver_ID, Driver_Name")
+          .select("Driver_ID")
           .eq("Sub_ID", sub.Sub_ID)
           .eq("Is_Sub_Owner", true)
           .maybeSingle()
-        if (owner?.Driver_ID) driver = owner
-        else return { ok: false, error: `"${payment.Driver_Name}" เป็นสังกัด แต่ยังไม่ได้ตั้งเจ้าของสังกัด (ตั้ง Is_Sub_Owner ให้คนขับ 1 คนในสังกัดก่อน)` }
+        if (owner?.Driver_ID) driver = { Driver_ID: owner.Driver_ID }
       }
     }
 
-    if (!driver?.Driver_ID) {
-      return { ok: false, error: `ไม่พบผู้รับ "${payment.Driver_Name}" (คนขับ/เจ้าของสังกัด) ใน Master_Drivers` }
+    if (!driver?.Driver_ID && !subId) {
+      return { ok: false, error: `ไม่พบผู้รับ "${payment.Driver_Name}" (คนขับ/สังกัด) ในระบบ` }
     }
 
     const record = {
-      Driver_ID: String(driver.Driver_ID),
+      Driver_ID: driver?.Driver_ID ? String(driver.Driver_ID) : String(subId),
+      Sub_ID: subId,
       driver_name: payment.Driver_Name,
       sheet_name: null,
       title: `ใบสำคัญจ่าย ${payment.Driver_Payment_ID}`,

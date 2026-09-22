@@ -491,15 +491,17 @@ export async function POST(req: NextRequest) {
             // Customers bind at the group level, so keep that lookup on targetId.
             const personId = userId || targetId
             const inGroup = !!groupId
-            const [custRes, drivRes, userRes] = await Promise.all([
+            const [custRes, drivRes, userRes, subRes] = await Promise.all([
                 supabase.from('Master_Customers').select('Customer_ID, Customer_Name').eq(custLineIdField, targetId).limit(1),
                 supabase.from('Master_Drivers').select('Driver_ID, Driver_Name, Vehicle_Plate, Branch_ID').eq('Line_User_ID', personId).limit(1),
                 supabase.from('Master_Users').select('Username, Name, Role, Role_ID, Branch_ID').eq('Line_User_ID', personId).limit(1),
+                supabase.from('Master_Subcontractors').select('Sub_ID, Sub_Name, Branch_ID').eq('Line_User_ID', personId).limit(1),
             ])
 
             const boundCustomer = custRes.data?.[0] || null
             const boundDriver = drivRes.data?.[0] || null
             const resolvedAdmin = userRes.data?.[0] || null
+            const boundSub = subRes.data?.[0] || null   // เจ้าของสังกัด
             // Admins act on commands / AI ONLY in 1:1 chats — group chats are shared
             // with drivers (and customers), so keep internal admin powers out of them.
             // `adminFuel` is the ONE exception: the fuel-receipt OCR + its confirm are
@@ -1053,6 +1055,18 @@ export async function POST(req: NextRequest) {
                         continue
                     }
 
+                    // เจ้าของสังกัด: BIND [รหัสสังกัด] [รหัสผ่าน]
+                    const { data: subMatch } = await supabase.from('Master_Subcontractors')
+                        .select('Sub_ID, Sub_Name, Password')
+                        .eq('Sub_ID', id.trim())
+                        .maybeSingle()
+                    if (subMatch && subMatch.Password && String(subMatch.Password) === String(phone)) {
+                        await supabase.from('Master_Subcontractors').update({ Line_User_ID: null }).eq('Line_User_ID', personId)
+                        await supabase.from('Master_Subcontractors').update({ Line_User_ID: personId }).eq('Sub_ID', subMatch.Sub_ID)
+                        await replyToUser(replyToken, `✅ ผูกบัญชีสังกัด "${subMatch.Sub_Name}" สำเร็จ!\nพิมพ์ "สรุปจ่าย" เพื่อดูใบสรุปจ่ายของคนขับในสังกัดครับ 🎉`)
+                        continue
+                    }
+
                     // Admin (any user in Master_Users)
                     const { data: allAdminMatches } = await supabase.from('Master_Users')
                         .select('Username, Name, Role, Role_ID, Email')
@@ -1084,6 +1098,43 @@ export async function POST(req: NextRequest) {
                     } else {
                         await replyToUser(replyToken, `❌ ไม่พบผู้ใช้ "${id}" ในระบบ หรือเบอร์โทรศัพท์/รหัสผ่านไม่ถูกต้อง\nลองตรวจสอบความถูกต้องของรหัสและเบอร์โทรใหม่อีกครั้งครับ\nรูปแบบ: BIND [รหัสคนขับ/ลูกค้า] [เบอร์โทร]`)
                     }
+                    continue
+                }
+
+                // 2.5 เจ้าของสังกัด: "สรุปจ่าย" → Flex รวมสลิปของคนขับในสังกัด
+                if (boundSub) {
+                    if (text === 'สรุปจ่าย' || text === 'ใบสำคัญจ่าย' || text === 'สลิป' || text === 'สลิปจ่าย' || text.includes('สรุปจ่าย')) {
+                        const { data: subDrivers } = await supabase.from('Master_Drivers').select('Driver_ID').eq('Sub_ID', boundSub.Sub_ID)
+                        const ids = (subDrivers || []).map((d: { Driver_ID: string }) => String(d.Driver_ID)).filter(Boolean)
+                        const cols = 'id, title, period_label, total_amount, kind, public_token, driver_name, uploaded_at'
+                        const byDriver = ids.length ? (await supabase.from('Driver_Payslips').select(cols).in('Driver_ID', ids).order('uploaded_at', { ascending: false }).limit(30)).data || [] : []
+                        const bySub = (await supabase.from('Driver_Payslips').select(cols).eq('Sub_ID', boundSub.Sub_ID).order('uploaded_at', { ascending: false }).limit(30)).data || []
+                        const map = new Map<string, { id: string; title?: string; period_label?: string; total_amount?: number; public_token?: string; driver_name?: string; uploaded_at?: string; kind?: string }>()
+                        for (const r of [...bySub, ...byDriver]) map.set(String(r.id), r)
+                        const slips = Array.from(map.values()).sort((a, b) => String(b.uploaded_at || '').localeCompare(String(a.uploaded_at || ''))).slice(0, 12)
+
+                        if (!slips.length) {
+                            await replyToUser(replyToken, `📄 สังกัด ${boundSub.Sub_Name}\nยังไม่มีใบสรุปจ่ายของคนขับในสังกัดครับ`)
+                            continue
+                        }
+                        const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://tms-e-pod.vercel.app'
+                        const bubbles = slips.map(s => ({
+                            type: 'bubble', size: 'kilo',
+                            header: { type: 'box', layout: 'vertical', paddingAll: '12px', backgroundColor: '#1e3a8a',
+                                contents: [
+                                    { type: 'text', text: s.driver_name || s.title || 'ใบสรุปจ่ายรถ', color: '#ffffff', size: 'sm', weight: 'bold', wrap: true },
+                                    { type: 'text', text: s.period_label ? `งวด ${s.period_label}` : (s.kind === 'voucher' ? 'ใบสำคัญจ่าย' : 'สรุปจ่ายรถ'), color: '#93c5fd', size: 'xs' },
+                                ] },
+                            body: { type: 'box', layout: 'vertical', paddingAll: '12px',
+                                contents: [{ type: 'text', text: typeof s.total_amount === 'number' ? `฿${s.total_amount.toLocaleString()}` : '—', size: 'xxl', weight: 'bold', color: '#047857' }] },
+                            footer: { type: 'box', layout: 'vertical', paddingAll: '12px',
+                                contents: [{ type: 'button', style: 'primary', color: '#1e3a8a', height: 'sm',
+                                    action: { type: 'uri', label: 'เปิดดู / โหลด PDF', uri: s.public_token ? `${appUrl}/p/payslip/${s.public_token}` : `${appUrl}/mobile/payslips/${s.id}` } }] },
+                        }))
+                        await replyToUser(replyToken, { type: 'flex', altText: `ใบสรุปจ่าย สังกัด ${boundSub.Sub_Name} (${slips.length})`, contents: { type: 'carousel', contents: bubbles } })
+                        continue
+                    }
+                    await replyToUser(replyToken, `สวัสดีครับ สังกัด ${boundSub.Sub_Name}\nพิมพ์ "สรุปจ่าย" เพื่อดูใบสรุปจ่ายของคนขับในสังกัด`)
                     continue
                 }
 
