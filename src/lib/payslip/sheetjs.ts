@@ -111,6 +111,100 @@ export function parseWorkbookClient(ab: ArrayBuffer): ClientSheet[] {
   return out
 }
 
+// ---------------------------------------------------------------------------
+// ตารางแม่ (master roster) — Sheet ที่รวมรายชื่อ+ยอดของทุกคนในงวด
+// ใช้สร้าง "สลิปสรุป" ให้คนที่ไม่มีแท็บรายละเอียด
+// ---------------------------------------------------------------------------
+export interface MasterPerson {
+  seq?: number
+  code?: string
+  name: string
+  bankName?: string
+  bankNo?: string
+  income: number
+  deductions: { label: string; amount: number }[]
+  net: number       // คงเหลือ
+  wht: number       // หัก ณ ที่จ่าย
+  transfer: number  // ยอดโอนสุทธิ
+}
+
+const toNum = (v: unknown): number => {
+  if (typeof v === "number") return v
+  const n = parseFloat(String(v ?? "").replace(/[, ]/g, ""))
+  return isNaN(n) ? 0 : n
+}
+
+/** หา + parse ตารางแม่ (Sheet1) → รายชื่อผู้รับเงินพร้อมยอด */
+export function parseMasterRoster(ab: ArrayBuffer): MasterPerson[] {
+  const wb = XLSX.read(ab, { type: "array", sheetRows: 2000, cellDates: false, cellStyles: false })
+  for (const name of wb.SheetNames) {
+    const ws = wb.Sheets[name]
+    if (!ws) continue
+    const aoa = XLSX.utils.sheet_to_json<unknown[]>(ws, { header: 1, raw: true, defval: "" })
+    if (aoa.length < 3) continue
+    const h1 = (aoa[0] || []).map((c) => String(c || "").trim())
+    const h2 = (aoa[1] || []).map((c) => String(c || "").trim())
+    // ต้องเป็นตารางแม่: มีคอลัมน์ "ชื่อ-นามสกุล" + "รายได้"
+    const nameCol = h1.findIndex((c) => c.includes("ชื่อ"))
+    const incomeCol = h1.findIndex((c) => c.includes("รายได้"))
+    if (nameCol < 0 || incomeCol < 0) continue
+    const codeCol = h1.findIndex((c) => c.includes("ผู้รับเงิน") || c.includes("คู่ค้า"))
+    const bankNoCol = h1.findIndex((c) => c.includes("เลขที่บัญชี"))
+    const bankNameCol = h2.findIndex((c) => c.includes("ธนาคาร"))
+    const netCol = h1.findIndex((c) => c.includes("คงเหลือ"))
+    const whtCol = h1.findIndex((c) => c.includes("ณ ที่จ่าย"))
+    const transferCol = h1.findIndex((c) => c.includes("ยอดโอน"))
+    // คอลัมน์หัก = อยู่ระหว่าง "หัก" กับ "คงเหลือ"
+    const dedStart = h1.findIndex((c) => c === "หัก")
+    const people: MasterPerson[] = []
+    for (let r = 2; r < aoa.length; r++) {
+      const row = aoa[r] || []
+      const nm = String(row[nameCol] || "").trim()
+      if (!nm) continue
+      const income = toNum(row[incomeCol])
+      const deductions: { label: string; amount: number }[] = []
+      if (dedStart >= 0 && netCol > dedStart) {
+        for (let c = dedStart; c < netCol; c++) {
+          const amt = toNum(row[c])
+          const label = String(h2[c] || "").trim() || "หัก"
+          if (amt > 0) deductions.push({ label, amount: amt })
+        }
+      }
+      people.push({
+        seq: toNum(row[0]) || undefined,
+        code: codeCol >= 0 ? String(row[codeCol] || "").trim() : undefined,
+        name: nm,
+        bankName: bankNameCol >= 0 ? String(row[bankNameCol] || "").trim() : undefined,
+        bankNo: bankNoCol >= 0 ? String(row[bankNoCol] || "").trim() : undefined,
+        income,
+        deductions,
+        net: netCol >= 0 ? toNum(row[netCol]) : income,
+        wht: whtCol >= 0 ? toNum(row[whtCol]) : 0,
+        transfer: transferCol >= 0 ? toNum(row[transferCol]) : income,
+      })
+    }
+    if (people.length) return people
+  }
+  return []
+}
+
+const fmtMoney = (n: number) => n.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+
+/** สร้าง grid สรุป (ใช้ PayslipGridView เดิม render ได้เลย) จากคน 1 คนในตารางแม่ */
+export function masterPersonToGrid(p: MasterPerson): PayslipGrid {
+  const rows: PayslipCell[][] = []
+  rows.push([{ t: p.name, b: true }, { t: p.code || "" }])
+  rows.push([{ t: "รายการ", b: true }, { t: "จำนวนเงิน (บาท)", b: true, a: "right" }])
+  rows.push([{ t: "รายได้รวม" }, { t: fmtMoney(p.income), n: true }])
+  for (const d of p.deductions) rows.push([{ t: `หัก: ${d.label}` }, { t: `-${fmtMoney(d.amount)}`, n: true }])
+  rows.push([{ t: "คงเหลือ", b: true }, { t: fmtMoney(p.net), n: true, b: true }])
+  if (p.wht > 0) rows.push([{ t: "หัก ณ ที่จ่าย 1%" }, { t: `-${fmtMoney(p.wht)}`, n: true }])
+  rows.push([{ t: "ยอดโอนสุทธิ", b: true }, { t: fmtMoney(p.transfer), n: true, b: true }])
+  const bank = [p.bankName, p.bankNo].filter(Boolean).join(" ")
+  if (bank) rows.push([{ t: "ธนาคาร" }, { t: bank }])
+  return { cols: [34, 22], merges: [], rows, maxCols: 2 }
+}
+
 /** อ่าน workbook ครั้งเดียว (ใช้ตอนสร้างไฟล์รายคนหลายคน จะได้ไม่ parse ซ้ำ) */
 export function readWorkbookClient(ab: ArrayBuffer): XLSX.WorkBook {
   return XLSX.read(ab, { type: "array", sheetRows: ROW_CAP, cellStyles: true })

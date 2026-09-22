@@ -12,7 +12,7 @@ import {
   deletePayslipBatch,
   type ClientConfirmItem,
 } from "@/lib/actions/payslip-actions"
-import { parseWorkbookClient, readWorkbookClient, buildSingleSheetFromWb } from "@/lib/payslip/sheetjs"
+import { parseWorkbookClient, readWorkbookClient, buildSingleSheetFromWb, parseMasterRoster, masterPersonToGrid } from "@/lib/payslip/sheetjs"
 import type { PayslipGrid } from "@/lib/payslip/types"
 import { suggestDriverId, parseFileName, type DriverLite } from "@/lib/payslip/match"
 import { createClient } from "@/utils/supabase/client"
@@ -29,6 +29,7 @@ interface Row {
   total: number | null
   selected: boolean
   driverId: string
+  isSummary?: boolean   // สลิปสรุปจากตารางแม่ (Sheet1) — ไม่มีไฟล์ต้นทาง
 }
 
 export default function PayslipsClient({ initialList }: { initialList: Record<string, unknown>[] }) {
@@ -82,22 +83,44 @@ export default function PayslipsClient({ initialList }: { initialList: Record<st
       setTitle(parsedName.title)
       setPeriod(parsedName.period)
       setBranch(parsedName.branch)
-      setRows(
-        sheets.map((s) => ({
-          sheetName: s.name,
-          rowCount: s.rowCount,
-          isDriverSheet: s.isDriverSheet,
-          grid: s.grid,
-          total: s.total,
-          selected: s.isDriverSheet,
-          driverId: s.isDriverSheet ? suggestDriverId(s.name, drv) || "" : "",
-        }))
-      )
+      const tabRows: Row[] = sheets.map((s) => ({
+        sheetName: s.name,
+        rowCount: s.rowCount,
+        isDriverSheet: s.isDriverSheet,
+        grid: s.grid,
+        total: s.total,
+        selected: s.isDriverSheet,
+        driverId: s.isDriverSheet ? suggestDriverId(s.name, drv) || "" : "",
+      }))
+
+      // สลิปสรุปจากตารางแม่ (Sheet1): สร้างให้เฉพาะคนที่ "ไม่มีแท็บรายละเอียด"
+      const detailNames = sheets.filter((s) => s.isDriverSheet).map((s) => s.name)
+      const hasDetailTab = (fullName: string) =>
+        detailNames.some((tab) => fullName.includes(tab) || suggestDriverId(tab, drv) === suggestDriverId(fullName, drv))
+      const summaryRows: Row[] = []
+      try {
+        for (const p of parseMasterRoster(ab)) {
+          if (hasDetailTab(p.name)) continue
+          summaryRows.push({
+            sheetName: `[สรุป] ${p.name}`,
+            rowCount: 1,
+            isDriverSheet: true,
+            grid: masterPersonToGrid(p),
+            total: p.transfer || p.net || p.income,
+            selected: true,
+            driverId: suggestDriverId(p.name, drv) || "",
+            isSummary: true,
+          })
+        }
+      } catch (e) { console.error("parse master roster failed", e) }
+
+      setRows([...tabRows, ...summaryRows])
       batchRef.current = crypto.randomUUID()
       setHasParsed(true)
       const driverSheets = sheets.filter((s) => s.isDriverSheet)
       const matched = driverSheets.filter((s) => suggestDriverId(s.name, drv)).length
-      toast.success(`พบ ${driverSheets.length} แผ่นคนขับ · จับคู่อัตโนมัติได้ ${matched}`)
+      toast.success(`พบ ${driverSheets.length} แผ่นคนขับ · จับคู่ได้ ${matched}` +
+        (summaryRows.length ? ` · +${summaryRows.length} สลิปสรุปจากตารางแม่` : ""))
     } catch (e) {
       console.error(e)
       toast.error("อ่านไฟล์ไม่สำเร็จ (ไฟล์อาจเสียหรือไม่ใช่ .xlsx)")
@@ -150,20 +173,23 @@ export default function PayslipsClient({ initialList }: { initialList: Record<st
         done++
         setProgress(`กำลังเตรียมไฟล์ ${done}/${mapped.length} …`)
         let xlsxPath: string | null = null
-        try {
-          const bytes = buildSingleSheetFromWb(wb, r.sheetName)
-          const path = `payslips/${batchId}/${r.driverId}.xlsx`
-          const signed = await createPayslipSignedUpload(path)
-          if (signed.ok && signed.path && signed.token) {
-            const { error } = await supabase.storage
-              .from(BUCKET)
-              .uploadToSignedUrl(signed.path, signed.token, new Blob([bytes as unknown as BlobPart], {
-                type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-              }))
-            if (!error) xlsxPath = path
+        // สลิปสรุป (จากตารางแม่) ไม่มีไฟล์ต้นทาง — เก็บแค่ grid
+        if (!r.isSummary) {
+          try {
+            const bytes = buildSingleSheetFromWb(wb, r.sheetName)
+            const path = `payslips/${batchId}/${r.driverId}.xlsx`
+            const signed = await createPayslipSignedUpload(path)
+            if (signed.ok && signed.path && signed.token) {
+              const { error } = await supabase.storage
+                .from(BUCKET)
+                .uploadToSignedUrl(signed.path, signed.token, new Blob([bytes as unknown as BlobPart], {
+                  type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                }))
+              if (!error) xlsxPath = path
+            }
+          } catch (e) {
+            console.error("build/upload xlsx failed", r.sheetName, e)
           }
-        } catch (e) {
-          console.error("build/upload xlsx failed", r.sheetName, e)
         }
         items.push({
           driverId: r.driverId,

@@ -259,8 +259,10 @@ export function DashboardClient({
                 </div>
                 
                 <div className="flex items-center gap-3">
-                    {customerMode && (
-                        <button 
+                    {/* ปุ่มแจ้งงานใหม่ฝั่งลูกค้า: ปิดตามข้อตกลง — ไม่ให้ลูกค้าสร้างงานเอง
+                        (แอดมินเป็นผู้สร้างงานให้). คงโค้ด dialog ไว้เผื่อเปิดใช้ภายหลัง. */}
+                    {false && customerMode && (
+                        <button
                             onClick={() => setIsRequestDialogOpen(true)}
                             className="h-12 px-8 bg-primary hover:bg-primary/90 text-primary-foreground font-black text-sm uppercase tracking-[0.2em] transition-all shadow-sm active:scale-95 border border-primary/30 rounded-xl"
                         >

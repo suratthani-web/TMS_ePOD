@@ -177,9 +177,12 @@ export function CalendarClient({
              <PremiumButton onClick={goToToday} variant="outline" className="border-border hover:border-primary/50 text-muted-foreground h-14 px-8 rounded-2xl">
                 {t('calendar.today')}
              </PremiumButton>
-             <PremiumButton onClick={() => setIsDialogOpen(true)} className="h-14 px-8 rounded-2xl gap-3">
-                <Plus size={20} /> {t('navigation.request_mission')}
-             </PremiumButton>
+             {/* ลูกค้าไม่ให้สร้างงานเอง — ซ่อนปุ่มสำหรับ customer view */}
+             {!isCustomerView && (
+               <PremiumButton onClick={() => setIsDialogOpen(true)} className="h-14 px-8 rounded-2xl gap-3">
+                  <Plus size={20} /> {t('navigation.request_mission')}
+               </PremiumButton>
+             )}
           </div>
         </div>
       </div>
