@@ -439,8 +439,25 @@ export async function pushDriverPaymentToApp(
 
 export async function getMyPayslips(): Promise<Record<string, unknown>[]> {
   const session = await getDriverSession()
-  if (!session?.driverId) return []
   const supabase = createAdminClient()
+  const cols = "id, title, period_label, branch_label, total_amount, source_file, kind, uploaded_at, driver_name, Driver_ID, Sub_ID"
+
+  // เจ้าของสังกัด: ดึงสลิปของคนขับทุกคนในสังกัด + voucher ที่ผูกสังกัดโดยตรง
+  if (session?.subId) {
+    const { data: subDrivers } = await supabase
+      .from("Master_Drivers").select("Driver_ID").eq("Sub_ID", session.subId)
+    const ids = (subDrivers || []).map((d: { Driver_ID: string }) => String(d.Driver_ID)).filter(Boolean)
+    const byDriver = ids.length
+      ? (await supabase.from(TABLE).select(cols).in("Driver_ID", ids).order("uploaded_at", { ascending: false }).limit(500)).data || []
+      : []
+    const bySub = (await supabase.from(TABLE).select(cols).eq("Sub_ID", session.subId).order("uploaded_at", { ascending: false }).limit(500)).data || []
+    const merged = new Map<string, Record<string, unknown>>()
+    for (const r of [...bySub, ...byDriver]) merged.set(String((r as { id: string }).id), r as Record<string, unknown>)
+    return Array.from(merged.values()).sort((a, b) =>
+      String(b.uploaded_at || "").localeCompare(String(a.uploaded_at || "")))
+  }
+
+  if (!session?.driverId) return []
   const { data } = await supabase
     .from(TABLE)
     .select("id, title, period_label, branch_label, total_amount, source_file, kind, uploaded_at")
@@ -462,16 +479,27 @@ export async function getMyPayslip(
   error?: string
 }> {
   const session = await getDriverSession()
-  if (!session?.driverId) return { ok: false, error: "กรุณาเข้าสู่ระบบ" }
+  if (!session?.driverId && !session?.subId) return { ok: false, error: "กรุณาเข้าสู่ระบบ" }
   const supabase = createAdminClient()
   const { data } = await supabase
     .from(TABLE)
-    .select("id, Driver_ID, title, period_label, branch_label, total_amount, kind, grid_json, voucher_json, xlsx_url, uploaded_at, driver_name")
+    .select("id, Driver_ID, Sub_ID, title, period_label, branch_label, total_amount, kind, grid_json, voucher_json, xlsx_url, uploaded_at, driver_name")
     .eq("id", id)
     .single()
-  if (!data || String(data.Driver_ID) !== String(session.driverId)) {
-    return { ok: false, error: "ไม่พบสลิป" }
+  if (!data) return { ok: false, error: "ไม่พบสลิป" }
+
+  // ตรวจสิทธิ์: คนขับ = เจ้าของสลิป; เจ้าของสังกัด = สลิปอยู่ในสังกัดตน
+  let allowed = false
+  if (session?.subId) {
+    allowed = data.Sub_ID === session.subId
+    if (!allowed && data.Driver_ID) {
+      const { data: d } = await supabase.from("Master_Drivers").select("Sub_ID").eq("Driver_ID", data.Driver_ID).maybeSingle()
+      allowed = d?.Sub_ID === session.subId
+    }
+  } else {
+    allowed = String(data.Driver_ID) === String(session.driverId)
   }
+  if (!allowed) return { ok: false, error: "ไม่พบสลิป" }
   return {
     ok: true,
     kind: (data.kind as string) || "excel",

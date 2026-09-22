@@ -10,7 +10,8 @@ export const dynamic = "force-dynamic"
 
 export default async function PayslipsPage() {
   const session = await getDriverSession()
-  if (!session?.driverId) redirect("/mobile/login")
+  if (!session?.driverId && !session?.subId) redirect("/mobile/login")
+  const isSubOwner = !!session?.subId
 
   const slips = await getMyPayslips()
 
@@ -39,8 +40,11 @@ export default async function PayslipsPage() {
                         <Banknote className="text-indigo-600" size={22} />
                       </div>
                       <div className="min-w-0">
-                        <p className="font-semibold text-gray-800 truncate">{String(meta.title || "ใบสรุปจ่ายรถ")}</p>
-                        <p className="text-sm text-gray-400">
+                        <p className="font-semibold text-gray-800 truncate">
+                          {isSubOwner && meta.driver_name ? String(meta.driver_name) : String(meta.title || "ใบสรุปจ่ายรถ")}
+                        </p>
+                        <p className="text-sm text-gray-400 truncate">
+                          {isSubOwner && meta.driver_name ? String(meta.title || "") + " · " : ""}
                           {meta.period_label ? `งวด ${meta.period_label}` : ""}
                           {uploaded ? ` · ${uploaded.toLocaleDateString("th-TH")}` : ""}
                         </p>

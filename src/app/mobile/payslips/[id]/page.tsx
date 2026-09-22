@@ -12,7 +12,7 @@ export default async function PayslipDetailPage({
   params: Promise<{ id: string }>
 }) {
   const session = await getDriverSession()
-  if (!session?.driverId) redirect("/mobile/login")
+  if (!session?.driverId && !session?.subId) redirect("/mobile/login")
 
   const { id } = await params
   const res = await getMyPayslip(id)

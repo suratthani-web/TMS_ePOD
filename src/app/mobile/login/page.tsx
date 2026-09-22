@@ -54,7 +54,8 @@ export default function DriverLoginPage() {
       setError(result?.error === "เบอร์โทรหรือรหัสผ่านไม่ถูกต้อง" ? "เบอร์โทรหรือรหัสผ่านไม่ถูกต้อง" : result.error)
       setLoading(false)
     } else {
-      router.push("/mobile/dashboard")
+      // เจ้าของสังกัดไม่มีงาน/แดชบอร์ด → ส่งไปหน้าใบสรุปจ่ายเลย
+      router.push((result as { role?: string }).role === "sub_owner" ? "/mobile/payslips" : "/mobile/dashboard")
     }
   }
 

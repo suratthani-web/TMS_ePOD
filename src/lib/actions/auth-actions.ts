@@ -90,7 +90,31 @@ export async function loginDriver(formData: FormData) {
     }
   }
 
+  // ถ้าไม่ใช่คนขับ ลองเป็น "เจ้าของสังกัด" — ล็อกอินด้วยรหัสสังกัด (Sub_ID) + รหัสผ่าน
+  // เพื่อดูใบสรุปจ่ายของคนขับทุกคนในสังกัด (ไม่ต้องมี driver id)
   if (!driver) {
+    const { data: sub } = await supabase
+      .from("Master_Subcontractors")
+      .select("Sub_ID, Sub_Name, Branch_ID, Password")
+      .eq("Sub_ID", cleanInput)
+      .maybeSingle()
+    if (sub && sub.Password) {
+      const okSub = await verifyPassword(sub.Password, password) || sub.Password === password
+      if (!okSub) return { error: "รหัสผ่านไม่ถูกต้อง" }
+      const subSession = {
+        driverId: null,
+        subId: sub.Sub_ID,
+        driverName: sub.Sub_Name || sub.Sub_ID,
+        branchId: sub.Branch_ID,
+        role: "sub_owner",
+        permissions: { show_income: true },
+      }
+      const { cookies: cs } = await getCookieStore()
+      cs.set("driver_session", JSON.stringify(subSession), {
+        httpOnly: true, secure: true, maxAge: 30 * 24 * 60 * 60, sameSite: "lax", path: "/", priority: "high",
+      })
+      return { success: true, role: "sub_owner" }
+    }
     return { error: "ไม่พบข้อมูลในระบบ กรุณาตรวจสอบเบอร์โทรหรือ Username" }
   }
 
