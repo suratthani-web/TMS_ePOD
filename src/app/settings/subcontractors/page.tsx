@@ -116,7 +116,10 @@ export default function SubcontractorsPage() {
         try {
             let res;
             if (editingId) {
-                res = await updateSubcontractor(editingId, formData)
+                // ถ้าเว้นช่องรหัสผ่านว่างตอนแก้ไข = ไม่เปลี่ยนรหัสเดิม (ตัดออกจาก payload)
+                const payload = { ...formData }
+                if (!payload.Password) delete payload.Password
+                res = await updateSubcontractor(editingId, payload)
             } else {
                 res = await createSubcontractor(formData)
             }
@@ -475,6 +478,23 @@ export default function SubcontractorsPage() {
                                     />
                                 </div>
                             </div>
+                        </div>
+
+                        {/* เข้าระบบ (เจ้าของสังกัดล็อกอินดูใบสรุปจ่าย) */}
+                        <div className="mt-6 rounded-2xl border-2 border-indigo-500/20 bg-indigo-500/5 p-6 space-y-3">
+                            <Label className="text-base font-bold font-black text-indigo-600 uppercase tracking-[0.1em] ml-1">
+                                รหัสผ่านเข้าระบบ (เจ้าของสังกัด)
+                            </Label>
+                            <Input
+                                type="text"
+                                value={formData.Password || ""}
+                                onChange={e => setFormData({ ...formData, Password: e.target.value })}
+                                placeholder={editingId ? "เว้นว่าง = ไม่เปลี่ยนรหัสเดิม" : "ตั้งรหัสผ่าน เช่น 123456"}
+                                className="h-14 bg-background border-border text-foreground font-black rounded-xl px-6 text-lg"
+                            />
+                            <p className="text-sm text-muted-foreground ml-1">
+                                ล็อกอินที่ <b>/mobile/login</b> ด้วย รหัสเรียก <b>&ldquo;{formData.Sub_ID || "—"}&rdquo;</b> + รหัสผ่านนี้ → เห็นใบสรุปจ่ายของคนขับในสังกัด
+                            </p>
                         </div>
                     </div>
 

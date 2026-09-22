@@ -8,4 +8,6 @@ export interface Subcontractor {
     Active_Status: string;
     Branch_ID?: string;
     Created_At?: string;
+    Password?: string;       // รหัสผ่านให้เจ้าของสังกัดล็อกอินดูใบสรุปจ่าย
+    Line_User_ID?: string;
 }
