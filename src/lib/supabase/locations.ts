@@ -355,6 +355,54 @@ export async function ensureJobLocations(
   }
 }
 
+// จับคู่ "คีย์เวิร์ด" ที่ลูกค้าพิมพ์ → ชื่อสถานที่มาตรฐานในระบบ (Master_Locations).
+// ใช้ตอนลูกค้ากดสร้างงาน: ลูกค้าพิมพ์ปลายทางเอง แล้วระบบ normalize ให้ตรงกับเส้นทางจริง
+// เพื่อให้ได้พิกัด/ระยะทาง/รายงานที่สะอาด. คืน Map ของ input(เดิม) → canonical(ชื่อในระบบ)
+// เฉพาะตัวที่จับคู่ได้; ตัวที่ไม่เจอจะไม่อยู่ใน Map (ให้ผู้เรียกใช้ข้อความเดิม).
+// กติกา: ตรงเป๊ะ (ไม่สนตัวพิมพ์) > ชื่อในระบบมีคำที่พิมพ์เป็นส่วนหนึ่ง > คำที่พิมพ์คลุมชื่อในระบบ.
+export async function resolveLocationKeywords(
+  inputs: (string | null | undefined)[],
+  branchId?: string | null
+): Promise<Record<string, string>> {
+  try {
+    const wanted = inputs.map(s => (s || '').trim()).filter(Boolean)
+    if (wanted.length === 0) return {}
+    const supabase = createAdminClient()
+
+    // ดึงชื่อสถานที่ของสาขานี้ + ที่ไม่ระบุสาขา (global) มาเป็น candidate
+    let q = supabase.from('Master_Locations').select('Name, Branch_ID').not('Name', 'is', null)
+    const { data } = await q
+    const candidates = (data || [])
+      .filter((r: { Name: string | null; Branch_ID: string | null }) =>
+        !branchId || branchId === 'All' || !r.Branch_ID || r.Branch_ID === branchId)
+      .map((r: { Name: string | null }) => (r.Name || '').trim())
+      .filter(Boolean)
+
+    const norm = (s: string) => s.toLowerCase().replace(/\s+/g, ' ').trim()
+    const byNorm = new Map<string, string>()
+    for (const c of candidates) { const n = norm(c); if (!byNorm.has(n)) byNorm.set(n, c) }
+
+    const out: Record<string, string> = {}
+    for (const input of wanted) {
+      const ni = norm(input)
+      // 1) ตรงเป๊ะ
+      if (byNorm.has(ni)) { out[input] = byNorm.get(ni)!; continue }
+      // 2/3) จับคู่บางส่วน — เลือกชื่อในระบบที่ยาวสุด (เฉพาะเจาะจงสุด)
+      let best: string | null = null
+      for (const c of candidates) {
+        const nc = norm(c)
+        if (nc.includes(ni) || ni.includes(nc)) {
+          if (!best || c.length > best.length) best = c
+        }
+      }
+      if (best) out[input] = best
+    }
+    return out
+  } catch {
+    return {}
+  }
+}
+
 // รายชื่อสถานที่ไม่ซ้ำ (สำหรับ autocomplete)
 export async function getUniqueLocationNames() {
   try {

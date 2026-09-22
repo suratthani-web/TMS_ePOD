@@ -4,14 +4,27 @@ import { useState, useEffect } from "react"
 import { DashboardLayout } from "@/components/layout/dashboard-layout"
 import { usePresence } from "@/components/providers/presence-provider"
 import { PremiumCard } from "@/components/ui/premium-card"
-import { Activity, Shield, Users, Clock, MapPin, Globe } from "lucide-react"
+import { Activity, Shield, Users, Clock, MapPin, Globe, History } from "lucide-react"
 import { useLanguage } from "@/components/providers/language-provider"
 import { cn } from "@/lib/utils"
+import { getCustomerLoginHistory } from "@/lib/supabase/logs"
+
+type CustomerLogin = { username: string; name: string; branch: string | null; loginAt: string; ip: string | null }
 
 export default function UserMonitorPage() {
     const { onlineUsers, user } = usePresence()
     const { t } = useLanguage()
     const [currentTime, setCurrentTime] = useState(new Date())
+    const [customerLogins, setCustomerLogins] = useState<CustomerLogin[]>([])
+
+    // ประวัติการเข้าใช้งานลูกค้า (จาก log จริง) — เชื่อถือได้ ไม่หายเมื่อปิดแท็บ
+    useEffect(() => {
+        let active = true
+        const load = () => getCustomerLoginHistory(50).then(rows => { if (active) setCustomerLogins(rows) }).catch(() => {})
+        load()
+        const id = setInterval(load, 30000)
+        return () => { active = false; clearInterval(id) }
+    }, [])
 
     const isSuper = user?.Role === 'Super Admin'
     const userBranch = user?.Branch_ID
@@ -158,6 +171,78 @@ export default function UserMonitorPage() {
                                         </td>
                                     </tr>
                                 ))
+                            )}
+                        </tbody>
+                    </table>
+                </div>
+            </PremiumCard>
+
+            {/* ประวัติการเข้าใช้งานลูกค้า (จาก System_Logs — ย้อนหลังได้) */}
+            <PremiumCard className="bg-background/40 border border-border/5 shadow-xl rounded-3xl overflow-hidden">
+                <div className="p-6 border-b border-border/5 bg-black/40 flex items-center gap-4">
+                    <History size={20} className="text-indigo-400" />
+                    <h2 className="text-lg font-black text-foreground tracking-normal uppercase italic">CUSTOMER_ACCESS_HISTORY</h2>
+                    <span className="text-[10px] font-black text-muted-foreground uppercase tracking-widest">ประวัติการเข้าใช้งานลูกค้า</span>
+                </div>
+
+                <div className="relative w-full overflow-auto custom-scrollbar">
+                    <table className="w-full text-sm text-left border-collapse">
+                        <thead>
+                            <tr className="bg-black/20 text-[10px] font-black uppercase tracking-widest text-muted-foreground border-b border-border/5 italic">
+                                <th className="px-8 py-4">ลูกค้า</th>
+                                <th className="px-6 py-4">สาขา</th>
+                                <th className="px-6 py-4">เข้าใช้งานล่าสุด</th>
+                                <th className="px-6 py-4">IP</th>
+                                <th className="px-8 py-4 text-right">สถานะ</th>
+                            </tr>
+                        </thead>
+                        <tbody className="divide-y divide-white/[0.02]">
+                            {customerLogins.length === 0 ? (
+                                <tr><td colSpan={5} className="text-center py-16 opacity-30 italic font-black text-foreground">ยังไม่มีประวัติการเข้าใช้งานของลูกค้า</td></tr>
+                            ) : (
+                                customerLogins.map((c, idx) => {
+                                    const recent = (Date.now() - new Date(c.loginAt).getTime()) < 15 * 60 * 1000
+                                    return (
+                                        <tr key={idx} className="group/row hover:bg-indigo-500/5 transition-all duration-300">
+                                            <td className="px-8 py-5">
+                                                <div className="flex items-center gap-4">
+                                                    <div className="w-10 h-10 rounded-full bg-gradient-to-br from-indigo-500/20 to-indigo-500/5 border border-indigo-500/20 flex items-center justify-center text-indigo-400 font-black">
+                                                        {(c.name || c.username || '?').charAt(0).toUpperCase()}
+                                                    </div>
+                                                    <div>
+                                                        <div className="font-black text-foreground uppercase italic leading-none">{c.name}</div>
+                                                        <div className="text-[10px] font-black text-muted-foreground uppercase tracking-tighter mt-1">@{c.username}</div>
+                                                    </div>
+                                                </div>
+                                            </td>
+                                            <td className="px-6 py-4">
+                                                <div className="flex items-center gap-2 text-muted-foreground font-black uppercase text-xs">
+                                                    <MapPin size={12} className="text-indigo-400" />
+                                                    {c.branch || 'GLOBAL'}
+                                                </div>
+                                            </td>
+                                            <td className="px-6 py-4">
+                                                <div className="flex items-center gap-2 text-muted-foreground font-black text-xs">
+                                                    <Clock size={12} />
+                                                    {new Date(c.loginAt).toLocaleString('th-TH', { dateStyle: 'medium', timeStyle: 'short' })}
+                                                </div>
+                                            </td>
+                                            <td className="px-6 py-4">
+                                                <span className="text-[10px] font-mono text-muted-foreground">{c.ip || '-'}</span>
+                                            </td>
+                                            <td className="px-8 py-4 text-right">
+                                                {recent ? (
+                                                    <div className="inline-flex items-center gap-2 px-3 py-1 bg-emerald-500/10 text-emerald-400 rounded-full border border-emerald-500/20 text-[9px] font-black uppercase italic">
+                                                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                                                        เพิ่งเข้าใช้งาน
+                                                    </div>
+                                                ) : (
+                                                    <span className="text-[9px] font-black text-muted-foreground uppercase italic opacity-60">เข้าใช้งานแล้ว</span>
+                                                )}
+                                            </td>
+                                        </tr>
+                                    )
+                                })
                             )}
                         </tbody>
                     </table>

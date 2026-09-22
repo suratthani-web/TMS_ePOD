@@ -2,7 +2,6 @@
 
 import { useState, useEffect } from "react"
 import { useLanguage } from "@/components/providers/language-provider"
-import { LocationAutocomplete } from "@/components/location-autocomplete"
 import { todayTH } from "@/lib/utils/date-th"
 import { Calendar, MapPin, Package, StickyNote, Send, CheckCircle2, Plus, Trash2, Truck } from "lucide-react"
 import { motion, AnimatePresence } from "framer-motion"
@@ -46,19 +45,19 @@ export function RequestShipmentDialog({ open, onOpenChange }: RequestShipmentDia
         Notes: "",
     })
     const [stops, setStops] = useState<Stop[]>([emptyStop()])
-    // จุดรับ/จุดส่งที่ลูกค้าเคยใช้ (ดรอปดาวน์) — โหลดตอนเปิดฟอร์ม + prefill จุดรับล่าสุด
-    const [originOptions, setOriginOptions] = useState<string[]>([])
-    const [destOptions, setDestOptions] = useState<string[]>([])
+    // จุดรับที่ลูกค้าใช้บ่อยสุด "อันเดียว" — prefill ให้ ถ้าต้องรับที่อื่นพิมพ์ทับได้
+    // (ไม่โชว์เป็นดรอปดาวน์รายการ เพื่อตัดปัญหาเห็นข้อมูลลูกค้าอื่น)
+    const [topOrigin, setTopOrigin] = useState<string | null>(null)
 
     useEffect(() => {
         if (!open) return
         let active = true
-        getCustomerOriginSuggestions().then(({ suggestions, lastUsed, destSuggestions }) => {
+        getCustomerOriginSuggestions().then(({ lastUsed, suggestions }) => {
             if (!active) return
-            setOriginOptions(suggestions)
-            setDestOptions(destSuggestions)
-            // ถ้ายังไม่ได้เลือกจุดรับ และมีจุดล่าสุด → เติมให้อัตโนมัติ (แก้ได้)
-            setHeader(p => p.Origin_Location ? p : (lastUsed ? { ...p, Origin_Location: lastUsed } : p))
+            const best = suggestions[0] || lastUsed || null
+            setTopOrigin(best)
+            // ถ้ายังไม่ได้กรอกจุดรับ → เติมจุดที่ใช้บ่อยสุดให้ (แก้ได้)
+            setHeader(p => p.Origin_Location ? p : (best ? { ...p, Origin_Location: best } : p))
         }).catch(() => {})
         return () => { active = false }
     }, [open])
@@ -165,13 +164,22 @@ export function RequestShipmentDialog({ open, onOpenChange }: RequestShipmentDia
                                     <Label className="text-sm font-black uppercase tracking-widest text-muted-foreground flex items-center gap-2">
                                         <MapPin size={14} className="text-emerald-500" /> {t('shipment.origin')}
                                     </Label>
-                                    <LocationAutocomplete
-                                        value={header.Origin_Location}
-                                        onChange={(val) => setHeader(p => ({ ...p, Origin_Location: val }))}
-                                        locations={originOptions}
+                                    <Input
                                         placeholder={t('shipment.placeholder_origin')}
+                                        required
+                                        value={header.Origin_Location}
+                                        onChange={(e) => setHeader(p => ({ ...p, Origin_Location: e.target.value }))}
                                         className={fieldCls}
                                     />
+                                    {topOrigin && header.Origin_Location !== topOrigin && (
+                                        <button
+                                            type="button"
+                                            onClick={() => setHeader(p => ({ ...p, Origin_Location: topOrigin }))}
+                                            className="text-[11px] font-black text-emerald-600 hover:underline ml-1"
+                                        >
+                                            {th ? `ใช้จุดรับประจำ: ${topOrigin}` : `Use usual pickup: ${topOrigin}`}
+                                        </button>
+                                    )}
                                 </div>
                             </div>
 
@@ -212,11 +220,10 @@ export function RequestShipmentDialog({ open, onOpenChange }: RequestShipmentDia
                                             )}
                                         </div>
                                         <div className="grid grid-cols-1 sm:grid-cols-[1fr_auto] gap-3">
-                                            <LocationAutocomplete
-                                                placeholder={t('shipment.placeholder_destination')}
+                                            <Input
+                                                placeholder={th ? "พิมพ์ชื่อปลายทาง (ระบบจะจับคู่เส้นทางให้ตอนสร้าง)" : t('shipment.placeholder_destination')}
                                                 value={stop.Dest_Location}
-                                                onChange={(val) => updateStop(idx, { Dest_Location: val })}
-                                                locations={destOptions}
+                                                onChange={(e) => updateStop(idx, { Dest_Location: e.target.value })}
                                                 className={fieldCls}
                                             />
                                             <div className="flex items-center gap-2 bg-muted/50 rounded-2xl border border-border/10 px-3 h-12 shrink-0">

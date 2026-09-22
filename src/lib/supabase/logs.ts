@@ -102,6 +102,60 @@ export async function logActivity(options: LogOptions) {
 }
 
 /**
+ * ประวัติการเข้าใช้งานของลูกค้า (Role = Customer) จาก System_Logs (event LOGIN).
+ * ใช้บนหน้าติดตามผู้ใช้งานสด เพื่อให้แอดมินเห็น "ใครเข้ามาเมื่อไหร่" แบบย้อนหลังได้
+ * (ต่างจาก presence สดที่หายเมื่อปิดแท็บ). Super Admin เห็นทุกสาขา, อื่น ๆ เฉพาะสาขาตัวเอง.
+ */
+export async function getCustomerLoginHistory(limit = 50) {
+  try {
+    const { isSuperAdmin, getUserBranchId } = await import("@/lib/permissions")
+    const supabase = createAdminClient()
+    const isSuper = await isSuperAdmin()
+    const branchId = await getUserBranchId()
+
+    let query = supabase
+      .from("System_Logs")
+      .select("username, role, branch_id, action_type, details, created_at")
+      .eq("module", "Auth")
+      .eq("action_type", "LOGIN")
+      .ilike("role", "customer")
+      .order("created_at", { ascending: false })
+      .limit(limit)
+
+    if (!isSuper) {
+      if (branchId && branchId !== "All") query = query.eq("branch_id", branchId)
+      else return []
+    }
+
+    const { data, error } = await query
+    if (error) return []
+
+    // เติมชื่อจริงของลูกค้าจาก Master_Users (log เก็บแค่ username)
+    const usernames = Array.from(new Set((data || []).map(r => r.username).filter(Boolean)))
+    const nameMap = new Map<string, string>()
+    if (usernames.length > 0) {
+      const { data: users } = await supabase
+        .from("Master_Users")
+        .select("Username, Name")
+        .in("Username", usernames as string[])
+      ;(users || []).forEach((u: { Username: string; Name: string | null }) => {
+        if (u.Username) nameMap.set(u.Username, u.Name || u.Username)
+      })
+    }
+
+    return (data || []).map(r => ({
+      username: r.username as string,
+      name: nameMap.get(r.username as string) || (r.username as string),
+      branch: (r.branch_id as string) || null,
+      loginAt: r.created_at as string,
+      ip: (r.details as { ip_address?: string } | null)?.ip_address || null,
+    }))
+  } catch {
+    return []
+  }
+}
+
+/**
  * Retrieves logs with filtering
  */
 export async function getSystemLogs(filters: {

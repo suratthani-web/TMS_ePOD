@@ -1490,17 +1490,23 @@ export async function requestShipment(data: {
 
   const userBranchId = await getUserBranchId()
   const jobId = `REQ-${Date.now().toString().slice(-6)}-${Math.floor(Math.random() * 1000)}`
+  const reqBranch = customer?.Branch_ID || userBranchId || 'HQ'
+
+  // map คีย์เวิร์ดที่ลูกค้าพิมพ์ → สถานที่มาตรฐานในระบบ (ถ้าจับคู่ได้)
+  const { resolveLocationKeywords } = await import('@/lib/supabase/locations')
+  const keywordMap = await resolveLocationKeywords([data.Origin_Location, data.Dest_Location], reqBranch)
+  const canon = (name: string) => keywordMap[(name || '').trim()] || (name || '').trim()
 
   // Build a complete payload to satisfy DB constraints
   const payload = {
     Job_ID: jobId,
     Customer_ID: customerId,
     Customer_Name: customer?.Customer_Name || userId || 'Unknown Customer',
-    Branch_ID: customer?.Branch_ID || userBranchId || 'HQ',
+    Branch_ID: reqBranch,
     Plan_Date: data.Plan_Date,
     Delivery_Date: data.Plan_Date, // Default delivery to plan date for requests
-    Origin_Location: data.Origin_Location,
-    Dest_Location: data.Dest_Location,
+    Origin_Location: canon(data.Origin_Location),
+    Dest_Location: canon(data.Dest_Location),
     Cargo_Type: data.Cargo_Type,
     Notes: data.Notes,
     Job_Status: 'Requested',
@@ -1598,6 +1604,16 @@ export async function requestShipmentBatch(data: {
   const branch = customer?.Branch_ID || userBranchId || 'HQ'
   const custName = customer?.Customer_Name || userId || 'Unknown Customer'
 
+  // ลูกค้าพิมพ์ต้นทาง/ปลายทางเอง → map คีย์เวิร์ดกับสถานที่มาตรฐานในระบบ (ถ้าจับคู่ได้)
+  // เพื่อให้เส้นทาง/พิกัดสะอาด ตัวที่ไม่เจอคงข้อความเดิมไว้ (ensureJobLocations สร้างให้ทีหลัง)
+  const { resolveLocationKeywords } = await import('@/lib/supabase/locations')
+  const keywordMap = await resolveLocationKeywords(
+    [data.Origin_Location, ...validStops.map(s => s.Dest_Location)],
+    branch
+  )
+  const canon = (name: string) => keywordMap[(name || '').trim()] || (name || '').trim()
+  const canonOrigin = canon(data.Origin_Location)
+
   const nowIso = new Date().toISOString()
   const rows: Record<string, unknown>[] = []
   let seq = 0
@@ -1613,8 +1629,8 @@ export async function requestShipmentBatch(data: {
         Branch_ID: branch,
         Plan_Date: data.Plan_Date,
         Delivery_Date: data.Plan_Date,
-        Origin_Location: data.Origin_Location,
-        Dest_Location: stop.Dest_Location.trim(),
+        Origin_Location: canonOrigin,
+        Dest_Location: canon(stop.Dest_Location),
         Cargo_Type: stop.Cargo_Type || data.Cargo_Type || '',
         Notes: stop.Notes || data.Notes || '',
         Job_Status: 'Requested',
