@@ -15,6 +15,7 @@ import { ImportDriversDialog } from "./import-drivers-dialog"
 import { Pagination } from "@/components/ui/pagination"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { useLanguage } from "@/components/providers/language-provider"
+import { cn } from "@/lib/utils"
 
 type DriversContentProps = {
   drivers: Driver[]
@@ -45,7 +46,13 @@ export function DriversContent({
   const searchParams = useSearchParams()
 
   const [deletingId, setDeletingId] = useState<string | null>(null)
-  const [searchQuery, setSearchQuery] = useState(searchParams.get("query") || searchParams.get("q") || "")
+  const targetDriverId = searchParams.get("driverId") || searchParams.get("id") || ""
+  const urlQuery = searchParams.get("query") || searchParams.get("q") || searchParams.get("search") || (targetDriverId && !searchParams.get("query") ? targetDriverId : "")
+  const [searchQuery, setSearchQuery] = useState(urlQuery)
+
+  useEffect(() => {
+    setSearchQuery(urlQuery)
+  }, [urlQuery])
 
   // NOTE: `searchParams` is intentionally NOT in the dependency array — it changes
   // reference on every render, which let unrelated re-renders clear this debounce
@@ -54,15 +61,19 @@ export function DriversContent({
   useEffect(() => {
     const timer = setTimeout(() => {
       const params = new URLSearchParams(window.location.search)
-      const currentQuery = params.get("query") || params.get("q") || ""
+      const currentQuery = params.get("query") || params.get("q") || params.get("search") || ""
       if (currentQuery === searchQuery) return
 
       if (searchQuery.trim()) {
         params.set("query", searchQuery.trim())
-        params.set("q", searchQuery.trim())
+        params.delete("q")
+        params.delete("search")
       } else {
         params.delete("query")
         params.delete("q")
+        params.delete("search")
+        params.delete("driverId")
+        params.delete("id")
       }
       params.set("page", "1")
       router.push(`${pathname}?${params.toString()}`)
@@ -70,6 +81,18 @@ export function DriversContent({
 
     return () => clearTimeout(timer)
   }, [searchQuery, router, pathname])
+
+  useEffect(() => {
+    if (targetDriverId) {
+      const timer = setTimeout(() => {
+        const el = document.getElementById(`driver-${targetDriverId}`)
+        if (el) {
+          el.scrollIntoView({ behavior: "smooth", block: "center" })
+        }
+      }, 300)
+      return () => clearTimeout(timer)
+    }
+  }, [targetDriverId])
 
   const filteredDrivers = (drivers || []).filter(driver => {
     if (!searchQuery.trim()) return true
@@ -221,81 +244,113 @@ export function DriversContent({
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {filteredDrivers.map((driver) => (
-          <div key={driver.Driver_ID} className="group bg-card border border-border rounded-xl hover:shadow-md transition-all duration-200 overflow-hidden">
-            <div className="p-5 space-y-4">
-              <div className="flex justify-between items-start">
-                <div className="flex items-center gap-3">
-                  <div className="relative">
-                    <Avatar className="h-10 w-10 border border-border shadow-sm">
-                      <AvatarImage src={`https://api.dicebear.com/7.x/avataaars/svg?seed=${driver.Driver_Name}`} />
-                      <AvatarFallback className="bg-muted text-foreground font-bold text-xs">{driver.Driver_Name?.charAt(0)}</AvatarFallback>
-                    </Avatar>
-                    <div className="absolute -bottom-0.5 -right-0.5 w-3 h-3 bg-emerald-500 border-2 border-card rounded-full" />
-                  </div>
-                  <div>
-                    <h3 className="text-sm font-semibold text-foreground group-hover:text-primary transition-colors line-clamp-1">{driver.Driver_Name || t('common.loading')}</h3>
-                    <div className="flex items-center gap-1.5 mt-0.5">
-                        <span className="text-[10px] text-muted-foreground">ID: {driver.Driver_ID}</span>
-                        <div className="w-1 h-1 rounded-full bg-border" />
-                        <span className="text-[10px] text-primary font-medium">{driver.Sub_ID ? (subcontractors.find(s => s.Sub_ID === driver.Sub_ID)?.Sub_Name || "Subcontractor") : "Staff"}</span>
+          {filteredDrivers.map((driver) => {
+            const isTarget = Boolean(targetDriverId && driver.Driver_ID === targetDriverId)
+            const expDate = driver.Expire_Date ? new Date(driver.Expire_Date) : null
+            const isExpired = expDate ? !isNaN(expDate.getTime()) && expDate.getTime() < Date.now() : false
+            const isNearExpiry = expDate ? !isNaN(expDate.getTime()) && !isExpired && (expDate.getTime() - Date.now() <= 30 * 24 * 60 * 60 * 1000) : false
+
+            return (
+            <div 
+              key={driver.Driver_ID} 
+              id={`driver-${driver.Driver_ID}`}
+              className={cn(
+                "group bg-card border rounded-xl hover:shadow-md transition-all duration-300 overflow-hidden",
+                isTarget 
+                  ? "ring-2 ring-primary border-primary shadow-lg bg-primary/[0.04]" 
+                  : "border-border"
+              )}
+            >
+              <div className="p-5 space-y-4">
+                <div className="flex justify-between items-start">
+                  <div className="flex items-center gap-3">
+                    <div className="relative">
+                      <Avatar className={cn("h-10 w-10 border shadow-sm", isTarget ? "border-primary" : "border-border")}>
+                        <AvatarImage src={`https://api.dicebear.com/7.x/avataaars/svg?seed=${driver.Driver_Name}`} />
+                        <AvatarFallback className="bg-muted text-foreground font-bold text-xs">{driver.Driver_Name?.charAt(0)}</AvatarFallback>
+                      </Avatar>
+                      <div className="absolute -bottom-0.5 -right-0.5 w-3 h-3 bg-emerald-500 border-2 border-card rounded-full" />
+                    </div>
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <h3 className="text-sm font-semibold text-foreground group-hover:text-primary transition-colors line-clamp-1">{driver.Driver_Name || t('common.loading')}</h3>
+                        {isTarget && (
+                          <Badge className="bg-primary text-primary-foreground text-[9px] font-black px-1.5 py-0 h-4">
+                            เป้าหมาย
+                          </Badge>
+                        )}
+                      </div>
+                      <div className="flex items-center gap-1.5 mt-0.5">
+                          <span className="text-[10px] text-muted-foreground">ID: {driver.Driver_ID}</span>
+                          <div className="w-1 h-1 rounded-full bg-border" />
+                          <span className="text-[10px] text-primary font-medium">{driver.Sub_ID ? (subcontractors.find(s => s.Sub_ID === driver.Sub_ID)?.Sub_Name || "Subcontractor") : "Staff"}</span>
+                      </div>
                     </div>
                   </div>
-                </div>
-                <div className="flex gap-1">
-                    <DriverDialog 
-                        mode="edit"
-                        driver={driver}
-                        vehicles={vehicles}
-                        branches={branches}
-                        subcontractors={subcontractors}
-                        trigger={
-                            <button className="p-2 rounded-lg hover:bg-muted text-muted-foreground hover:text-foreground transition-all">
-                                <Edit size={14} />
-                            </button>
-                        }
-                    />
-                    <button 
-                        onClick={() => handleDelete(driver.Driver_ID, driver.Driver_Name || '')}
-                        disabled={deletingId === driver.Driver_ID}
-                        className="p-2 rounded-lg hover:bg-red-500/10 text-muted-foreground hover:text-red-600 transition-all disabled:opacity-50"
-                    >
-                        <Trash2 size={14} />
-                    </button>
-                </div>
-              </div>
-
-              <div className="grid grid-cols-2 gap-3">
-                  <div className="p-3 bg-muted/20 rounded-lg border border-border/5">
-                      <p className="text-[10px] font-medium text-muted-foreground mb-1">{t('navigation.vehicles') || "ยานพาหนะ"}</p>
-                      <div className="flex items-center gap-2">
-                        <Truck size={12} className="text-primary" />
-                        <span className="text-xs font-semibold text-foreground">{driver.Vehicle_Plate || t('common.pending') || "รอดำเนินการ"}</span>
-                      </div>
+                  <div className="flex gap-1">
+                      <DriverDialog 
+                          mode="edit"
+                          driver={driver}
+                          vehicles={vehicles}
+                          branches={branches}
+                          subcontractors={subcontractors}
+                          trigger={
+                              <button className="p-2 rounded-lg hover:bg-muted text-muted-foreground hover:text-foreground transition-all">
+                                  <Edit size={14} />
+                              </button>
+                          }
+                      />
+                      <button 
+                          onClick={() => handleDelete(driver.Driver_ID, driver.Driver_Name || '')}
+                          disabled={deletingId === driver.Driver_ID}
+                          className="p-2 rounded-lg hover:bg-red-500/10 text-muted-foreground hover:text-red-600 transition-all disabled:opacity-50"
+                      >
+                          <Trash2 size={14} />
+                      </button>
                   </div>
-                  <div className="p-3 bg-muted/20 rounded-lg border border-border/5">
-                      <p className="text-[10px] font-medium text-muted-foreground mb-1">{t('drivers.phone') || "เบอร์โทรศัพท์"}</p>
-                      <div className="flex items-center gap-2">
-                        <Phone size={12} className="text-primary" />
-                        <span className="text-xs font-semibold text-foreground">{driver.Mobile_No || "-"}</span>
-                      </div>
-                  </div>
-              </div>
-
-              <div className="flex items-center justify-between border-t border-border pt-3.5">
-                <div className="flex items-center gap-2">
-                    <span className="text-[10px] text-muted-foreground">{t('drivers.expiry') || "บัตรหมดอายุ"}:</span>
-                    <span className="text-[10px] font-medium text-foreground">{driver.Expire_Date ? new Date(driver.Expire_Date).toLocaleDateString() : "-"}</span>
                 </div>
-                {driver.Branch_ID && (
-                  <Badge variant="outline" className="text-[9px] font-medium px-2 py-0">
-                    {branches.find(b => b.Branch_ID === driver.Branch_ID)?.Branch_Name || driver.Branch_ID}
-                  </Badge>
-                )}
+
+                <div className="grid grid-cols-2 gap-3">
+                    <div className="p-3 bg-muted/20 rounded-lg border border-border/5">
+                        <p className="text-[10px] font-medium text-muted-foreground mb-1">{t('navigation.vehicles') || "ยานพาหนะ"}</p>
+                        <div className="flex items-center gap-2">
+                          <Truck size={12} className="text-primary" />
+                          <span className="text-xs font-semibold text-foreground">{driver.Vehicle_Plate || t('common.pending') || "รอดำเนินการ"}</span>
+                        </div>
+                    </div>
+                    <div className="p-3 bg-muted/20 rounded-lg border border-border/5">
+                        <p className="text-[10px] font-medium text-muted-foreground mb-1">{t('drivers.phone') || "เบอร์โทรศัพท์"}</p>
+                        <div className="flex items-center gap-2">
+                          <Phone size={12} className="text-primary" />
+                          <span className="text-xs font-semibold text-foreground">{driver.Mobile_No || "-"}</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div className="flex items-center justify-between border-t border-border pt-3.5">
+                  <div className="flex items-center gap-2">
+                      <span className="text-[10px] text-muted-foreground">{t('drivers.expiry') || "บัตรหมดอายุ"}:</span>
+                      <span className={cn(
+                        "text-[10px] font-semibold",
+                        isExpired ? "text-rose-600 dark:text-rose-400" :
+                        isNearExpiry ? "text-amber-600 dark:text-amber-400" :
+                        "text-foreground"
+                      )}>
+                        {expDate && !isNaN(expDate.getTime()) ? expDate.toLocaleDateString('th-TH') : "-"}
+                        {isExpired && " (หมดอายุแล้ว)"}
+                        {isNearExpiry && " (ใกล้หมดอายุ)"}
+                      </span>
+                  </div>
+                  {driver.Branch_ID && (
+                    <Badge variant="outline" className="text-[9px] font-medium px-2 py-0">
+                      {branches.find(b => b.Branch_ID === driver.Branch_ID)?.Branch_Name || driver.Branch_ID}
+                    </Badge>
+                  )}
+                </div>
               </div>
             </div>
-          </div>
-          ))}
+            )
+          })}
         </div>
       )}
       

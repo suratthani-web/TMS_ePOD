@@ -249,34 +249,36 @@ export function NotificationsClient({ alerts = [] }: { alerts: AdminAlert[] }) {
                     const style = SEVERITY_STYLES[alert.severity as keyof typeof SEVERITY_STYLES] || SEVERITY_STYLES.info
                     return (
                       <div key={alert.id} className={cn(
-                         "p-6 flex items-start gap-8 hover:bg-muted/20 transition-all group/item border-l-4 border-transparent",
+                         "p-6 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 sm:gap-8 hover:bg-muted/20 transition-all group/item border-l-4 border-transparent",
                          alert.severity === 'critical' ? 'hover:border-rose-500' : 'hover:border-primary'
                       )}>
-                        <div className={cn("w-2 h-2 rounded-full mt-2.5 flex-shrink-0", style.dot)} />
-                        
-                        <div className="flex-1 space-y-2">
-                           <div className="flex flex-wrap items-center gap-3">
-                            <span className="text-base font-black text-foreground tracking-tight uppercase group-hover/item:text-primary transition-colors">{alert.title}</span>
-                            <div className={cn("px-2.5 py-0.5 rounded-lg text-[10px] font-black uppercase tracking-widest border", style.bg, style.text)}>
-                              {t(style.labelKey)}
+                        <div className="flex items-start gap-4 sm:gap-8 flex-1">
+                          <div className={cn("w-2 h-2 rounded-full mt-2.5 flex-shrink-0", style.dot)} />
+                          
+                          <div className="flex-1 space-y-2">
+                             <div className="flex flex-wrap items-center gap-3">
+                              <span className="text-base font-black text-foreground tracking-tight uppercase group-hover/item:text-primary transition-colors">{alert.title}</span>
+                              <div className={cn("px-2.5 py-0.5 rounded-lg text-[10px] font-black uppercase tracking-widest border", style.bg, style.text)}>
+                                {t(style.labelKey)}
+                              </div>
                             </div>
+                            
+                            <p className="text-sm font-bold text-muted-foreground leading-relaxed uppercase tracking-tight">{alert.description}</p>
+                            
+                            {alert.meta?.plate && (
+                              <div className="flex items-center gap-2 pt-1">
+                                 <div className="p-1.5 bg-muted rounded-lg border border-border text-muted-foreground">
+                                    <Truck size={12} />
+                                 </div>
+                                 <span className="text-[10px] font-black text-foreground uppercase tracking-widest bg-muted px-2.5 py-1 rounded-lg border border-border">{t('vehicles.plate')}: {alert.meta.plate}</span>
+                              </div>
+                            )}
                           </div>
-                          
-                          <p className="text-sm font-bold text-muted-foreground leading-relaxed uppercase tracking-tight">{alert.description}</p>
-                          
-                          {alert.meta?.plate && (
-                            <div className="flex items-center gap-2 pt-1">
-                               <div className="p-1.5 bg-muted rounded-lg border border-border text-muted-foreground">
-                                  <Truck size={12} />
-                               </div>
-                               <span className="text-[10px] font-black text-foreground uppercase tracking-widest bg-muted px-2.5 py-1 rounded-lg border border-border">{t('vehicles.plate')}: {alert.meta.plate}</span>
-                            </div>
-                          )}
                         </div>
 
-                        <div className="hidden lg:block">
-                           <Link href={alert.href || '#'}>
-                              <PremiumButton variant="secondary" className="bg-muted border-border hover:bg-muted/80 text-foreground font-black uppercase tracking-widest text-[10px] h-10 px-6 rounded-xl">
+                        <div className="flex-shrink-0 w-full sm:w-auto flex justify-end">
+                           <Link href={alert.href || '#'} className="w-full sm:w-auto">
+                              <PremiumButton variant="secondary" className="w-full sm:w-auto bg-muted border-border hover:bg-muted/80 text-foreground font-black uppercase tracking-widest text-[10px] h-10 px-5 sm:px-6 rounded-xl">
                                   {t('common.view_details')}
                               </PremiumButton>
                            </Link>

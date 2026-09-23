@@ -323,7 +323,7 @@ type SystemLog = { id: string | number, module: string, action_type?: string, de
             message: `${v.Vehicle_Plate} — ${label} (${expiryMsg(n)})`,
             timestamp: now.toISOString(),
             read: false,
-            href: '/vehicles',
+            href: `/vehicles?search=${encodeURIComponent(String(v.Vehicle_Plate || ''))}`,
             severity: n < 0 ? 'critical' : 'warning',
           })
         }
@@ -348,7 +348,7 @@ type SystemLog = { id: string | number, module: string, action_type?: string, de
               message: `${v.Vehicle_Plate} — ${label} ${over ? `เกิน ${diff} กม.` : `อีก ${diff} กม.`} (ไมล์ ${cur.toLocaleString()}/${target.toLocaleString()})`,
               timestamp: now.toISOString(),
               read: false,
-              href: '/vehicles',
+              href: `/vehicles?search=${encodeURIComponent(String(v.Vehicle_Plate || ''))}`,
               severity: over ? 'critical' : 'warning',
             })
           }
@@ -358,7 +358,7 @@ type SystemLog = { id: string | number, module: string, action_type?: string, de
 
     // คนขับ: ใบขับขี่
     let dQ = supabase.from('Master_Drivers')
-      .select('Driver_Name, Expire_Date, Active_Status, Branch_ID')
+      .select('Driver_ID, Driver_Name, Expire_Date, Active_Status, Branch_ID')
     if (isAdmin && selectedBranch && selectedBranch !== 'All') dQ = dQ.eq('Branch_ID', selectedBranch)
     else if (branchId && branchId !== 'All') dQ = dQ.eq('Branch_ID', branchId)
     const { data: driversExp } = await dQ
@@ -366,14 +366,17 @@ type SystemLog = { id: string | number, module: string, action_type?: string, de
       if (d.Active_Status && d.Active_Status !== 'Active') return
       const n = dLeft(d.Expire_Date as string)
       if (n !== null && n <= WARN_DAYS) {
+        const dId = String(d.Driver_ID || '')
+        const dName = String(d.Driver_Name || dId || '')
+        const queryTerm = (dName || dId).trim()
         notifications.push({
-          id: `exp-lic-${d.Driver_Name}`,
+          id: `exp-lic-${dId || dName}`,
           type: 'maintenance',
           title: `${n < 0 ? '🚨' : '⚠️'} ใบขับขี่${n < 0 ? 'หมดอายุ' : 'ใกล้หมดอายุ'}`,
-          message: `${d.Driver_Name || 'ไม่ทราบชื่อ'} — ใบขับขี่ (${expiryMsg(n)})`,
+          message: `${dName || 'ไม่ทราบชื่อ'} — ใบขับขี่ (${expiryMsg(n)})`,
           timestamp: now.toISOString(),
           read: false,
-          href: '/drivers',
+          href: `/drivers?query=${encodeURIComponent(queryTerm)}&driverId=${encodeURIComponent(dId)}`,
           severity: n < 0 ? 'critical' : 'warning',
         })
       }

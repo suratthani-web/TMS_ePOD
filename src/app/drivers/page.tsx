@@ -21,7 +21,7 @@ export default async function DriversPage(props: Props) {
   const branches: Branch[] = branchesData || []
 
   const page = Number(searchParams.page) || 1
-  const query = (searchParams.query as string) || ''
+  const query = (searchParams.query as string) || (searchParams.q as string) || (searchParams.search as string) || (searchParams.driverId as string) || ''
   
   // Fetch drivers with pagination and search
   const { data: drivers, count } = await getAllDrivers(page, 12, query, searchParams.branchId as string)

@@ -256,7 +256,7 @@ export async function checkComplianceAndMaintenance(): Promise<SentinelAlert[]> 
         message: `คนขับ ${d.Driver_Name} (${d.Driver_ID}) ใบขับขี่จะหมดอายุในวันที่ ${d.Expire_Date}`,
         targetId: d.Driver_ID,
         branchId: d.Branch_ID,
-        actionUrl: '/settings/users',
+        actionUrl: `/drivers?query=${encodeURIComponent(d.Driver_Name || d.Driver_ID)}&driverId=${encodeURIComponent(d.Driver_ID)}`,
         details: { driverName: d.Driver_Name, expiry: d.Expire_Date }
       })
     }

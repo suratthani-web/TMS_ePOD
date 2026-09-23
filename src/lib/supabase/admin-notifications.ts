@@ -57,7 +57,7 @@ export async function getAdminAlerts(): Promise<AdminAlert[]> {
               ? `หมดอายุแล้ว ${Math.abs(diffDays)} วัน`
               : `เหลืออีก ${diffDays} วัน (หมดอายุ ${expDate.toLocaleDateString('th-TH')})`,
             date: c.field || '',
-            href: `/fleet?search=${plate}`,
+            href: `/vehicles?search=${encodeURIComponent(plate)}`,
             meta: { plate, expiryType: c.type }
           })
         }
@@ -81,7 +81,7 @@ export async function getAdminAlerts(): Promise<AdminAlert[]> {
               title: `${m.label} — ${plate}`,
               description: over ? `เกินกำหนด ${diff} กม. (ไมล์ ${cur.toLocaleString()}/${m.target.toLocaleString()})` : `อีก ${diff} กม. (ไมล์ ${cur.toLocaleString()}/${m.target.toLocaleString()})`,
               date: '',
-              href: `/fleet?search=${plate}`,
+              href: `/vehicles?search=${encodeURIComponent(plate)}`,
               meta: { plate, expiryType: m.type }
             })
           }
@@ -103,6 +103,7 @@ export async function getAdminAlerts(): Promise<AdminAlert[]> {
       if (isNaN(expDate.getTime())) return
       const diffDays = Math.ceil((expDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24))
       if (diffDays <= 30) {
+        const queryTerm = (d.Driver_Name || d.Driver_ID || '').trim()
         alerts.push({
           id: `lic-${d.Driver_ID}`,
           type: 'expiry',
@@ -110,8 +111,8 @@ export async function getAdminAlerts(): Promise<AdminAlert[]> {
           title: `ใบขับขี่ — ${d.Driver_Name || d.Driver_ID}`,
           description: diffDays <= 0 ? `หมดอายุแล้ว ${Math.abs(diffDays)} วัน` : `เหลืออีก ${diffDays} วัน (หมดอายุ ${expDate.toLocaleDateString('th-TH')})`,
           date: d.Expire_Date,
-          href: `/drivers`,
-          meta: { driver: d.Driver_Name }
+          href: `/drivers?query=${encodeURIComponent(queryTerm)}&driverId=${encodeURIComponent(d.Driver_ID)}`,
+          meta: { driver: d.Driver_Name, driverId: d.Driver_ID }
         })
       }
     })
