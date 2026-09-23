@@ -34,6 +34,14 @@ export default function VehiclesPage() {
   const [refreshTrigger, setRefreshTrigger] = useState(0)
 
   useEffect(() => {
+    if (typeof window !== "undefined") {
+      const sp = new URLSearchParams(window.location.search)
+      const q = sp.get("search")
+      if (q) setSearchQuery(q)
+    }
+  }, [])
+
+  useEffect(() => {
     async function loadVehicles() {
       setLoading(true)
       const [data, adminStatus] = await Promise.all([

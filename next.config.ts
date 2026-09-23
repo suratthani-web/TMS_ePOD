@@ -139,6 +139,16 @@ const nextConfig: NextConfig = {
         source: '/track',
         destination: '/dashboard/tracking',
         permanent: true,
+      },
+      {
+        source: '/fleet',
+        destination: '/vehicles',
+        permanent: false,
+      },
+      {
+        source: '/fleet/:path*',
+        destination: '/vehicles/:path*',
+        permanent: false,
       }
     ];
   },
