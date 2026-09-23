@@ -56,8 +56,13 @@ export function MobileHeader({ title, showBack, rightElement }: Props) {
     <header className="fixed top-0 left-0 right-0 h-[calc(56px+env(safe-area-inset-top))] pt-[env(safe-area-inset-top)] bg-background/80 backdrop-blur-2xl border-b border-border flex items-center justify-between px-6 z-[100] transition-colors duration-300">
       <div className="flex items-center gap-4">
         {shouldShowBack && (
-            <button 
-                onClick={() => router.back()}
+            <button
+                onClick={() => {
+                    // ถ้ามี history ย้อนได้ปกติ; ถ้า landing ตรงหน้านี้ (เช่น เจ้าของสังกัด
+                    // เข้าจากลิงก์/ล็อกอิน) ไม่มี history → กลับหน้าโปรไฟล์แทน กันกดแล้วค้าง
+                    if (typeof window !== "undefined" && window.history.length > 1) router.back()
+                    else router.push("/mobile/profile")
+                }}
                 className="w-10 h-10 rounded-2xl bg-card border border-border flex items-center justify-center text-muted-foreground active:scale-95"
             >
                 <ChevronLeft size={20} />

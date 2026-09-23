@@ -292,6 +292,71 @@ type SystemLog = { id: string | number, module: string, action_type?: string, de
   }
 
   try {
+    // 4.5 เอกสารหมดอายุ/ใกล้หมด (ภาษี/ประกัน/พ.ร.บ./ประกันสินค้า ของรถ + ใบขับขี่คนขับ)
+    // เดิมมีแค่ browser push (cron) — เพิ่มเข้าศูนย์แจ้งเตือนให้ดูในระบบได้ด้วย
+    const WARN_DAYS = 30
+    const dLeft = (s: string | null | undefined): number | null => {
+      if (!s) return null
+      const d = new Date(s); if (isNaN(d.getTime())) return null
+      return Math.ceil((d.getTime() - now.getTime()) / (1000 * 60 * 60 * 24))
+    }
+    const expiryMsg = (n: number) => (n < 0 ? `หมดอายุแล้ว ${Math.abs(n)} วัน` : n === 0 ? 'หมดอายุวันนี้' : `เหลือ ${n} วัน`)
+
+    // รถ: ภาษี/ประกัน/พ.ร.บ./ประกันสินค้า
+    let vQ = supabase.from('Master_Vehicles')
+      .select('Vehicle_Plate, Tax_Expiry, Insurance_Expiry, Act_Expiry, Cargo_Insurance_Expiry, Active_Status, Branch_ID')
+    if (isAdmin && selectedBranch && selectedBranch !== 'All') vQ = vQ.eq('Branch_ID', selectedBranch)
+    else if (branchId && branchId !== 'All') vQ = vQ.eq('Branch_ID', branchId)
+    const { data: vehicles } = await vQ
+    const docLabels: [string, string][] = [
+      ['Tax_Expiry', 'ภาษีรถ'], ['Insurance_Expiry', 'ประกันภัย'], ['Act_Expiry', 'พ.ร.บ.'], ['Cargo_Insurance_Expiry', 'ประกันสินค้า'],
+    ]
+    ;(vehicles || []).forEach((v: Record<string, unknown>) => {
+      if (v.Active_Status && v.Active_Status !== 'Active') return
+      for (const [field, label] of docLabels) {
+        const n = dLeft(v[field] as string)
+        if (n !== null && n <= WARN_DAYS) {
+          notifications.push({
+            id: `exp-veh-${v.Vehicle_Plate}-${field}`,
+            type: 'maintenance',
+            title: `${n < 0 ? '🚨' : '⚠️'} ${label}${n < 0 ? 'หมดอายุ' : 'ใกล้หมดอายุ'}`,
+            message: `${v.Vehicle_Plate} — ${label} (${expiryMsg(n)})`,
+            timestamp: now.toISOString(),
+            read: false,
+            href: '/vehicles',
+            severity: n < 0 ? 'critical' : 'warning',
+          })
+        }
+      }
+    })
+
+    // คนขับ: ใบขับขี่
+    let dQ = supabase.from('Master_Drivers')
+      .select('Driver_Name, Expire_Date, Active_Status, Branch_ID')
+    if (isAdmin && selectedBranch && selectedBranch !== 'All') dQ = dQ.eq('Branch_ID', selectedBranch)
+    else if (branchId && branchId !== 'All') dQ = dQ.eq('Branch_ID', branchId)
+    const { data: driversExp } = await dQ
+    ;(driversExp || []).forEach((d: Record<string, unknown>) => {
+      if (d.Active_Status && d.Active_Status !== 'Active') return
+      const n = dLeft(d.Expire_Date as string)
+      if (n !== null && n <= WARN_DAYS) {
+        notifications.push({
+          id: `exp-lic-${d.Driver_Name}`,
+          type: 'maintenance',
+          title: `${n < 0 ? '🚨' : '⚠️'} ใบขับขี่${n < 0 ? 'หมดอายุ' : 'ใกล้หมดอายุ'}`,
+          message: `${d.Driver_Name || 'ไม่ทราบชื่อ'} — ใบขับขี่ (${expiryMsg(n)})`,
+          timestamp: now.toISOString(),
+          read: false,
+          href: '/drivers',
+          severity: n < 0 ? 'critical' : 'warning',
+        })
+      }
+    })
+  } catch {
+    // คอลัมน์วันหมดอายุอาจไม่มีในบางฐาน — ข้ามไป
+  }
+
+  try {
     // 4. Unread Chat Messages from Drivers
     // Detect correct schema resilience
     const { tableName: chatTableName, columns: chatCols } = await getChatSchema(supabase)

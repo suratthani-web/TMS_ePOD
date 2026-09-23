@@ -17,7 +17,7 @@ export default async function PayslipsPage() {
 
   return (
     <div className="min-h-full bg-background pb-24 pt-16 px-4">
-      <MobileHeader title="ใบสรุปจ่ายรถ" />
+      <MobileHeader title="ใบสรุปจ่ายรถ" showBack />
 
       <div className="space-y-3">
         {slips.length === 0 ? (
