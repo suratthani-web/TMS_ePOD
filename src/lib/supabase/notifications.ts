@@ -302,9 +302,9 @@ type SystemLog = { id: string | number, module: string, action_type?: string, de
     }
     const expiryMsg = (n: number) => (n < 0 ? `หมดอายุแล้ว ${Math.abs(n)} วัน` : n === 0 ? 'หมดอายุวันนี้' : `เหลือ ${n} วัน`)
 
-    // รถ: ภาษี/ประกัน/พ.ร.บ./ประกันสินค้า
+    // รถ: ภาษี/ประกัน/พ.ร.บ./ประกันสินค้า + เช็คระยะ/เปลี่ยนยาง (ตามเลขไมล์)
     let vQ = supabase.from('Master_Vehicles')
-      .select('Vehicle_Plate, Tax_Expiry, Insurance_Expiry, Act_Expiry, Cargo_Insurance_Expiry, Active_Status, Branch_ID')
+      .select('Vehicle_Plate, Tax_Expiry, Insurance_Expiry, Act_Expiry, Cargo_Insurance_Expiry, Active_Status, Branch_ID, Current_Mileage, Next_Service_Mileage, Tire_Next_Change_Mileage')
     if (isAdmin && selectedBranch && selectedBranch !== 'All') vQ = vQ.eq('Branch_ID', selectedBranch)
     else if (branchId && branchId !== 'All') vQ = vQ.eq('Branch_ID', branchId)
     const { data: vehicles } = await vQ
@@ -326,6 +326,32 @@ type SystemLog = { id: string | number, module: string, action_type?: string, de
             href: '/vehicles',
             severity: n < 0 ? 'critical' : 'warning',
           })
+        }
+      }
+      // เช็คระยะ / เปลี่ยนยาง — ตามเลขไมล์ (เตือนเมื่อใกล้ครบ ≤1,000 กม. หรือเกินแล้ว)
+      const cur = Number(v.Current_Mileage) || 0
+      const KM_BUFFER = 1000
+      const mileageChecks: [string, string][] = [
+        ['Next_Service_Mileage', 'เช็คระยะ'],
+        ['Tire_Next_Change_Mileage', 'เปลี่ยนยาง'],
+      ]
+      if (cur > 0) {
+        for (const [field, label] of mileageChecks) {
+          const target = Number(v[field]) || 0
+          if (target > 0 && cur >= target - KM_BUFFER) {
+            const over = cur >= target
+            const diff = Math.abs(target - cur).toLocaleString()
+            notifications.push({
+              id: `svc-veh-${v.Vehicle_Plate}-${field}`,
+              type: 'maintenance',
+              title: `${over ? '🚨' : '🔧'} ${label}${over ? 'เกินกำหนด' : 'ใกล้ครบ'}`,
+              message: `${v.Vehicle_Plate} — ${label} ${over ? `เกิน ${diff} กม.` : `อีก ${diff} กม.`} (ไมล์ ${cur.toLocaleString()}/${target.toLocaleString()})`,
+              timestamp: now.toISOString(),
+              read: false,
+              href: '/vehicles',
+              severity: over ? 'critical' : 'warning',
+            })
+          }
         }
       }
     })
