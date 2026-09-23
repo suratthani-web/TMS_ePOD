@@ -688,6 +688,13 @@ export async function createBulkJobs(
         normalized.original_origins_json = origins
     }
 
+    // ค่าใช้จ่ายเพิ่มเติม + ค่าเพิ่มรวม — ไม่อยู่ใน whitelist getValue ด้านบน
+    // ต้องส่งผ่านตรงๆ ไม่งั้น "หาย" ตอนสร้างงาน (เดิม createBulkJobs ตัดทิ้ง)
+    const rowRec = row as Record<string, unknown>
+    if (rowRec.extra_costs_json !== undefined) normalized.extra_costs_json = rowRec.extra_costs_json
+    if (rowRec.Price_Cust_Extra !== undefined) normalized.Price_Cust_Extra = rowRec.Price_Cust_Extra
+    if (rowRec.Cost_Driver_Extra !== undefined) normalized.Cost_Driver_Extra = rowRec.Cost_Driver_Extra
+
     // 2. Destinations Mapping
     if (row.original_destinations_json) {
         normalized.original_destinations_json = row.original_destinations_json
