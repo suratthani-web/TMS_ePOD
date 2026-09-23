@@ -146,16 +146,25 @@ export default function PayslipsClient({ initialList }: { initialList: Record<st
       toast.error("กรุณาเลือกและจับคู่คนขับอย่างน้อย 1 รายการ")
       return
     }
-    // กันจับคู่คนขับซ้ำ
-    const seen = new Set<string>()
+    // ตรวจสอบกรณีเลือกคนขับ/สังกัดเดียวกันหลายแผ่น (อนุญาตให้ทำได้ หากตั้งใจเลือก)
+    const countById = new Map<string, number>()
     for (const m of mapped) {
-      if (seen.has(m.driverId)) {
-        const d = drivers.find((x) => x.id === m.driverId)
-        toast.error(`คนขับ "${d?.name || m.driverId}" ถูกจับคู่มากกว่า 1 แผ่น`)
-        return
-      }
-      seen.add(m.driverId)
+      countById.set(m.driverId, (countById.get(m.driverId) || 0) + 1)
     }
+    const dupes = Array.from(countById.entries()).filter(([_, count]) => count > 1)
+    if (dupes.length > 0) {
+      const dupeNames = dupes
+        .map(([id, count]) => {
+          const d = drivers.find((x) => x.id === id)
+          return `• "${d?.name || id}" (${count} แผ่น)`
+        })
+        .join("\n")
+      const proceed = confirm(
+        `มีคนขับ/สังกัดที่ถูกจับคู่มากกว่า 1 แผ่น:\n\n${dupeNames}\n\nคุณต้องการบันทึกหลายแผ่นให้กับคนขับ/สังกัดเดียวกันต่อไปหรือไม่?`
+      )
+      if (!proceed) return
+    }
+
     if (unmatched.length > 0) {
       const names = unmatched.map((r) => `• ${r.sheetName}`).join("\n")
       const proceed = confirm(
@@ -182,7 +191,7 @@ export default function PayslipsClient({ initialList }: { initialList: Record<st
         if (!r.isSummary) {
           try {
             const bytes = buildSingleSheetFromWb(wb, r.sheetName)
-            const path = `payslips/${batchId}/${safeId}.xlsx`
+            const path = `payslips/${batchId}/${safeId}_${done}.xlsx`
             const signed = await createPayslipSignedUpload(path)
             if (signed.ok && signed.path && signed.token) {
               const { error } = await supabase.storage
