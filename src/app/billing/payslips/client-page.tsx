@@ -16,7 +16,7 @@ import { parseWorkbookClient, readWorkbookClient, buildSingleSheetFromWb, parseM
 import type { PayslipGrid } from "@/lib/payslip/types"
 import { suggestDriverId, parseFileName, type DriverLite } from "@/lib/payslip/match"
 import { createClient } from "@/utils/supabase/client"
-import { Upload, FileSpreadsheet, Loader2, CheckCircle2, Trash2, Users } from "lucide-react"
+import { Upload, FileSpreadsheet, Loader2, CheckCircle2, Trash2, Users, ArrowLeft } from "lucide-react"
 import { toast } from "sonner"
 
 const BUCKET = "company-assets"
@@ -251,6 +251,12 @@ export default function PayslipsClient({ initialList }: { initialList: Record<st
 
   return (
     <div className="max-w-5xl mx-auto p-4 md:p-6 space-y-6">
+      <button
+        onClick={() => { if (typeof window !== "undefined" && window.history.length > 1) router.back(); else router.push("/billing/driver") }}
+        className="inline-flex items-center gap-1.5 text-sm font-bold text-muted-foreground hover:text-indigo-600 transition-colors"
+      >
+        <ArrowLeft className="w-4 h-4" /> ย้อนกลับ
+      </button>
       <div>
         <h1 className="text-2xl font-bold flex items-center gap-2">
           <FileSpreadsheet className="text-indigo-600" /> ใบสรุปจ่ายรถ
