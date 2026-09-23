@@ -67,6 +67,9 @@ export default function PayslipsClient({ initialList }: { initialList: Record<st
     return Array.from(map.values())
   }, [initialList])
 
+  const subs = useMemo(() => drivers.filter((d) => d.type === "sub"), [drivers])
+  const individualDrivers = useMemo(() => drivers.filter((d) => d.type !== "sub"), [drivers])
+
   const handleFile = async (file: File) => {
     setUploading(true)
     setHasParsed(false)
@@ -90,7 +93,7 @@ export default function PayslipsClient({ initialList }: { initialList: Record<st
         grid: s.grid,
         total: s.total,
         selected: s.isDriverSheet,
-        driverId: s.isDriverSheet ? suggestDriverId(s.name, drv) || "" : "",
+        driverId: s.isDriverSheet ? suggestDriverId(s.name, drv, s.extraText) || "" : "",
       }))
 
       // สลิปสรุปจากตารางแม่ (Sheet1): สร้างให้เฉพาะคนที่ "ไม่มีแท็บรายละเอียด"
@@ -118,8 +121,8 @@ export default function PayslipsClient({ initialList }: { initialList: Record<st
       batchRef.current = crypto.randomUUID()
       setHasParsed(true)
       const driverSheets = sheets.filter((s) => s.isDriverSheet)
-      const matched = driverSheets.filter((s) => suggestDriverId(s.name, drv)).length
-      toast.success(`พบ ${driverSheets.length} แผ่นคนขับ · จับคู่ได้ ${matched}` +
+      const matched = driverSheets.filter((s) => suggestDriverId(s.name, drv, s.extraText)).length
+      toast.success(`พบ ${driverSheets.length} แผ่นคนขับ/สังกัด · จับคู่ได้ ${matched}` +
         (summaryRows.length ? ` · +${summaryRows.length} สลิปสรุปจากตารางแม่` : ""))
     } catch (e) {
       console.error(e)
@@ -173,11 +176,13 @@ export default function PayslipsClient({ initialList }: { initialList: Record<st
         done++
         setProgress(`กำลังเตรียมไฟล์ ${done}/${mapped.length} …`)
         let xlsxPath: string | null = null
+        const matchedTarget = drivers.find((d) => d.id === r.driverId)
+        const safeId = r.driverId.replace(/[^A-Za-z0-9_-]/g, "_")
         // สลิปสรุป (จากตารางแม่) ไม่มีไฟล์ต้นทาง — เก็บแค่ grid
         if (!r.isSummary) {
           try {
             const bytes = buildSingleSheetFromWb(wb, r.sheetName)
-            const path = `payslips/${batchId}/${r.driverId}.xlsx`
+            const path = `payslips/${batchId}/${safeId}.xlsx`
             const signed = await createPayslipSignedUpload(path)
             if (signed.ok && signed.path && signed.token) {
               const { error } = await supabase.storage
@@ -192,12 +197,15 @@ export default function PayslipsClient({ initialList }: { initialList: Record<st
           }
         }
         items.push({
-          driverId: r.driverId,
-          driverName: drivers.find((d) => d.id === r.driverId)?.name,
+          driverId: matchedTarget?.rawId || r.driverId,
+          rawId: matchedTarget?.rawId,
+          driverName: matchedTarget?.name,
           sheetName: r.sheetName,
           grid: r.grid,
           total: r.total,
           xlsxPath,
+          targetType: matchedTarget?.type,
+          subId: matchedTarget?.subId,
         })
       }
 
@@ -296,15 +304,15 @@ export default function PayslipsClient({ initialList }: { initialList: Record<st
             </div>
 
             <div className="text-sm text-muted-foreground flex items-center gap-2">
-              <Users size={16} /> จับคู่แผ่นงานกับคนขับ ({selectedCount} รายการพร้อมบันทึก)
+              <Users size={16} /> จับคู่แผ่นงานกับคนขับ/เจ้าของสังกัด ({selectedCount} รายการพร้อมบันทึก)
             </div>
 
             {unmatched.length > 0 && (
               <div className="rounded-lg border border-amber-300 bg-amber-50 text-amber-800 text-sm p-3">
-                ⚠️ มี {unmatched.length} แผ่นที่เป็นคนขับแต่ <b>ไม่มีในระบบ</b> (จับคู่ไม่ได้) —
-                รายการเหล่านี้จะ <b>ถูกข้าม ไม่บันทึก</b>: {unmatched.map((r) => r.sheetName).join(", ")}
+                ⚠️ มี {unmatched.length} แผ่นที่ยังจับคู่ไม่ได้ —
+                รายการเหล่านี้จะ <b>ถูกข้าม ไม่บันทึก</b> (หากไม่เลือกคนขับ/สังกัด): {unmatched.map((r) => r.sheetName).join(", ")}
                 <div className="text-xs mt-1 text-amber-700">
-                  หากต้องการส่งให้คนเหล่านี้ ต้องเพิ่มคนขับใน &ldquo;คนขับ&rdquo; ก่อน แล้วอัปโหลดใหม่
+                  คุณสามารถเลือกคนขับหรือเจ้าของสังกัดในช่องเลือกด้านขวาได้ หรือเพิ่มในระบบก่อนแล้วอัปโหลดใหม่
                 </div>
               </div>
             )}
@@ -319,11 +327,24 @@ export default function PayslipsClient({ initialList }: { initialList: Record<st
                     className="w-4 h-4 shrink-0"
                   />
                   <div className="min-w-0 flex-1">
-                    <p className="font-medium truncate">
-                      {r.sheetName}
-                      {!r.isDriverSheet && <span className="ml-2 text-xs text-amber-600">(ไม่ใช่แผ่นคนขับ?)</span>}
+                    <p className="font-medium truncate flex items-center flex-wrap gap-1">
+                      <span>{r.sheetName}</span>
+                      {!r.isDriverSheet && <span className="text-xs text-amber-600">(ไม่ใช่แผ่นคนขับ?)</span>}
                       {r.isDriverSheet && !r.driverId && (
-                        <span className="ml-2 text-xs font-semibold text-rose-600">จับคู่ไม่ได้ – จะถูกข้าม</span>
+                        <span className="text-xs font-semibold text-rose-600">จับคู่ไม่ได้ – จะถูกข้าม</span>
+                      )}
+                      {r.isDriverSheet && r.driverId && (
+                        (() => {
+                          const matched = drivers.find((d) => d.id === r.driverId)
+                          if (!matched) return null
+                          if (matched.type === "sub") {
+                            return <span className="text-xs font-semibold text-indigo-600 bg-indigo-50 px-1.5 py-0.5 rounded">🏢 เจ้าของสังกัด</span>
+                          }
+                          if (matched.subId) {
+                            return <span className="text-xs text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded">👤 สังกัด: {matched.subId}</span>
+                          }
+                          return <span className="text-xs text-gray-500 bg-gray-100 px-1.5 py-0.5 rounded">👤 รายคัน</span>
+                        })()
                       )}
                     </p>
                     <p className="text-xs text-muted-foreground">
@@ -336,12 +357,25 @@ export default function PayslipsClient({ initialList }: { initialList: Record<st
                     onChange={(e) => updateRow(i, { driverId: e.target.value, selected: true })}
                     className="border rounded-lg px-2 py-1.5 text-sm max-w-[45%] bg-background"
                   >
-                    <option value="">— เลือกคนขับ —</option>
-                    {drivers.map((d) => (
-                      <option key={d.id} value={d.id}>
-                        {d.name}
-                      </option>
-                    ))}
+                    <option value="">— เลือกคนขับ / เจ้าของสังกัด —</option>
+                    {subs.length > 0 && (
+                      <optgroup label="🏢 เจ้าของสังกัด / รถร่วม">
+                        {subs.map((d) => (
+                          <option key={d.id} value={d.id}>
+                            {d.name}
+                          </option>
+                        ))}
+                      </optgroup>
+                    )}
+                    {individualDrivers.length > 0 && (
+                      <optgroup label="👤 คนขับ">
+                        {individualDrivers.map((d) => (
+                          <option key={d.id} value={d.id}>
+                            {d.name} {d.subId ? `(สังกัด ${d.subId})` : ""}
+                          </option>
+                        ))}
+                      </optgroup>
+                    )}
                   </select>
                 </div>
               ))}

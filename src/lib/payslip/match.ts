@@ -1,26 +1,66 @@
 // ยูทิลิตี้ (ไม่ใช่ server action) สำหรับจับคู่ชื่อ sheet -> คนขับ และแยกชื่อไฟล์
 
-export interface DriverLite { id: string; name: string; branch?: string | null }
-
-function norm(s: string): string {
-  return (s || "").replace(/\s+/g, "").replace(/[().]/g, "").trim().toLowerCase()
+export interface DriverLite {
+  id: string
+  rawId?: string
+  name: string
+  branch?: string | null
+  type?: "driver" | "sub"
+  subId?: string | null
+  isSubOwner?: boolean
 }
 
-/** เดา Driver_ID จากชื่อ sheet (ชื่อ tab = ชื่อคนขับ) */
-export function suggestDriverId(sheetName: string, drivers: DriverLite[]): string | null {
-  const s = norm(sheetName)
-  if (!s) return null
-  // 1) ตรงเป๊ะ
-  for (const d of drivers) if (norm(d.name) === s) return d.id
-  // 2) ชื่อคนขับขึ้นต้นด้วยชื่อ sheet (sheet มักเป็นชื่อจริงคำแรก)
+function norm(s?: string): string {
+  return (s || "")
+    .replace(/^นาย|^นางสาว|^นาง|^บจก\.?|^หจก\.?/g, "")
+    .replace(/\s+/g, "")
+    .replace(/[().\-_\d]/g, "") // ตัดตัวเลข เช่น พชรพล2 -> พชรพล
+    .replace(/ษ์|ศ์|ฆ์|ธ์/g, "ก") // การันต์ออกเสียงคล้ายกัน สุรพงศ์/สุรพงษ์, สมพงศ์/สมพงษ์
+    .replace(/ะ/g, "") // ธีระชาติ -> ธีรชาติ
+    .trim()
+    .toLowerCase()
+}
+
+/** เดา id จากชื่อ sheet หรือข้อความในหัวตาราง A1 */
+export function suggestDriverId(
+  sheetName: string,
+  drivers: DriverLite[],
+  extraText?: string
+): string | null {
+  const sName = norm(sheetName)
+  const eText = extraText ? norm(extraText) : ""
+  if (!sName && !eText) return null
+
+  // 1) ตรงเป๊ะกับ sheetName (ให้ความสำคัญกับ target name หรือ rawId)
   for (const d of drivers) {
-    const dn = norm(d.name)
-    if (dn.startsWith(s) || s.startsWith(dn)) return d.id
+    const tn = norm(d.name)
+    const tid = norm(d.rawId)
+    if (sName === tn || sName === tid) return d.id
   }
-  // 3) มีชื่อ sheet เป็นส่วนหนึ่งของชื่อคนขับ
+
+  // 2) startsWith / startsWith กับ sheetName
   for (const d of drivers) {
-    if (norm(d.name).includes(s)) return d.id
+    const tn = norm(d.name)
+    if (tn.startsWith(sName) || sName.startsWith(tn)) return d.id
   }
+
+  // 3) extraText (ข้อความจากเซลล์ A1 / หัวชีท เช่น "สง่า" หรือ "สุรศักดิ์")
+  if (eText) {
+    for (const d of drivers) {
+      const tn = norm(d.name)
+      const tid = norm(d.rawId)
+      if (eText === tn || eText === tid) return d.id
+      if (tn.startsWith(eText) || eText.startsWith(tn)) return d.id
+    }
+  }
+
+  // 4) Inclusions (มีคำค้นเป็นส่วนหนึ่ง)
+  for (const d of drivers) {
+    const tn = norm(d.name)
+    if (sName.length >= 3 && tn.includes(sName)) return d.id
+    if (eText && eText.length >= 3 && tn.includes(eText)) return d.id
+  }
+
   return null
 }
 
@@ -42,3 +82,4 @@ export function parseFileName(fileName: string): {
   const title = [prefix, period, branch ? `(${branch})` : ""].filter(Boolean).join(" ")
   return { prefix, period, branch, title: title || base }
 }
+

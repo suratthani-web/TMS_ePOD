@@ -12,6 +12,7 @@ export interface ClientSheet {
   isDriverSheet: boolean
   grid: PayslipGrid
   total: number | null
+  extraText?: string
 }
 
 const isNumericText = (s: string) => s !== "" && /^-?\d{1,3}(,\d{3})*(\.\d+)?$|^-?\d+(\.\d+)?$/.test(s.trim())
@@ -106,7 +107,8 @@ export function parseWorkbookClient(ab: ArrayBuffer): ClientSheet[] {
     const rowCount = ref ? XLSX.utils.decode_range(ref).e.r + 1 : 0
     const grid = wsToGrid(ws)
     const isDriver = looksLikeDriverGrid(grid)
-    out.push({ name, rowCount, isDriverSheet: isDriver, grid, total: isDriver ? guessTotal(grid) : null })
+    const extraText = grid.rows[0]?.map((c) => c.t).filter(Boolean).join(" ") || ""
+    out.push({ name, rowCount, isDriverSheet: isDriver, grid, total: isDriver ? guessTotal(grid) : null, extraText })
   }
   return out
 }

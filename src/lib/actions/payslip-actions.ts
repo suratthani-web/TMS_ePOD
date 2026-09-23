@@ -245,16 +245,51 @@ export async function deletePayslipBatch(batchId: string): Promise<{ ok: boolean
 
 // ============ Flow ใหม่: อ่านไฟล์ฝั่ง browser (กันไฟล์ใหญ่เกินลิมิต Server Action) ============
 
-/** ดึงรายชื่อคนขับสำหรับจับคู่ (payload เล็ก) */
+/** ดึงรายชื่อคนขับและเจ้าของสังกัดสำหรับจับคู่ (payload เล็ก) */
 export async function getPayslipDrivers(): Promise<{ drivers: DriverLite[] }> {
   await requireAdmin()
-  const rows = await getActiveDrivers()
-  const drivers: DriverLite[] = (rows || []).map((d: Record<string, unknown>) => ({
-    id: String(d.Driver_ID),
-    name: String(d.Driver_Name || d.Driver_ID),
-    branch: (d.Branch_ID as string) ?? null,
-  }))
-  return { drivers }
+  const supabase = createAdminClient()
+
+  const [driversRes, subsRes] = await Promise.all([
+    supabase
+      .from("Master_Drivers")
+      .select("Driver_ID, Driver_Name, Branch_ID, Sub_ID, Is_Sub_Owner")
+      .order("Driver_Name"),
+    supabase
+      .from("Master_Subcontractors")
+      .select("Sub_ID, Sub_Name, Branch_ID")
+      .order("Sub_Name"),
+  ])
+
+  const targets: DriverLite[] = []
+
+  // 1) สังกัด / รถร่วม (Subcontractors)
+  for (const s of subsRes.data || []) {
+    targets.push({
+      id: `sub:${s.Sub_ID}`,
+      rawId: String(s.Sub_ID),
+      name: String(s.Sub_Name || s.Sub_ID),
+      branch: (s.Branch_ID as string) ?? null,
+      type: "sub",
+      subId: String(s.Sub_ID),
+      isSubOwner: true,
+    })
+  }
+
+  // 2) คนขับ (Drivers)
+  for (const d of driversRes.data || []) {
+    targets.push({
+      id: `driver:${d.Driver_ID}`,
+      rawId: String(d.Driver_ID),
+      name: String(d.Driver_Name || d.Driver_ID),
+      branch: (d.Branch_ID as string) ?? null,
+      type: "driver",
+      subId: d.Sub_ID ? String(d.Sub_ID) : null,
+      isSubOwner: !!d.Is_Sub_Owner,
+    })
+  }
+
+  return { drivers: targets }
 }
 
 /** ขอ signed URL ให้ browser อัปไฟล์ตรงเข้า storage (ไม่ผ่าน body ของ Server Action) */
@@ -277,11 +312,14 @@ export async function createPayslipSignedUpload(
 
 export interface ClientConfirmItem {
   driverId: string
+  rawId?: string
   driverName?: string
   sheetName: string
   grid: PayslipGrid
   total: number | null
   xlsxPath: string | null
+  targetType?: "driver" | "sub"
+  subId?: string | null
 }
 
 /** ยืนยันบันทึกสลิป (grid มาจาก browser แล้ว, payload เล็ก) */
@@ -299,24 +337,31 @@ export async function confirmPayslipsClient(input: {
     if (items.length === 0) return { ok: false, error: "ไม่มีรายการที่จับคู่" }
 
     const supabase = createAdminClient()
-    const records = items.map((it) => ({
-      Driver_ID: it.driverId,
-      driver_name: it.driverName || it.sheetName,
-      sheet_name: it.sheetName,
-      title: input.title,
-      period_label: input.period || null,
-      branch_label: input.branch || null,
-      total_amount: it.total,
-      kind: "excel",
-      grid_json: it.grid,
-      voucher_json: null,
-      xlsx_url: it.xlsxPath,
-      source_file: input.fileName,
-      batch_id: input.batchId,
-      payment_id: null,
-      uploaded_by: session.userId,
-      uploaded_at: new Date().toISOString(),
-    }))
+    const records = items.map((it) => {
+      const isSub = it.targetType === "sub" || it.driverId.startsWith("sub:")
+      const rawId = it.rawId || (it.driverId.startsWith("driver:") ? it.driverId.slice(7) : it.driverId.startsWith("sub:") ? it.driverId.slice(4) : it.driverId)
+      const subId = it.subId || (isSub ? rawId : null)
+
+      return {
+        Driver_ID: isSub ? (subId || rawId) : rawId,
+        Sub_ID: subId,
+        driver_name: it.driverName || it.sheetName,
+        sheet_name: it.sheetName,
+        title: input.title,
+        period_label: input.period || null,
+        branch_label: input.branch || null,
+        total_amount: it.total,
+        kind: "excel",
+        grid_json: it.grid,
+        voucher_json: null,
+        xlsx_url: it.xlsxPath,
+        source_file: input.fileName,
+        batch_id: input.batchId,
+        payment_id: null,
+        uploaded_by: session.userId,
+        uploaded_at: new Date().toISOString(),
+      }
+    })
 
     const { error } = await supabase.from(TABLE).insert(records)
     if (error) return { ok: false, error: "บันทึกไม่สำเร็จ: " + error.message }
@@ -446,17 +491,28 @@ export async function getMyPayslips(): Promise<Record<string, unknown>[]> {
   const supabase = createAdminClient()
   const cols = "id, title, period_label, branch_label, total_amount, source_file, kind, uploaded_at, driver_name, Driver_ID, Sub_ID"
 
-  // เจ้าของสังกัด: ดึงสลิปของคนขับทุกคนในสังกัด + voucher ที่ผูกสังกัดโดยตรง
+  // เจ้าของสังกัด: ดึงสลิปของคนขับทุกคนในสังกัด + สลิป/voucher ที่ผูกสังกัดโดยตรง + สลิปของตนเอง (ถ้าขับเอง)
   if (session?.subId) {
     const { data: subDrivers } = await supabase
       .from("Master_Drivers").select("Driver_ID").eq("Sub_ID", session.subId)
     const ids = (subDrivers || []).map((d: { Driver_ID: string }) => String(d.Driver_ID)).filter(Boolean)
+    
+    // ถ้าเจ้าของสังกัดขับเองด้วย และมี driverId ใน session ให้ดึงสลิปของตนเองด้วย
+    if (session.driverId && !ids.includes(String(session.driverId))) {
+      ids.push(String(session.driverId))
+    }
+
     const byDriver = ids.length
       ? (await supabase.from(TABLE).select(cols).in("Driver_ID", ids).order("uploaded_at", { ascending: false }).limit(500)).data || []
       : []
     const bySub = (await supabase.from(TABLE).select(cols).eq("Sub_ID", session.subId).order("uploaded_at", { ascending: false }).limit(500)).data || []
+    
+    const byOwn = session.driverId
+      ? (await supabase.from(TABLE).select(cols).eq("Driver_ID", String(session.driverId)).order("uploaded_at", { ascending: false }).limit(500)).data || []
+      : []
+
     const merged = new Map<string, Record<string, unknown>>()
-    for (const r of [...bySub, ...byDriver]) merged.set(String((r as { id: string }).id), r as Record<string, unknown>)
+    for (const r of [...bySub, ...byDriver, ...byOwn]) merged.set(String((r as { id: string }).id), r as Record<string, unknown>)
     return Array.from(merged.values()).sort((a, b) =>
       String(b.uploaded_at || "").localeCompare(String(a.uploaded_at || "")))
   }
@@ -492,13 +548,17 @@ export async function getMyPayslip(
     .single()
   if (!data) return { ok: false, error: "ไม่พบสลิป" }
 
-  // ตรวจสิทธิ์: คนขับ = เจ้าของสลิป; เจ้าของสังกัด = สลิปอยู่ในสังกัดตน
+  // ตรวจสิทธิ์: คนขับ = เจ้าของสลิป; เจ้าของสังกัด = สลิปอยู่ในสังกัดตน หรือสลิปที่ตนขับเอง
   let allowed = false
   if (session?.subId) {
     allowed = data.Sub_ID === session.subId
     if (!allowed && data.Driver_ID) {
-      const { data: d } = await supabase.from("Master_Drivers").select("Sub_ID").eq("Driver_ID", data.Driver_ID).maybeSingle()
-      allowed = d?.Sub_ID === session.subId
+      if (session.driverId && String(data.Driver_ID) === String(session.driverId)) {
+        allowed = true
+      } else {
+        const { data: d } = await supabase.from("Master_Drivers").select("Sub_ID").eq("Driver_ID", data.Driver_ID).maybeSingle()
+        allowed = d?.Sub_ID === session.subId
+      }
     }
   } else {
     allowed = String(data.Driver_ID) === String(session.driverId)

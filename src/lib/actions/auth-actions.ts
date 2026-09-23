@@ -210,10 +210,29 @@ export async function loginDriver(formData: FormData) {
   // 4. Create Session (Cookie)
   const userPermissions = (userData as { Permissions?: unknown; permissions?: unknown })?.Permissions || (userData as { Permissions?: unknown; permissions?: unknown })?.permissions || { show_income: true }
 
+  // ถ้าคนขับคนนี้เป็นเจ้าของสังกัด (ขับเองด้วย) หรือผูกกับสังกัด
+  let subId: string | null = null
+  if (driver.Sub_ID) {
+    if (driver.Is_Sub_Owner) {
+      subId = driver.Sub_ID
+    } else {
+      const { data: subMatch } = await supabase
+        .from("Master_Subcontractors")
+        .select("Sub_ID, Sub_Name")
+        .eq("Sub_ID", driver.Sub_ID)
+        .maybeSingle()
+      if (subMatch && (driver.Driver_ID === subMatch.Sub_ID || (driver.Driver_Name && subMatch.Sub_Name?.includes(driver.Driver_Name)))) {
+        subId = subMatch.Sub_ID
+      }
+    }
+  }
+
   const sessionData = {
     driverId: driver.Driver_ID,
     driverName: driver.Driver_Name,
     branchId: driver.Branch_ID,
+    subId: subId || null,
+    isSubOwner: !!driver.Is_Sub_Owner || !!subId,
     role: "driver",
     permissions: userPermissions
   }
