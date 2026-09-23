@@ -54,9 +54,10 @@ export const PayslipGridView = React.forwardRef<HTMLDivElement, Props>(function 
         <tbody>
           {grid.rows.map((row, r) => {
             // ข้ามแถวว่างเปล่า (จากเทมเพลต Excel ที่มีแถวสำรอง) — แต่ไม่ข้ามถ้าเป็นส่วนของ merge
-            const isEmptyRow = Array.from({ length: maxCols }).every((_, c) =>
-              (row[c]?.t ?? "") === "" && !covered.has(`${r}:${c}`) && !spanMap.has(`${r}:${c}`)
-            )
+            const isEmptyRow = Array.from({ length: maxCols }).every((_, c) => {
+              const val = (row[c]?.t ?? "").trim()
+              return (val === "" || val === "-") && !covered.has(`${r}:${c}`) && !spanMap.has(`${r}:${c}`)
+            })
             if (isEmptyRow) return null
             return (
             <tr key={r}>

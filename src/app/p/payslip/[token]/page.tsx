@@ -28,7 +28,7 @@ export default async function PublicPayslipPage({
   const subtitle = String(meta.period_label || "")
 
   return (
-    <div className="min-h-screen bg-slate-50 pb-16 pt-6 px-4 max-w-3xl mx-auto">
+    <div className="min-h-screen bg-slate-50 pb-16 pt-6 px-4 w-full max-w-7xl mx-auto">
       <div className="rounded-2xl bg-gradient-to-br from-indigo-600 to-blue-700 p-5 mb-4 shadow-lg">
         <p className="text-blue-100 text-sm">{String(meta.title || "ใบสรุปจ่ายรถ")}</p>
         {subtitle && <p className="text-blue-100 text-xs mt-0.5">งวด {subtitle}</p>}
