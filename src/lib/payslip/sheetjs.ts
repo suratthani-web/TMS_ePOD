@@ -26,41 +26,62 @@ function wsToGrid(ws: XLSX.WorkSheet): PayslipGrid {
     blankrows: true,
   }) as unknown as string[][]
 
-  let rows = aoa.slice(0, MAX_ROWS)
-  let maxCols = 0
-  for (const r of rows) maxCols = Math.max(maxCols, r.length)
-  maxCols = Math.min(maxCols || 1, MAX_COLS)
+  const srcRows = aoa.slice(0, MAX_ROWS)
+  let srcMaxCols = 0
+  for (const r of srcRows) srcMaxCols = Math.max(srcMaxCols, r.length)
+  srcMaxCols = Math.min(srcMaxCols || 1, MAX_COLS)
 
-  const gridRows: PayslipCell[][] = rows.map((r) => {
-    const cells: PayslipCell[] = []
-    for (let c = 0; c < maxCols; c++) {
-      const t = (r[c] ?? "").toString().replace(/\r?\n/g, " ").trim()
+  // แถว/คอลัมน์ที่ถูก "ซ่อน" ใน Excel (แอดมินซ่อนส่วนที่ไม่มีจ่ายรอบนั้น) → ข้ามทั้งหมด
+  const rowMeta = (ws["!rows"] || []) as ({ hidden?: boolean } | undefined)[]
+  const colMeta = (ws["!cols"] || []) as ({ hidden?: boolean; wch?: number } | undefined)[]
+  const isRowHidden = (i: number) => !!rowMeta[i]?.hidden
+  const isColHidden = (i: number) => !!colMeta[i]?.hidden
+
+  // map คอลัมน์เดิม -> ใหม่ (เฉพาะที่ไม่ซ่อน)
+  const visCols: number[] = []
+  for (let c = 0; c < srcMaxCols; c++) if (!isColHidden(c)) visCols.push(c)
+  const colNew = new Map<number, number>()
+  visCols.forEach((oldC, newC) => colNew.set(oldC, newC))
+  const maxCols = visCols.length || 1
+
+  // map แถวเดิม -> ใหม่ (เฉพาะที่ไม่ซ่อน)
+  const visRows: number[] = []
+  for (let r = 0; r < srcRows.length; r++) if (!isRowHidden(r)) visRows.push(r)
+  const rowNew = new Map<number, number>()
+  visRows.forEach((oldR, newR) => rowNew.set(oldR, newR))
+
+  const gridRows: PayslipCell[][] = visRows.map((oldR) => {
+    const src = srcRows[oldR] || []
+    return visCols.map((oldC) => {
+      const t = (src[oldC] ?? "").toString().replace(/\r?\n/g, " ").trim()
       const cell: PayslipCell = { t }
       if (isNumericText(t)) cell.n = true
-      cells.push(cell)
-    }
-    return cells
+      return cell
+    })
   })
 
   // ตัดแถวว่างท้าย
   while (gridRows.length > 0 && gridRows[gridRows.length - 1].every((c) => c.t === "")) gridRows.pop()
 
-  // ความกว้างคอลัมน์
-  const cols: number[] = []
-  const wsCols = (ws["!cols"] || []) as { wch?: number; wpx?: number }[]
-  for (let c = 0; c < maxCols; c++) {
-    const w = wsCols[c]?.wch
-    cols.push(typeof w === "number" && w > 0 ? w : 10)
-  }
+  // ความกว้างคอลัมน์ (เฉพาะคอลัมน์ที่แสดง)
+  const cols: number[] = visCols.map((oldC) => {
+    const w = colMeta[oldC]?.wch
+    return typeof w === "number" && w > 0 ? w : 10
+  })
 
-  // merges
+  // merges — remap เป็นดัชนีใหม่ ตัดส่วนที่อยู่ในแถว/คอลัมน์ที่ซ่อนออก
   const merges: PayslipMerge[] = []
   for (const m of (ws["!merges"] || []) as XLSX.Range[]) {
-    if (m.s.c >= maxCols) continue
-    merges.push({ r: m.s.r, c: m.s.c, rs: m.e.r - m.s.r + 1, cs: Math.min(m.e.c - m.s.c + 1, maxCols - m.s.c) })
+    const rIn: number[] = []
+    for (let r = m.s.r; r <= m.e.r; r++) if (rowNew.has(r)) rIn.push(rowNew.get(r)!)
+    const cIn: number[] = []
+    for (let c = m.s.c; c <= m.e.c; c++) if (colNew.has(c)) cIn.push(colNew.get(c)!)
+    if (rIn.length === 0 || cIn.length === 0) continue
+    const newR = Math.min(...rIn), newC = Math.min(...cIn)
+    if (newR >= gridRows.length) continue
+    merges.push({ r: newR, c: newC, rs: rIn.length, cs: cIn.length })
   }
 
-  rows = [] // free
   return { cols, merges, rows: gridRows, maxCols }
 }
 
@@ -89,7 +110,8 @@ function guessTotal(grid: PayslipGrid): number | null {
 
 /** parse ทั้งไฟล์ฝั่ง browser -> รายการ sheet + grid */
 export function parseWorkbookClient(ab: ArrayBuffer): ClientSheet[] {
-  const wb = XLSX.read(ab, { type: "array", sheetRows: ROW_CAP, cellDates: false, cellStyles: false })
+  // cellStyles:true จำเป็นเพื่ออ่านสถานะ "ซ่อน" ของแถว/คอลัมน์ (!rows/!cols hidden)
+  const wb = XLSX.read(ab, { type: "array", sheetRows: ROW_CAP, cellDates: false, cellStyles: true })
   // ข้ามชีตที่ถูกซ่อนใน Excel (Hidden=1 / VeryHidden=2) — มักเป็นของเก่า/พัง (#REF!)
   // เพื่อให้หน้าอัปเห็นเฉพาะคนขับที่มองเห็นจริงในไฟล์ (ตรงกับที่ผู้ใช้เห็น)
   const wbMeta = (wb.Workbook && wb.Workbook.Sheets) || []

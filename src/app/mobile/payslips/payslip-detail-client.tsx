@@ -88,6 +88,11 @@ export function PayslipDetailClient({ kind, grid, voucher, title, subtitle }: Pr
         </Button>
       </div>
 
+      {kind !== "voucher" && grid && (
+        <p className="text-xs text-muted-foreground text-center -mb-1">
+          👉 เลื่อนซ้าย/ขวาเพื่อดูทุกคอลัมน์ · หรือกด &ldquo;ดาวน์โหลด PDF&rdquo; เพื่อดูแบบเต็ม
+        </p>
+      )}
       {/* เนื้อหา — เป็นแหล่ง render สำหรับ PDF ด้วย */}
       <div className="rounded-xl border border-gray-200 bg-white overflow-x-auto">
         {kind === "voucher" && voucher ? (
