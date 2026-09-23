@@ -25,7 +25,7 @@ export async function getAdminAlerts(): Promise<AdminAlert[]> {
   try {
     let vQuery = supabase
       .from('Master_Vehicles')
-      .select('Vehicle_Plate, Tax_Expiry, Insurance_Expiry, Act_Expiry, Active_Status')
+      .select('Vehicle_Plate, Tax_Expiry, Insurance_Expiry, Act_Expiry, Cargo_Insurance_Expiry, Active_Status, Current_Mileage, Next_Service_Mileage, Tire_Next_Change_Mileage')
       .eq('Active_Status', 'Active')
 
     if (branchId && branchId !== 'All') {
@@ -33,32 +33,87 @@ export async function getAdminAlerts(): Promise<AdminAlert[]> {
     }
 
     const { data: vehicles } = await vQuery
-    vehicles?.forEach((v: { Tax_Expiry: string, Insurance_Expiry: string, Act_Expiry: string, Vehicle_Plate: string }) => {
+    vehicles?.forEach((v: Record<string, unknown>) => {
+      const plate = String(v.Vehicle_Plate || '')
       const checks = [
-        { field: v.Tax_Expiry, label: 'ภาษีรถ (Tax)', type: 'tax' },
-        { field: v.Insurance_Expiry, label: 'ประกันภัย (Insurance)', type: 'insurance' },
-        { field: v.Act_Expiry, label: 'พ.ร.บ. (ACT)', type: 'act' },
+        { field: v.Tax_Expiry as string, label: 'ภาษีรถ (Tax)', type: 'tax' },
+        { field: v.Insurance_Expiry as string, label: 'ประกันภัย (Insurance)', type: 'insurance' },
+        { field: v.Act_Expiry as string, label: 'พ.ร.บ. (ACT)', type: 'act' },
+        { field: v.Cargo_Insurance_Expiry as string, label: 'ประกันสินค้า (Cargo)', type: 'cargo' },
       ]
       checks.forEach(c => {
         if (!c.field) return
         const expDate = new Date(c.field)
+        if (isNaN(expDate.getTime())) return
         const diffDays = Math.ceil((expDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24))
-        
+
         if (diffDays <= 30) {
           alerts.push({
-            id: `${v.Vehicle_Plate}-${c.type}`,
+            id: `${plate}-${c.type}`,
             type: 'expiry',
             severity: diffDays <= 0 ? 'critical' : diffDays <= 15 ? 'warning' : 'info',
-            title: `${c.label} — ${v.Vehicle_Plate}`,
-            description: diffDays <= 0 
-              ? `หมดอายุแล้ว ${Math.abs(diffDays)} วัน` 
+            title: `${c.label} — ${plate}`,
+            description: diffDays <= 0
+              ? `หมดอายุแล้ว ${Math.abs(diffDays)} วัน`
               : `เหลืออีก ${diffDays} วัน (หมดอายุ ${expDate.toLocaleDateString('th-TH')})`,
             date: c.field || '',
-            href: `/fleet?search=${v.Vehicle_Plate}`,
-            meta: { plate: v.Vehicle_Plate, expiryType: c.type }
+            href: `/fleet?search=${plate}`,
+            meta: { plate, expiryType: c.type }
           })
         }
       })
+
+      // เช็คระยะ / เปลี่ยนยาง — ตามเลขไมล์
+      const cur = Number(v.Current_Mileage) || 0
+      if (cur > 0) {
+        const mChecks = [
+          { target: Number(v.Next_Service_Mileage) || 0, label: 'เช็คระยะ', type: 'service' },
+          { target: Number(v.Tire_Next_Change_Mileage) || 0, label: 'เปลี่ยนยาง', type: 'tire' },
+        ]
+        mChecks.forEach(m => {
+          if (m.target > 0 && cur >= m.target - 1000) {
+            const over = cur >= m.target
+            const diff = Math.abs(m.target - cur).toLocaleString()
+            alerts.push({
+              id: `${plate}-${m.type}`,
+              type: 'expiry',
+              severity: over ? 'critical' : 'warning',
+              title: `${m.label} — ${plate}`,
+              description: over ? `เกินกำหนด ${diff} กม. (ไมล์ ${cur.toLocaleString()}/${m.target.toLocaleString()})` : `อีก ${diff} กม. (ไมล์ ${cur.toLocaleString()}/${m.target.toLocaleString()})`,
+              date: '',
+              href: `/fleet?search=${plate}`,
+              meta: { plate, expiryType: m.type }
+            })
+          }
+        })
+      }
+    })
+  } catch { /* ignore */ }
+
+  // 1.5 ใบขับขี่คนขับใกล้หมด/หมดอายุ
+  try {
+    let dQuery = supabase.from('Master_Drivers')
+      .select('Driver_ID, Driver_Name, Expire_Date, Active_Status, Branch_ID')
+      .eq('Active_Status', 'Active')
+    if (branchId && branchId !== 'All') dQuery = dQuery.eq('Branch_ID', branchId)
+    const { data: drivers } = await dQuery
+    drivers?.forEach((d: { Driver_ID: string, Driver_Name: string, Expire_Date: string }) => {
+      if (!d.Expire_Date) return
+      const expDate = new Date(d.Expire_Date)
+      if (isNaN(expDate.getTime())) return
+      const diffDays = Math.ceil((expDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24))
+      if (diffDays <= 30) {
+        alerts.push({
+          id: `lic-${d.Driver_ID}`,
+          type: 'expiry',
+          severity: diffDays <= 0 ? 'critical' : diffDays <= 15 ? 'warning' : 'info',
+          title: `ใบขับขี่ — ${d.Driver_Name || d.Driver_ID}`,
+          description: diffDays <= 0 ? `หมดอายุแล้ว ${Math.abs(diffDays)} วัน` : `เหลืออีก ${diffDays} วัน (หมดอายุ ${expDate.toLocaleDateString('th-TH')})`,
+          date: d.Expire_Date,
+          href: `/drivers`,
+          meta: { driver: d.Driver_Name }
+        })
+      }
     })
   } catch { /* ignore */ }
 
