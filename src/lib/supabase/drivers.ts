@@ -29,6 +29,7 @@ export type Driver = {
   Show_Price_Default?: boolean | null
   Branch_ID?: string | null
   Customer_ID?: string | null
+  Image_Url?: string | null
 }
 
 // Get all drivers from Master_Drivers table
@@ -78,8 +79,18 @@ export async function getDriverById(id: string): Promise<Driver | null> {
       .eq('Driver_ID', id)
       .single()
     
-    if (error) return null
-    return data
+    if (error || !data) return null
+
+    try {
+      const { getImageMap } = await import("@/lib/gdrive/entity-images")
+      const map = await getImageMap()
+      return {
+        ...data,
+        Image_Url: data.Image_Url || map.drivers[data.Driver_ID] || null,
+      }
+    } catch {
+      return data
+    }
   } catch {
     return null
   }
@@ -229,7 +240,18 @@ export async function getAllDrivers(page?: number, limit?: number, query?: strin
     
     const { data, error, count } = await queryBuilder
     if (error) return { data: [], count: 0 }
-    return { data: data || [], count: count || 0 }
+
+    try {
+      const { getImageMap } = await import("@/lib/gdrive/entity-images")
+      const map = await getImageMap()
+      const enriched = (data || []).map((d: Driver) => ({
+        ...d,
+        Image_Url: d.Image_Url || map.drivers[d.Driver_ID] || null,
+      }))
+      return { data: enriched, count: count || 0 }
+    } catch {
+      return { data: data || [], count: count || 0 }
+    }
   } catch {
     return { data: [], count: 0 }
   }

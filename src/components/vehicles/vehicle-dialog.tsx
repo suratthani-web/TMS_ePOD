@@ -17,6 +17,7 @@ import { Vehicle } from "@/lib/supabase/vehicles"
 import { Branch } from "@/lib/supabase/branches"
 import { Subcontractor } from "@/types/subcontractor"
 import { cn } from "@/lib/utils"
+import { formatGoogleDriveImageUrl } from "@/lib/gdrive/utils"
 
 type VehicleDialogProps = {
   mode?: 'create' | 'edit'
@@ -87,7 +88,8 @@ export function VehicleDialog({
     Cargo_Insurance_Company: vehicle?.Cargo_Insurance_Company || '',
     Tire_Change_Date: vehicle?.Tire_Change_Date || '',
     Tire_Change_Odometer: vehicle?.Tire_Change_Odometer || '',
-    Tire_Next_Change_Mileage: vehicle?.Tire_Next_Change_Mileage || ''
+    Tire_Next_Change_Mileage: vehicle?.Tire_Next_Change_Mileage || '',
+    Image_Url: vehicle?.Image_Url || ''
   })
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -104,6 +106,7 @@ export function VehicleDialog({
         Max_Volume_cbm: formData.Max_Volume_cbm === '' ? undefined : Number(formData.Max_Volume_cbm),
         Tire_Change_Odometer: formData.Tire_Change_Odometer === '' ? undefined : Number(formData.Tire_Change_Odometer),
         Tire_Next_Change_Mileage: formData.Tire_Next_Change_Mileage === '' ? undefined : Number(formData.Tire_Next_Change_Mileage),
+        Image_Url: formData.Image_Url || null,
       }
 
       if (mode === 'create') {
@@ -138,7 +141,8 @@ export function VehicleDialog({
               Cargo_Insurance_Company: '',
               Tire_Change_Date: '',
               Tire_Change_Odometer: '',
-              Tire_Next_Change_Mileage: ''
+              Tire_Next_Change_Mileage: '',
+              Image_Url: ''
           })
         }
         if (onSuccess) onSuccess()
@@ -230,6 +234,51 @@ export function VehicleDialog({
               disabled={mode === 'edit'}
               className="h-12 px-4 rounded-xl bg-muted/50 border-border text-foreground placeholder:text-muted-foreground focus:ring-primary/40"
             />
+          </div>
+
+          {/* Vehicle Photo (Google Drive / URL) */}
+          <div className="space-y-2">
+            <Label htmlFor="Image_Url" className="text-sm font-medium text-muted-foreground ml-1 flex items-center justify-between">
+              <span>รูปรถ (ลิงก์ Google Drive หรือ URL รูปภาพ)</span>
+              {formData.Image_Url && (
+                <button
+                  type="button"
+                  onClick={() => setFormData({ ...formData, Image_Url: "" })}
+                  className="text-xs text-rose-500 hover:underline font-normal"
+                >
+                  ล้างรูป
+                </button>
+              )}
+            </Label>
+            <div className="flex gap-4 items-center">
+              <div className="relative w-16 h-16 rounded-xl overflow-hidden border border-border bg-muted/50 flex-shrink-0 flex items-center justify-center shadow-xs">
+                {formData.Image_Url ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img
+                    src={formatGoogleDriveImageUrl(formData.Image_Url)}
+                    alt="Vehicle Preview"
+                    className="w-full h-full object-cover"
+                    onError={(e) => {
+                      (e.currentTarget as HTMLImageElement).style.display = 'none'
+                    }}
+                  />
+                ) : (
+                  <Car className="text-muted-foreground/40" size={26} />
+                )}
+              </div>
+              <div className="flex-1 space-y-1">
+                <Input
+                  id="Image_Url"
+                  value={formData.Image_Url}
+                  onChange={(e) => setFormData({ ...formData, Image_Url: e.target.value })}
+                  placeholder="วางลิงก์รูป Google Drive (เช่น https://drive.google.com/file/d/...)"
+                  className="h-11 px-4 rounded-xl bg-muted/50 border-border text-foreground placeholder:text-muted-foreground text-xs"
+                />
+                <p className="text-[11px] text-muted-foreground">
+                  * รองรับลิงก์แชร์จาก Google Drive หรือลิงก์รูปภาพโดยตรง
+                </p>
+              </div>
+            </div>
           </div>
           
           <div className="grid grid-cols-2 gap-4">

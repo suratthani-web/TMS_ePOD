@@ -13,6 +13,7 @@ import { Loader2, User, Phone, Key, Calendar, Landmark, Save } from "lucide-reac
 import { Driver } from "@/lib/supabase/drivers"
 import { BANKS } from "@/lib/constants/banks"
 import { useLanguage } from "@/components/providers/language-provider"
+import { formatGoogleDriveImageUrl } from "@/lib/gdrive/utils"
 
 type DriverDialogProps = {
   mode?: 'create' | 'edit'
@@ -58,6 +59,7 @@ export function DriverDialog({
     Bank_Account_No: driver?.Bank_Account_No || '',
     Bank_Account_Name: driver?.Bank_Account_Name || '',
     Is_Sub_Owner: (driver as { Is_Sub_Owner?: boolean })?.Is_Sub_Owner || false,
+    Image_Url: driver?.Image_Url || '',
   })
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -167,6 +169,51 @@ export function DriverDialog({
                       required={mode === 'create'}
                       className="h-12 pl-12 rounded-xl bg-muted/50 border-border/10 text-foreground placeholder:text-muted-foreground focus:ring-primary/40"
                     />
+                </div>
+              </div>
+
+              {/* Photo from Google Drive */}
+              <div className="space-y-2 md:col-span-2">
+                <Label htmlFor="Image_Url" className="text-base font-bold font-black uppercase tracking-tight text-muted-foreground ml-1 flex items-center justify-between">
+                  <span>รูปถ่ายคนขับ (ลิงก์ Google Drive หรือ URL)</span>
+                  {formData.Image_Url && (
+                    <button
+                      type="button"
+                      onClick={() => setFormData({ ...formData, Image_Url: "" })}
+                      className="text-xs text-rose-500 hover:underline font-normal"
+                    >
+                      ล้างรูป
+                    </button>
+                  )}
+                </Label>
+                <div className="flex gap-4 items-center">
+                  <div className="relative w-14 h-14 rounded-2xl overflow-hidden border border-border bg-muted/50 flex-shrink-0 flex items-center justify-center shadow-xs">
+                    {formData.Image_Url ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img
+                        src={formatGoogleDriveImageUrl(formData.Image_Url)}
+                        alt="Driver Preview"
+                        className="w-full h-full object-cover"
+                        onError={(e) => {
+                          (e.currentTarget as HTMLImageElement).src = `https://api.dicebear.com/7.x/avataaars/svg?seed=${formData.Driver_Name || 'driver'}`
+                        }}
+                      />
+                    ) : (
+                      <User className="text-muted-foreground/40" size={24} />
+                    )}
+                  </div>
+                  <div className="flex-1 space-y-1">
+                    <Input
+                      id="Image_Url"
+                      value={formData.Image_Url}
+                      onChange={(e) => setFormData({ ...formData, Image_Url: e.target.value })}
+                      placeholder="วางลิงก์รูป Google Drive (เช่น https://drive.google.com/file/d/...)"
+                      className="h-12 px-4 rounded-xl bg-muted/50 border-border/10 text-foreground placeholder:text-muted-foreground text-xs"
+                    />
+                    <p className="text-[11px] text-muted-foreground">
+                      * รองรับลิงก์ Google Drive ทุกรูปแบบ หรือ URL รูปภาพทั่วไป
+                    </p>
+                  </div>
                 </div>
               </div>
           </div>

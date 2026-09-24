@@ -27,6 +27,7 @@ export type VehicleFormData = {
   Tire_Change_Date?: string
   Tire_Change_Odometer?: number
   Tire_Next_Change_Mileage?: number
+  Image_Url?: string | null
 }
 
 export async function createVehicle(data: VehicleFormData) {
@@ -71,6 +72,15 @@ export async function createVehicle(data: VehicleFormData) {
 
   if (error) {
     return { success: false, message: 'Failed to create vehicle: ' + error.message }
+  }
+
+  if (data.Image_Url !== undefined) {
+    try {
+      const { saveEntityImage } = await import('@/lib/gdrive/entity-images')
+      await saveEntityImage('vehicle', data.Vehicle_Plate, data.Image_Url || null)
+    } catch {
+      // Non-blocking
+    }
   }
 
   revalidatePath('/vehicles')
@@ -223,6 +233,15 @@ export async function updateVehicle(plate: string, data: Partial<VehicleFormData
 
   if (error) {
     return { success: false, message: 'Failed to update vehicle' }
+  }
+
+  if (data.Image_Url !== undefined) {
+    try {
+      const { saveEntityImage } = await import('@/lib/gdrive/entity-images')
+      await saveEntityImage('vehicle', plate, data.Image_Url || null)
+    } catch {
+      // Non-blocking
+    }
   }
 
   revalidatePath('/vehicles')

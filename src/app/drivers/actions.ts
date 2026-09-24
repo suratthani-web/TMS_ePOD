@@ -17,6 +17,7 @@ export type DriverFormData = {
   Bank_Account_No?: string
   Bank_Account_Name?: string
   Is_Sub_Owner?: boolean
+  Image_Url?: string | null
 }
 
 export async function createDriver(data: DriverFormData) {
@@ -48,6 +49,13 @@ export async function createDriver(data: DriverFormData) {
 
   if (error) {
     return { success: false, message: `Failed to create driver: ${error.message} ${error.details || ''}` }
+  }
+
+  if (data.Image_Url) {
+    try {
+      const { saveEntityImage } = await import("@/lib/gdrive/entity-images")
+      await saveEntityImage("driver", data.Driver_ID, data.Image_Url)
+    } catch { /* ignore */ }
   }
 
   revalidatePath('/drivers')
@@ -202,6 +210,13 @@ export async function updateDriver(driverId: string, data: Partial<DriverFormDat
     }
   } catch (error: unknown) {
     return { success: false, message: error instanceof Error ? error.message : 'Database error' }
+  }
+
+  if (data.Image_Url !== undefined) {
+    try {
+      const { saveEntityImage } = await import("@/lib/gdrive/entity-images")
+      await saveEntityImage("driver", data.Driver_ID || driverId, data.Image_Url || "")
+    } catch { /* ignore */ }
   }
 
   revalidatePath('/drivers')

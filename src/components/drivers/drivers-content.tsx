@@ -16,6 +16,8 @@ import { Pagination } from "@/components/ui/pagination"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { useLanguage } from "@/components/providers/language-provider"
 import { cn } from "@/lib/utils"
+import { GDriveSyncDialog } from "@/components/gdrive/gdrive-sync-dialog"
+import { formatGoogleDriveImageUrl } from "@/lib/gdrive/utils"
 
 type DriversContentProps = {
   drivers: Driver[]
@@ -206,6 +208,10 @@ export function DriversContent({
         <div className="flex items-center gap-3 w-full md:w-auto justify-end">
             {isAdminUser && (
               <>
+                <GDriveSyncDialog
+                    defaultType="driver"
+                    onSuccess={() => router.refresh()}
+                />
                 <ImportDriversDialog 
                     createBulkDrivers={createBulkDrivers}
                     branches={branches}
@@ -266,7 +272,10 @@ export function DriversContent({
                   <div className="flex items-center gap-3">
                     <div className="relative">
                       <Avatar className={cn("h-10 w-10 border shadow-sm", isTarget ? "border-primary" : "border-border")}>
-                        <AvatarImage src={`https://api.dicebear.com/7.x/avataaars/svg?seed=${driver.Driver_Name}`} />
+                        <AvatarImage 
+                          src={driver.Image_Url ? formatGoogleDriveImageUrl(driver.Image_Url) : `https://api.dicebear.com/7.x/avataaars/svg?seed=${driver.Driver_Name}`} 
+                          alt={driver.Driver_Name || undefined}
+                        />
                         <AvatarFallback className="bg-muted text-foreground font-bold text-xs">{driver.Driver_Name?.charAt(0)}</AvatarFallback>
                       </Avatar>
                       <div className="absolute -bottom-0.5 -right-0.5 w-3 h-3 bg-emerald-500 border-2 border-card rounded-full" />

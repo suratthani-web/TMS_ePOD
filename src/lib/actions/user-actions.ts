@@ -56,7 +56,17 @@ export async function getUsers(providedBranchId?: string) {
         return []
     }
 
-    return data
+    try {
+        const { getImageMap } = await import("@/lib/gdrive/entity-images")
+        const map = await getImageMap()
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        return (data || []).map((u: any) => ({
+            ...u,
+            Avatar_Url: u.Avatar_Url || map.users[u.Username] || null,
+        }))
+    } catch {
+        return data || []
+    }
 }
 
 const ROLE_MAP: Record<string, number> = {

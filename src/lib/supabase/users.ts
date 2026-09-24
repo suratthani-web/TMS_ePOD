@@ -46,6 +46,14 @@ export async function getUserProfile() {
         if (!data.Last_Name) data.Last_Name = parts.slice(1).join(" ") || ""
     }
 
+    try {
+      const { getImageMap } = await import("@/lib/gdrive/entity-images")
+      const map = await getImageMap()
+      if (!data.Avatar_Url && map.users[data.Username]) {
+        data.Avatar_Url = map.users[data.Username]
+      }
+    } catch {}
+
     return data
   } catch {
     return null
@@ -82,6 +90,13 @@ export async function updateUserProfile(data: Partial<UserProfile>) {
 
     if (count === 0) {
       return { success: false, error: 'User record not found or no changes applied' }
+    }
+
+    if (data.Avatar_Url !== undefined) {
+      try {
+        const { saveEntityImage } = await import('@/lib/gdrive/entity-images')
+        await saveEntityImage('user', session.userId, data.Avatar_Url)
+      } catch {}
     }
 
     revalidatePath('/settings/profile')

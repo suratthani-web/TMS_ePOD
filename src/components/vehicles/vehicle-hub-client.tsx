@@ -14,6 +14,7 @@ import {
     getFuelLogsFor, getRepairTicketsFor, getVehicleChecksFor,
     type TireSummary, type VehicleCostSummary,
 } from "@/app/vehicles/fleet-log-actions"
+import { formatGoogleDriveImageUrl } from "@/lib/gdrive/utils"
 
 const DOC_LABELS: Record<string, string> = { tax: 'ภาษีรถ', insurance: 'ประกันภัย', act: 'พ.ร.บ.', cargo: 'ประกันสินค้า', tire: 'ยาง' }
 const TIRE_ACTION_LABELS: Record<string, string> = { change: 'เปลี่ยน', patch: 'ปะ', rotate: 'สลับ' }
@@ -61,6 +62,19 @@ export function VehicleHubClient({ vehicle }: { vehicle: Vehicle }) {
             <div className="flex flex-wrap items-center justify-between gap-4">
                 <div className="flex items-center gap-4">
                     <Link href="/vehicles"><Button variant="outline" size="icon" className="h-10 w-10"><ArrowLeft size={18} /></Button></Link>
+                    {vehicle.Image_Url ? (
+                        <div className="w-16 h-16 rounded-2xl overflow-hidden border border-border bg-muted/30 shrink-0 shadow-sm">
+                            {/* eslint-disable-next-line @next/next/no-img-element */}
+                            <img
+                                src={formatGoogleDriveImageUrl(vehicle.Image_Url)}
+                                alt={plate}
+                                className="w-full h-full object-cover"
+                                onError={(e) => {
+                                    (e.currentTarget as HTMLImageElement).style.display = 'none'
+                                }}
+                            />
+                        </div>
+                    ) : null}
                     <div>
                         <div className="flex items-center gap-2 mb-1">
                             <Badge className="bg-primary/10 text-primary border-primary/20 text-xs">{vehicle.Vehicle_Type || '-'}</Badge>

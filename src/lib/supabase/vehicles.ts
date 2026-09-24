@@ -38,6 +38,7 @@ export type Vehicle = {
   Primary_Driver_Name?: string | null
   is_chassis?: boolean | null
   Customer_ID?: string | null
+  Image_Url?: string | null
 }
 
 export async function getAllVehiclesFromTable(providedBranchId?: string): Promise<Vehicle[]> {
@@ -63,7 +64,16 @@ export async function getAllVehiclesFromTable(providedBranchId?: string): Promis
 
     const { data, error } = await query
     if (error) return []
-    return data || []
+    try {
+      const { getImageMap } = await import("@/lib/gdrive/entity-images")
+      const map = await getImageMap()
+      return (data || []).map((v: Vehicle) => ({
+        ...v,
+        Image_Url: v.Image_Url || (v.Vehicle_Plate ? map.vehicles[v.Vehicle_Plate] : null) || null,
+      }))
+    } catch {
+      return data || []
+    }
   } catch {
     return []
   }
@@ -81,8 +91,18 @@ export async function getVehicleByPlate(plate: string): Promise<Vehicle | null> 
       .eq('Vehicle_Plate', plate)
       .single()
     
-    if (error) return null
-    return data
+    if (error || !data) return null
+
+    try {
+      const { getImageMap } = await import("@/lib/gdrive/entity-images")
+      const map = await getImageMap()
+      return {
+        ...data,
+        Image_Url: data.Image_Url || map.vehicles[data.Vehicle_Plate] || null,
+      }
+    } catch {
+      return data
+    }
   } catch {
     return null
   }
@@ -257,7 +277,17 @@ export async function getAllVehicles(page?: number, limit?: number, query?: stri
       Primary_Driver_Name: driverMap.get(v.Driver_ID || '') || driverByPlate.get(v.Vehicle_Plate || '') || null
     }))
     
-    return { data: mappedData, count: count || 0 }
+    try {
+      const { getImageMap } = await import("@/lib/gdrive/entity-images")
+      const map = await getImageMap()
+      const enrichedData = mappedData.map((v: Partial<Vehicle>) => ({
+        ...v,
+        Image_Url: v.Image_Url || (v.Vehicle_Plate ? map.vehicles[v.Vehicle_Plate] : null) || null,
+      }))
+      return { data: enrichedData, count: count || 0 }
+    } catch {
+      return { data: mappedData, count: count || 0 }
+    }
   } catch (err) {
     console.error(`[DB] Critical Failure in getAllVehicles:`, err)
     return { data: [], count: 0 }

@@ -23,6 +23,8 @@ import { useLanguage } from "@/components/providers/language-provider"
 import { ExcelImport } from "@/components/ui/excel-import"
 import { PremiumButton } from "@/components/ui/premium-button"
 import { isAdmin } from "@/lib/permissions"
+import { GDriveSyncDialog } from "@/components/gdrive/gdrive-sync-dialog"
+import { formatGoogleDriveImageUrl } from "@/lib/gdrive/utils"
 
 export default function VehiclesPage() {
   const [vehicles, setVehicles] = useState<Vehicle[]>([])
@@ -84,6 +86,7 @@ export default function VehiclesPage() {
           Primary_Driver_Name: v.Primary_Driver_Name ?? null,
           is_chassis: v.is_chassis ?? null,
           Customer_ID: v.Customer_ID ?? null,
+          Image_Url: v.Image_Url ?? null,
         } satisfies Vehicle)))
       setIsAdminUser(adminStatus)
       setLoading(false)
@@ -116,6 +119,10 @@ export default function VehiclesPage() {
             <div className="relative z-10 flex items-center gap-3">
                 {isAdminUser && (
                   <>
+                    <GDriveSyncDialog 
+                        defaultType="vehicle"
+                        onSuccess={() => setRefreshTrigger(prev => prev + 1)}
+                    />
                     <ExcelImport 
                         trigger={
                             <PremiumButton variant="outline" className="h-11 px-5 rounded-xl border-border hover:bg-muted/50 text-muted-foreground text-sm font-semibold gap-2">
@@ -190,22 +197,46 @@ export default function VehiclesPage() {
                         </div>
                         
                         <div className="flex justify-between items-start relative z-10 mb-4">
-                            <div>
-                                <div className="flex flex-wrap items-center gap-1.5 mb-2">
-                                    <Badge className="bg-primary/10 text-primary border-primary/20 px-2 py-0.5 rounded-md font-medium text-xs">
-                                        {vehicle.Vehicle_Type || "-"}
-                                    </Badge>
-                                    {/* Ownership: company / independent รถร่วม / affiliated รถร่วม */}
-                                    {(() => {
-                                        const ot = vehicle.Owner_Type || (vehicle.Sub_ID ? 'sub' : 'company')
-                                        if (ot === 'sub') return <Badge className="bg-amber-500/10 text-amber-600 border-amber-500/20 px-2 py-0.5 rounded-md font-medium text-xs">รถร่วม (มีสังกัด)</Badge>
-                                        if (ot === 'independent') return <Badge className="bg-orange-500/10 text-orange-600 border-orange-500/20 px-2 py-0.5 rounded-md font-medium text-xs">รถร่วมอิสระ</Badge>
-                                        return <Badge className="bg-emerald-500/10 text-emerald-600 border-emerald-500/20 px-2 py-0.5 rounded-md font-medium text-xs">รถบริษัท</Badge>
-                                    })()}
+                            <div className="flex items-start gap-3">
+                                {vehicle.Image_Url ? (
+                                    <div className="w-14 h-14 rounded-xl overflow-hidden border border-border bg-muted/40 shrink-0 shadow-xs">
+                                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                                        <img
+                                            src={formatGoogleDriveImageUrl(vehicle.Image_Url)}
+                                            alt={vehicle.Vehicle_Plate}
+                                            className="w-full h-full object-cover"
+                                            onError={(e) => {
+                                                (e.currentTarget as HTMLImageElement).style.display = 'none'
+                                            }}
+                                        />
+                                    </div>
+                                ) : (
+                                    <div className="w-14 h-14 rounded-xl border border-border bg-primary/10 flex items-center justify-center shrink-0 text-primary">
+                                        <Truck size={24} />
+                                    </div>
+                                )}
+                                <div>
+                                    <div className="flex flex-wrap items-center gap-1.5 mb-1.5">
+                                        <Badge className="bg-primary/10 text-primary border-primary/20 px-2 py-0.5 rounded-md font-medium text-xs">
+                                            {vehicle.Vehicle_Type || "-"}
+                                        </Badge>
+                                        {/* Ownership: company / independent รถร่วม / affiliated รถร่วม */}
+                                        {(() => {
+                                            const ot = vehicle.Owner_Type || (vehicle.Sub_ID ? 'sub' : 'company')
+                                            if (ot === 'sub') return <Badge className="bg-amber-500/10 text-amber-600 border-amber-500/20 px-2 py-0.5 rounded-md font-medium text-xs">รถร่วม (มีสังกัด)</Badge>
+                                            if (ot === 'independent') return <Badge className="bg-orange-500/10 text-orange-600 border-orange-500/20 px-2 py-0.5 rounded-md font-medium text-xs">รถร่วมอิสระ</Badge>
+                                            return <Badge className="bg-emerald-500/10 text-emerald-600 border-emerald-500/20 px-2 py-0.5 rounded-md font-medium text-xs">รถบริษัท</Badge>
+                                        })()}
+                                    </div>
+                                    <Link href={`/vehicles/${encodeURIComponent(vehicle.Vehicle_Plate)}`} className="text-xl font-semibold text-foreground tracking-tight hover:text-primary hover:underline transition-colors block">
+                                        {vehicle.Vehicle_Plate}
+                                    </Link>
+                                    {(vehicle.Brand || vehicle.Model) && (
+                                        <p className="text-xs text-muted-foreground mt-0.5">
+                                            {[vehicle.Brand, vehicle.Model].filter(Boolean).join(' ')}
+                                        </p>
+                                    )}
                                 </div>
-                                <Link href={`/vehicles/${encodeURIComponent(vehicle.Vehicle_Plate)}`} className="text-xl font-semibold text-foreground tracking-tight hover:text-primary hover:underline transition-colors">
-                                    {vehicle.Vehicle_Plate}
-                                </Link>
                             </div>
                             <VehicleActions vehicle={vehicle} />
                         </div>
