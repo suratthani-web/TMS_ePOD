@@ -21,7 +21,6 @@ import { Subcontractor } from "@/types/subcontractor"
 import { getBankCode } from "@/lib/constants/banks"
 import { toast } from "sonner"
 import { exportToCSV } from "@/lib/utils/export"
-import { generateCrewPaymentXlsx } from "@/lib/actions/crew-payment-export"
 import { PaymentVoucher } from "@/components/billing/driver/PaymentVoucher"
 import { cn } from "@/lib/utils"
 
@@ -120,8 +119,6 @@ export default function DriverPaymentClient({
   const [vatRate, setVatRate] = useState<number>(0)
   const [whtRate, setWhtRate] = useState<number>(1)
   const [claimRate, setClaimRate] = useState<number>(0)
-  const [helperName, setHelperName] = useState<string>("")
-  const [crewLoading, setCrewLoading] = useState(false)
   const [entitySearch, setEntitySearch] = useState("")
 
   // Jobs belonging to the chosen recipient (and date range). This is the ONLY
@@ -267,29 +264,6 @@ export default function DriverPaymentClient({
     exportToCSV(rows, `Driver_Payment_${entityName}`)
   }
 
-  // สร้างไฟล์จ่ายพนักงาน 3 แท็บตามแม่แบบแอดมิน PCG (คนขับ + เด็กรถ + สรุปจ่าย)
-  const handleExportCrewXlsx = async () => {
-    if (selectedData.length === 0) return
-    setCrewLoading(true)
-    try {
-      const res = await generateCrewPaymentXlsx({
-        jobIds: selectedData.map(j => j.Job_ID),
-        driverName: entityName,
-        helperName: helperName.trim() || undefined,
-      })
-      if (!res.success) { toast.error(res.message); return }
-      const href = `data:application/vnd.openxmlformats-officedocument.spreadsheetml.sheet;base64,${res.base64}`
-      const link = document.createElement("a")
-      link.href = href
-      link.setAttribute("download", res.filename)
-      document.body.appendChild(link); link.click(); document.body.removeChild(link)
-      toast.success("สร้างไฟล์จ่ายพนักงานแล้ว")
-    } catch (e) {
-      toast.error(e instanceof Error ? e.message : "สร้างไฟล์ไม่สำเร็จ")
-    } finally {
-      setCrewLoading(false)
-    }
-  }
 
   const entityOptions = mode === 'individual'
     ? drivers.filter(d => !d.Sub_ID).map(d => ({ id: d.Driver_Name || "", label: d.Driver_Name || "-" }))
@@ -583,22 +557,6 @@ export default function DriverPaymentClient({
                     <button onClick={handleExportCSV} className="h-12 px-6 rounded-xl bg-muted/50 border border-border/10 hover:bg-muted transition-all font-bold flex items-center gap-2">
                         <Download size={18} /> Export CSV
                     </button>
-                </div>
-
-                {/* ไฟล์จ่ายพนักงานตามแม่แบบแอดมิน (3 แท็บ: สรุปจ่าย / คนขับ / เด็กรถ) */}
-                <div className="p-5 rounded-2xl border border-indigo-500/20 bg-indigo-500/5 space-y-3">
-                    <p className="text-sm font-black flex items-center gap-2"><FileDown size={16} className="text-indigo-500" /> ไฟล์จ่ายพนักงาน (แม่แบบ PCG)</p>
-                    <div className="flex flex-wrap items-end gap-3">
-                        <label className="text-xs font-bold flex-1 min-w-[220px]">ชื่อเด็กรถ (ถ้ามี)
-                            <Input value={helperName} onChange={e => setHelperName(e.target.value)}
-                                className="h-11 mt-1" placeholder="เว้นว่างถ้าไม่มีเด็กรถ" />
-                            <span className="text-[10px] text-muted-foreground">เด็กรถได้ราคา = คนขับ − 200 (สูตรอ้างอิงแท็บคนขับ)</span>
-                        </label>
-                        <button onClick={handleExportCrewXlsx} disabled={crewLoading}
-                            className="h-11 px-6 rounded-xl bg-indigo-500/10 border border-indigo-500/20 text-indigo-600 hover:bg-indigo-500 hover:text-white transition-all font-bold flex items-center gap-2 disabled:opacity-50">
-                            {crewLoading ? <Loader2 size={18} className="animate-spin" /> : <FileDown size={18} />} สร้างไฟล์ Excel
-                        </button>
-                    </div>
                 </div>
             </div>
 
