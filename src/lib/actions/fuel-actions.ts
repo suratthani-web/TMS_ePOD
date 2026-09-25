@@ -372,21 +372,22 @@ export async function getSuggestedRate(
     if (!targetFuelPrice) return null
 
     const supabase = createAdminClient()
-    const { data, error } = await supabase
-        .from('Customer_Route_Rates')
-        .select('Fuel_Rate_Matrix')
-        .eq('Customer_ID', customerId)
-        .eq('Route_Name', routeName)
-        .ilike('Vehicle_Type', vehicleType) 
-        .maybeSingle()
-
-    if (error) {
-        console.error('[FUEL_ACTION] getSuggestedRate Error:', error)
-        return null
+    // ลอง route จริงก่อน; ถ้าไม่เจอ fallback ไป SYSTEM_PER_PIECE (matrix กลางแบบต่อชิ้น
+    // ของลูกค้ารายนั้น) — กันเคสที่คิดเงินฝั่งวางบิลส่ง route จริงมาแต่ matrix เก็บใต้ per-piece
+    const lookupRoutes = routeName === 'SYSTEM_PER_PIECE' ? ['SYSTEM_PER_PIECE'] : [routeName, 'SYSTEM_PER_PIECE']
+    let matrix: Array<{ min: number, max: number, price: number }> | null = null
+    for (const rn of lookupRoutes) {
+        const { data, error } = await supabase
+            .from('Customer_Route_Rates')
+            .select('Fuel_Rate_Matrix')
+            .eq('Customer_ID', customerId)
+            .eq('Route_Name', rn)
+            .ilike('Vehicle_Type', vehicleType)
+            .maybeSingle()
+        if (error) { console.error('[FUEL_ACTION] getSuggestedRate Error:', error); continue }
+        if (data?.Fuel_Rate_Matrix) { matrix = data.Fuel_Rate_Matrix as Array<{ min: number, max: number, price: number }>; break }
     }
-    if (!data || !data.Fuel_Rate_Matrix) return null
-
-    const matrix = data.Fuel_Rate_Matrix as Array<{ min: number, max: number, price: number }>
+    if (!matrix) return null
     if (!matrix || matrix.length === 0) return null
 
     const sortedMatrix = [...matrix].sort((a, b) => a.min - b.min)
