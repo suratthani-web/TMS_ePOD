@@ -208,48 +208,18 @@ export function PlanningClient({
         const filteredDrivers = customerBranchId ? drivers.filter(d => d.Branch_ID === customerBranchId) : drivers
         const filteredVehicles = customerBranchId ? vehicles.filter(v => v.Branch_ID === customerBranchId) : vehicles
 
-        // Align drivers and vehicles by mapping
-        const matchedPairs: { driver?: Driver; vehicle?: Vehicle }[] = []
-        const usedDriverIds = new Set<string>()
-        const usedVehiclePlates = new Set<string>()
-
-        // 1. Match by driver.Vehicle_Plate first
-        filteredDrivers.forEach(d => {
-            if (d.Vehicle_Plate) {
-                const matchedVehicle = filteredVehicles.find(v => v.Vehicle_Plate === d.Vehicle_Plate)
-                if (matchedVehicle) {
-                    matchedPairs.push({ driver: d, vehicle: matchedVehicle })
-                    usedDriverIds.add(d.Driver_ID)
-                    usedVehiclePlates.add(matchedVehicle.Vehicle_Plate)
-                }
+        // 1 แถว = 1 คนขับ พร้อม "ทะเบียนที่ตัวเองลงทะเบียนไว้จริง" เท่านั้น
+        // ถ้าไม่ได้ลงทะเบียนทะเบียนไว้ (คนขับหลายคัน สลับไปมา) → เว้นว่าง ตามจริง
+        // ห้ามจับคู่รถที่เหลือแบบสุ่ม (เดิมทำให้คนขับได้ทะเบียนของคนอื่น/สังกัดอื่น)
+        const driverRows = filteredDrivers.map(d => {
+            const v = d.Vehicle_Plate ? filteredVehicles.find(x => x.Vehicle_Plate === d.Vehicle_Plate) : undefined
+            return {
+                driverId: d.Driver_ID || "",
+                driverName: d.Driver_Name || "",
+                plate: d.Vehicle_Plate || "",       // ทะเบียนของคนขับเอง (หรือว่าง)
+                type: v?.Vehicle_Type || "",
             }
         })
-
-        // 2. Match by vehicle.Driver_ID next for remaining
-        filteredVehicles.forEach(v => {
-            if (v.Driver_ID && !usedVehiclePlates.has(v.Vehicle_Plate)) {
-                const matchedDriver = filteredDrivers.find(d => d.Driver_ID === v.Driver_ID && !usedDriverIds.has(d.Driver_ID))
-                if (matchedDriver) {
-                    matchedPairs.push({ driver: matchedDriver, vehicle: v })
-                    usedDriverIds.add(matchedDriver.Driver_ID)
-                    usedVehiclePlates.add(v.Vehicle_Plate)
-                }
-            }
-        })
-
-        // 3. Collect remaining unmapped drivers
-        const remainingDrivers = filteredDrivers.filter(d => !usedDriverIds.has(d.Driver_ID))
-        // 4. Collect remaining unmapped vehicles
-        const remainingVehicles = filteredVehicles.filter(v => !usedVehiclePlates.has(v.Vehicle_Plate))
-
-        // 5. Align remaining drivers and vehicles side-by-side
-        const maxRemaining = Math.max(remainingDrivers.length, remainingVehicles.length)
-        for (let i = 0; i < maxRemaining; i++) {
-            matchedPairs.push({
-                driver: remainingDrivers[i],
-                vehicle: remainingVehicles[i]
-            })
-        }
 
         // Reference list of unique locations (ต้นทาง/ปลายทางใช้ร่วมกันได้ ไม่ต้องแยกคอลัมน์)
         const locationList = Array.from(new Set(
@@ -257,22 +227,20 @@ export function PlanningClient({
                 .filter((v): v is string => Boolean(v))
         ))
 
-        const maxRows = Math.max(locationList.length, matchedPairs.length)
+        const maxRows = Math.max(locationList.length, driverRows.length)
         const dataSheetContent = []
 
         for (let i = 0; i < maxRows; i++) {
-            const pair = matchedPairs[i]
-            const d = pair?.driver
-            const v = pair?.vehicle
+            const dr = driverRows[i]
 
             dataSheetContent.push({
                 "สถานที่ (Location)": locationList[i] || "",
                 " ": "", // Spacer
-                "รหัสคนขับ (Driver ID)": d?.Driver_ID || "",
-                "ชื่อคนขับ (Driver Name)": d?.Driver_Name || "",
+                "รหัสคนขับ (Driver ID)": dr?.driverId || "",
+                "ชื่อคนขับ (Driver Name)": dr?.driverName || "",
                 "  ": "", // Spacer
-                "ทะเบียนรถ (Plate)": v?.Vehicle_Plate || "",
-                "ประเภทรถ (Type)": v?.Vehicle_Type || ""
+                "ทะเบียนรถ (Plate)": dr?.plate || "",
+                "ประเภทรถ (Type)": dr?.type || ""
             })
         }
 
