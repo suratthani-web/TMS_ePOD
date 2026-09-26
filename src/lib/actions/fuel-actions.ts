@@ -375,19 +375,26 @@ export async function getSuggestedRate(
     // ลอง route จริงก่อน; ถ้าไม่เจอ fallback ไป SYSTEM_PER_PIECE (matrix กลางแบบต่อชิ้น
     // ของลูกค้ารายนั้น) — กันเคสที่คิดเงินฝั่งวางบิลส่ง route จริงมาแต่ matrix เก็บใต้ per-piece
     const lookupRoutes = routeName === 'SYSTEM_PER_PIECE' ? ['SYSTEM_PER_PIECE'] : [routeName, 'SYSTEM_PER_PIECE']
+    // เทียบประเภทรถแบบทน "4" == "4-Wheel", "6" == "6-Wheel" (เอาเลขล้อมาเทียบ)
+    const wheelNum = (s: string) => (String(s || '').match(/\d+/)?.[0] || '')
+    const targetWheel = wheelNum(vehicleType)
     let matrix: Array<{ min: number, max: number, price: number }> | null = null
     for (const rn of lookupRoutes) {
+        // ดึงทุกประเภทรถของ route นี้ แล้วเลือกที่ตรงเอง (ilike ตรงๆ พลาดเพราะ "4" != "4-Wheel")
         const { data, error } = await supabase
             .from('Customer_Route_Rates')
-            .select('Fuel_Rate_Matrix')
+            .select('Vehicle_Type, Fuel_Rate_Matrix')
             .eq('Customer_ID', customerId)
             .eq('Route_Name', rn)
-            .ilike('Vehicle_Type', vehicleType)
-            .maybeSingle()
         if (error) { console.error('[FUEL_ACTION] getSuggestedRate Error:', error); continue }
-        if (data?.Fuel_Rate_Matrix) { matrix = data.Fuel_Rate_Matrix as Array<{ min: number, max: number, price: number }>; break }
+        if (!data || data.length === 0) continue
+        const rows = data as Array<{ Vehicle_Type: string, Fuel_Rate_Matrix: unknown }>
+        // 1) ตรงเป๊ะ (ตัวพิมพ์ไม่สำคัญ) 2) เลขล้อตรง 3) ถ้ามีแค่แถวเดียวใช้เลย
+        const pick = rows.find(r => String(r.Vehicle_Type || '').toLowerCase() === String(vehicleType).toLowerCase())
+            || (targetWheel ? rows.find(r => wheelNum(r.Vehicle_Type) === targetWheel) : undefined)
+            || (rows.length === 1 ? rows[0] : undefined)
+        if (pick?.Fuel_Rate_Matrix) { matrix = pick.Fuel_Rate_Matrix as Array<{ min: number, max: number, price: number }>; break }
     }
-    if (!matrix) return null
     if (!matrix || matrix.length === 0) return null
 
     const sortedMatrix = [...matrix].sort((a, b) => a.min - b.min)
