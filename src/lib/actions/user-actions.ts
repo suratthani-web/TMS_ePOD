@@ -18,6 +18,7 @@ export interface UserData {
     Active_Status: string;
     Customer_ID?: string | null;
     Permissions?: string[];
+    Avatar_Url?: string | null;
 }
 
 import { getUserBranchId, isSuperAdmin, isAdmin as checkIsAdmin } from "@/lib/permissions"
@@ -125,6 +126,12 @@ export async function createUser(user: UserData) {
         return { success: false, error: error.message }
     }
 
+    if (user.Avatar_Url) {
+        const { saveEntityImage } = await import("@/lib/gdrive/entity-images")
+        const img = await saveEntityImage("user", user.Username, user.Avatar_Url)
+        if (!img.success) return { success: false, error: `สร้างผู้ใช้แล้ว แต่บันทึกรูปไม่สำเร็จ: ${img.message || ''}` }
+    }
+
     revalidatePath("/settings/users")
     return { success: true }
 }
@@ -209,6 +216,22 @@ export async function updateUser(username: string, updates: Partial<UserData>) {
         // 23505 = unique_violation (กันกรณี race กับชื่อซ้ำ)
         const dup = (error as { code?: string }).code === '23505'
         return { success: false, error: dup ? "ชื่อผู้ใช้นี้มีอยู่ในระบบแล้ว กรุณาใช้ชื่ออื่น" : error.message }
+    }
+
+    // รูปโปรไฟล์: map รูปใน System_Settings ผูกด้วย username → ถ้าเปลี่ยนชื่อต้องย้าย key ด้วย
+    if (updates.Avatar_Url !== undefined || renaming) {
+        const { saveEntityImage, getImageMap } = await import("@/lib/gdrive/entity-images")
+        const finalUsername = renaming ? newUsername : username
+        // ไม่ได้ส่งรูปมา (แค่เปลี่ยนชื่อ) → ย้ายเฉพาะ key ใน map; คอลัมน์ Avatar_Url ติดไปกับแถวอยู่แล้ว
+        const avatar = updates.Avatar_Url !== undefined
+            ? updates.Avatar_Url
+            : (await getImageMap()).users[username]
+        if (avatar !== undefined) {
+            // ย้ายออกจากชื่อเดิมก่อน (หลัง rename ไม่มีแถวชื่อเดิมแล้ว จึงแตะแค่ map)
+            if (renaming) await saveEntityImage("user", username, "")
+            const img = await saveEntityImage("user", finalUsername, avatar || "")
+            if (!img.success) return { success: false, error: `บันทึกข้อมูลแล้ว แต่บันทึกรูปไม่สำเร็จ: ${img.message || ''}` }
+        }
     }
 
     // Cascade: ย้ายการอ้างชื่อผู้ใช้เดิมไปชื่อใหม่ในตารางที่เก็บ username เป็น string

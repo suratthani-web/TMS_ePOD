@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react"
 import { LogOut, Loader2 } from "lucide-react"
 import { getUserProfile, UserProfile } from "@/lib/supabase/users"
-import Image from "next/image"
+import { formatGoogleDriveImageUrl } from "@/lib/gdrive/utils"
 import { cn } from "@/lib/utils"
 
 export function SidebarProfile({ collapsed }: { collapsed: boolean }) {
@@ -22,6 +22,9 @@ export function SidebarProfile({ collapsed }: { collapsed: boolean }) {
         }
     }
     load()
+    // หน้าโปรไฟล์ยิง event นี้หลังบันทึก → โหลดรูป/ชื่อใหม่
+    window.addEventListener("profile-updated", load)
+    return () => window.removeEventListener("profile-updated", load)
   }, [])
 
   if (loading) return (
@@ -48,7 +51,9 @@ export function SidebarProfile({ collapsed }: { collapsed: boolean }) {
       <div className="relative w-11 h-11 rounded-2xl bg-gradient-to-tr from-primary to-accent p-[2px] shadow-lg shadow-primary/10 transition-transform group-hover:scale-105 shrink-0 overflow-hidden">
         <div className="w-full h-full rounded-[inherit] bg-background flex items-center justify-center text-foreground overflow-hidden relative">
             {avatarUrl ? (
-                <Image src={avatarUrl} alt={displayName} fill className="object-cover" />
+                // <img> แทน next/image: URL รูปมาจากผู้ใช้ (host ไหนก็ได้) ไม่ต้องอยู่ใน remotePatterns
+                // eslint-disable-next-line @next/next/no-img-element
+                <img src={formatGoogleDriveImageUrl(avatarUrl)} alt={displayName} className="absolute inset-0 w-full h-full object-cover" />
             ) : (
                 <span className="font-black text-lg tracking-tighter">{(displayName || "U").charAt(0).toUpperCase()}</span>
             )}

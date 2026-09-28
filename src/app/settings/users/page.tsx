@@ -21,6 +21,8 @@ import { STANDARD_ROLES, StandardRole } from "@/types/role"
 import { getRolePermissions } from "@/lib/actions/permission-actions"
 import { toast } from "sonner"
 import { useLanguage } from "@/components/providers/language-provider"
+import { AvatarPicker } from "@/components/users/avatar-picker"
+import { formatGoogleDriveImageUrl } from "@/lib/gdrive/utils"
 import { cn } from "@/lib/utils"
 import { useRouter } from "next/navigation"
 
@@ -48,7 +50,8 @@ export default function UserSettingsPage() {
         Role: "Staff", 
         Active_Status: "Active",
         Customer_ID: null,
-        Permissions: []
+        Permissions: [],
+        Avatar_Url: ""
     })
     const [useIndividualPermissions, setUseIndividualPermissions] = useState(false)
 
@@ -94,7 +97,8 @@ export default function UserSettingsPage() {
                 Role: (user.Role as StandardRole) || "Staff",
                 Active_Status: user.Active_Status,
                 Customer_ID: user.Customer_ID,
-                Permissions: Array.isArray(user.Permissions) ? user.Permissions : []
+                Permissions: Array.isArray(user.Permissions) ? user.Permissions : [],
+                Avatar_Url: user.Avatar_Url || ""
             })
             setUseIndividualPermissions(Array.isArray(user.Permissions) && user.Permissions.length > 0)
         } else {
@@ -108,7 +112,8 @@ export default function UserSettingsPage() {
                 Role: defaultRole, 
                 Active_Status: "Active",
                 Customer_ID: null,
-                Permissions: []
+                Permissions: [],
+                Avatar_Url: ""
             })
             setUseIndividualPermissions(false)
         }
@@ -293,6 +298,15 @@ export default function UserSettingsPage() {
                                     filteredUsers.map((user) => (
                                         <tr key={user.Username} className="group/row hover:bg-muted/40 transition-all duration-300">
                                             <td className="px-8 py-4">
+                                                <div className="flex items-center gap-3">
+                                                <div className="w-9 h-9 rounded-xl overflow-hidden border border-border bg-muted flex items-center justify-center shrink-0">
+                                                    {user.Avatar_Url ? (
+                                                        // eslint-disable-next-line @next/next/no-img-element
+                                                        <img src={formatGoogleDriveImageUrl(user.Avatar_Url)} alt={user.Username} className="w-full h-full object-cover" />
+                                                    ) : (
+                                                        <span className="text-sm font-black text-muted-foreground">{(user.Name || user.Username || "U").charAt(0).toUpperCase()}</span>
+                                                    )}
+                                                </div>
                                                 <div className="flex flex-col">
                                                     <span className="text-primary font-black tracking-normal uppercase italic group-hover/row:scale-105 origin-left transition-transform inline-block">
                                                         {user.Username}
@@ -302,6 +316,7 @@ export default function UserSettingsPage() {
                                                             {t('common.tactical.ext_client')}: {user.Master_Customers?.Customer_Name || user.Customer_ID}
                                                         </div>
                                                     )}
+                                                </div>
                                                 </div>
                                             </td>
                                             <td className="px-6 py-4 font-black text-foreground uppercase tracking-tight italic">{user.Name}</td>
@@ -386,6 +401,16 @@ export default function UserSettingsPage() {
                                     placeholder={editingUser ? t('settings_pages.users.dialog.password_placeholder_edit') : t('settings_pages.users.dialog.password_placeholder_add')}
                                 />
                             </div>
+                        </div>
+
+                        <div className="space-y-3">
+                            <Label className="text-sm sm:text-base font-bold font-black text-muted-foreground uppercase tracking-widest ml-2 sm:ml-4">รูปโปรไฟล์</Label>
+                            <AvatarPicker
+                                value={formData.Avatar_Url}
+                                onChange={(url) => setFormData(prev => ({ ...prev, Avatar_Url: url }))}
+                                username={editingUser || formData.Username || undefined}
+                                fallbackText={formData.Name || formData.Username || "U"}
+                            />
                         </div>
 
                         <div className="space-y-3">

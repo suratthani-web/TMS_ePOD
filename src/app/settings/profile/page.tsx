@@ -11,6 +11,8 @@ import Link from "next/link"
 import { getUserProfile, updateUserProfile, UserProfile } from "@/lib/supabase/users"
 import { toast } from "sonner"
 import { useLanguage } from "@/components/providers/language-provider"
+import { AvatarPicker } from "@/components/users/avatar-picker"
+import { formatGoogleDriveImageUrl } from "@/lib/gdrive/utils"
 
 export default function AdminProfilePage() {
   const { t } = useLanguage()
@@ -63,6 +65,8 @@ export default function AdminProfilePage() {
             if (updatedProfile) {
                 setFormData(updatedProfile)
             }
+            // ให้ sidebar โหลดรูป/ชื่อใหม่โดยไม่ต้องรีเฟรช
+            window.dispatchEvent(new Event("profile-updated"))
         } else {
             toast.error(result.error || t('settings_pages.profile.toasts.save_failed'))
         }
@@ -100,7 +104,12 @@ export default function AdminProfilePage() {
                     <div className="w-32 h-32 rounded-[2.5rem] bg-gradient-to-br from-primary via-indigo-500 to-accent p-1 shadow-2xl shadow-primary/20 rotate-3 group-hover:rotate-6 transition-transform duration-700">
                         <div className="w-full h-full rounded-[2.3rem] bg-background flex items-center justify-center text-foreground text-5xl font-black italic border-2 border-border overflow-hidden relative">
                             <div className="absolute inset-0 bg-primary/5" />
-                            {(formData.First_Name || "A").charAt(0)}
+                            {formData.Avatar_Url ? (
+                                // eslint-disable-next-line @next/next/no-img-element
+                                <img src={formatGoogleDriveImageUrl(formData.Avatar_Url)} alt="Avatar" className="absolute inset-0 w-full h-full object-cover" />
+                            ) : (
+                                (formData.First_Name || "A").charAt(0)
+                            )}
                         </div>
                     </div>
                     <div className="absolute -bottom-2 -right-2 w-10 h-10 bg-background rounded-2xl border-2 border-primary flex items-center justify-center text-primary shadow-xl animate-pulse">
@@ -133,6 +142,15 @@ export default function AdminProfilePage() {
         <PremiumCard className="bg-background/40 border-2 border-border shadow-3xl p-12 rounded-[4rem] relative overflow-hidden group/card">
             <div className="absolute inset-0 bg-gradient-to-b from-primary/[0.02] to-transparent pointer-events-none" />
             
+            <div className="mb-10 space-y-3 relative z-10">
+                <Label className="text-base font-bold font-black text-muted-foreground uppercase tracking-[0.4em] mb-2 block ml-4">รูปโปรไฟล์</Label>
+                <AvatarPicker
+                    value={formData.Avatar_Url}
+                    onChange={(url) => setFormData({ ...formData, Avatar_Url: url })}
+                    fallbackText={formData.First_Name || formData.Username || "A"}
+                />
+            </div>
+
             <div className="grid grid-cols-1 md:grid-cols-2 gap-10 relative z-10">
                 <div className="space-y-3">
                     <Label className="text-base font-bold font-black text-muted-foreground uppercase tracking-[0.4em] mb-2 block ml-4">{t('settings_pages.profile.first_name')}</Label>

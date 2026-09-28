@@ -93,10 +93,9 @@ export async function updateUserProfile(data: Partial<UserProfile>) {
     }
 
     if (data.Avatar_Url !== undefined) {
-      try {
-        const { saveEntityImage } = await import('@/lib/gdrive/entity-images')
-        await saveEntityImage('user', session.userId, data.Avatar_Url)
-      } catch {}
+      const { saveEntityImage } = await import('@/lib/gdrive/entity-images')
+      const img = await saveEntityImage('user', session.userId, data.Avatar_Url)
+      if (!img.success) return { success: false, error: `บันทึกรูปไม่สำเร็จ: ${img.message || ''}` }
     }
 
     revalidatePath('/settings/profile')
