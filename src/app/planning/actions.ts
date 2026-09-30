@@ -909,6 +909,11 @@ export async function createBulkJobs(
       Est_Distance_KM: Number(data.Est_Distance_KM) || route?.Distance_KM || 0,
       Show_Price_To_Driver: data.Show_Price_To_Driver !== undefined ? (data.Show_Price_To_Driver === true || data.Show_Price_To_Driver === 'true') : (j.Show_Price_To_Driver ?? true),
       Round: data.Round || null,
+      // ค่าใช้จ่ายอื่นๆ: normalizeData ส่งผ่านมาแล้ว แต่ต้องใส่ใน object นี้ด้วย
+      // ไม่งั้นหายตอนสร้างงาน (ต้องกดแก้ไขงานใส่ซ้ำถึงจะบันทึก)
+      extra_costs_json: data.extra_costs_json !== undefined ? stringifyIfObject(data.extra_costs_json) : undefined,
+      Price_Cust_Extra: data.Price_Cust_Extra ?? undefined,
+      Cost_Driver_Extra: data.Cost_Driver_Extra ?? undefined,
       job_type: data.job_type || 'normal',
       chassis_plate: data.chassis_plate || null
     })
