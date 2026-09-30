@@ -8,7 +8,8 @@ import { CameraInput } from "@/components/mobile/camera-input"
 import { SignaturePad } from "@/components/mobile/signature-pad"
 import { toast } from "sonner"
 import { submitJobPOD } from "@/lib/actions/pod-actions"
-import { getJobDetails } from "@/app/mobile/jobs/actions"
+import { getJobDetails, getJobCarbon } from "@/app/mobile/jobs/actions"
+import type { TripCarbon } from "@/lib/utils/job-carbon"
 import { Loader2, CheckCircle, BrainCircuit, AlertTriangle, ScanLine, Box } from "lucide-react"
 import { PodReport } from "@/components/mobile/pod-report"
 import { ContainerDeliveryReport } from "@/components/mobile/container-delivery-report"
@@ -51,6 +52,8 @@ export default function JobCompletePage() {
 
   // Job Data for Report
   const [job, setJob] = useState<Job | null>(null)
+  // Trip carbon for the delivery note; best-effort (null offline → card hidden).
+  const [carbon, setCarbon] = useState<TripCarbon | null>(null)
   const reportRef = useRef<HTMLDivElement>(null)
   const floorClimbReportRef = useRef<HTMLDivElement>(null)
   // Synchronous in-flight lock to block double-tap. `loading` state only flips
@@ -85,6 +88,7 @@ export default function JobCompletePage() {
   useEffect(() => {
     if (params.id) {
         getScanRequirement(params.id).then(setRequireScan).catch(() => {})
+        getJobCarbon(params.id).then(setCarbon).catch(() => {})
         getJobDetails(params.id).then(j => {
             setJob(j)
             // Only load the item checklist for the drop currently being delivered
@@ -456,6 +460,7 @@ export default function JobCompletePage() {
                      job={job}
                      photos={photoUrls}
                      signature={signatureUrl}
+                     carbon={carbon}
                  />
              ) : (
                  <PodReport
@@ -468,6 +473,7 @@ export default function JobCompletePage() {
                     dropIndex={_doneDrops}
                     totalDrops={_containerDrops.length || 1}
                     deliveryItems={deliveryItems}
+                    carbon={carbon}
                  />
              )}
              {extraServiceData && (

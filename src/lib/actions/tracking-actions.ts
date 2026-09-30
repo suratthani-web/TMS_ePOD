@@ -3,6 +3,8 @@
 import { createClient, createAdminClient } from "@/utils/supabase/server";
 import { getUserBranchId, getCustomerId } from "@/lib/permissions";
 import { getCustomerShowLiveTracking } from "@/lib/supabase/customers";
+import { getCarbonFactors } from "@/lib/actions/carbon-factors";
+import { computeTripCarbon, type TripCarbon } from "@/lib/utils/job-carbon";
 
 export interface PublicJobDetails {
   jobId: string;
@@ -55,6 +57,8 @@ export interface PublicJobDetails {
   sensorTotalStepsUpward?: number;
   // false = ลูกค้ารายนี้ปิดการแสดงตำแหน่งรถ → หน้า track ต้องซ่อนแผนที่
   showLiveTracking?: boolean;
+  // คาร์บอนฟุตพริ้นต์ทั้งเที่ยว (สูตรเดียวกับ LINE/POD/ใบแจ้งหนี้); null = ไม่มีระยะทาง
+  carbon?: TripCarbon | null;
   jobType?: string | null;
   originalDestinations?: Array<{
     name?: string;
@@ -112,6 +116,7 @@ type PublicJobRow = {
   Volume_Cbm?: number | null
   Volume?: number | null
   Vehicle_Type?: string | null
+  Est_Distance_KM?: number | null
   Pickup_Lat?: number | null
   Pickup_Lon?: number | null
   Delivery_Lat?: number | null
@@ -340,8 +345,13 @@ export async function getPublicJobDetails(
     job.Vehicle_Plate
   ).catch(() => ({ driver: null, vehicle: null }))
 
+  const carbon = await getCarbonFactors()
+    .then(f => computeTripCarbon(job, f))
+    .catch(() => null)
+
   return {
     ...mapJobToPublicDetails(job),
+    carbon,
     driverImage: entityImages.driver,
     vehicleImage: entityImages.vehicle,
     lastLocation,

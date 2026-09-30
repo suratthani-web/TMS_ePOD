@@ -563,6 +563,32 @@ export default async function TrackingPage(props: { params: Promise<{ jobId: str
             )}
         </div>
 
+        {/* Trip Carbon Footprint — same shared formula as LINE / POD / invoice */}
+        {job.carbon && (
+            <section className="bg-white border border-emerald-200 rounded-3xl p-6 sm:p-8 shadow-sm space-y-5">
+                <h3 className="text-lg font-bold text-slate-900 border-l-4 border-emerald-500 pl-4 uppercase tracking-tight">
+                    🌱 คาร์บอนฟุตพริ้นต์เที่ยวนี้
+                </h3>
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                    <div className="bg-slate-50 p-4 rounded-2xl border border-slate-100">
+                        <p className="text-[10px] font-bold uppercase text-slate-400 mb-1 tracking-wider">ระยะทางขนส่ง</p>
+                        <p className="text-xl font-extrabold text-slate-900">{job.carbon.distanceKm.toLocaleString()} กม.</p>
+                    </div>
+                    <div className="bg-emerald-50 p-4 rounded-2xl border border-emerald-100">
+                        <p className="text-[10px] font-bold uppercase text-emerald-600 mb-1 tracking-wider">ปล่อยก๊าซเรือนกระจก</p>
+                        <p className="text-xl font-extrabold text-emerald-700">{job.carbon.co2Kg.toLocaleString()} kgCO₂e</p>
+                    </div>
+                    <div className="bg-slate-50 p-4 rounded-2xl border border-slate-100">
+                        <p className="text-[10px] font-bold uppercase text-slate-400 mb-1 tracking-wider">เทียบเท่าต้นไม้ที่ต้องปลูกชดเชย</p>
+                        <p className="text-xl font-extrabold text-slate-900">{job.carbon.trees.toLocaleString()} ต้น</p>
+                    </div>
+                </div>
+                <p className="text-xs text-slate-400">
+                    คำนวณตาม ISO 14083 / GLEC / อบก. · เที่ยวเดียว (ไม่รวมเที่ยวรถเปล่ากลับ) · {job.carbon.method}
+                </p>
+            </section>
+        )}
+
         {currentStepIndex === 4 && (
             <div className="space-y-6 pt-4 animate-in fade-in slide-in-from-bottom-5 duration-700">
                 <PODDownloadButton job={job} />

@@ -7,7 +7,7 @@ import { ConfirmInvoiceButton } from "@/components/billing/confirm-invoice-butto
 import { cookies } from "next/headers"
 import { dictionaries, Language } from "@/lib/i18n/dictionaries"
 import { createClient } from "@/utils/supabase/server"
-import { CO2_COEFFICIENTS, WTT_FREIGHT_COEFFICIENTS } from "@/lib/utils/esg-utils"
+import { computeTripCarbon } from "@/lib/utils/job-carbon"
 import { getCarbonFactors } from "@/lib/actions/carbon-factors"
 
 export default async function InvoiceViewPage({ params }: { params: Promise<{ id: string }> }) {
@@ -21,37 +21,21 @@ export default async function InvoiceViewPage({ params }: { params: Promise<{ id
   const dict = dictionaries[lang]
   const t = dict.billing_note // Reuse billing_note translation for consistency
 
-  // Fetch associated jobs to get CO2 data (Notes and Distance)
+  // Fetch associated jobs to compute per-trip CO2 with the shared formula
+  // (computeTripCarbon) — same number the customer sees on LINE / POD / track.
   const supabase = await createClient()
   const { data: jobs } = await supabase
     .from('Jobs_Main')
-    .select('Job_ID, Notes, Est_Distance_KM, Vehicle_Type')
+    .select('Job_ID, Est_Distance_KM, Vehicle_Type, Weight_Kg')
     .eq('Invoice_ID', invoice.Invoice_ID)
 
-  // CO2 Calculation Logic
-  const extractCO2 = (notes?: string | null): number => {
-    if (!notes) return 0
-    const match = notes.match(/\[ESG\] ปล่อย CO2: (\d+\.?\d*) kg/)
-    if (match) return parseFloat(match[1])
-    return 0
-  }
   // ดึงค่า EF จาก DB (แอดมินตั้งใน /settings/esg) แล้ว fallback เป็น hardcode
-  const { freightPerKm = {}, freightWTTPerKm = {} } = await getCarbonFactors()
-  const calculateCO2 = (dist?: number | null, vType?: string | null) => {
-    const key = vType || 'default'
-    // WTW = TTW + WTT ต่อ กม. ตาม ISO 14083
-    const ttw = freightPerKm[key] ?? freightPerKm['default'] ?? CO2_COEFFICIENTS[key] ?? CO2_COEFFICIENTS['default']
-    const wtt = freightWTTPerKm[key] ?? freightWTTPerKm['default'] ?? WTT_FREIGHT_COEFFICIENTS[key] ?? WTT_FREIGHT_COEFFICIENTS['default'] ?? 0
-    // ใบแจ้งหนี้: คิด "1 ขา รถหนัก" (เที่ยวเดียว) ไม่รวมตีเปล่ากลับ
-    const emissionDist = Number(dist) || 12.5
-    return emissionDist * (ttw + wtt)
-  }
-
-  const totalCO2 = (jobs || []).reduce((sum, job) => {
-    const fromNote = extractCO2(job.Notes)
-    if (fromNote > 0) return sum + fromNote
-    return sum + calculateCO2(job.Est_Distance_KM, job.Vehicle_Type)
-  }, 0)
+  const carbonFactors = await getCarbonFactors()
+  // ใบแจ้งหนี้: คิด "1 ขา รถหนัก" (เที่ยวเดียว) ไม่รวมตีเปล่ากลับ; ไม่มีระยะ → ประมาณ 12.5 กม.
+  const totalCO2 = (jobs || []).reduce(
+    (sum, job) => sum + (computeTripCarbon(job, carbonFactors, { fallbackKm: 12.5 })?.co2Kg ?? 0),
+    0
+  )
 
   const localeStr = lang === 'th' ? 'th-TH' : 'en-US'
 

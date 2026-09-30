@@ -5,6 +5,7 @@ import { getEffectiveBranchId, REVENUE_STATUSES, formatDateSafe, fetchAllRows } 
 import { getCustomerId } from "@/lib/permissions"
 import { calculateJobEmissions, TGO_STANDARDS_METADATA } from '../utils/esg-utils'
 import { getCarbonFactors } from '@/lib/actions/carbon-factors'
+import { resolveVehicleKey } from '@/lib/utils/job-carbon'
 
 /**
  * ESG Intelligence Engine - TMS 2026 (TGO Standard Certified Edition)
@@ -120,7 +121,9 @@ export async function getESGStats(startDate?: string, endDate?: string, branchId
         const factors = await getCarbonFactors()
 
         jobs.forEach((j: any) => {
-            const vType = j.Vehicle_Type || 'default'
+            // Same vehicle→EF mapping as every per-trip document ("4" → 4-Wheel; a
+            // custom row in /settings/esg with the exact type name wins).
+            const vType = resolveVehicleKey(j.Vehicle_Type, factors)
             const actualFuel: number | null = null // Actual_Fuel_Liters column not yet in DB
             let dist = Number(j.Est_Distance_KM) || 0
             const rawWeight = Number(j.Weight_Kg) || null

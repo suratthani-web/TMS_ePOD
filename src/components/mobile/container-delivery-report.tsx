@@ -2,6 +2,8 @@
 
 import { Job, JobContainer } from "@/types/database"
 import { forwardRef } from "react"
+import type { TripCarbon } from "@/lib/utils/job-carbon"
+import { TripCarbonCard } from "@/components/mobile/trip-carbon-card"
 
 type ContainerJob = Job & {
   container?: Partial<JobContainer> | null
@@ -11,9 +13,10 @@ type Props = {
   job: ContainerJob
   photos: string[] // EIR Gate-in photos
   signature: string | null // Receiver/Gate Officer signature
+  carbon?: TripCarbon | null // whole-trip carbon footprint; hidden when null
 }
 
-export const ContainerDeliveryReport = forwardRef<HTMLDivElement, Props>(({ job, photos, signature }, ref) => {
+export const ContainerDeliveryReport = forwardRef<HTMLDivElement, Props>(({ job, photos, signature, carbon }, ref) => {
   const container = job.container
   
   return (
@@ -66,6 +69,8 @@ export const ContainerDeliveryReport = forwardRef<HTMLDivElement, Props>(({ job,
             </div>
         </div>
       </div>
+
+      <TripCarbonCard carbon={carbon} />
 
       {/* EIR Photos */}
       <div className="mb-8">

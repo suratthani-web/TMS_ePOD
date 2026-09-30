@@ -5,7 +5,7 @@ import { revalidatePath } from 'next/cache'
 
 import { SupabaseClient } from '@supabase/supabase-js'
 
-import { calculateJobEmissions } from '@/lib/utils/esg-utils'
+import { computeTripCarbon, type TripCarbon } from '@/lib/utils/job-carbon'
 import { getCarbonFactors } from '@/lib/actions/carbon-factors'
 
 /**
@@ -23,15 +23,10 @@ export async function calculateJobCO2(supabase: SupabaseClient, jobId: string) {
 
         if (!job) return null
 
-        const oneWayKm = Number(job.Est_Distance_KM) || 12.5
-        const vType = job.Vehicle_Type || '4-Wheel'
-        const rawWeight = Number(job.Weight_Kg) || 0
-        const cargoWeightTonnes = rawWeight > 0 ? rawWeight / 1000 : null
-
-        // ใบแจ้งหนี้: คิด "1 ขา รถหนัก" (เที่ยวเดียว บรรทุกจริง) ไม่รวมตีเปล่ากลับ → emptyReturnRatio=0
-        const factors = await getCarbonFactors()
-        const emissions = calculateJobEmissions(oneWayKm, null, vType, factors, cargoWeightTonnes, 0)
-        const co2Amount = emissions.co2EmissionsKg
+        // สูตรเดียวกับทุกเอกสารรายเที่ยว (computeTripCarbon); ไม่มีระยะ → ประมาณ 12.5 กม. เหมือนเดิม
+        const carbon = computeTripCarbon(job, await getCarbonFactors(), { fallbackKm: 12.5 })
+        if (!carbon) return null
+        const co2Amount = carbon.co2Kg
 
         return {
             amount: co2Amount,
@@ -39,6 +34,26 @@ export async function calculateJobCO2(supabase: SupabaseClient, jobId: string) {
         }
     } catch (e) {
         console.error('[ESG] CO2 Calculation failed:', e)
+        return null
+    }
+}
+
+/**
+ * Per-trip carbon for rendering on the driver's POD / container delivery note.
+ * Returns null (card hidden) when the job has no distance.
+ */
+export async function getJobCarbon(jobId: string): Promise<TripCarbon | null> {
+    try {
+        const supabase = createAdminClient()
+        const { data: job } = await supabase
+            .from('Jobs_Main')
+            .select('Est_Distance_KM, Vehicle_Type, Weight_Kg')
+            .eq('Job_ID', jobId)
+            .single()
+        if (!job) return null
+        return computeTripCarbon(job, await getCarbonFactors())
+    } catch (e) {
+        console.error('[ESG] getJobCarbon failed:', e)
         return null
     }
 }

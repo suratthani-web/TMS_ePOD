@@ -176,6 +176,31 @@ export async function generatePodPdf(job: PublicJobDetails) {
         summary.appendChild(statusBox)
         container.appendChild(summary)
 
+        // Trip carbon footprint — same shared formula as LINE / POD / invoice
+        if (job.carbon) {
+            const c = job.carbon
+            const carbonBox = document.createElement('div')
+            carbonBox.classList.add('pdf-block')
+            carbonBox.style.cssText = 'border: 2px solid #a7f3d0; padding: 22px 25px; border-radius: 20px; background: #ecfdf5; margin-bottom: 35px;'
+            const pCT = document.createElement('p')
+            pCT.style.cssText = 'margin: 0 0 14px 0; font-size: 11px; font-weight: 950; color: #047857; text-transform: uppercase;'
+            pCT.textContent = 'Carbon Footprint / คาร์บอนฟุตพริ้นต์เที่ยวนี้'
+            carbonBox.appendChild(pCT)
+            const cGrid = document.createElement('div')
+            cGrid.style.cssText = 'display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px;'
+            ;[
+                ['Distance / ระยะทาง', `${c.distanceKm.toLocaleString()} km`],
+                ['Emissions / ปล่อย', `${c.co2Kg.toLocaleString()} kgCO₂e`],
+                ['Tree offset / ต้นไม้ชดเชย', `${c.trees.toLocaleString()} ต้น`],
+            ].forEach(([label, value]) => cGrid.appendChild(createField(label, value, '#059669', '18px', '900')))
+            carbonBox.appendChild(cGrid)
+            const pCM = document.createElement('p')
+            pCM.style.cssText = 'margin: 0; font-size: 10px; color: #64748b;'
+            pCM.textContent = `ISO 14083 / GLEC / อบก. · เที่ยวเดียว (ไม่รวมเที่ยวรถเปล่ากลับ) · ${c.method}`
+            carbonBox.appendChild(pCM)
+            container.appendChild(carbonBox)
+        }
+
         // Notes
         if (job.notes) {
             container.appendChild(createSectionHeader('2. JOB REMARKS/NOTES'))

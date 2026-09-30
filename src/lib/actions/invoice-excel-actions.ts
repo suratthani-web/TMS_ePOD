@@ -1,7 +1,7 @@
 'use server'
 
 import { createAdminClient } from '@/utils/supabase/server'
-import { CO2_COEFFICIENTS } from '@/lib/utils/esg-utils'
+import { computeTripCarbon } from '@/lib/utils/job-carbon'
 import { getCarbonFactors } from '@/lib/actions/carbon-factors'
 import ExcelJS from 'exceljs'
 import { getSystemSetting } from './system-settings-actions'
@@ -243,7 +243,7 @@ export async function exportInvoiceExcel(invoiceId: string) {
         let totalCO2 = 0
 
         // Live TGO freight factors (editable in /settings/esg), loaded once.
-        const { freightPerKm = {}, freightWTTPerKm = {} } = await getCarbonFactors()
+        const carbonFactors = await getCarbonFactors()
 
         for (let index = 0; index < jobs.length; index++) {
             const job = jobs[index]
@@ -285,15 +285,9 @@ export async function exportInvoiceExcel(invoiceId: string) {
             row.getCell(5).value = origin || ''
             row.getCell(6).value = multiDropDests || dest || asString(job.Route_Name)
             
-            // Carbon Footprint — live TGO freight factor per vehicle type
-            // (editable in /settings/esg; falls back to default when unknown).
-            // WTW = TTW + WTT ต่อ กม. ตาม ISO 14083
-            // ใบแจ้งหนี้: คิด "1 ขา รถหนัก" (เที่ยวเดียว) ไม่รวมตีเปล่ากลับ
-            const emissionDist = Number(job.Est_Distance_KM) || 12.5
-            const vType = normalizeVehicleType(asString(job.Vehicle_Type))
-            const ttwCoeff = freightPerKm[vType] ?? freightPerKm['default'] ?? CO2_COEFFICIENTS['default']
-            const wttCoeff = freightWTTPerKm[vType] ?? freightWTTPerKm['default'] ?? 0
-            const co2Value = Number((emissionDist * (ttwCoeff + wttCoeff)).toFixed(2))
+            // Carbon Footprint — shared per-trip formula (computeTripCarbon), same as
+            // LINE / POD / track. ใบแจ้งหนี้: คิด "1 ขา รถหนัก" ไม่รวมตีเปล่ากลับ; ไม่มีระยะ → 12.5 กม.
+            const co2Value = computeTripCarbon(job as { Est_Distance_KM?: number | null; Vehicle_Type?: string | null; Weight_Kg?: number | null }, carbonFactors, { fallbackKm: 12.5 })?.co2Kg ?? 0
             row.getCell(7).value = co2Value
             totalCO2 += co2Value
 

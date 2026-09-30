@@ -2,6 +2,8 @@
 
 import { Job } from "@/lib/supabase/jobs"
 import { forwardRef } from "react"
+import type { TripCarbon } from "@/lib/utils/job-carbon"
+import { TripCarbonCard } from "@/components/mobile/trip-carbon-card"
 
 type DropInfo = { name?: string; recipient_name?: string; phone?: string; address?: string; stop_type?: string }
 type DeliveredItem = { code?: string | null; label?: string; qty?: number }
@@ -25,9 +27,11 @@ type Props = {
   dropIndex?: number       // 0-based
   totalDrops?: number
   deliveryItems?: DeliveredItem[]
+  // Whole-trip carbon footprint (same on every drop's note); hidden when null.
+  carbon?: TripCarbon | null
 }
 
-export const PodReport = forwardRef<HTMLDivElement, Props>(({ job, photos, signature, extraServiceData, drop, dropIndex, totalDrops, deliveryItems }, ref) => {
+export const PodReport = forwardRef<HTMLDivElement, Props>(({ job, photos, signature, extraServiceData, drop, dropIndex, totalDrops, deliveryItems, carbon }, ref) => {
   const isMulti = (totalDrops || 0) > 1
   const dropName = drop?.recipient_name || drop?.name || ""
   const dropAddr = drop?.address || ""
@@ -150,6 +154,8 @@ export const PodReport = forwardRef<HTMLDivElement, Props>(({ job, photos, signa
             </tbody>
         </table>
       </div>
+
+      <TripCarbonCard carbon={carbon} />
 
       {/* Photos */}
       <div className="mb-8 break-inside-avoid">
