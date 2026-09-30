@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createAdminClient } from '@/utils/supabase/server'
+import { fillDeliveryDateIfEmpty } from '@/lib/supabase/delivery-date'
 import { replyToUser as _replyToUser, resolveWebhookBot, getMessageContent as _getMessageContent, pushToUser as _pushToUser, pushToCustomerActive } from '@/lib/integrations/line'
 import { aiToolExecutors, geminiToolDefinitions, isWriteTool, buildPendingAction, executeWriteTool } from '@/lib/ai/tools'
 import { savePendingAction, popPendingAction } from '@/lib/ai/pending-actions'
@@ -2340,8 +2341,9 @@ export async function POST(req: NextRequest) {
                                     await supabase.from('Jobs_Main').update({
                                         Photo_Proof_Url: newPhotos,
                                         Actual_Delivery_Time: timeString,
-                                        Delivery_Date: dateString
                                     }).eq('Job_ID', activeJob.Job_ID)
+                                    // Keep the admin-set delivery date; only fill when missing
+                                    await fillDeliveryDateIfEmpty(supabase, activeJob.Job_ID, now)
 
                                     const result = await transitionJobStatus(activeJob.Job_ID, 'Delivered', {
                                         userId: boundDriver.Driver_ID,
@@ -2613,8 +2615,11 @@ If it is NOT a fuel receipt, return {"classification":"other"}. No markdown, JSO
                                 await supabase.from('Jobs_Main').update({
                                     Photo_Proof_Url: newPhotos,
                                     Actual_Delivery_Time: timeString,
-                                    Delivery_Date: dateString
                                 }).eq('Job_ID', activeJob.Job_ID)
+
+                                // Keep the admin-set delivery date; only fill when missing
+
+                                await fillDeliveryDateIfEmpty(supabase, activeJob.Job_ID, now)
 
                                 const result = await transitionJobStatus(activeJob.Job_ID, 'Delivered', {
                                     userId: boundDriver.Driver_ID,
@@ -2626,8 +2631,9 @@ If it is NOT a fuel receipt, return {"classification":"other"}. No markdown, JSO
                                     await supabase.from('Jobs_Main').update({
                                         Photo_Proof_Url: newPhotos,
                                         Actual_Delivery_Time: timeString,
-                                        Delivery_Date: dateString
                                     }).eq('Job_ID', activeJob.Job_ID)
+                                    // Keep the admin-set delivery date; only fill when missing
+                                    await fillDeliveryDateIfEmpty(supabase, activeJob.Job_ID, now)
                                 } else {
                                     await replyToUser(replyToken, `❌ ไม่สามารถบันทึกส่งของได้: ${result.message}`)
                                     continue

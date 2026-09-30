@@ -7,6 +7,7 @@ import { getSession } from '@/lib/session'
 
 import { type JobStatus, transitionJobStatus } from "@/services/job-status-machine"
 import { timeTH, dateKeyTH } from "@/lib/utils/date-th"
+import { fillDeliveryDateIfEmpty } from "@/lib/supabase/delivery-date"
 import { appendJobToMaster } from "@/lib/actions/master-sheet-sync"
 
 const JOB_STATUSES: readonly JobStatus[] = [
@@ -81,7 +82,8 @@ export async function adminUpdateJobStatus(jobId: string, newStatus: string, not
   
   if (newStatus === 'Delivered' || newStatus === 'Completed') {
       updateData.Actual_Delivery_Time = timeString
-      updateData.Delivery_Date = dateString
+      // Keep the admin-set delivery date; only fill it when missing
+      await fillDeliveryDateIfEmpty(supabase, jobId, now)
   }
 
   if (newStatus === 'Verified' || newStatus === 'Rejected') {

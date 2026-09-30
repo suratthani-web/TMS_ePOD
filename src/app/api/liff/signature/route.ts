@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createAdminClient } from '@/utils/supabase/server'
+import { fillDeliveryDateIfEmpty } from '@/lib/supabase/delivery-date'
 import { uploadFileToSupabase } from '@/lib/actions/supabase-upload'
 import { pushToCustomerActive } from '@/lib/integrations/line'
 
@@ -48,10 +49,11 @@ export async function POST(req: NextRequest) {
                 Photo_Proof_Url: newPhotos,
                 Signature_Url: uploadRes.directLink,
                 Actual_Delivery_Time: timeString,
-                Delivery_Date: dateString
             })
             .eq('Job_ID', jobId)
         if (updateError) throw updateError
+        // Keep the admin-set delivery date; only fill when missing
+        await fillDeliveryDateIfEmpty(supabase, jobId, now)
 
         const result = await transitionJobStatus(jobId, 'Delivered', {
             userId: lineUserId || 'LIFF_USER',

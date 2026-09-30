@@ -9,6 +9,7 @@ import { transitionJobStatus } from "@/services/job-status-machine"
 import { calculateJobPrice } from "@/services/pricing-engine"
 import { getScanRequirement } from "@/lib/actions/scan-actions"
 import { timeTH } from "@/lib/utils/date-th"
+import { fillDeliveryDateIfEmpty } from "@/lib/supabase/delivery-date"
 import type { SupabaseClient } from "@supabase/supabase-js"
 import { createHash } from "crypto"
 
@@ -295,7 +296,7 @@ export async function submitJobPOD(jobId: string, formData: FormData) {
       Photo_Proof_Url: newPhotos.join(','),
       Signature_Url: newSignatures.join(','),
       POD_Drops_Json: JSON.stringify(dropLog),
-      Delivery_Date: new Date().toISOString(),
+      // Delivery_Date is NOT overwritten here — see fillDeliveryDateIfEmpty below
       Actual_Delivery_Time: timeString,
       Loaded_Qty: loadedQty
     }
@@ -359,6 +360,9 @@ export async function submitJobPOD(jobId: string, formData: FormData) {
       .eq("Job_ID", jobId)
 
     if (updateError) throw updateError
+
+    // Keep the admin-set delivery date (e.g. back-dated jobs); only fill when missing
+    await fillDeliveryDateIfEmpty(supabase, jobId, now)
 
     // Transition Status:
     // If there are remaining drops in a Multi-Drop job, set status back to 'In Transit'
