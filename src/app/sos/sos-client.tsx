@@ -7,7 +7,6 @@ import {
   MapPin,
   Clock,
   CheckCircle2,
-  User,
   Truck,
   ShieldAlert,
   Activity,
@@ -18,6 +17,7 @@ import { getAllSOSAlerts, getSOSCount, SOSAlert } from "@/lib/supabase/sos"
 import { PremiumButton } from "@/components/ui/premium-button"
 import { PremiumCard } from "@/components/ui/premium-card"
 import { cn } from "@/lib/utils"
+import { EntityAvatar } from "@/components/ui/entity-avatar"
 import { useLanguage } from "@/components/providers/language-provider"
 import Link from "next/link"
 import { useState, useEffect } from "react"
@@ -157,9 +157,7 @@ export default function SOSPage({ alerts: initialAlerts, activeCount: initialCou
 
             <div className="space-y-3 border-t border-border/5 pt-6">
                <div className="flex items-center gap-3 group/item">
-                  <div className="p-1.5 bg-muted/5 rounded-lg border border-border/5 group-hover/item:bg-primary/20 transition-colors">
-                     <User size={12} className="text-muted-foreground group-hover/item:text-primary" />
-                  </div>
+                  <EntityAvatar kind="driver" id={alert.Driver_ID} name={alert.Driver_Name} className="h-9 w-9 rounded-lg" />
                   <span className="text-xs font-black text-foreground uppercase tracking-widest italic">{alert.Driver_Name || t('common.no_data')}</span>
                </div>
                <div className="flex items-center gap-3 group/item">

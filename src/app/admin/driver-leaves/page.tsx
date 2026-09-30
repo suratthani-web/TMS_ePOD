@@ -1,7 +1,8 @@
 import { createClient, createAdminClient } from "@/utils/supabase/server"
 import { Card, CardContent } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
-import { Calendar, User, Clock, FileText, ArrowLeft } from "lucide-react"
+import { EntityAvatar } from "@/components/ui/entity-avatar"
+import { Calendar, Clock, FileText, ArrowLeft } from "lucide-react"
 import { redirect } from "next/navigation"
 import { getAdminSession } from "@/lib/actions/auth-actions"
 import { cn } from "@/lib/utils"
@@ -82,14 +83,11 @@ export default async function AdminLeavesPage() {
                                   <div className="space-y-4 flex-1">
                                       <div className="flex items-center gap-4">
                                           <div className={cn(
-                                              "w-12 h-12 rounded-xl flex items-center justify-center transition-all duration-500 border",
+                                              "w-12 h-12 rounded-xl overflow-hidden flex items-center justify-center transition-all duration-500 border",
                                               leave.Status === 'Approved' ? "bg-emerald-500/10 border-emerald-500/20" : 
                                               leave.Status === 'Rejected' ? "bg-red-500/10 border-red-500/20" : "bg-muted/50 border-border/10"
                                           )}>
-                                              <User size={20} strokeWidth={2.5} className={cn(
-                                                  leave.Status === 'Approved' ? "text-emerald-500" : 
-                                                  leave.Status === 'Rejected' ? "text-red-500" : "text-foreground"
-                                              )} />
+                                              <EntityAvatar kind="driver" id={leave.Driver_ID} name={leave.Driver_Name} className="w-full h-full rounded-[inherit] border-0 bg-transparent" />
                                           </div>
                                           <div>
                                               <h3 className="text-xl font-black text-foreground leading-tight uppercase italic">{leave.Driver_Name || 'ไม่ระบุชื่อ'}</h3>

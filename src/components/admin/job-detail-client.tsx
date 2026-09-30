@@ -14,6 +14,7 @@ import { LineShareButton } from "@/components/admin/line-share-button"
 import { PremiumCard } from "@/components/ui/premium-card"
 import { PremiumButton } from "@/components/ui/premium-button"
 import { cn } from "@/lib/utils"
+import { EntityAvatar } from "@/components/ui/entity-avatar"
 import { useLanguage } from "@/components/providers/language-provider"
 import { PODDownloadButton } from "@/components/tracking/pod-download"
 import { useSearchParams } from "next/navigation"
@@ -224,9 +225,12 @@ export function JobDetailClient({ job, routeHistory }: JobDetailClientProps) {
             
             <CardContent className="p-6 space-y-6">
               <div className="flex items-center gap-4 p-3 bg-muted/30 rounded-2xl border border-border">
-                <div className="h-12 w-12 rounded-xl bg-primary/10 flex items-center justify-center text-primary font-black text-lg border border-primary/20 relative overflow-hidden group/avatar shrink-0">
-                    {job.Driver_Name?.charAt(0) || "?"}
-                </div>
+                <EntityAvatar
+                    kind="driver"
+                    id={job.Driver_ID}
+                    name={job.Driver_Name || "?"}
+                    className="h-12 w-12 bg-primary/10 border-primary/20 [&_span]:text-primary [&_span]:text-lg"
+                />
                 <div>
                     <p className="text-base font-black text-foreground leading-tight">{job.Driver_Name || t('job_detail.operator_null')}</p>
                     <div className="flex items-center gap-1.5 mt-0.5">
@@ -239,7 +243,10 @@ export function JobDetailClient({ job, routeHistory }: JobDetailClientProps) {
               <div className="space-y-3">
                 <div className="flex justify-between items-center bg-white/5 p-3 rounded-xl border border-border text-xs">
                     <span className="font-semibold text-muted-foreground">{t('job_detail.asset_plate')}</span>
-                    <span className="font-semibold text-foreground font-mono bg-muted/30 px-2.5 py-0.5 rounded border border-border">{job.Vehicle_Plate || t('job_detail.field_unit')}</span>
+                    <span className="flex items-center gap-2">
+                        {job.Vehicle_Plate && <EntityAvatar kind="vehicle" id={job.Vehicle_Plate} name={job.Vehicle_Plate} className="h-8 w-8 rounded-lg" />}
+                        <span className="font-semibold text-foreground font-mono bg-muted/30 px-2.5 py-0.5 rounded border border-border">{job.Vehicle_Plate || t('job_detail.field_unit')}</span>
+                    </span>
                 </div>
                 <div className="flex justify-between items-center p-3 text-xs">
                     <span className="font-semibold text-muted-foreground">{t('job_detail.secure_link')}</span>

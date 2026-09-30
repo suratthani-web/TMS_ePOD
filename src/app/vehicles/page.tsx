@@ -24,7 +24,7 @@ import { ExcelImport } from "@/components/ui/excel-import"
 import { PremiumButton } from "@/components/ui/premium-button"
 import { isAdmin } from "@/lib/permissions"
 import { GDriveSyncDialog } from "@/components/gdrive/gdrive-sync-dialog"
-import { formatGoogleDriveImageUrl } from "@/lib/gdrive/utils"
+import { EntityAvatar } from "@/components/ui/entity-avatar"
 
 export default function VehiclesPage() {
   const [vehicles, setVehicles] = useState<Vehicle[]>([])
@@ -198,23 +198,12 @@ export default function VehiclesPage() {
                         
                         <div className="flex justify-between items-start relative z-10 mb-4">
                             <div className="flex items-start gap-3">
-                                {vehicle.Image_Url ? (
-                                    <div className="w-14 h-14 rounded-xl overflow-hidden border border-border bg-muted/40 shrink-0 shadow-xs">
-                                        {/* eslint-disable-next-line @next/next/no-img-element */}
-                                        <img
-                                            src={formatGoogleDriveImageUrl(vehicle.Image_Url)}
-                                            alt={vehicle.Vehicle_Plate}
-                                            className="w-full h-full object-cover"
-                                            onError={(e) => {
-                                                (e.currentTarget as HTMLImageElement).style.display = 'none'
-                                            }}
-                                        />
-                                    </div>
-                                ) : (
-                                    <div className="w-14 h-14 rounded-xl border border-border bg-primary/10 flex items-center justify-center shrink-0 text-primary">
-                                        <Truck size={24} />
-                                    </div>
-                                )}
+                                <EntityAvatar
+                                    kind="vehicle"
+                                    url={vehicle.Image_Url}
+                                    name={vehicle.Vehicle_Plate}
+                                    className="w-14 h-14 bg-primary/10 shadow-xs [&_svg]:text-primary"
+                                />
                                 <div>
                                     <div className="flex flex-wrap items-center gap-1.5 mb-1.5">
                                         <Badge className="bg-primary/10 text-primary border-primary/20 px-2 py-0.5 rounded-md font-medium text-xs">

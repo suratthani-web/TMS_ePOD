@@ -57,7 +57,17 @@ export async function getAllDriversFromTable(providedBranchId?: string): Promise
 
     const { data, error } = await dbQuery
     if (error) return []
-    return data || []
+    // รูปคนขับ: คอลัมน์ Image_Url หรือ fallback จาก map Google Drive (เหมือน getDrivers)
+    try {
+      const { getImageMap } = await import("@/lib/gdrive/entity-images")
+      const map = await getImageMap()
+      return (data || []).map((d: Driver) => ({
+        ...d,
+        Image_Url: d.Image_Url || map.drivers[d.Driver_ID] || null,
+      }))
+    } catch {
+      return data || []
+    }
   } catch {
     return []
   }

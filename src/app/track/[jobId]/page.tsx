@@ -24,6 +24,7 @@ type ExtraCostItem = {
   charge_cust?: number | string
 }
 import { cn } from "@/lib/utils"
+import { EntityAvatar } from "@/components/ui/entity-avatar"
 import { ShareTrackingButton } from "@/components/tracking/share-tracking-button"
 import { TrackingMap } from "@/components/tracking/tracking-map"
 import { FeedbackForm } from "@/components/tracking/feedback-form"
@@ -204,11 +205,17 @@ export default async function TrackingPage(props: { params: Promise<{ jobId: str
                 <div className="grid grid-cols-2 gap-4">
                     <div className="bg-slate-50 p-4 rounded-2xl border border-slate-100">
                         <p className="text-[10px] font-bold uppercase text-slate-400 mb-1 tracking-wider">หมายเลขรถ</p>
-                        <p className="text-base font-bold text-slate-900">{job.vehiclePlate.toUpperCase()}</p>
+                        <div className="flex items-center gap-2.5">
+                            <EntityAvatar kind="vehicle" url={job.vehicleImage} name={job.vehiclePlate} className="h-10 w-10 bg-white border-slate-200" />
+                            <p className="text-base font-bold text-slate-900">{job.vehiclePlate.toUpperCase()}</p>
+                        </div>
                     </div>
                     <div className="bg-slate-50 p-4 rounded-2xl border border-slate-100">
                         <p className="text-[10px] font-bold uppercase text-slate-400 mb-1 tracking-wider">พนักงานขับรถ</p>
-                        <p className="text-base font-bold text-slate-900">{job.driverName || 'กำลังมอบหมาย'}</p>
+                        <div className="flex items-center gap-2.5">
+                            <EntityAvatar kind="driver" url={job.driverImage} name={job.driverName !== '-' ? job.driverName : null} className="h-10 w-10 bg-white border-slate-200" />
+                            <p className="text-base font-bold text-slate-900">{job.driverName || 'กำลังมอบหมาย'}</p>
+                        </div>
                     </div>
                 </div>
 

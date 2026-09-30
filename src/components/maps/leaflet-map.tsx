@@ -10,6 +10,7 @@ import { useEffect, useState, useRef, Fragment, useMemo } from 'react'
 import { Truck, MapPin } from 'lucide-react'
 import { ProfitabilityHeatmap, ProfitPoint } from './profitability-heatmap'
 import { cn } from '@/lib/utils'
+import { EntityAvatar, useEntityImage } from '@/components/ui/entity-avatar'
 
 // Arrival geofence radii in real-world metres (rendered with <Circle>, which
 // scales with zoom — unlike <CircleMarker> whose radius is screen pixels).
@@ -602,6 +603,10 @@ function MovingMarker({ driver, onShowRoute }: { driver: DriverLocation, onShowR
   const isOffline = !isAlert && driver.status !== 'Online';
   const accent = isAlert ? '#ef4444' : (isOffline ? '#94a3b8' : '#10b981');
 
+  // รูปคนขับ → วงกลมเล็กมุมซ้ายบน (ไม่หมุนตาม heading); ไม่มีรูป/โหลดไม่ได้ = ซ่อน เหลือไอคอนรถเดิม
+  const photoUrl = useEntityImage('driver', driver.id)
+  const safePhoto = photoUrl ? encodeURI(photoUrl).replace(/["'<>]/g, '') : ''
+
   const driverIcon = useMemo(() => {
     return L.divIcon({
         className: 'custom-div-icon',
@@ -632,6 +637,13 @@ function MovingMarker({ driver, onShowRoute }: { driver: DriverLocation, onShowR
                     </svg>
                 </div>
 
+                ${safePhoto ? `
+                    <img src="${safePhoto}" referrerpolicy="no-referrer" alt=""
+                         onerror="this.style.display='none'"
+                         class="absolute -top-1 -left-1 w-6 h-6 rounded-full object-cover border-2 z-20 bg-background"
+                         style="border-color: ${accent};" />
+                ` : ''}
+
                 <!-- Online Status Pulse -->
                 <div class="absolute -bottom-1 -right-1 w-4 h-4 rounded-full border-2 border-slate-950 ${driver.status === 'Online' ? 'bg-emerald-500 shadow-[0_0_12px_rgba(16,185,129,1)]' : 'bg-slate-500'} z-20">
                     ${driver.status === 'Online' ? '<div class="w-full h-full bg-emerald-400 rounded-full animate-ping opacity-75"></div>' : ''}
@@ -642,7 +654,7 @@ function MovingMarker({ driver, onShowRoute }: { driver: DriverLocation, onShowR
         iconAnchor: [30, 30],
         popupAnchor: [0, -20]
     });
-  }, [driver.vehiclePlate, driver.status, driver.speed, isSpeeding, isAlert, isOffline, accent, heading]);
+  }, [driver.vehiclePlate, driver.status, driver.speed, isSpeeding, isAlert, isOffline, accent, heading, safePhoto]);
 
   return (
     <Marker 
@@ -708,7 +720,10 @@ function DriverPopup({ driver, onShowRoute }: { driver: DriverLocation, onShowRo
 
   return (
     <div className="text-xl min-w-[200px]">
-      <p className="font-bold text-base mb-1">{driver.name}</p>
+      <div className="flex items-center gap-2.5 mb-1.5">
+        <EntityAvatar kind="driver" id={driver.id} name={driver.name} className="h-10 w-10" />
+        <p className="font-bold text-base">{driver.name}</p>
+      </div>
       <div className="space-y-1">
         <div className="flex items-center gap-2 text-gray-600">
             <Truck size={14} className="text-emerald-500" />

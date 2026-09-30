@@ -18,6 +18,7 @@ import { suggestDriverId, parseFileName, type DriverLite } from "@/lib/payslip/m
 import { createClient } from "@/utils/supabase/client"
 import { Upload, FileSpreadsheet, Loader2, CheckCircle2, Trash2, Users, ArrowLeft } from "lucide-react"
 import { toast } from "sonner"
+import { EntityAvatar } from "@/components/ui/entity-avatar"
 
 const BUCKET = "company-assets"
 
@@ -367,6 +368,9 @@ export default function PayslipsClient({ initialList }: { initialList: Record<st
                       {typeof r.total === "number" ? ` · ยอด ~฿${r.total.toLocaleString()}` : ""}
                     </p>
                   </div>
+                  {r.driverId && !subs.some((d) => d.id === r.driverId) && (
+                    <EntityAvatar kind="driver" id={r.driverId} name={individualDrivers.find((d) => d.id === r.driverId)?.name} className="h-8 w-8 rounded-lg" />
+                  )}
                   <select
                     value={r.driverId}
                     onChange={(e) => updateRow(i, { driverId: e.target.value, selected: true })}

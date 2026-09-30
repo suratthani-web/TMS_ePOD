@@ -14,6 +14,8 @@ export interface PublicJobDetails {
   driverName: string;
   driverPhone: string;
   vehiclePlate: string;
+  driverImage?: string | null;
+  vehicleImage?: string | null;
   planDate: string;
   pickupDate: string | null;
   deliveryDate: string | null;
@@ -331,8 +333,17 @@ export async function getPublicJobDetails(
   const custId = (job as { Customer_ID?: string | null }).Customer_ID
   const showLiveTracking = custId ? await getCustomerShowLiveTracking(custId) : true
 
+  // รูปคนขับ/รถ (ไม่มีรูป = null → หน้า track แสดงตัวอักษร/ไอคอนแทน)
+  const { getJobEntityImages } = await import("@/lib/gdrive/job-images")
+  const entityImages = await getJobEntityImages(
+    (job as { Driver_ID?: string | null }).Driver_ID,
+    job.Vehicle_Plate
+  ).catch(() => ({ driver: null, vehicle: null }))
+
   return {
     ...mapJobToPublicDetails(job),
+    driverImage: entityImages.driver,
+    vehicleImage: entityImages.vehicle,
     lastLocation,
     showLiveTracking
   };

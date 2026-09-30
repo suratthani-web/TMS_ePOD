@@ -28,6 +28,7 @@ import type { RepairTicket } from "@/lib/supabase/maintenance"
 import { ExcelExport } from "@/components/ui/excel-export"
 import type { Driver } from "@/lib/supabase/drivers"
 import type { MaintenanceScheduleData } from "@/lib/supabase/maintenance-schedule"
+import { EntityAvatar } from "@/components/ui/entity-avatar"
 
 interface MaintenanceClientProps {
   tickets: RepairTicket[]
@@ -228,6 +229,9 @@ export function MaintenanceClient({
                   )}>
                     {effectivePriority === 'High' ? <AlertTriangle size={24} className="animate-pulse" /> : <Wrench size={24} />}
                   </div>
+                  {ticket.Vehicle_Plate && (
+                    <EntityAvatar kind="vehicle" id={ticket.Vehicle_Plate} name={ticket.Vehicle_Plate} className="w-14 h-14 rounded-2xl" />
+                  )}
                   <div className="space-y-1">
                     <h3 className="text-xl font-black text-foreground italic tracking-widest uppercase leading-none">{ticket.Driver_Name || "UNASSIGNED"}</h3>
                     <div className="flex flex-wrap items-center gap-2">

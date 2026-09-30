@@ -56,6 +56,7 @@ import { Vehicle } from "@/lib/supabase/vehicles"
 import { Customer } from "@/lib/supabase/customers"
 import { Route } from "@/lib/supabase/routes"
 import { Subcontractor } from "@/types/subcontractor"
+import { EntityAvatar } from "@/components/ui/entity-avatar"
 
 // รวมค่าคนขับ + ค่าใช้จ่ายอื่นๆ (Cost_Driver_Extra + รายการใน extra_costs_json)
 // ให้ตรงกับที่คำนวณในหน้าแก้ไขงานและรายงาน Trip Performance
@@ -668,6 +669,12 @@ export function HistoryClient({
                             </div>
 
                             {/* Section 3: Vehicle & Driver */}
+                            <div className="flex items-center gap-2.5 min-w-0">
+                            <EntityAvatar
+                                kind="driver"
+                                url={job.Driver_ID ? drivers.find(d => d.Driver_ID === job.Driver_ID)?.Image_Url : null}
+                                name={job.Driver_Name || (job.Driver_ID ? drivers.find(d => d.Driver_ID === job.Driver_ID)?.Driver_Name : null)}
+                            />
                             <div className="flex flex-col gap-0.5 min-w-0">
                                 <div className="flex items-center gap-2">
                                     <div className="p-1 bg-muted/50 rounded-md text-muted-foreground group-hover/row:text-primary transition-colors shrink-0">
@@ -678,6 +685,7 @@ export function HistoryClient({
                                 <p className="text-[10px] font-black text-muted-foreground uppercase tracking-widest pl-1 truncate">
                                     {job.Driver_Name || (job.Driver_ID ? (drivers.find(d => d.Driver_ID === job.Driver_ID)?.Driver_Name || t('common.pending')) : t('common.pending'))}
                                 </p>
+                            </div>
                             </div>
 
                             {/* Section 4: Integrity Status */}
@@ -697,7 +705,10 @@ export function HistoryClient({
                                     </div>
                                 )}
                                 {job.Verified_At && (
-                                    <p className="text-[8px] font-black text-muted-foreground uppercase tracking-widest truncate w-full text-center hidden lg:block">
+                                    <p className="text-[8px] font-black text-muted-foreground uppercase tracking-widest truncate w-full hidden lg:flex items-center justify-center gap-1">
+                                        {job.Verified_By && job.Verified_By !== 'backfill' && (
+                                            <EntityAvatar kind="user" id={job.Verified_By} name={job.Verified_By} className="h-4 w-4 rounded-full border-0 [&_span]:text-[8px]" />
+                                        )}
                                         {t('history.agent')} {job.Verified_By?.split('@')[0]}
                                     </p>
                                 )}

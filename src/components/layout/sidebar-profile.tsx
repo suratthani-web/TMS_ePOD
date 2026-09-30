@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react"
 import { LogOut, Loader2 } from "lucide-react"
 import { getUserProfile, UserProfile } from "@/lib/supabase/users"
-import { formatGoogleDriveImageUrl } from "@/lib/gdrive/utils"
+import { EntityAvatar } from "@/components/ui/entity-avatar"
 import { cn } from "@/lib/utils"
 
 export function SidebarProfile({ collapsed }: { collapsed: boolean }) {
@@ -50,13 +50,7 @@ export function SidebarProfile({ collapsed }: { collapsed: boolean }) {
 
       <div className="relative w-11 h-11 rounded-2xl bg-gradient-to-tr from-primary to-accent p-[2px] shadow-lg shadow-primary/10 transition-transform group-hover:scale-105 shrink-0 overflow-hidden">
         <div className="w-full h-full rounded-[inherit] bg-background flex items-center justify-center text-foreground overflow-hidden relative">
-            {avatarUrl ? (
-                // <img> แทน next/image: URL รูปมาจากผู้ใช้ (host ไหนก็ได้) ไม่ต้องอยู่ใน remotePatterns
-                // eslint-disable-next-line @next/next/no-img-element
-                <img src={formatGoogleDriveImageUrl(avatarUrl)} alt={displayName} className="absolute inset-0 w-full h-full object-cover" />
-            ) : (
-                <span className="font-black text-lg tracking-tighter">{(displayName || "U").charAt(0).toUpperCase()}</span>
-            )}
+            <EntityAvatar kind="user" url={avatarUrl} name={displayName || "U"} className="w-full h-full rounded-none border-0 bg-transparent [&_span]:text-lg [&_span]:text-foreground" />
         </div>
       </div>
       

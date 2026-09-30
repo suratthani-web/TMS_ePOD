@@ -1,8 +1,9 @@
 export const dynamic = 'force-dynamic'
 
 import { DashboardLayout } from "@/components/layout/dashboard-layout"
+import { EntityAvatar } from "@/components/ui/entity-avatar"
 import { getDriverLeaves } from "@/lib/supabase/driver-leaves"
-import { CalendarDays, ArrowLeft, User, CheckCircle2, XCircle, Clock } from "lucide-react"
+import { CalendarDays, ArrowLeft, CheckCircle2, XCircle, Clock } from "lucide-react"
 import Link from "next/link"
 import { PremiumCard } from "@/components/ui/premium-card"
 import { Badge } from "@/components/ui/badge"
@@ -101,7 +102,7 @@ export default async function DriverSchedulePage() {
                     <div className="flex-1 min-w-0">
                       <div className="flex flex-wrap items-center gap-3 mb-1.5">
                         <span className="flex items-center gap-2 font-black text-foreground text-sm uppercase italic">
-                          <User size={14} className="text-primary" /> {leave.Driver_Name || leave.Driver_ID}
+                          <EntityAvatar kind="driver" id={leave.Driver_ID} name={leave.Driver_Name || leave.Driver_ID} className="h-7 w-7 rounded-lg" /> {leave.Driver_Name || leave.Driver_ID}
                         </span>
                         <Badge variant="outline" className={cn("font-black text-[9px] uppercase tracking-widest rounded-md border shadow-sm", leaveStyle)}>
                           {leave.Leave_Type}

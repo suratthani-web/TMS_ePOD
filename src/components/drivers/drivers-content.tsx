@@ -273,7 +273,7 @@ export function DriversContent({
                     <div className="relative">
                       <Avatar className={cn("h-10 w-10 border shadow-sm", isTarget ? "border-primary" : "border-border")}>
                         <AvatarImage 
-                          src={driver.Image_Url ? formatGoogleDriveImageUrl(driver.Image_Url) : `https://api.dicebear.com/7.x/avataaars/svg?seed=${driver.Driver_Name}`} 
+                          src={driver.Image_Url ? formatGoogleDriveImageUrl(driver.Image_Url) : undefined} 
                           alt={driver.Driver_Name || undefined}
                         />
                         <AvatarFallback className="bg-muted text-foreground font-bold text-xs">{driver.Driver_Name?.charAt(0)}</AvatarFallback>

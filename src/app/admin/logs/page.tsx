@@ -4,12 +4,13 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Badge } from '@/components/ui/badge'
 import { getAllBranches } from '@/lib/supabase/branches'
 import { Input } from '@/components/ui/input'
-import { Search, ArrowLeft, ShieldCheck, Activity, Cpu, Target, Clock, User, HardDrive, Terminal } from 'lucide-react'
+import { Search, ArrowLeft, ShieldCheck, Activity, Cpu, Target, Clock, HardDrive, Terminal } from 'lucide-react'
 import LinkNext from 'next/link'
 import { format } from 'date-fns'
 import { th } from 'date-fns/locale'
 import { PremiumCard } from '@/components/ui/premium-card'
 import { PremiumButton } from '@/components/ui/premium-button'
+import { EntityAvatar } from '@/components/ui/entity-avatar'
 import { cn } from '@/lib/utils'
 
 export const dynamic = 'force-dynamic'
@@ -20,6 +21,8 @@ type SystemLogRow = {
   module: string
   action_type: string
   user_name?: string | null
+  user_id?: string | null
+  username?: string | null
   role?: string | null
   branch_id?: string | null
   target_id?: string | null
@@ -176,9 +179,12 @@ export default async function LogsPage(props: {
                       </TableCell>
                       <TableCell className="p-10">
                         <div className="flex items-center gap-4">
-                          <div className="w-10 h-10 rounded-2xl bg-muted/50 flex items-center justify-center text-primary group-hover/row:scale-110 group-hover/row:bg-primary/20 transition-all duration-500 shadow-inner border border-border/5">
-                            <span className="font-black italic text-lg font-bold">{(log.user_name || "A").charAt(0)}</span>
-                          </div>
+                          <EntityAvatar
+                            kind="user"
+                            id={log.user_id || log.username}
+                            name={log.user_name || log.username || "A"}
+                            className="w-10 h-10 rounded-2xl bg-muted/50 group-hover/row:scale-110 transition-all duration-500 shadow-inner [&_span]:text-primary [&_span]:text-lg"
+                          />
                           <div className="flex flex-col">
                             <span className="font-black text-white text-xl tracking-widest uppercase italic">{log.user_name}</span>
                             <span className="text-base font-bold text-muted-foreground font-black uppercase tracking-widest">{log.role}</span>

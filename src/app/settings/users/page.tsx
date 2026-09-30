@@ -22,7 +22,7 @@ import { getRolePermissions } from "@/lib/actions/permission-actions"
 import { toast } from "sonner"
 import { useLanguage } from "@/components/providers/language-provider"
 import { AvatarPicker } from "@/components/users/avatar-picker"
-import { formatGoogleDriveImageUrl } from "@/lib/gdrive/utils"
+import { EntityAvatar } from "@/components/ui/entity-avatar"
 import { cn } from "@/lib/utils"
 import { useRouter } from "next/navigation"
 
@@ -299,14 +299,7 @@ export default function UserSettingsPage() {
                                         <tr key={user.Username} className="group/row hover:bg-muted/40 transition-all duration-300">
                                             <td className="px-8 py-4">
                                                 <div className="flex items-center gap-3">
-                                                <div className="w-9 h-9 rounded-xl overflow-hidden border border-border bg-muted flex items-center justify-center shrink-0">
-                                                    {user.Avatar_Url ? (
-                                                        // eslint-disable-next-line @next/next/no-img-element
-                                                        <img src={formatGoogleDriveImageUrl(user.Avatar_Url)} alt={user.Username} className="w-full h-full object-cover" />
-                                                    ) : (
-                                                        <span className="text-sm font-black text-muted-foreground">{(user.Name || user.Username || "U").charAt(0).toUpperCase()}</span>
-                                                    )}
-                                                </div>
+                                                <EntityAvatar kind="user" url={user.Avatar_Url} name={user.Name || user.Username} />
                                                 <div className="flex flex-col">
                                                     <span className="text-primary font-black tracking-normal uppercase italic group-hover/row:scale-105 origin-left transition-transform inline-block">
                                                         {user.Username}

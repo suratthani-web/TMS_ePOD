@@ -9,7 +9,7 @@ import {
     Clock, Banknote, Package, CalendarCheck,
     ChevronRight, ArrowUpRight, ShieldCheck, CheckCircle2
 } from "lucide-react"
-import { Avatar, AvatarFallback } from "@/components/ui/avatar"
+import { EntityAvatar } from "@/components/ui/entity-avatar"
 import { createClient } from "@/utils/supabase/client"
 import { toast } from "sonner"
 import Link from "next/link"
@@ -159,9 +159,12 @@ export function DashboardClient({ session, currentJob, activeJobs = [], gamifica
                 <div className="flex items-center gap-3">
                     <div className="relative">
                         <Link href="/mobile/profile">
-                            <Avatar className="h-11 w-11 rounded-[13px] active:scale-95 transition-transform">
-                                <AvatarFallback className="rounded-[13px] bg-foreground text-background font-bold">{session.driverName?.charAt(0)}</AvatarFallback>
-                            </Avatar>
+                            <EntityAvatar
+                                kind="driver"
+                                id={session.driverId}
+                                name={session.driverName}
+                                className="h-11 w-11 rounded-[13px] border-0 bg-foreground active:scale-95 transition-transform [&_span]:text-background [&_span]:text-sm"
+                            />
                         </Link>
                         <div
                             className="absolute -bottom-0.5 -right-0.5 w-3.5 h-3.5 rounded-full border-[2.5px] border-background"

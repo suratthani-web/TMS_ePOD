@@ -5,11 +5,12 @@ import { toast } from 'sonner'
 import { createClient } from '@/utils/supabase/client'
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { Send, Search, MessageSquare, Check, CheckCheck, Loader2, Image as ImageIcon, User, ShieldCheck, Activity, Target, CheckCircle2 } from "lucide-react"
+import { Send, Search, MessageSquare, Check, CheckCheck, Loader2, Image as ImageIcon, ShieldCheck, Activity, Target, CheckCircle2 } from "lucide-react"
 import { ChatMessage } from '@/lib/actions/chat-actions'
 import { uploadImageToDrive } from '@/lib/actions/upload-actions'
 import Image from 'next/image'
 import { cn } from "@/lib/utils"
+import { EntityAvatar } from "@/components/ui/entity-avatar"
 import { useLanguage } from "@/components/providers/language-provider"
 
 interface Contact {
@@ -374,9 +375,7 @@ export function ChatWindow({ initialContacts, initialDrivers, forcedDriverId }: 
                         )}
                       >
                           <div className="relative shrink-0">
-                              <div className="w-10 h-10 rounded-full bg-muted flex items-center justify-center font-bold border">
-                                  {c.driver_name.charAt(0)}
-                              </div>
+                              <EntityAvatar kind="driver" id={c.driver_id} name={c.driver_name} className="w-10 h-10 rounded-full [&_span]:text-sm" />
                               {(() => {
                                   const isPresenceOnline = onlineDrivers.has(c.driver_id)
                                   const lastUpdateDate = c.last_update ? new Date(c.last_update) : null
@@ -410,9 +409,7 @@ export function ChatWindow({ initialContacts, initialDrivers, forcedDriverId }: 
                   <>
                     <div className="p-4 border-b bg-muted/10 flex items-center justify-between">
                         <div className="flex items-center gap-3">
-                            <div className="w-10 h-10 rounded-full bg-primary/20 text-primary flex items-center justify-center font-bold">
-                                {activeDriver.driver_name.charAt(0)}
-                            </div>
+                            <EntityAvatar kind="driver" id={activeDriver.driver_id} name={activeDriver.driver_name} className="w-10 h-10 rounded-full bg-primary/20 border-0 [&_span]:text-primary [&_span]:text-sm" />
                             <div>
                                 <p className="text-sm font-bold">{activeDriver.driver_name}</p>
                                 {(() => {

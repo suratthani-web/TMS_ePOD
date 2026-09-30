@@ -1,9 +1,10 @@
 "use client"
 
 import { useState, useRef, useEffect } from "react"
-import { Check, ChevronsUpDown, Truck } from "lucide-react"
+import { Check, ChevronsUpDown } from "lucide-react"
 import { Input } from "@/components/ui/input"
 import { cn } from "@/lib/utils"
+import { EntityAvatar } from "@/components/ui/entity-avatar"
 
 import { Vehicle } from "@/lib/supabase/vehicles"
 
@@ -129,7 +130,7 @@ export function VehicleAutocomplete({
                   )}
                 >
                   <div className="flex items-center gap-2">
-                    <Truck size={14} className="text-emerald-600" />
+                    <EntityAvatar kind="vehicle" url={vehicle.Image_Url} id={vehicle.Vehicle_Plate} name={vehicle.Vehicle_Plate} className="h-7 w-7 rounded-lg [&_svg]:text-emerald-600" />
                     <span>{vehicle.Vehicle_Plate}</span>
                     <span className="text-lg font-bold text-muted-foreground font-black">({vehicle.Vehicle_Type})</span>
                     {customerId && customerId !== 'All' && (

@@ -1,9 +1,10 @@
 "use client"
 
 import { useState, useRef, useEffect } from "react"
-import { Check, ChevronsUpDown, User } from "lucide-react"
+import { Check, ChevronsUpDown } from "lucide-react"
 import { Input } from "@/components/ui/input"
 import { cn } from "@/lib/utils"
+import { EntityAvatar } from "@/components/ui/entity-avatar"
 
 import { Driver } from "@/lib/supabase/drivers"
 
@@ -142,7 +143,7 @@ export function DriverAutocomplete({
                   )}
                 >
                   <div className="flex items-center gap-2">
-                    <User size={14} className="text-emerald-600" />
+                    <EntityAvatar kind="driver" url={driver.Image_Url} id={driver.Driver_ID} name={driver.Driver_Name} className="h-7 w-7 rounded-lg" />
                     <span>{driver.Driver_Name} <span className="text-muted-foreground ml-1">({driver.Vehicle_Plate || '-'})</span></span>
                     {customerId && customerId !== 'All' && (
                       <span className={cn(

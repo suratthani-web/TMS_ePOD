@@ -8,6 +8,7 @@ import Link from "next/link"
 import { PremiumCard } from "@/components/ui/premium-card"
 import { cn } from "@/lib/utils"
 import { useLanguage } from "@/components/providers/language-provider"
+import { EntityAvatar } from "@/components/ui/entity-avatar"
 
 interface VehicleCheck {
     id: string;
@@ -145,9 +146,7 @@ export function ChecksClient({ checks }: ChecksClientProps) {
                                         </td>
                                         <td className="px-6 py-4">
                                             <div className="flex items-center gap-3">
-                                                <div className="w-8 h-8 rounded-lg bg-muted/50 flex items-center justify-center text-primary group-hover/row:scale-110 group-hover/row:bg-primary/20 transition-all duration-500 border border-border">
-                                                    <Truck size={14} />
-                                                </div>
+                                                <EntityAvatar kind="vehicle" id={check.Vehicle_Plate} name={check.Vehicle_Plate} className="w-8 h-8 rounded-lg group-hover/row:scale-110 transition-all duration-500 [&_svg]:text-primary" />
                                                 <span className="font-black text-foreground text-sm tracking-widest uppercase italic border-b border-primary/20">{check.Vehicle_Plate}</span>
                                             </div>
                                         </td>

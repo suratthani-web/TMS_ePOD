@@ -40,6 +40,7 @@ import type { FuelAnalytics } from "@/lib/supabase/fuel-analytics"
 import type { Driver } from "@/lib/supabase/drivers"
 import type { Branch } from "@/lib/supabase/branches"
 import type { FuelIntelligenceSummary } from "@/lib/fuel/fuel-allocation-engine"
+import { EntityAvatar } from "@/components/ui/entity-avatar"
 
 type FuelClientProps = {
   logs: EnrichedFuelLog[]
@@ -475,9 +476,12 @@ export function FuelClient({
                               </span>
                             </td>
                             <td className="px-4 py-3.5">
-                              <Badge variant="outline" className="font-black bg-primary/10 text-primary border-primary/20 mb-0.5">
-                                {log.Vehicle_Plate || "-"}
-                              </Badge>
+                              <div className="flex items-center gap-2 mb-0.5">
+                                {log.Vehicle_Plate && <EntityAvatar kind="vehicle" id={log.Vehicle_Plate} name={log.Vehicle_Plate} className="h-7 w-7 rounded-lg" />}
+                                <Badge variant="outline" className="font-black bg-primary/10 text-primary border-primary/20">
+                                  {log.Vehicle_Plate || "-"}
+                                </Badge>
+                              </div>
                               <p className="text-[10px] text-muted-foreground truncate max-w-[120px]">{log.Driver_Name}</p>
                               {log.Trip_Fill_Type === 'enroute' && (
                                 <span className="text-[8px] px-1.5 py-0.5 rounded-full font-black uppercase tracking-wide bg-amber-500/20 text-amber-500 border border-amber-500/20 inline-block mt-0.5">

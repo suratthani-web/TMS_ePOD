@@ -3,6 +3,7 @@
 import { useEffect, useState, useCallback } from "react"
 import { useRouter } from "next/navigation"
 import Link from "next/link"
+import { EntityAvatar } from "@/components/ui/entity-avatar"
 import { DashboardLayout } from "@/components/layout/dashboard-layout"
 import { PremiumCard, PremiumCardHeader, PremiumCardTitle } from "@/components/ui/premium-card"
 import { PremiumButton } from "@/components/ui/premium-button"
@@ -303,7 +304,12 @@ export default function DriverPaymentHistory() {
                                 {new Date(item.Created_At).toLocaleDateString('th-TH')}
                              </div>
                         </TableCell>
-                        <TableCell className="py-5 px-4 text-muted-foreground font-black tracking-tight">{item.Driver_Name}</TableCell>
+                        <TableCell className="py-5 px-4 text-muted-foreground font-black tracking-tight">
+                            <span className="flex items-center gap-2.5">
+                                <EntityAvatar kind="driver" id={(item as { Driver_ID?: string | null }).Driver_ID} name={item.Driver_Name} className="h-8 w-8 rounded-lg" />
+                                {item.Driver_Name}
+                            </span>
+                        </TableCell>
                         <TableCell className="py-5 px-4 text-right">
                             <span className="text-muted-foreground font-black text-lg tracking-tighter">
                                 <span className="text-muted-foreground text-lg font-bold mr-1">฿</span>
