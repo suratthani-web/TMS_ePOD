@@ -95,7 +95,10 @@ export default function SheetMappingPage() {
     toast.success("ลบแล้ว"); load()
   }
 
-  const DraftForm = ({ onSave, onCancel }: { onSave: () => void; onCancel: () => void }) => (
+  // Plain render function, NOT a component: declaring `const DraftForm = () => ...`
+  // inside the page gave it a new identity every render, so React remounted the
+  // inputs on each keystroke and focus was lost after one character.
+  const renderDraftForm = (onSave: () => void, onCancel: () => void) => (
     <div className="grid grid-cols-1 md:grid-cols-12 gap-3 items-end p-4 bg-muted/30 rounded-2xl border border-border">
       <div className="md:col-span-3 space-y-1">
         <Label className="text-xs font-bold text-muted-foreground uppercase">ชื่อลูกค้า / กลุ่ม</Label>
@@ -148,7 +151,7 @@ export default function SheetMappingPage() {
           )}
         </div>
 
-        {showAdd && <DraftForm onSave={saveNew} onCancel={cancel} />}
+        {showAdd && renderDraftForm(saveNew, cancel)}
 
         <div className="bg-card rounded-2xl border border-border shadow-sm overflow-hidden">
           <div className="px-5 py-3 border-b border-border bg-muted/30 flex items-center gap-2 text-sm font-black text-foreground uppercase tracking-widest">
@@ -163,7 +166,7 @@ export default function SheetMappingPage() {
             <div className="divide-y divide-border">
               {rows.map((r) => (
                 editingId === r.id ? (
-                  <div key={r.id} className="p-3"><DraftForm onSave={() => saveEdit(r.id)} onCancel={cancel} /></div>
+                  <div key={r.id} className="p-3">{renderDraftForm(() => saveEdit(r.id), cancel)}</div>
                 ) : (
                   <div key={r.id} className="flex flex-wrap items-center gap-3 px-5 py-4 hover:bg-muted/30 transition-colors">
                     <div className="flex-1 min-w-[160px]">
