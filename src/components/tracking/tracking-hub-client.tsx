@@ -6,7 +6,7 @@ import {
   Activity, Navigation, ExternalLink, ShieldCheck, Target, Cpu, 
   Layers, TrendingUp, AlertTriangle, Info, DollarSign, User, 
   CheckCircle2, Calendar, Phone, Smartphone, Box, Scale, Maximize2, 
-  RefreshCw, ArrowRight, Eye, PenTool, ArrowLeft, Send, Download, Printer
+  RefreshCw, ArrowRight, Eye, PenTool, ArrowLeft, Send, Download, Printer, Leaf
 } from "lucide-react"
 
 // Print a floor-climb slip on its own — opens a bare A4-landscape page with zero
@@ -603,6 +603,32 @@ export function TrackingHubClient({ initialActiveJobs, customerMode = false }: T
                                     </button>
                                 </div>
                              </PremiumCard>
+
+                             {/* Trip carbon footprint — same shared formula as LINE / POD / /track / invoice */}
+                             {selectedJob.carbon && (
+                                <PremiumCard className="rounded-2xl border border-emerald-500/20 shadow-sm bg-card p-8 space-y-5">
+                                    <h3 className="text-sm font-semibold flex items-center gap-3 text-emerald-600">
+                                        <Leaf size={18} /> คาร์บอนฟุตพริ้นต์เที่ยวนี้
+                                    </h3>
+                                    <div className="grid grid-cols-3 gap-3 text-center">
+                                        <div className="bg-muted/20 rounded-xl p-3">
+                                            <p className="text-[10px] font-bold text-muted-foreground">ระยะทาง</p>
+                                            <p className="text-base font-black text-foreground">{selectedJob.carbon.distanceKm.toLocaleString()} กม.</p>
+                                        </div>
+                                        <div className="bg-emerald-500/10 rounded-xl p-3">
+                                            <p className="text-[10px] font-bold text-emerald-600">ปล่อย</p>
+                                            <p className="text-base font-black text-emerald-600">{selectedJob.carbon.co2Kg.toLocaleString()} kgCO₂e</p>
+                                        </div>
+                                        <div className="bg-muted/20 rounded-xl p-3">
+                                            <p className="text-[10px] font-bold text-muted-foreground">ต้นไม้ชดเชย</p>
+                                            <p className="text-base font-black text-foreground">{selectedJob.carbon.trees.toLocaleString()} ต้น</p>
+                                        </div>
+                                    </div>
+                                    <p className="text-[11px] text-muted-foreground">
+                                        ISO 14083 / GLEC / อบก. · เที่ยวเดียว (ไม่รวมเที่ยวรถเปล่ากลับ) · {selectedJob.carbon.method}
+                                    </p>
+                                </PremiumCard>
+                             )}
 
                              {selectedJob.notes && (
                                 <div className="p-8 bg-amber-500/5 rounded-2xl border border-amber-500/20 space-y-4">
