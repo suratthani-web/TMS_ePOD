@@ -188,6 +188,10 @@ export function JobDialog({
   // Guards the init effect so it re-populates the form only on open / job change,
   // not on every parent re-render (which used to wipe typed dates).
   const lastInitKeyRef = useRef<string | null>(null)
+  // True while an edit dialog is re-fetching the full job. The form is locked
+  // meanwhile: the fresh copy replaces the whole form when it lands, so anything
+  // typed before then (an extra cost, a date) used to be silently wiped.
+  const [hydrating, setHydrating] = useState(false)
   const initialContainer = Array.isArray((job as any)?.container)
     ? (job as any).container[0]
     : (job as any)?.container
@@ -697,22 +701,31 @@ export function JobDialog({
     if (job) {
       populateFromJob(job)
 
-      let isMounted = true
       if (job.Job_ID) {
+        // The list that opened us may not carry every column (e.g. extra_costs_json),
+        // so load the full row. Apply it only if this is still the same open
+        // session — checked via the init key, NOT an effect-cleanup flag: a parent
+        // re-render runs the cleanup while the guard above skips re-init, which
+        // used to drop the fresh row and leave the form on partial list data.
+        setHydrating(true)
         const fetchFresh = async () => {
           try {
             const freshJob = await getFreshJob(job.Job_ID)
-            if (freshJob && isMounted) {
+            if (freshJob && lastInitKeyRef.current === initKey) {
               populateFromJob(freshJob as Job)
             }
           } catch {
-            // Ignore error
+            // Keep the list copy; the form unlocks below
+          } finally {
+            if (lastInitKeyRef.current === initKey) setHydrating(false)
           }
         }
         fetchFresh()
+      } else {
+        setHydrating(false)
       }
-      return () => { isMounted = false }
     } else {
+      setHydrating(false)
       setFormData({
         Job_ID: generateJobId(),
         Plan_Date: defaultDate || new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Bangkok' }),
@@ -1150,7 +1163,11 @@ export function JobDialog({
 
   const handleSubmit = async (e?: React.FormEvent, stayOpen = false, forcedStatus?: string) => {
     if (e) e.preventDefault()
-    
+    if (hydrating) {
+      toast.info('กำลังโหลดข้อมูลงานล่าสุด รอสักครู่แล้วกดบันทึกอีกครั้ง')
+      return
+    }
+
     // Validation
     const errors = validateForm()
     if (errors.length > 0) {
@@ -1348,7 +1365,14 @@ export function JobDialog({
           ))}
         </div>
         
+        {hydrating && (
+          <div className="flex items-center gap-2 text-sm font-bold text-muted-foreground mb-2">
+            <Loader2 className="w-4 h-4 animate-spin" /> กำลังโหลดข้อมูลงานล่าสุด…
+          </div>
+        )}
         <form onSubmit={handleSubmit} className="space-y-4">
+          {/* Locked while hydrating so edits can't be overwritten by the fresh row */}
+          <fieldset disabled={hydrating} className="contents">
           {/* Tab: ข้อมูลงาน */}
           {activeTab === 'info' && (
             <div className="space-y-12">
@@ -2921,6 +2945,7 @@ export function JobDialog({
                 )}
             </div>
           </div>
+          </fieldset>
         </form>
       </DialogContent>
     </Dialog>
