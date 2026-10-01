@@ -25,6 +25,7 @@ export type Driver = {
   Bank_Name?: string | null
   Bank_Account_No?: string | null
   Bank_Account_Name?: string | null
+  ID_Card_No?: string | null
   Sub_ID?: string | null
   Show_Price_Default?: boolean | null
   Branch_ID?: string | null

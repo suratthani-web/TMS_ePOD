@@ -3,6 +3,7 @@
 import { createAdminClient } from '@/utils/supabase/server'
 import { revalidatePath } from 'next/cache'
 import { getUserBranchId, isSuperAdmin, isAdmin } from '@/lib/permissions'
+import { normalizeThaiId, isValidThaiId } from '@/lib/utils/thai-id'
 
 export type DriverFormData = {
   Driver_ID: string
@@ -16,11 +17,32 @@ export type DriverFormData = {
   Bank_Name?: string
   Bank_Account_No?: string
   Bank_Account_Name?: string
+  /** เลขบัตรประชาชน 13 หลัก */
+  ID_Card_No?: string
+  /** ค่าเดิมก่อนแก้ — ให้ล้างค่าได้โดยไม่ส่งคอลัมน์นี้เมื่อไม่จำเป็น */
+  ID_Card_No_Original?: string
   Is_Sub_Owner?: boolean
   Image_Url?: string | null
 }
 
+/**
+ * ID_Card_No is only written when there's something to write — before the
+ * 20261001_driver_id_card.sql migration runs, sending an unknown column would
+ * fail every driver save.
+ */
+function idCardPatch(data: Partial<DriverFormData>): { patch: Record<string, string | null>; error?: string } {
+  const id = normalizeThaiId(data.ID_Card_No)
+  if (id) {
+    if (!isValidThaiId(id)) return { patch: {}, error: 'เลขบัตรประชาชนไม่ถูกต้อง (ต้องเป็นตัวเลข 13 หลักและเลขตรวจสอบถูกต้อง)' }
+    return { patch: { ID_Card_No: id } }
+  }
+  // cleared in the form → write null only if a value existed before
+  return { patch: normalizeThaiId(data.ID_Card_No_Original) ? { ID_Card_No: null } : {} }
+}
+
 export async function createDriver(data: DriverFormData) {
+  const idCard = idCardPatch(data)
+  if (idCard.error) return { success: false, message: idCard.error }
   const supabase = createAdminClient()
   const userBranchId = await getUserBranchId()
   const isSuper = await isSuperAdmin()
@@ -44,6 +66,7 @@ export async function createDriver(data: DriverFormData) {
       Bank_Name: data.Bank_Name || null,
       Bank_Account_No: data.Bank_Account_No || null,
       Bank_Account_Name: data.Bank_Account_Name || null,
+      ...idCard.patch,
       Branch_ID: finalBranchId
     })
 
@@ -104,6 +127,7 @@ export async function createBulkDrivers(drivers: any[]) {
     normalized.Bank_Name = getValue(['Bank_Name', 'bank', 'ธนาคาร']) as string
     normalized.Bank_Account_No = getValue(['Bank_Account_No', 'account_no', 'เลขบัญชี']) as string
     normalized.Bank_Account_Name = getValue(['Bank_Account_Name', 'account_name', 'ชื่อบัญชี']) as string
+    normalized.ID_Card_No = normalizeThaiId(getValue(['ID_Card_No', 'id_card', 'เลขบัตรประชาชน', 'เลขประจำตัวประชาชน']))
     
     return normalized
   }
@@ -137,12 +161,23 @@ export async function createBulkDrivers(drivers: any[]) {
       Bank_Name: data.Bank_Name || null,
       Bank_Account_No: data.Bank_Account_No || null,
       Bank_Account_Name: data.Bank_Account_Name || null,
+      ID_Card_No: (data.ID_Card_No as string) || null,
       Branch_ID: finalBranchId
     }
   }).filter(d => d.Driver_Name && d.Mobile_No) // Ensure essential fields exist
 
   if (cleanData.length === 0) {
      return { success: false, message: 'ไม่พบข้อมูลพนักงานที่ถูกต้อง (กรุณาระบุชื่อและเบอร์โทร)' }
+  }
+
+  // เลขบัตรประชาชน: ตรวจทั้งไฟล์ก่อนบันทึก; ไฟล์ที่ไม่มีคอลัมน์นี้จะไม่แตะค่าเดิม
+  // (และไม่ส่งคอลัมน์ที่อาจยังไม่ได้สร้างใน DB)
+  const badIds = cleanData.filter(d => d.ID_Card_No && !isValidThaiId(d.ID_Card_No))
+  if (badIds.length > 0) {
+    return { success: false, message: `เลขบัตรประชาชนไม่ถูกต้อง: ${badIds.slice(0, 5).map(d => d.Driver_Name).join(', ')}${badIds.length > 5 ? ` และอีก ${badIds.length - 5} คน` : ''}` }
+  }
+  if (!cleanData.some(d => d.ID_Card_No)) {
+    for (const d of cleanData) delete (d as { ID_Card_No?: string | null }).ID_Card_No
   }
 
   const { error } = await supabase
@@ -158,6 +193,8 @@ export async function createBulkDrivers(drivers: any[]) {
 }
 
 export async function updateDriver(driverId: string, data: Partial<DriverFormData>) {
+  const idCard = idCardPatch(data)
+  if (idCard.error) return { success: false, message: idCard.error }
   const supabase = createAdminClient()
   const branchId = await getUserBranchId()
   const isAdmin = await isSuperAdmin()
@@ -172,6 +209,7 @@ export async function updateDriver(driverId: string, data: Partial<DriverFormDat
     Bank_Name: data.Bank_Name || null,
     Bank_Account_No: data.Bank_Account_No || null,
     Bank_Account_Name: data.Bank_Account_Name || null,
+    ...idCard.patch,
   }
 
   if (isAdmin && data.Branch_ID) {

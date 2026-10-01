@@ -616,7 +616,10 @@ export async function getDriverPaymentByIdWithJobs(id: string) {
             .from('Jobs_Main')
             .select('*, extra_costs_json')
             .eq('Driver_Payment_ID', id)
-        
+            // Printed vouchers list trips in date order (unordered came back shuffled)
+            .order('Plan_Date', { ascending: true })
+            .order('Job_ID', { ascending: true })
+
         if (jobsError) throw jobsError
 
         // 3. Get Accounting Profile (New priority)
@@ -640,37 +643,52 @@ export async function getDriverPaymentByIdWithJobs(id: string) {
             } catch {}
         }
         
-        // If accounting profile is empty, fallback to company profile
-        if (!companyProfile && profileData?.value) {
+        // Fill gaps from company profile — accounting_profile has no logo_url and
+        // names the company company_name_th, so the voucher printed a blank name.
+        if (profileData?.value) {
             try {
-                companyProfile = typeof profileData.value === 'string' ? JSON.parse(profileData.value) : profileData.value
+                const base = typeof profileData.value === 'string' ? JSON.parse(profileData.value) : profileData.value
+                companyProfile = { ...base, ...(companyProfile || {}) }
             } catch {}
         }
 
-        // 4. Get Payee Details (Bank Info)
-        let bankInfo = {
+        // 4. Get Payee Details (Bank Info + ID for the voucher / 50 ทวิ)
+        // select('*') on purpose: ID_Card_No may not exist until its migration runs,
+        // and naming it explicitly would fail the whole lookup.
+        let bankInfo: { Bank_Name: string; Bank_Account_No: string; Bank_Account_Name: string; Payee_Tax_ID?: string | null } = {
             Bank_Name: "",
             Bank_Account_No: "",
-            Bank_Account_Name: ""
+            Bank_Account_Name: "",
+            Payee_Tax_ID: null,
         }
+        type PayeeRow = { Bank_Name?: string | null; Bank_Account_No?: string | null; Bank_Account_Name?: string | null; ID_Card_No?: string | null; Tax_ID?: string | null }
+        const toBankInfo = (r: PayeeRow, taxId: string | null | undefined) => ({
+            Bank_Name: r.Bank_Name || "",
+            Bank_Account_No: r.Bank_Account_No || "",
+            Bank_Account_Name: r.Bank_Account_Name || "",
+            Payee_Tax_ID: taxId || null,
+        })
 
-        // Try as Individual Driver first
-        const { data: driver } = await supabase
+        // Try as Individual Driver first (limit, not maybeSingle — duplicate names would error out)
+        const { data: drivers } = await supabase
             .from('Master_Drivers')
-            .select('Bank_Name, Bank_Account_No, Bank_Account_Name')
+            .select('*')
             .eq('Driver_Name', payment.Driver_Name)
-            .maybeSingle()
-        
+            .limit(5)
+        const driver = ((drivers || []) as PayeeRow[]).find(d => d.Bank_Account_No) || (drivers?.[0] as PayeeRow | undefined)
+
         if (driver?.Bank_Account_No) {
-            bankInfo = driver
+            bankInfo = toBankInfo(driver, driver.ID_Card_No)
         } else {
-            // Try as Subcontractor
+            // Try as Subcontractor (the table is Master_Subcontractors — 'Subcontractors' never existed)
             const { data: sub } = await supabase
-                .from('Subcontractors')
-                .select('Bank_Name, Bank_Account_No, Bank_Account_Name')
+                .from('Master_Subcontractors')
+                .select('*')
                 .eq('Sub_Name', payment.Driver_Name)
+                .limit(1)
                 .maybeSingle()
-            if (sub) bankInfo = sub
+            if (sub) bankInfo = toBankInfo(sub as PayeeRow, (sub as PayeeRow).Tax_ID)
+            else if (driver) bankInfo = toBankInfo(driver, driver.ID_Card_No)
         }
 
         return { 

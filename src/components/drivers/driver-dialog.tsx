@@ -14,6 +14,7 @@ import { Driver } from "@/lib/supabase/drivers"
 import { BANKS } from "@/lib/constants/banks"
 import { useLanguage } from "@/components/providers/language-provider"
 import { formatGoogleDriveImageUrl } from "@/lib/gdrive/utils"
+import { formatThaiId, isValidThaiId, normalizeThaiId } from "@/lib/utils/thai-id"
 
 type DriverDialogProps = {
   mode?: 'create' | 'edit'
@@ -58,12 +59,21 @@ export function DriverDialog({
     Bank_Name: driver?.Bank_Name || '',
     Bank_Account_No: driver?.Bank_Account_No || '',
     Bank_Account_Name: driver?.Bank_Account_Name || '',
+    ID_Card_No: formatThaiId(driver?.ID_Card_No || ''),
+    ID_Card_No_Original: driver?.ID_Card_No || '',
     Is_Sub_Owner: (driver as { Is_Sub_Owner?: boolean })?.Is_Sub_Owner || false,
     Image_Url: driver?.Image_Url || '',
   })
 
+  const idCardDigits = normalizeThaiId(formData.ID_Card_No)
+  const idCardInvalid = idCardDigits.length > 0 && !isValidThaiId(idCardDigits)
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
+    if (idCardInvalid) {
+      toast.error('เลขบัตรประชาชนไม่ถูกต้อง (ต้องเป็นตัวเลข 13 หลัก)')
+      return
+    }
     setLoading(true)
 
     try {
@@ -341,6 +351,24 @@ export function DriverDialog({
                         className="h-12 bg-background border-border text-foreground placeholder:text-muted-foreground"
                     />
                 </div>
+            </div>
+
+            <div className="space-y-2">
+                <Label htmlFor="ID_Card_No" className="text-base font-bold font-black text-muted-foreground tracking-tight">เลขบัตรประชาชน (สำหรับใบสำคัญจ่าย / 50 ทวิ)</Label>
+                <Input
+                    id="ID_Card_No"
+                    inputMode="numeric"
+                    autoComplete="off"
+                    value={formData.ID_Card_No}
+                    onChange={(e) => setFormData({ ...formData, ID_Card_No: e.target.value })}
+                    onBlur={() => setFormData(f => ({ ...f, ID_Card_No: formatThaiId(f.ID_Card_No) }))}
+                    placeholder="x-xxxx-xxxxx-xx-x"
+                    aria-invalid={idCardInvalid}
+                    className={`h-12 bg-background border-border text-foreground placeholder:text-muted-foreground font-mono ${idCardInvalid ? 'border-destructive' : ''}`}
+                />
+                {idCardInvalid && (
+                    <p className="text-sm text-destructive">เลขบัตรไม่ถูกต้อง — ต้องเป็นตัวเลข 13 หลักและเลขตรวจสอบหลักสุดท้ายถูกต้อง</p>
+                )}
             </div>
           </div>
 
