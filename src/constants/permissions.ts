@@ -36,6 +36,7 @@ import {
 export const CUSTOMER_DEFAULT_KEYS = [
   "navigation.dashboard",
   "navigation.customer_tracking_hub",
+  "navigation.customer_report",
   "navigation.monitoring",
   "navigation.routes",
   "navigation.history",
@@ -63,6 +64,7 @@ export const MODULE_GROUPS = [
       { key: "navigation.monitoring", label: "ติดตามรถ", icon: Activity },
       { key: "navigation.tracking_hub", label: "ศูนย์ติดตามงานสด (Admin)", icon: Activity },
       { key: "navigation.customer_tracking_hub", label: "ศูนย์ติดตามงานลูกค้า (Customer Tracking)", icon: Activity },
+      { key: "navigation.customer_report", label: "รายงานสรุปงาน (ลูกค้า)", icon: BarChart3 },
       { key: "navigation.pod", label: "หลักฐานการส่งสินค้า (POD)", icon: FileText },
       { key: "navigation.damage_reports", label: "รายงานความเสียหาย", icon: AlertTriangle },
       { key: "navigation.chat", label: "แชท", icon: MessageSquare },
@@ -89,6 +91,7 @@ export const MODULE_GROUPS = [
       { key: "navigation.analytics", label: "วิเคราะห์ข้อมูล", icon: BarChart3 },
       { key: "navigation.ai", label: "ผู้ช่วย AI", icon: Bot },
       { key: "navigation.reports", label: "รายงานสรุป", icon: BarChart3 },
+      { key: "navigation.customer_reports_admin", label: "รายงานลูกค้า (ส่งเมล)", icon: BarChart3 },
     ]
   },
   {

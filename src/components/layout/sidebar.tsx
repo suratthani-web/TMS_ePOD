@@ -39,6 +39,7 @@ import {
   Container,
   ClipboardList,
   Bot,
+  Mail,
 } from "lucide-react"
 
 import { SidebarProfile } from "./sidebar-profile"
@@ -119,6 +120,7 @@ const navigation: NavGroup[] = [
     items: [
       { titleKey: "navigation.analytics", href: "/admin/analytics", icon: <BarChart3 size={20} />, badgeColor: "blue" },
       { titleKey: "navigation.reports", href: "/reports", icon: <BarChart3 size={20} /> },
+      { titleKey: "navigation.customer_reports_admin", href: "/reports/customer-reports", icon: <Mail size={20} /> },
       { titleKey: "navigation.ai", href: "/ai", icon: <Bot size={20} />, badge: "common.new", badgeColor: "green" },
     ],
   },
@@ -164,7 +166,7 @@ const customerNavigation: NavGroup[] = [
   {
     titleKey: "nav_groups.client_portal",
     titleFallback: { th: "งานของลูกค้า", en: "Client Portal" },
-    items: [customerTrackingItem],
+    items: [customerTrackingItem, { titleKey: "navigation.customer_report", href: "/customer-report", icon: <BarChart3 size={20} /> }],
   },
   ...navigation,
 ]
