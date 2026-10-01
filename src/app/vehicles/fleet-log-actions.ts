@@ -237,7 +237,7 @@ export async function getVehicleCostSummary(plate: string): Promise<VehicleCostS
     const fuelCost = fuelLogs.reduce((s, f) => s + (Number(f.Price_Total) || 0), 0)
     const fuelLiters = fuelLogs.reduce((s, f) => s + (Number(f.Liters) || 0), 0)
     const repairCost = repairs
-        .filter(r => String(r.Status) !== 'Cancelled')
+        .filter(r => ['Completed', 'เสร็จสิ้น', 'ซ่อมเสร็จ'].includes(String(r.Status)))
         .reduce((s, r) => s + (Number(r.Cost_Total) || 0), 0)
     const tireCost = tires.reduce((s, t) => s + (Number(t.cost) || 0), 0)
 

@@ -243,7 +243,7 @@ export async function getFilteredReportData(filters: ReportFilters): Promise<{
             .from('Repair_Tickets')
             .select('Vehicle_Plate, Cost_Total')
             .in('Vehicle_Plate', plates)
-            .eq('Status', 'completed')
+            .in('Status', ['Completed', 'เสร็จสิ้น', 'ซ่อมเสร็จ'])
           if (filters.dateFrom) maintQuery = maintQuery.gte('Date_Report', filters.dateFrom)
           if (filters.dateTo) maintQuery = maintQuery.lte('Date_Report', filters.dateTo)
           return maintQuery

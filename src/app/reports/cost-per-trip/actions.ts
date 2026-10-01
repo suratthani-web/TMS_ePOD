@@ -3,6 +3,7 @@
 import { createClient, createAdminClient } from '@/utils/supabase/server'
 import { getUserBranchId, getCustomerId, isAdmin } from "@/lib/permissions"
 import { fetchAllRows } from "@/lib/supabase/analytics-helpers"
+import { getWearRates, DEFAULT_WEAR_RATE_PER_KM, type WearRateSource } from "@/lib/supabase/wear-rate"
 
 export interface TripCost {
   Job_ID: string
@@ -20,6 +21,9 @@ export interface TripCost {
   maint_real: number
   fuel_est: number
   maint_est: number
+  /** ฿/km wear rate applied to this trip and where it came from. */
+  maint_rate: number
+  maint_rate_source: WearRateSource
   toll_cost: number
   extra_cost: number
   total_cost: number
@@ -130,7 +134,7 @@ export async function getCostPerTrip(startDate?: string, endDate?: string, custo
   let fuelLogs: { Vehicle_Plate: string | null; Date_Time: string | null; Price_Total: number | null; Liters: number | null; Odometer: number | null }[] = []
   if (uniquePlates.length > 0) {
     fuelLogs = await fetchAllRows(() => {
-      let fQuery = supabase
+      const fQuery = supabase
         .from('Fuel_Logs')
         .select('Vehicle_Plate, Date_Time, Price_Total, Liters, Odometer')
         .in('Vehicle_Plate', uniquePlates)
@@ -140,20 +144,11 @@ export async function getCostPerTrip(startDate?: string, endDate?: string, custo
     })
   }
 
-  // Fetch actual Repair/Maintenance Tickets for the vehicles & date range
-  let maintLogs: { Vehicle_Plate: string | null; Date_Report: string | null; Cost_Total: number | null }[] = []
-  if (uniquePlates.length > 0) {
-    maintLogs = await fetchAllRows(() => {
-      let mQuery = supabase
-        .from('Repair_Tickets')
-        .select('Vehicle_Plate, Date_Report, Cost_Total')
-        .in('Vehicle_Plate', uniquePlates)
-        .eq('Status', 'completed')
-        .gte('Date_Report', start)
-        .lte('Date_Report', end)
-      return mQuery
-    })
-  }
+  // Wear (ค่าสึกหรอ) ฿/km per vehicle from the trailing year of completed repairs
+  // + tires, so a big repair is spread over the km it serves instead of hitting
+  // only the trips on the day it was reported. Rate tables are read with the
+  // admin client — they're fleet-level, not customer data.
+  const wearRates = await getWearRates(createAdminClient(), end)
 
   const normalizePlate = (plate?: string | null) => (plate || '').replace(/\s+/g, '').trim()
 
@@ -193,39 +188,16 @@ export async function getCostPerTrip(startDate?: string, endDate?: string, custo
     vehicleEfficiencyMap.set(plateNorm, { kmPerLiter, avgUnitPrice })
   })
 
-  // Map Maintenance Logs by (Vehicle_Plate | YYYY-MM-DD)
-  const vehicleDayMaint = new Map<string, number>()
-  for (const m of maintLogs) {
-    if (!m.Vehicle_Plate || !m.Date_Report) continue
-    const date = m.Date_Report.slice(0, 10)
-    const key = `${normalizePlate(m.Vehicle_Plate)}|${date}`
-    const curr = vehicleDayMaint.get(key) || 0
-    vehicleDayMaint.set(key, curr + (Number(m.Cost_Total) || 0))
-  }
-
-  // Calculate day total distance & trip count per vehicle-day for maintenance cost allocation
-  const dayEstDistance = new Map<string, number>()
-  const dayTripCount = new Map<string, number>()
-  for (const r of rows) {
-    const normPlate = normalizePlate(r.Vehicle_Plate)
-    const date = String(r.Plan_Date || '').slice(0, 10)
-    const key = `${normPlate}|${date}`
-    const dist = Number(r.Est_Distance_KM) || 0
-    dayEstDistance.set(key, (dayEstDistance.get(key) || 0) + dist)
-    dayTripCount.set(key, (dayTripCount.get(key) || 0) + 1)
-  }
-
   const trips: TripCost[] = rows.map((d) => {
     const dist = Number(d.Est_Distance_KM) || 0
     const planDate = d.Plan_Date || null
     const loadedQty = Number(d.Loaded_Qty) || 0
     const normPlate = normalizePlate(d.Vehicle_Plate)
-    const bucketKey = planDate ? `${normPlate}|${planDate}` : ''
 
     // Estimates (For reference only)
     const dailyPrice = planDate ? fuelMap.get(planDate) || 0 : 0
     const fuelEst = dist > 0 ? dist * 3.5 : 0
-    const maintEst = dist * 1.25
+    const maintEst = dist * DEFAULT_WEAR_RATE_PER_KM
 
     // Real fuel cost: calculated from actual vehicle efficiency (KM/L) & actual unit fuel price
     const eff = vehicleEfficiencyMap.get(normPlate) || { kmPerLiter: 8.5, avgUnitPrice: 38.0 }
@@ -235,15 +207,9 @@ export async function getCostPerTrip(startDate?: string, endDate?: string, custo
       fuelReal = Math.round(consumedLiters * eff.avgUnitPrice)
     }
 
-    // Real maintenance cost from Repair_Tickets
-    let maintReal = 0
-    const maintBucketCost = (bucketKey ? vehicleDayMaint.get(bucketKey) : null) || 0
-    if (maintBucketCost > 0) {
-      const totalDayDist = dayEstDistance.get(bucketKey) || 0
-      const totalDayTrips = dayTripCount.get(bucketKey) || 1
-      const share = totalDayDist > 0 ? (dist / totalDayDist) : (1 / totalDayTrips)
-      maintReal = Math.round(maintBucketCost * share)
-    }
+    // Wear cost: trip km × the vehicle's actual ฿/km (0 for subcontracted trucks)
+    const wear = wearRates.get(d.Vehicle_Plate)
+    const maintReal = Math.round(dist * wear.ratePerKm)
 
     const tollCost = 0
     const driverCost = Number(d.Cost_Driver_Total) || 0
@@ -280,6 +246,8 @@ export async function getCostPerTrip(startDate?: string, endDate?: string, custo
       maint_real: maintReal,
       fuel_est: fuelEst,
       maint_est: maintEst,
+      maint_rate: wear.ratePerKm,
+      maint_rate_source: wear.source,
       toll_cost: tollCost,
       extra_cost: extraCost,
       total_cost: totalCost,

@@ -27,9 +27,11 @@ export default async function MaintenancePage(props: Props) {
     getMaintenanceSchedule(),
   ])
 
-  // แสดงเฉพาะรถบริษัท (Sub_ID ว่าง) — รถร่วมไม่ใช้งานและบริษัทไม่ได้ซ่อมให้
+  // แสดงเฉพาะรถบริษัท (Owner_Type = 'company') — รถร่วม/รถอิสระบริษัทไม่ได้ซ่อมให้.
+  // Sub_ID ว่างไม่พอ: รถอิสระ (independent) ก็ไม่มี Sub_ID. ใช้เกณฑ์เดียวกับ /fuel และ wear-rate
   const companyVehicles = (vehicles.data || []).filter(
-    (v: { Sub_ID?: string | null }) => !v.Sub_ID || String(v.Sub_ID).trim() === ''
+    (v: { Owner_Type?: string | null; Sub_ID?: string | null }) =>
+      String(v.Owner_Type || (v.Sub_ID ? 'sub' : 'company')).toLowerCase() === 'company'
   )
 
   return (

@@ -43,7 +43,7 @@ export async function getAllRepairTickets(
     
     let dbQuery = supabase
       .from('Repair_Tickets')
-      .select('*, Master_Drivers(Driver_Name)', { count: 'exact' })
+      .select('*', { count: 'exact' })
     
     if (isAdmin) {
       if (selectedBranch && selectedBranch !== 'All') {
@@ -79,10 +79,23 @@ export async function getAllRepairTickets(
       return { data: [], count: 0 }
     }
 
-    // Map the joined data to include Driver_Name at the top level
-    const data = (rawData || []).map((ticket: Partial<RepairTicket> & { Master_Drivers?: { Driver_Name: string } }) => ({
+    // Repair_Tickets has no FK to Master_Drivers, so an embedded join fails
+    // (PGRST200) and empties the list — look driver names up separately.
+    const tickets = (rawData || []) as RepairTicket[]
+    const driverIds = [...new Set(tickets.map(t => t.Driver_ID).filter((id): id is string => Boolean(id)))]
+    const nameById = new Map<string, string>()
+    if (driverIds.length > 0) {
+      const { data: drivers } = await supabase
+        .from('Master_Drivers')
+        .select('Driver_ID, Driver_Name')
+        .in('Driver_ID', driverIds)
+      for (const d of (drivers || []) as { Driver_ID: string; Driver_Name: string | null }[]) {
+        if (d.Driver_Name) nameById.set(String(d.Driver_ID), d.Driver_Name)
+      }
+    }
+    const data = tickets.map(ticket => ({
       ...ticket,
-      Driver_Name: ticket.Master_Drivers?.Driver_Name || 'Unknown'
+      Driver_Name: (ticket.Driver_ID && nameById.get(String(ticket.Driver_ID))) || 'Unknown'
     }))
   
     return { data: data as RepairTicket[], count: count || 0 }

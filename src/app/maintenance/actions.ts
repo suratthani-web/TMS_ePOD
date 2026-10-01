@@ -110,6 +110,10 @@ export async function updateRepairTicket(ticketId: string, data: TicketUpdateDat
   // Explicitly parse Cost_Total to ensure it's a number and not NaN
   const costTotal = data.Cost_Total !== undefined ? (parseFloat(String(data.Cost_Total)) || 0) : undefined
 
+  // P&L counts repair cost by Date_Finish — a completed ticket without one would
+  // silently drop out of the cost reports, so stamp it when closing.
+  const dateFinish = data.Date_Finish || (data.Status === 'Completed' ? new Date().toISOString() : null)
+
   console.log(`[MAINTENANCE] Updating Ticket ${ticketId}:`, { status: data.Status, cost: costTotal })
 
   const { error, data: updatedData } = await supabase
@@ -118,7 +122,7 @@ export async function updateRepairTicket(ticketId: string, data: TicketUpdateDat
       Status: data.Status,
       Cost_Total: costTotal,
       Remark: data.Remark || null,
-      Date_Finish: data.Date_Finish || null,
+      Date_Finish: dateFinish,
       // Allow updating basic info too if needed
       Issue_Type: data.Issue_Type,
       Description: data.Description,

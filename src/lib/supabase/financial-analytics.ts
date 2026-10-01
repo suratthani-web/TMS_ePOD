@@ -16,6 +16,7 @@ import {
 } from './analytics-helpers'
 import { CO2_COEFFICIENTS } from '../utils/esg-utils'
 import { getCarbonFactors } from '@/lib/actions/carbon-factors'
+import { getWearRates } from '@/lib/supabase/wear-rate'
 
 // อัตราดูดซับคาร์บอนของต้นไม้มาตรฐาน TGO (kgCO2/ต้น/ปี) — ให้ตรงกับ esg-utils
 const TREE_ABSORB_KG_PER_YEAR = 22
@@ -247,7 +248,7 @@ export async function getExecutiveDashboardUnified(branchId?: string, startDate?
         const treesSaved = co2Saved / TREE_ABSORB_KG_PER_YEAR
 
         const predictedFuelCost = (curr.distance / 10) * 38 // 10km/L, 38 THB/L
-        const predictedMaintCost = curr.distance * 1.5 // 1.5 THB/KM
+        const predictedMaintCost = curr.distance * (await getWearRates(supabase)).fleet.ratePerKm
 
         // IF NO PERMISSION: Mask financial values
         if (!canViewProfit) {
@@ -417,7 +418,7 @@ export async function getExecutiveDashboardUnified(branchId?: string, startDate?
     const treesSaved = co2Saved / TREE_ABSORB_KG_PER_YEAR
 
     const predictedFuelCost = (effectiveDistance / 10) * 38
-    const predictedMaintCost = effectiveDistance * 1.5
+    const predictedMaintCost = effectiveDistance * (await getWearRates(supabase)).fleet.ratePerKm
 
     // IF NO PERMISSION: Mask financial values
     if (!canViewProfit) {
@@ -1124,6 +1125,7 @@ export async function getVehicleProfitability(startDate?: string, endDate?: stri
         if (eDate) query = query.lte('Plan_Date', eDate)
         return query
     })
+    const wearRates = await getWearRates(supabase, eDate || undefined)
     const stats: Record<string, { plate: string; revenue: number; driverCost: number; fuelCost: number; maintenanceCost: number; totalKm: number; count: number; predictedFuel: number; predictedMaintenance: number; netProfit: number }> = {}
     jobs?.forEach((j: { Job_Status?: string | null, Price_Cust_Total?: number | null, Cost_Driver_Total?: number | null, Price_Cust_Extra?: number | null, Cost_Driver_Extra?: number | null, Plan_Date?: string | null, Est_Distance_KM?: number | null, Loaded_Qty?: number | null, Weight_Kg?: number | null, Volume_Cbm?: number | null, Vehicle_Type?: string | null, Customer_Name?: string | null, Branch_ID?: string | null, Vehicle_Plate?: string | null }) => {
         const p = j.Vehicle_Plate || 'Unknown'
@@ -1136,7 +1138,7 @@ export async function getVehicleProfitability(startDate?: string, endDate?: stri
         // Grouping logic for predicted
         const km = Number(j.Est_Distance_KM) || 0
         stats[p].predictedFuel += (km / 10) * 38
-        stats[p].predictedMaintenance += (km / 10) * 2
+        stats[p].predictedMaintenance += km * wearRates.get(j.Vehicle_Plate).ratePerKm
         
         // Net Profit only subtracts Driver Cost (Actual known cost in Jobs_Main)
         // Fuel/Maintenance actuals are handled separately if data is available, 

@@ -8,6 +8,14 @@ import React from "react"
 import { getAllCustomers } from "@/lib/supabase/customers"
 import { ProfitReportFilters } from "./profit-report-filters"
 import { ExportCSVButton } from "./export-csv-button"
+import { DEFAULT_WEAR_RATE_PER_KM, type WearRateSource } from "@/lib/supabase/wear-rate"
+
+const WEAR_SOURCE_LABEL: Record<WearRateSource, string> = {
+  vehicle: 'จากประวัติรถ',
+  fleet: 'เฉลี่ยกองรถ',
+  default: 'ค่าตั้งต้น',
+  not_company: 'รถร่วม/อิสระ',
+}
 
 function formatMoney(n: number) {
   return n.toLocaleString('th-TH', { minimumFractionDigits: 0, maximumFractionDigits: 0 })
@@ -106,8 +114,9 @@ export default async function CostPerTripPage(props: PageProps) {
         <div className="bg-card rounded-2xl border border-border shadow-sm overflow-hidden">
           <div className="px-6 py-4 border-b border-border bg-muted/30 flex flex-col lg:flex-row lg:justify-between lg:items-center gap-3">
             <h2 className="font-semibold text-foreground">รายละเอียดกำไร-ขาดทุนรายเที่ยว</h2>
-            <div className="text-xs font-medium text-amber-600 dark:text-amber-400 bg-amber-500/10 px-3 py-1 rounded-full">
-              * ต้นทุนคาดการณ์ (น้ำมัน/ซ่อมบำรุง) ใช้เป็นข้อมูลอ้างอิงเท่านั้น และไม่ถูกนำมาหักลบในกำไรจริง
+            <div className="text-xs font-medium text-amber-600 dark:text-amber-400 bg-amber-500/10 px-3 py-1 rounded-xl">
+              * ต้นทุนคาดการณ์ (น้ำมัน/ซ่อมบำรุง) ใช้เป็นข้อมูลอ้างอิงเท่านั้น และไม่ถูกนำมาหักลบในกำไรจริง<br />
+              * ค่าสึกหรอ(จริง) = ระยะทาง × อัตรา ฿/กม. ของรถคันนั้น (ค่าซ่อมที่ปิดงานแล้ว + ค่ายาง ย้อนหลัง 12 เดือน ÷ กม.ที่วิ่ง); รถที่ข้อมูลยังไม่พอใช้ค่าเฉลี่ยกองรถ หรือค่าตั้งต้น {DEFAULT_WEAR_RATE_PER_KM} ฿/กม.
             </div>
           </div>
 
@@ -128,7 +137,7 @@ export default async function CostPerTripPage(props: PageProps) {
                     <th className="text-right px-4 py-4 font-medium">ค่าคนขับ</th>
                     <th className="text-right px-4 py-4 font-medium">น้ำมัน(จริง)</th>
                     <th className="text-right px-4 py-4 font-medium text-amber-600 dark:text-amber-400">น้ำมัน(อ้างอิง)</th>
-                    <th className="text-right px-4 py-4 font-medium">ซ่อมบำรุง(จริง)</th>
+                    <th className="text-right px-4 py-4 font-medium">ค่าสึกหรอ(จริง)</th>
                     <th className="text-right px-4 py-4 font-medium text-amber-600 dark:text-amber-400">ซ่อมบำรุง(อ้างอิง)</th>
                     <th className="text-right px-4 py-4 font-medium text-red-500">ต้นทุนรวม(จริง)</th>
                     <th className="text-right px-4 py-4 font-medium">กำไร</th>
@@ -192,6 +201,11 @@ export default async function CostPerTripPage(props: PageProps) {
                           </td>
                           <td className="px-4 py-4 text-right text-foreground whitespace-nowrap">
                             ฿{formatMoney(trip.maint_real)}
+                            <div className="text-[10px] text-muted-foreground">
+                              {trip.maint_rate_source === 'not_company'
+                                ? 'รถร่วม/อิสระ'
+                                : `${trip.maint_rate.toFixed(2)} ฿/กม. · ${WEAR_SOURCE_LABEL[trip.maint_rate_source]}`}
+                            </div>
                           </td>
                           <td className="px-4 py-4 text-right text-amber-600 dark:text-amber-400 whitespace-nowrap text-sm">
                             ฿{formatMoney(trip.maint_est)}

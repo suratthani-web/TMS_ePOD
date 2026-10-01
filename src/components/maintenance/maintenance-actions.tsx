@@ -17,6 +17,7 @@ import {
 import { deleteRepairTicket, updateRepairTicket } from "@/app/maintenance/actions"
 import { toast } from "sonner"
 import { MaintenanceDialog } from "./maintenance-dialog"
+import { CompleteRepairDialog } from "./complete-repair-dialog"
 import { RepairTicket } from "@/lib/supabase/maintenance"
 
 interface MaintenanceActionsProps {
@@ -28,6 +29,7 @@ interface MaintenanceActionsProps {
 export function MaintenanceActions({ ticket, drivers, vehicles }: MaintenanceActionsProps) {
   const [loading, setLoading] = useState(false)
   const [showEditDialog, setShowEditDialog] = useState(false)
+  const [showCompleteDialog, setShowCompleteDialog] = useState(false)
 
   const handleDelete = async () => {
     if (!confirm("คุณแน่ใจหรือไม่ที่จะลบใบแจ้งซ่อมนี้?")) return
@@ -89,7 +91,7 @@ export function MaintenanceActions({ ticket, drivers, vehicles }: MaintenanceAct
             ) : (
               <Button 
                   disabled={loading}
-                  onClick={() => handleStatusUpdate('Completed')}
+                  onClick={() => setShowCompleteDialog(true)}
                   className="bg-emerald-600 hover:bg-emerald-700 text-white font-semibold text-xs h-10 px-4 rounded-xl shadow-sm active:scale-95 transition-all"
               >
                   {loading ? <Loader2 className="animate-spin h-3 w-3" /> : (
@@ -124,6 +126,7 @@ export function MaintenanceActions({ ticket, drivers, vehicles }: MaintenanceAct
                 vehicles={vehicles as { Vehicle_Plate: string }[]}
                 initialData={ticket as unknown as import('./maintenance-dialog').MaintenanceTicket}
             />
+            <CompleteRepairDialog ticket={ticket} open={showCompleteDialog} onOpenChange={setShowCompleteDialog} />
         </div>
     )
   }
@@ -162,7 +165,7 @@ export function MaintenanceActions({ ticket, drivers, vehicles }: MaintenanceAct
               <DropdownMenuItem onClick={() => handleStatusUpdate('Rejected')} className="cursor-pointer hover:bg-muted text-destructive">
                 ไม่อนุมัติ / ปฏิเสธ
               </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => handleStatusUpdate('Completed')} className="cursor-pointer hover:bg-muted text-emerald-500">
+              <DropdownMenuItem onClick={() => setShowCompleteDialog(true)} className="cursor-pointer hover:bg-muted text-emerald-500">
                 เสร็จสิ้น
               </DropdownMenuItem>
             </DropdownMenuSubContent>
@@ -187,6 +190,7 @@ export function MaintenanceActions({ ticket, drivers, vehicles }: MaintenanceAct
         vehicles={vehicles as { Vehicle_Plate: string }[]}
         initialData={ticket as unknown as import('./maintenance-dialog').MaintenanceTicket}
       />
+      <CompleteRepairDialog ticket={ticket} open={showCompleteDialog} onOpenChange={setShowCompleteDialog} />
     </>
   )
 }

@@ -307,7 +307,7 @@ export async function getVehicleProfitability(startDate?: string, endDate?: stri
         .select('Vehicle_Plate, Cost_Total')
         .gte('Date_Report', `${firstDay}T00:00:00`)
         .lte('Date_Report', `${lastDay}T23:59:59`)
-        .neq('Status', 'Cancelled')))
+        .in('Status', ['Completed', 'เสร็จสิ้น', 'ซ่อมเสร็จ'])))
 
     // Tire costs live in their own table (Tire_Logs) — include them so per-vehicle
     // profit reflects the real running cost, not just fuel + repairs.
