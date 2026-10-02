@@ -119,7 +119,7 @@ export function CustomerReportsQueue({ type, start, items, error }: { type: Peri
                                     </div>
                                     {m && (
                                         <p className="text-sm text-muted-foreground">
-                                            {m.jobs} งาน · ส่งตรงเวลา {m.onTimePct ?? "–"}% · หลักฐานครบ {m.podPct ?? "–"}% · {m.qty.toLocaleString()} ชิ้น
+                                            {m.jobs} งาน · ส่งตรงเวลา {m.onTimePct ?? "–"}% · หลักฐานครบ {m.podPct ?? "–"}% · {m.drops.toLocaleString()} จุดส่ง
                                         </p>
                                     )}
                                     <p className="text-xs text-muted-foreground">

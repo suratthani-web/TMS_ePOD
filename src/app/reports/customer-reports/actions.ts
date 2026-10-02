@@ -12,8 +12,6 @@ import {
     type ReportRow, type ReportSettings,
 } from '@/lib/reports/customer-report-service'
 
-const APP_URL = process.env.NEXT_PUBLIC_APP_URL || 'https://tms-e-pod.vercel.app'
-
 /** Admin's branch scope: null = all branches (super admin without a branch selected). */
 async function requireAdminScope(): Promise<{ branchId: string | null; user: string }> {
     if (!(await isAdmin())) throw new Error('ต้องเป็นแอดมินเท่านั้น')
@@ -107,7 +105,7 @@ export async function sendCustomerReportAction(reportId: string) {
             const { data } = await db.from('Customer_Reports').select('Branch_ID').eq('Report_ID', reportId).single()
             if (data?.Branch_ID !== branchId) return { success: false, message: 'ไม่มีสิทธิ์ส่งรายงานของสาขาอื่น' }
         }
-        const res = await sendReport(db, reportId, { sentBy: user, appUrl: APP_URL })
+        const res = await sendReport(db, reportId, { sentBy: user })
         revalidatePath('/reports/customer-reports')
         return res.success ? { success: true, message: 'ส่งอีเมลแล้ว' } : { success: false, message: res.error || 'ส่งไม่สำเร็จ' }
     } catch (e) {
@@ -119,7 +117,7 @@ export async function sendReadyReportsAction(type: PeriodType, start: string) {
     try {
         const { user, branchId } = await requireAdminScope()
         const db = createAdminClient()
-        const r = await sendReadyReports(db, { type: parseType(type), start, branchId, sentBy: user, appUrl: APP_URL })
+        const r = await sendReadyReports(db, { type: parseType(type), start, branchId, sentBy: user })
         revalidatePath('/reports/customer-reports')
         return {
             success: r.failed === 0,
@@ -170,7 +168,6 @@ export async function getCustomerReportDashboard(input: { type?: string; start?:
     if (snap?.Metrics_Json) return { data: forViewer(snap.Metrics_Json as CustomerReportData), customers }
 
     const { data: cust } = await db.from('Master_Customers').select('Customer_Name').eq('Customer_ID', customerId).maybeSingle()
-    const settings = (await loadSettings(db, [customerId]).catch(() => new Map())).get(customerId) || defaultSettings(customerId)
     const data = await computeCustomerReport(db, {
         customerId,
         customerName: cust?.Customer_Name || customerId,

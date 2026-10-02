@@ -22,8 +22,7 @@ export async function GET(req: Request) {
         const db = createAdminClient()
 
         const gen = await generateReports(db, { type, start: period.start })
-        const appUrl = process.env.NEXT_PUBLIC_APP_URL || new URL(req.url).origin
-        const auto = await sendReadyReports(db, { type, start: period.start, sentBy: 'auto (cron)', appUrl, onlyAutoSend: true })
+        const auto = await sendReadyReports(db, { type, start: period.start, sentBy: 'auto (cron)', onlyAutoSend: true })
 
         const pending = gen.created - auto.sent
         if (gen.created > 0) {

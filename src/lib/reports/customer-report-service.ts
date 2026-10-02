@@ -132,7 +132,7 @@ export async function generateReports(db: DB, opts: { type: PeriodType; start: s
 
 export const hasBlockingFlags = (flags: ReportFlag[] | null | undefined) => (flags || []).some(f => f.level === 'warning')
 
-export async function sendReport(db: DB, reportId: string, opts: { sentBy: string; appUrl: string; note?: string | null }) {
+export async function sendReport(db: DB, reportId: string, opts: { sentBy: string; note?: string | null }) {
     const { data: row } = await db.from('Customer_Reports').select('*').eq('Report_ID', reportId).single()
     const report = row as ReportRow | null
     if (!report || !report.Metrics_Json) return { success: false, error: 'ไม่พบรายงาน' }
@@ -148,8 +148,7 @@ export async function sendReport(db: DB, reportId: string, opts: { sentBy: strin
         ? await db.from('Master_Branches').select('Email').eq('Branch_ID', report.Branch_ID).maybeSingle()
         : { data: null }
     const companyName = await getCompanyName(db)
-    const dashboardUrl = `${opts.appUrl.replace(/\/$/, '')}/customer-report?type=${report.Period_Type}&start=${report.Period_Start}`
-    const { subject, html } = buildCustomerReportEmail(report.Metrics_Json, { companyName, dashboardUrl, adminNote: note })
+    const { subject, html } = buildCustomerReportEmail(report.Metrics_Json, { companyName, adminNote: note })
 
     const result = await sendBillingEmail({ from: branch?.Email || undefined, to: to[0], cc: cc.join(',') || undefined, subject, html })
     const now = new Date().toISOString()
@@ -161,7 +160,7 @@ export async function sendReport(db: DB, reportId: string, opts: { sentBy: strin
 }
 
 /** Sends every draft in the period that has recipients and no warning flags. */
-export async function sendReadyReports(db: DB, opts: { type: PeriodType; start: string; branchId?: string | null; sentBy: string; appUrl: string; onlyAutoSend?: boolean }) {
+export async function sendReadyReports(db: DB, opts: { type: PeriodType; start: string; branchId?: string | null; sentBy: string; onlyAutoSend?: boolean }) {
     const period = periodOf(opts.type, opts.start)
     let q = db.from('Customer_Reports').select('Report_ID, Customer_ID, Status, Flags_Json').eq('Period_Type', period.type).eq('Period_Start', period.start).in('Status', ['draft', 'failed'])
     if (opts.branchId) q = q.eq('Branch_ID', opts.branchId)
@@ -173,7 +172,7 @@ export async function sendReadyReports(db: DB, opts: { type: PeriodType; start: 
     for (const r of rows) {
         const st = settings.get(r.Customer_ID)!
         if (hasBlockingFlags(r.Flags_Json) || (opts.onlyAutoSend && !st.Auto_Send)) { held++; continue }
-        const res = await sendReport(db, r.Report_ID, { sentBy: opts.sentBy, appUrl: opts.appUrl })
+        const res = await sendReport(db, r.Report_ID, { sentBy: opts.sentBy })
         if (res.success) sent++
         else { failed++; errors.push(res.error || '') }
     }

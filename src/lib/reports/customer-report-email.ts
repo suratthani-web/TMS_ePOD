@@ -76,20 +76,6 @@ function volumeBars(d: CustomerReportData): string {
     return `<table width="100%" cellpadding="0" cellspacing="0" role="presentation">${rows}</table>${legend}`
 }
 
-function rankBars(items: { name: string; jobs: number }[]): string {
-    const max = Math.max(1, ...items.map(i => i.jobs))
-    return `<table width="100%" cellpadding="0" cellspacing="0" role="presentation">${items.map(i => {
-        const w = Math.max(2, Math.round((i.jobs / max) * 100))
-        return `<tr>
-          <td style="font-size:12px;color:${C.ink};padding:3px 8px 3px 0" width="45%">${esc(i.name)}</td>
-          <td style="padding:3px 0"><table width="100%" cellpadding="0" cellspacing="0" role="presentation"><tr>
-            <td width="${w}%" style="background:${C.blue};height:12px;font-size:0;line-height:0">&nbsp;</td>${w < 100 ? `<td width="${100 - w}%" style="font-size:0">&nbsp;</td>` : ''}
-          </tr></table></td>
-          <td style="font-size:12px;color:${C.ink};padding:3px 0 3px 8px;text-align:right;white-space:nowrap" width="1%">${i.jobs}</td>
-        </tr>`
-    }).join('')}</table>`
-}
-
 function jobTable(lines: JobLine[], limit = 10): string {
     const shown = lines.slice(0, limit)
     return `<table width="100%" cellpadding="0" cellspacing="0" role="presentation" style="font-size:12px;color:${C.ink};border-collapse:collapse">
@@ -98,10 +84,10 @@ function jobTable(lines: JobLine[], limit = 10): string {
         <td style="padding:6px 8px;border-bottom:1px solid ${C.line}" valign="top">${esc(l.destination)}<br><span style="color:${C.muted}">${esc(l.jobId)}</span></td>
         <td style="padding:6px 0 6px 8px;border-bottom:1px solid ${C.line};color:${C.muted}" valign="top">${esc(l.detail)}</td>
       </tr>`).join('')}
-    </table>${lines.length > limit ? `<div style="font-size:12px;color:${C.muted};margin-top:6px">และอีก ${lines.length - limit} รายการ — ดูทั้งหมดในระบบ</div>` : ''}`
+    </table>${lines.length > limit ? `<div style="font-size:12px;color:${C.muted};margin-top:6px">และอีก ${lines.length - limit} รายการ</div>` : ''}`
 }
 
-export function buildCustomerReportEmail(d: CustomerReportData, opts: { companyName: string; dashboardUrl: string; adminNote?: string | null }): { subject: string; html: string } {
+export function buildCustomerReportEmail(d: CustomerReportData, opts: { companyName: string; adminNote?: string | null }): { subject: string; html: string } {
     const label = periodLabel(d.period)
     const s = d.summary
     const p = d.previous
@@ -110,17 +96,14 @@ export function buildCustomerReportEmail(d: CustomerReportData, opts: { companyN
 
     const kpis = `<table width="100%" cellpadding="0" cellspacing="0" role="presentation">
       <tr>
-        ${kpi('งานขนส่งทั้งหมด', `${num(s.jobs)} <span style="font-size:14px;font-weight:400">งาน</span>`, `${delta(s.jobs, p.jobs, 'relative')} เทียบ${prevWord} · ${num(s.drops)} จุดส่ง`)}
+        ${kpi('งานขนส่งทั้งหมด', `${num(s.jobs)} <span style="font-size:14px;font-weight:400">งาน</span>`, `${delta(s.jobs, p.jobs, 'relative')} เทียบ${prevWord}${s.drops !== s.jobs ? ` · ${num(s.drops)} จุดส่ง` : ''}`)}
         ${kpi('ส่งตรงเวลา', fmtPct(s.onTimePct), `${delta(s.onTimePct, p.onTimePct, 'points')} · ${num(s.onTime)}/${num(s.onTimeMeasured)} งาน`)}
       </tr>
       <tr>
         ${kpi('หลักฐานการส่งครบ', fmtPct(s.podPct), `รูป/ลายเซ็น ${num(s.podComplete)}/${num(s.delivered)} งาน`)}
-        ${kpi('ปริมาณสินค้า', `${num(s.qty)} <span style="font-size:14px;font-weight:400">ชิ้น</span>`, `${delta(s.qty, p.qty, 'relative')} เทียบ${prevWord}${s.avgLeadTimeHours !== null ? ` · รับ→ส่งเฉลี่ย ${s.avgLeadTimeHours} ชม.` : ''}`)}
+        ${kpi('ระยะทางรวม', `${num(s.distanceKm)} <span style="font-size:14px;font-weight:400">กม.</span>`, `${delta(s.distanceKm, p.distanceKm, 'relative')} เทียบ${prevWord}`)}
       </tr>
     </table>`
-
-    const knownProvinces = d.provinces.filter(x => x.name !== 'ไม่ระบุจังหวัด')
-    const provinceShare = s.jobs ? knownProvinces.reduce((a, b) => a + b.jobs, 0) / s.jobs : 0
 
     const issues = [
         d.lateJobs.length ? `<div style="font-weight:600;margin:4px 0 6px">ส่งช้า ${d.lateJobs.length} งาน</div>${jobTable(d.lateJobs)}` : '',
@@ -139,14 +122,9 @@ export function buildCustomerReportEmail(d: CustomerReportData, opts: { companyN
   ${opts.adminNote ? `<tr><td style="padding:18px 24px 0"><div style="border-left:3px solid ${C.blue};background:${C.surface};padding:10px 14px;font-size:14px;white-space:pre-line">${esc(opts.adminNote)}</div></td></tr>` : ''}
   <tr><td style="padding:14px 18px 0">${kpis}</td></tr>
   ${s.jobs > 0 ? section(d.period.type === 'weekly' ? 'ปริมาณงานรายวัน' : 'ปริมาณงานรายสัปดาห์', volumeBars(d)) : ''}
-  ${d.topDestinations.length ? section('ปลายทางหลัก', rankBars(d.topDestinations.slice(0, 8))) : ''}
-  ${provinceShare >= 0.5 ? section('สัดส่วนตามจังหวัด', rankBars(knownProvinces)) : ''}
   ${issues ? section('งานที่ต้องติดตาม', issues) : section('งานที่ต้องติดตาม', `<div style="font-size:14px;color:${C.good}">✓ ไม่มีงานส่งช้าหรือส่งไม่สำเร็จในช่วงนี้</div>`)}
   ${d.carbon ? section('การปล่อยคาร์บอน (ESG)', `<div style="font-size:14px"><b>${num(d.carbon.co2Kg)} kgCO₂e</b> · เฉลี่ย ${d.carbon.kgPerJob} kg/งาน</div><div style="font-size:12px;color:${C.muted};margin-top:4px">คำนวณตาม GLEC Framework / ISO 14083 จาก ${num(d.carbon.jobsCounted)} งานที่มีระยะทาง · เทียบเท่าการดูดซับของต้นไม้ ${num(Math.round(d.carbon.trees))} ต้น/ปี</div>`) : ''}
-  <tr><td align="center" style="padding:26px 24px 8px">
-    <a href="${esc(opts.dashboardUrl)}" style="display:inline-block;background:${C.blue};color:#fff;text-decoration:none;font-weight:700;font-size:14px;padding:12px 26px;border-radius:8px">ดูรายงานฉบับเต็มและหลักฐานการส่ง</a>
-  </td></tr>
-  <tr><td style="padding:12px 24px 22px;font-size:11px;color:${C.muted};text-align:center;line-height:1.6">
+  <tr><td style="padding:22px 24px 22px;font-size:11px;color:${C.muted};text-align:center;line-height:1.6">
     ส่งตรงเวลา = ส่งถึงภายในวันส่งที่กำหนด หรือก่อน 08:00 น. ของวันถัดไปสำหรับรอบกลางคืน (วัดจากเวลาในหลักฐานการส่ง) · ตัวเลขตามข้อมูล ณ วันที่สร้างรายงาน<br>
     อีเมลนี้ส่งจากระบบ DRouteMind ของ ${esc(opts.companyName)} หากต้องการเปลี่ยนผู้รับ กรุณาตอบกลับอีเมลนี้
   </td></tr>

@@ -5,7 +5,7 @@
 // Data comes from lib/reports/customer-metrics (same numbers as the e-mail).
 
 import { Bar, BarChart, CartesianGrid, Legend, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts"
-import { AlertTriangle, CheckCircle2, Clock, Leaf, MapPin, Package, Truck } from "lucide-react"
+import { AlertTriangle, CheckCircle2, Clock, Leaf, MapPin, Truck } from "lucide-react"
 import type { CustomerReportData, JobLine, PeriodSummary } from "@/lib/reports/customer-metrics"
 import { periodLabel, thaiShortDate } from "@/lib/reports/period"
 
@@ -76,24 +76,6 @@ function JobList({ lines, empty }: { lines: JobLine[]; empty?: string }) {
     )
 }
 
-/** Horizontal ranked bars (plain HTML so long Thai names wrap instead of clipping). */
-function RankBars({ items }: { items: { name: string; jobs: number }[] }) {
-    const max = Math.max(1, ...items.map(i => i.jobs))
-    return (
-        <ul className="space-y-2">
-            {items.map(i => (
-                <li key={i.name} className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-3 gap-y-1 text-sm">
-                    <span className="truncate text-slate-800" title={i.name}>{i.name}</span>
-                    <span className="tabular-nums text-slate-700">{num(i.jobs)}</span>
-                    <span className="col-span-2 h-2.5 rounded-r bg-slate-100">
-                        <span className="block h-full rounded-r" style={{ width: `${(i.jobs / max) * 100}%`, background: BLUE }} title={`${i.name}: ${i.jobs} งาน`} />
-                    </span>
-                </li>
-            ))}
-        </ul>
-    )
-}
-
 type TooltipPayload = { payload?: { label: string; jobs: number; onTime: number; late: number; onTimePct: number | null } }[]
 
 function VolumeTooltip({ active, payload }: { active?: boolean; payload?: TooltipPayload }) {
@@ -119,8 +101,6 @@ export function CustomerReportDashboard({ data, isAdminView = false }: { data: C
         label: data.period.type === "weekly" ? thaiShortDate(x.start) : `${x.label}`,
         onTimeBar: x.jobs - x.late,
     }))
-    const knownProvinces = data.provinces.filter(x => x.name !== "ไม่ระบุจังหวัด")
-    const provinceShare = s.jobs ? knownProvinces.reduce((a, b) => a + b.jobs, 0) / s.jobs : 0
 
     return (
         <div className="customer-report space-y-4 text-slate-900">
@@ -139,13 +119,13 @@ export function CustomerReportDashboard({ data, isAdminView = false }: { data: C
 
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
                 <Kpi icon={<Truck size={16} />} label="งานขนส่งทั้งหมด" value={num(s.jobs)} unit="งาน"
-                    foot={<><Delta curr={s.jobs} prev={p.jobs} mode="relative" word={word} /><span className="text-slate-500"> · {num(s.drops)} จุดส่ง</span></>} />
+                    foot={<><Delta curr={s.jobs} prev={p.jobs} mode="relative" word={word} />{s.drops !== s.jobs && <span className="text-slate-500"> · {num(s.drops)} จุดส่ง</span>}</>} />
                 <Kpi icon={<Clock size={16} />} label="ส่งตรงเวลา" value={fmtPct(s.onTimePct)}
                     foot={<><Delta curr={s.onTimePct} prev={p.onTimePct} mode="points" word={word} /><span className="text-slate-500"> · {num(s.onTime)}/{num(s.onTimeMeasured)} งาน</span></>} />
                 <Kpi icon={<CheckCircle2 size={16} />} label="หลักฐานการส่งครบ" value={fmtPct(s.podPct)}
                     foot={<span className="text-slate-500">มีรูป/ลายเซ็น {num(s.podComplete)}/{num(s.delivered)} งาน</span>} />
-                <Kpi icon={<Package size={16} />} label="ปริมาณสินค้า" value={num(s.qty)} unit="ชิ้น"
-                    foot={<><Delta curr={s.qty} prev={p.qty} mode="relative" word={word} />{s.avgLeadTimeHours !== null && <span className="text-slate-500"> · รับ→ส่งเฉลี่ย {s.avgLeadTimeHours} ชม.</span>}</>} />
+                <Kpi icon={<MapPin size={16} />} label="ระยะทางรวม" value={num(s.distanceKm)} unit="กม."
+                    foot={<Delta curr={s.distanceKm} prev={p.distanceKm} mode="relative" word={word} />} />
             </div>
 
             {s.jobs > 0 && (
@@ -180,23 +160,14 @@ export function CustomerReportDashboard({ data, isAdminView = false }: { data: C
                 </Panel>
             )}
 
-            <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-                {data.topDestinations.length > 0 && (
-                    <Panel title="ปลายทางหลัก"><RankBars items={data.topDestinations} /></Panel>
-                )}
-                {provinceShare >= 0.5 ? (
-                    <Panel title="สัดส่วนตามจังหวัด"><RankBars items={knownProvinces} /></Panel>
-                ) : (
-                    <Panel title="สรุปการเดินทาง">
-                        <dl className="grid grid-cols-2 gap-3 text-sm">
-                            <div><dt className="text-slate-500">จุดส่งทั้งหมด</dt><dd className="text-xl font-semibold tabular-nums">{num(s.drops)}</dd></div>
-                            <div><dt className="text-slate-500">ระยะทางรวม</dt><dd className="text-xl font-semibold tabular-nums">{num(s.distanceKm)} กม.</dd></div>
-                            <div><dt className="text-slate-500">ส่งสำเร็จ</dt><dd className="text-xl font-semibold tabular-nums">{num(s.delivered)}</dd></div>
-                            <div><dt className="text-slate-500">ส่งไม่สำเร็จ</dt><dd className="text-xl font-semibold tabular-nums">{num(s.failed)}</dd></div>
-                        </dl>
-                    </Panel>
-                )}
-            </div>
+            <Panel title="สรุปการขนส่ง">
+                <dl className="grid grid-cols-2 gap-3 text-sm sm:grid-cols-4">
+                    <div><dt className="text-slate-500">ส่งสำเร็จ</dt><dd className="text-xl font-semibold tabular-nums">{num(s.delivered)} งาน</dd></div>
+                    <div><dt className="text-slate-500">ส่งไม่สำเร็จ</dt><dd className="text-xl font-semibold tabular-nums">{num(s.failed)} งาน</dd></div>
+                    <div><dt className="text-slate-500">จุดส่งทั้งหมด</dt><dd className="text-xl font-semibold tabular-nums">{num(s.drops)} จุด</dd></div>
+                    <div><dt className="text-slate-500">เวลารับ→ส่งเฉลี่ย</dt><dd className="text-xl font-semibold tabular-nums">{s.avgLeadTimeHours !== null ? `${s.avgLeadTimeHours} ชม.` : "–"}</dd></div>
+                </dl>
+            </Panel>
 
             {data.carbon && (
                 <Panel title="การปล่อยคาร์บอน (ESG)">
