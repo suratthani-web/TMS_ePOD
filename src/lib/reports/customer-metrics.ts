@@ -14,10 +14,11 @@ import { eachDay, previousPeriod, thaiShortDate, weeksInMonth, type ReportPeriod
  */
 export const OVERNIGHT_CUTOFF_HOUR = 8
 /**
- * Pickup and delivery recorded within this many minutes of each other = the driver
- * closed the job after the fact. The POD time is an upload time, so it is only an
- * upper bound on the real delivery: before the deadline still proves on-time, but
- * after it the real time is unknown — left unmeasured rather than counted late.
+ * Pickup and delivery recorded within this many minutes of each other = the job was
+ * closed after the fact (created/closed in the office, or the driver forgot to press
+ * the steps on site). For the CUSTOMER report such jobs count as delivered on time —
+ * the goods arrived; the late paperwork is internal. The internal job-quality page
+ * (lib/reports/job-quality.ts) is where backfilled / late-closed jobs are tracked.
  */
 export const BACKFILL_MAX_MINUTES = 10
 
@@ -118,13 +119,26 @@ export function actualDeliveredAt(job: Pick<JobRow, 'POD_Drops_Json' | 'Photo_Pr
     return null
 }
 
-function hasPod(job: JobRow): boolean {
+/** Latest acceptable POD time for a due date: OVERNIGHT_CUTOFF_HOUR on the next morning (Bangkok). */
+export function deliveryDeadline(dueYmd: string | null | undefined): number | null {
+    if (!dueYmd) return null
+    const t = new Date(`${dueYmd.slice(0, 10)}T${String(OVERNIGHT_CUTOFF_HOUR).padStart(2, '0')}:00:00+07:00`).getTime() + 24 * 3600_000
+    return Number.isFinite(t) ? t : null
+}
+
+/** Pickup and POD recorded within BACKFILL_MAX_MINUTES = closed after the fact. */
+export function isBackfilled(job: { Pickup_Date?: string | null }, deliveredAt: number | null): boolean {
+    const pickedAt = job.Pickup_Date ? new Date(job.Pickup_Date).getTime() : NaN
+    return !!deliveredAt && Number.isFinite(pickedAt) && Math.abs(deliveredAt - pickedAt) < BACKFILL_MAX_MINUTES * 60_000
+}
+
+export function hasPod(job: Pick<JobRow, 'Photo_Proof_Url' | 'Signature_Url' | 'POD_Drops_Json'>): boolean {
     if (job.Photo_Proof_Url || job.Signature_Url) return true
     const drops = parseJson(job.POD_Drops_Json)
     return Array.isArray(drops) && drops.some((d: { photos?: unknown[]; signature?: string }) => (Array.isArray(d?.photos) && d.photos.length > 0) || !!d?.signature)
 }
 
-function jobState(job: JobRow): 'cancelled' | 'failed' | 'delivered' | 'open' {
+export function jobState(job: Pick<JobRow, 'Job_Status' | 'Failed_Reason'>): 'cancelled' | 'failed' | 'delivered' | 'open' {
     const s = String(job.Job_Status || '')
     if (CANCELLED.test(s)) return 'cancelled'
     if (FAILED.test(s) || (job.Failed_Reason && !DONE_STATUSES.has(s))) return 'failed'
@@ -133,7 +147,7 @@ function jobState(job: JobRow): 'cancelled' | 'failed' | 'delivered' | 'open' {
 }
 
 /** "PCG สุราษฯ → ร้าน ก (อ.เมือง จ.ชุมพร)" → "ร้าน ก (อ.เมือง จ.ชุมพร)" */
-function destinationName(job: JobRow): string {
+export function destinationName(job: Pick<JobRow, 'Dest_Location' | 'Route_Name'>): string {
     const raw = (job.Dest_Location || job.Route_Name || '').trim()
     const parts = raw.split(/→|->/)
     return (parts[parts.length - 1] || raw).trim() || 'ไม่ระบุ'
@@ -163,12 +177,13 @@ function evaluate(job: JobRow): Evaluated {
     // ส่งตรงเวลา = ส่งถึงภายในวันส่งที่กำหนด (Delivery_Date, ถ้าไม่มีใช้ Plan_Date)
     // หรือก่อน OVERNIGHT_CUTOFF_HOUR ของเช้าวันถัดไป (รอบวิ่งกลางคืน)
     const promised = String(job.Delivery_Date || job.Plan_Date || '').slice(0, 10)
-    const pickedAt = job.Pickup_Date ? new Date(job.Pickup_Date).getTime() : NaN
-    const backfilled = !!deliveredAt && Number.isFinite(pickedAt) && Math.abs(deliveredAt - pickedAt) < BACKFILL_MAX_MINUTES * 60_000
+    const backfilled = isBackfilled(job, deliveredAt)
+    // Customer view: a delivered job is on time unless a real-time POD proves it late.
+    // Backfilled or timestamp-less deliveries count as on time (see BACKFILL_MAX_MINUTES).
     let onTime: boolean | null = null
-    if (deliveredAt && promised) {
-        const deadline = new Date(`${promised}T${String(OVERNIGHT_CUTOFF_HOUR).padStart(2, '0')}:00:00+07:00`).getTime() + 24 * 3600_000
-        onTime = deliveredAt < deadline ? true : backfilled ? null : false
+    if (state === 'delivered') {
+        const deadline = deliveryDeadline(promised)
+        onTime = !deliveredAt || !deadline || deliveredAt < deadline || backfilled
     }
     return { job, state, date, deliveredAt, onTime, backfilled, pod: state === 'delivered' && hasPod(job) }
 }
@@ -274,16 +289,10 @@ export async function computeCustomerReport(
     }
 
     // ธงเตือนให้แอดมินตรวจก่อนส่ง — มีธง warning = ห้ามส่งอัตโนมัติ
+    // (งานค้าง / POD ไม่ครบ / ปิดย้อนหลัง ติดตามในหน้า /reports/job-quality แทน ไม่บล็อกรายงานลูกค้า)
     const flags: ReportFlag[] = []
     if (summary.jobs === 0) flags.push({ level: 'info', code: 'no_jobs', message: 'ไม่มีงานในช่วงนี้' })
-    if (openJobs.length) flags.push({ level: 'warning', code: 'open_jobs', message: `มีงานยังไม่ปิด ${openJobs.length} งาน` })
-    if (podMissing.length) flags.push({ level: 'warning', code: 'pod_missing', message: `งานส่งแล้วแต่ไม่มีหลักฐาน ${podMissing.length} งาน` })
     if (summary.onTimePct !== null && summary.onTimePct < 80) flags.push({ level: 'warning', code: 'low_on_time', message: `ส่งตรงเวลาต่ำ (${summary.onTimePct}%)` })
-    const backfilledLate = active.filter(r => r.backfilled && r.onTime === null && r.deliveredAt).length
-    if (backfilledLate) flags.push({ level: 'info', code: 'backfilled', message: `ปิดงานย้อนหลังเลยกำหนด ${backfilledLate} งาน (ไม่ทราบเวลาส่งจริง จึงไม่นับ)` })
-    if (summary.delivered > 0 && summary.onTimeMeasured < summary.delivered * 0.5) {
-        flags.push({ level: 'warning', code: 'on_time_unmeasured', message: `วัดเวลาส่งได้แค่ ${summary.onTimeMeasured}/${summary.delivered} งาน (ไม่มีเวลาส่งจริง)` })
-    }
 
     return {
         customerId,

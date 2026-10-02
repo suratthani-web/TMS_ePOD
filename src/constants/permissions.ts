@@ -92,6 +92,7 @@ export const MODULE_GROUPS = [
       { key: "navigation.ai", label: "ผู้ช่วย AI", icon: Bot },
       { key: "navigation.reports", label: "รายงานสรุป", icon: BarChart3 },
       { key: "navigation.customer_reports_admin", label: "รายงานลูกค้า (ส่งเมล)", icon: BarChart3 },
+      { key: "navigation.job_quality", label: "คุณภาพการปิดงาน (ภายใน)", icon: BarChart3 },
     ]
   },
   {

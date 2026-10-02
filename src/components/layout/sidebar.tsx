@@ -121,6 +121,7 @@ const navigation: NavGroup[] = [
       { titleKey: "navigation.analytics", href: "/admin/analytics", icon: <BarChart3 size={20} />, badgeColor: "blue" },
       { titleKey: "navigation.reports", href: "/reports", icon: <BarChart3 size={20} /> },
       { titleKey: "navigation.customer_reports_admin", href: "/reports/customer-reports", icon: <Mail size={20} /> },
+      { titleKey: "navigation.job_quality", href: "/reports/job-quality", icon: <ClipboardList size={20} /> },
       { titleKey: "navigation.ai", href: "/ai", icon: <Bot size={20} />, badge: "common.new", badgeColor: "green" },
     ],
   },

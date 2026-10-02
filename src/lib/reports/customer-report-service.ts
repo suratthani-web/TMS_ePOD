@@ -136,8 +136,12 @@ export const hasBlockingFlags = (flags: ReportFlag[] | null | undefined) => (fla
  * is generated, so this flag is derived from current settings (and any copy
  * frozen into older rows is dropped) — saving recipients clears it immediately.
  */
+/** Flags no longer raised for customer reports (tracked on /reports/job-quality instead). */
+const RETIRED_FLAGS = new Set(['open_jobs', 'pod_missing', 'backfilled', 'on_time_unmeasured'])
+
 export function withRecipientFlag(flags: ReportFlag[] | null | undefined, settings: Pick<ReportSettings, 'Recipients_To'>): ReportFlag[] {
-    const out = (flags || []).filter(f => f.code !== 'no_recipients')
+    // also drops flag codes retired since older drafts were generated
+    const out = (flags || []).filter(f => f.code !== 'no_recipients' && !RETIRED_FLAGS.has(f.code))
     if (settings.Recipients_To.length === 0) out.push({ level: 'warning', code: 'no_recipients', message: 'ยังไม่ได้ตั้งอีเมลผู้รับ' })
     return out
 }
