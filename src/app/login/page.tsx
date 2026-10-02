@@ -2,21 +2,34 @@
 
 import { useState, useEffect, Suspense } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
-import { Shield, X, Truck, Building } from "lucide-react"
-import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
-import { cn } from "@/lib/utils"
-import { login } from "./actions"
 import Image from "next/image"
+import Link from "next/link"
+import { ArrowRight, FileCheck2, Loader2, MapPinned, BarChart3, Truck } from "lucide-react"
+import { login } from "./actions"
+import { LoginHeroGraphics } from "./login-hero-graphics"
+
+function errorText(error: string) {
+  if (error === 'Invalid credentials') return 'ชื่อผู้ใช้หรือรหัสผ่านไม่ถูกต้อง'
+  if (error === 'session_missing') return 'กรุณาเข้าสู่ระบบก่อนใช้งาน'
+  if (error === 'session_invalid') return 'เซสชันหมดอายุ กรุณาเข้าสู่ระบบใหม่'
+  if (error === 'IP_PENDING') return 'ตรวจพบการเข้าใช้งานจากอุปกรณ์หรือสถานที่ใหม่ กรุณารอ Super Admin อนุมัติการเข้าใช้งานครั้งแรกเพื่อความปลอดภัย'
+  if (error === 'IP_BLOCKED') return 'การเข้าใช้งานจาก IP นี้ถูกระงับชั่วคราว กรุณาติดต่อผู้ดูแลระบบ'
+  if (error.includes('not linked')) return 'บัญชีของคุณยังไม่ได้ผูกกับโปรไฟล์ลูกค้า กรุณาติดต่อแอดมิน'
+  return error
+}
+
+const FEATURES = [
+  { icon: MapPinned, label: "ติดตามรถเรียลไทม์" },
+  { icon: FileCheck2, label: "หลักฐานการส่ง ePOD" },
+  { icon: BarChart3, label: "รายงานลูกค้าอัตโนมัติ" },
+]
 
 function StaffLoginContent() {
   const router = useRouter()
   const searchParams = useSearchParams()
-  const [activeTab, setActiveTab] = useState<'info' | 'staff_form'>('info')
   const [isPending, setIsPending] = useState(false)
   const [errorMessage, setErrorMessage] = useState("")
-  
+
   const queryError = searchParams.get("error")
   const error = errorMessage || queryError
 
@@ -52,7 +65,7 @@ function StaffLoginContent() {
       const userAgent = navigator.userAgent || navigator.vendor || (window as { opera?: string }).opera;
       const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(userAgent || '');
       const isSmallScreen = window.innerWidth <= 768;
-      
+
       if (isMobile || isSmallScreen) {
         router.replace('/mobile/login');
       }
@@ -64,171 +77,107 @@ function StaffLoginContent() {
   }, [router]);
 
   return (
-    <div className="min-h-screen flex flex-col items-center justify-center p-6 relative overflow-hidden bg-background">
-      {/* Corporate CI Background (Navy #001E4C / Deep Black) */}
-      <div className="absolute inset-0 z-0 bg-background">
-        <div className="absolute inset-0 bg-gradient-to-br from-secondary/20 via-transparent to-background" />
-      </div>
+    // Fixed dark palette (not theme tokens): the page sits on a photo in every theme.
+    <div className="relative min-h-screen overflow-hidden bg-[#00122e] text-white">
+      {/* Photo + smart-logistics overlay share the same center/cover fit */}
+      <Image
+        src="/images/login-hero-v3.jpg"
+        alt=""
+        fill
+        priority
+        sizes="100vw"
+        className="object-cover object-center"
+      />
+      <LoginHeroGraphics />
+      {/* readability: deepen the right side where the text and form sit */}
+      <div className="pointer-events-none absolute inset-0 bg-gradient-to-r from-transparent via-[#001E4C]/20 to-[#001E4C]/85" />
 
-      {/* Glass Decor Elements */}
-      <div className="absolute top-0 left-1/4 w-[500px] h-[500px] bg-primary/20 rounded-full blur-[120px] -translate-y-1/2 animate-pulse" />
-      <div className="absolute bottom-0 right-1/4 w-[500px] h-[500px] bg-accent/20 rounded-full blur-[120px] translate-y-1/2 animate-pulse" />
-      
-      <div className="w-full max-w-5xl space-y-12 relative z-10 text-center">
-        {/* Logo & Header Section - Balanced Edition */}
-        <div className="space-y-6 flex flex-col items-center animate-in fade-in slide-in-from-top-4 duration-1000">
-            <div className={cn(
-                "relative w-56 h-56 transition-all duration-700 group-hover:scale-105 logo-container-pure",
-                "bg-muted rounded-full shadow-2xl border border-border/10",
-                "p-6"
-            )}>
-                <div className="relative w-full h-full rounded-full overflow-hidden bg-background/20 flex items-center justify-center">
-                    <Image
-                        src="/drouteMind-mark.png"
-                        alt="DRouteMind"
-                        fill
-                        sizes="(max-width: 768px) 100vw, 224px"
-                        priority
-                        className="object-cover transition-all duration-700"
-                    />
-                </div>
+      {/* Left side stays photo + route graphics only; all text lives on the dark right side */}
+      <div className="relative z-10 flex min-h-screen items-center justify-center px-6 py-8 lg:justify-end lg:px-[6vw]">
+        <div className="w-full max-w-[440px] space-y-6">
+          {/* brand + message */}
+          <div className="[text-shadow:0_2px_12px_rgba(0,18,46,0.6)]">
+            <div className="flex items-center gap-3">
+              <div className="relative h-11 w-11 overflow-hidden rounded-full bg-white/90 ring-1 ring-white/40">
+                <Image src="/drouteMind-mark.png" alt="" fill sizes="44px" className="object-cover" />
+              </div>
+              <div className="leading-tight">
+                <p className="text-lg font-bold tracking-tight">DRouteMind</p>
+                <p className="text-xs text-white/70">Smart Transport Management · DD Transport</p>
+              </div>
             </div>
-            <div className="space-y-1">
-                <h1 className="text-6xl font-sans font-black tracking-tighter drop-shadow-lg">
-                    <span className="text-primary">D</span><span className="text-accent">Route</span><span className="text-primary">Mind</span>
-                </h1>
-                <p className="text-lg text-muted-foreground font-medium tracking-wide">
-                    Sweet deliveries, serious logistics.
-                </p>
-            </div>
-        </div>
+            <h1 className="mt-6 text-3xl font-bold leading-tight xl:text-4xl">ทุกเที่ยววิ่ง เห็นชัด ส่งตรงเวลา</h1>
+            <p className="mt-2 text-sm text-white/75">วางแผน ติดตาม และยืนยันการส่งสินค้าในระบบเดียว ด้วยข้อมูลจริงจากหน้างาน</p>
+          </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-8 px-4 max-w-6xl mx-auto animate-in fade-in slide-in-from-bottom-8 duration-1000 delay-300">
-            {/* Driver Login Option */}
-            <div 
-                onClick={() => router.push('/mobile/login')}
-                className="group cursor-pointer relative overflow-hidden glass-panel rounded-[3rem] p-8 transition-all duration-500 hover:shadow-[0_20px_60px_rgba(255,30,133,0.15)] hover:-translate-y-3 text-center flex flex-col items-center gap-6"
-            >
-                <div className="absolute inset-0 bg-gradient-to-br from-primary/[0.05] to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
-                <div className="w-16 h-16 bg-primary/10 border border-primary/20 rounded-2xl flex items-center justify-center shadow-2xl group-hover:rotate-6 group-hover:bg-primary transition-all duration-700">
-                    <Truck className="text-primary group-hover:text-white w-8 h-8" strokeWidth={2.5} />
-                </div>
-                <div className="space-y-1">
-                    <h2 className="text-3xl font-black text-accent tracking-tighter">DRIVER</h2>
-                    <p className="text-muted-foreground text-[10px] font-bold font-black uppercase tracking-widest">Fleet Portal</p>
-                </div>
-                <button className="w-full h-14 rounded-xl bg-primary hover:brightness-110 text-foreground font-bold uppercase tracking-wide shadow-xl shadow-primary/20 transition-all">
-                    Start Engine
-                </button>
-            </div>
+          {/* login card */}
+          <section className="rounded-2xl border border-white/15 bg-[#001E4C]/70 p-7 shadow-2xl shadow-black/40 backdrop-blur-xl sm:p-8">
+            <h2 className="text-2xl font-bold">เข้าสู่ระบบ</h2>
+            <p className="mt-1 text-sm text-white/70">สำหรับแอดมิน ทีมงาน และลูกค้า</p>
 
-            {/* Customer Login Option */}
-            <div 
-                onClick={() => setActiveTab('staff_form')}
-                className="group cursor-pointer relative overflow-hidden glass-panel rounded-[3rem] p-8 transition-all duration-500 hover:shadow-[0_20px_60px_rgba(59,130,246,0.15)] hover:-translate-y-3 text-center flex flex-col items-center gap-6"
-            >
-                <div className="absolute inset-0 bg-gradient-to-br from-blue-500/[0.05] to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
-                <div className="w-16 h-16 bg-blue-500/10 border border-blue-500/20 rounded-2xl flex items-center justify-center shadow-2xl group-hover:scale-110 group-hover:bg-blue-600 transition-all duration-700">
-                    <Building className="text-blue-600 group-hover:text-white w-8 h-8" strokeWidth={2.5} />
-                </div>
-                <div className="space-y-1">
-                    <h2 className="text-3xl font-black text-accent tracking-tighter">CUSTOMER</h2>
-                    <p className="text-muted-foreground text-[10px] font-bold font-black uppercase tracking-widest">Consignor Portal</p>
-                </div>
-                <button className="w-full h-14 rounded-xl bg-blue-600 hover:brightness-110 text-white font-bold uppercase tracking-wide shadow-xl shadow-blue-600/20 transition-all">
-                    Access Grid
-                </button>
-            </div>
+            <form onSubmit={handleSubmit} className="mt-6 space-y-4">
+              <div className="space-y-1.5">
+                <label htmlFor="email" className="text-sm font-medium text-white/85">ชื่อผู้ใช้</label>
+                <input
+                  id="email"
+                  name="email"
+                  type="text"
+                  autoComplete="username"
+                  required
+                  className="h-12 w-full rounded-xl border border-white/15 bg-white/10 px-4 text-base text-white placeholder:text-white/40 outline-none transition focus:border-[#7fa8ff] focus:ring-2 focus:ring-[#7fa8ff]/40"
+                  placeholder="ชื่อผู้ใช้หรืออีเมล"
+                />
+              </div>
+              <div className="space-y-1.5">
+                <label htmlFor="password" className="text-sm font-medium text-white/85">รหัสผ่าน</label>
+                <input
+                  id="password"
+                  name="password"
+                  type="password"
+                  autoComplete="current-password"
+                  required
+                  className="h-12 w-full rounded-xl border border-white/15 bg-white/10 px-4 text-base text-white placeholder:text-white/40 outline-none transition focus:border-[#7fa8ff] focus:ring-2 focus:ring-[#7fa8ff]/40"
+                  placeholder="••••••••"
+                />
+              </div>
 
-            {/* Staff Login Option */}
-            <div 
-                onClick={() => setActiveTab('staff_form')}
-                className="group cursor-pointer relative overflow-hidden glass-panel rounded-[3rem] p-8 transition-all duration-500 hover:shadow-[0_20px_60px_rgba(147,51,234,0.15)] hover:-translate-y-3 text-center flex flex-col items-center gap-6"
-            >
-                <div className="absolute inset-0 bg-gradient-to-br from-accent/[0.05] to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
-                <div className="w-16 h-16 bg-accent/10 border border-accent/20 rounded-2xl flex items-center justify-center shadow-2xl group-hover:-rotate-6 group-hover:bg-accent transition-all duration-700">
-                    <Shield className="text-accent group-hover:text-white w-8 h-8" strokeWidth={2.5} />
+              {error && (
+                <div role="alert" className="rounded-xl border border-red-400/40 bg-red-500/15 p-3 text-sm text-red-100">
+                  {errorText(error)}
                 </div>
-                <div className="space-y-1">
-                    <h2 className="text-3xl font-black text-accent tracking-tighter">ADMIN</h2>
-                    <p className="text-muted-foreground text-[10px] font-bold font-black uppercase tracking-widest">Command Center</p>
-                </div>
-                <button className="w-full h-14 rounded-xl bg-muted/50 border border-border/10 hover:bg-muted/80 text-foreground font-black text-base font-bold uppercase tracking-wide shadow-xl transition-all">
-                    Command Key
-                </button>
-            </div>
-        </div>
+              )}
 
-        {/* Staff Login Modal */}
-        {activeTab === 'staff_form' && (
-            <div className="fixed inset-0 z-50 flex items-center justify-center p-6 bg-background/60 backdrop-blur-md animate-in fade-in duration-300">
-                <div className="bg-card/90 backdrop-blur-2xl border border-border/10 rounded-[2.5rem] p-10 w-full max-w-sm shadow-[0_0_50px_rgba(0,0,0,0.5)] relative overflow-hidden">
-                    <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-primary via-accent to-purple-500" />
-                    
-                    <Button 
-                        variant="ghost" 
-                        size="icon" 
-                        className="absolute right-6 top-6 text-muted-foreground hover:text-foreground hover:bg-muted/80 rounded-xl"
-                        onClick={() => setActiveTab('info')}
-                    >
-                        <X className="w-6 h-6" />
-                    </Button>
-                    
-                    <div className="text-center mb-10">
-                        <h3 className="text-3xl font-black text-accent mb-2 underline decoration-primary/30 underline-offset-8">Login</h3>
-                        <p className="text-xl text-muted-foreground font-medium tracking-tight">Enterprise staff authentication</p>
-                    </div>
+              <button
+                type="submit"
+                disabled={isPending}
+                className="inline-flex h-12 w-full items-center justify-center gap-2 rounded-xl bg-[#0047BB] text-base font-semibold text-white shadow-lg shadow-[#0047BB]/30 transition hover:bg-[#1858d1] disabled:opacity-70"
+              >
+                {isPending ? <><Loader2 size={18} className="animate-spin" /> กำลังเข้าสู่ระบบ...</> : "เข้าสู่ระบบ"}
+              </button>
+            </form>
 
-                    <form onSubmit={handleSubmit} className="space-y-6">
-                        <div className="space-y-3 text-left">
-                            <Label htmlFor="email" className="text-muted-foreground text-base font-bold font-black uppercase tracking-normal ml-1">Username / Fleet ID</Label>
-                            <Input 
-                                id="email" 
-                                name="email" 
-                                type="text" 
-                                placeholder="e.g. admin_pro_01" 
-                                required 
-                                className="h-14 rounded-2xl bg-muted/50 border-border/10 text-foreground placeholder:text-muted-foreground focus:ring-primary/50" 
-                            />
-                        </div>
-                        <div className="space-y-3 text-left">
-                            <Label htmlFor="password" className="text-muted-foreground text-base font-bold font-black uppercase tracking-normal ml-1">Security Key</Label>
-                            <Input 
-                                id="password" 
-                                name="password" 
-                                type="password" 
-                                placeholder="••••••••" 
-                                required 
-                                className="h-14 rounded-2xl bg-muted/50 border-border/10 text-foreground placeholder:text-muted-foreground focus:ring-primary/50" 
-                            />
-                        </div>
-                        {error && (
-                            <div className="p-4 bg-red-500/10 border border-red-500/20 text-red-400 text-lg font-bold font-bold rounded-xl animate-shake">
-                                {error === 'Invalid credentials' ? 'ชื่อผู้ใช้หรือรหัสผ่านไม่ถูกต้อง' : 
-                                 error === 'session_missing' ? 'กรุณาเข้าสู่ระบบก่อนใช้งาน' :
-                                 error === 'session_invalid' ? 'เซสชันหมดอายุ กรุณาเข้าสู่ระบบใหม่' : 
-                                 error === 'IP_PENDING' ? 'ตรวจพบการเข้าใช้งานจากอุปกรณ์หรือสถานที่ใหม่ กรุณารอ Super Admin อนุมัติการเข้าใช้งานครั้งแรกเพื่อความปลอดภัย' :
-                                 error === 'IP_BLOCKED' ? 'การเข้าใช้งานจาก IP นี้ถูกระงับชั่วคราว กรุณาติดต่อผู้ดูแลระบบ' :
-                                 error.includes('not linked') ? 'บัญชีของคุณยังไม่ได้ผูกกับโปรไฟล์ลูกค้า กรุณาติดต่อแอดมิน' :
-                                 error}
-                            </div>
-                        )}
-                        <Button type="submit" className="w-full h-14 bg-primary hover:brightness-110 text-foreground rounded-2xl shadow-xl shadow-primary/20 transition-all hover:scale-[1.02] active:scale-[0.98]" disabled={isPending}>
-                            {isPending ? "AUTHENTICATING..." : "CONFIRM LOGIN"}
-                        </Button>
-                    </form>
-                </div>
+            <div className="mt-6 border-t border-white/10 pt-5">
+              <Link
+                href="/mobile/login"
+                className="group flex items-center justify-between rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-sm transition hover:bg-white/10"
+              >
+                <span className="flex items-center gap-2.5">
+                  <Truck size={18} className="text-[#9fc0ff]" />
+                  คนขับรถ? เข้าแอปคนขับ
+                </span>
+                <ArrowRight size={16} className="transition group-hover:translate-x-0.5" />
+              </Link>
             </div>
-        )}
+          </section>
 
-        <div className="space-y-4 animate-in fade-in duration-1000 delay-700 pt-10">
-            <p className="text-base font-bold text-muted-foreground font-black uppercase tracking-wide">
-                © 2026 <span className="text-primary/60">DRouteMind</span> · DD TRANSPORT. ALL RIGHTS RESERVED.
-            </p>
-            <div className="flex justify-center gap-8 text-base font-bold text-muted-foreground font-black uppercase tracking-normal">
-                <a href="#" className="hover:text-primary transition-colors">Privacy</a>
-                <a href="#" className="hover:text-primary transition-colors">Terms</a>
-            </div>
+          <ul className="flex flex-wrap gap-2 text-xs text-white/80">
+            {FEATURES.map(f => (
+              <li key={f.label} className="inline-flex items-center gap-1.5 rounded-lg border border-white/15 bg-[#001E4C]/40 px-2.5 py-1.5 backdrop-blur">
+                <f.icon size={14} className="text-[#9fc0ff]" /> {f.label}
+              </li>
+            ))}
+          </ul>
+          <p className="text-xs text-white/50">© 2026 DRouteMind · DD Transport. All rights reserved.</p>
         </div>
       </div>
     </div>
@@ -238,12 +187,11 @@ function StaffLoginContent() {
 export default function StaffLoginPage() {
   return (
     <Suspense fallback={
-      <div className="min-h-screen bg-background flex items-center justify-center p-6">
-        <div className="w-16 h-16 border-4 border-primary/30 border-t-primary rounded-full animate-spin" />
+      <div className="min-h-screen bg-[#00122e] flex items-center justify-center p-6">
+        <div className="w-12 h-12 border-4 border-white/20 border-t-white rounded-full animate-spin" />
       </div>
     }>
       <StaffLoginContent />
     </Suspense>
   )
 }
-
