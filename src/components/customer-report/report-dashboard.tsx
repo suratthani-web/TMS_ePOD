@@ -195,10 +195,6 @@ export function CustomerReportDashboard({ data, isAdminView = false }: { data: C
                 </div>
             )}
 
-            <p className="flex items-start gap-1.5 text-xs text-slate-500">
-                <MapPin size={12} className="mt-0.5 shrink-0" />
-                ส่งตรงเวลา = ส่งถึงภายในวันส่งที่กำหนด หรือก่อน 08:00 น. ของวันถัดไปสำหรับรอบกลางคืน วัดจากเวลาในหลักฐานการส่ง (POD) · ข้อมูล ณ {new Date(data.generatedAt).toLocaleString("th-TH", { timeZone: "Asia/Bangkok", dateStyle: "medium", timeStyle: "short" })}
-            </p>
         </div>
     )
 }

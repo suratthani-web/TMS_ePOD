@@ -217,11 +217,11 @@ function SettingsDialog({ item, onClose, onSave, saving }: { item: ReportListIte
                 <div className="space-y-4">
                     <div className="space-y-1.5">
                         <Label htmlFor="rep-to">ผู้รับ (To) — หนึ่งอีเมลต่อบรรทัด</Label>
-                        <Textarea id="rep-to" value={to} onChange={e => setTo(e.target.value)} rows={3} placeholder="logistics@customer.co.th" />
+                        <Textarea id="rep-to" value={to} onChange={e => setTo(e.target.value)} rows={3} placeholder="เช่น logistics@customer.co.th" className="text-base placeholder:text-muted-foreground/50 placeholder:italic" />
                     </div>
                     <div className="space-y-1.5">
                         <Label htmlFor="rep-cc">สำเนา (Cc)</Label>
-                        <Textarea id="rep-cc" value={cc} onChange={e => setCc(e.target.value)} rows={2} placeholder="sales@ddservicegroup.com" />
+                        <Textarea id="rep-cc" value={cc} onChange={e => setCc(e.target.value)} rows={2} placeholder="เช่น sales@ddservicegroup.com (ไม่บังคับ)" className="text-base placeholder:text-muted-foreground/50 placeholder:italic" />
                     </div>
                     <ul className="divide-y divide-border rounded-xl border border-border">
                         {toggles.map(t => (
@@ -254,7 +254,7 @@ function NoteDialog({ item, onClose, onSave, saving }: { item: ReportListItem; o
                 <DialogHeader><DialogTitle>หมายเหตุถึงลูกค้า — {item.Customer_Name}</DialogTitle></DialogHeader>
                 <Label htmlFor="rep-note" className="sr-only">หมายเหตุ</Label>
                 <Textarea id="rep-note" value={note} onChange={e => setNote(e.target.value)} rows={5}
-                    placeholder="เช่น สัปดาห์นี้มีงานส่งช้า 2 งานจากฝนตกหนักที่ชุมพร ทีมงานได้ประสานปลายทางแล้ว" />
+                    placeholder="เช่น สัปดาห์นี้มีงานส่งช้า 2 งานจากฝนตกหนักที่ชุมพร ทีมงานได้ประสานปลายทางแล้ว" className="text-base placeholder:text-muted-foreground/50 placeholder:italic" />
                 <p className="text-xs text-muted-foreground">ข้อความนี้จะแสดงด้านบนสุดของอีเมล</p>
                 <div className="mt-2 flex justify-end gap-2">
                     <Button variant="ghost" onClick={onClose}>ยกเลิก</Button>

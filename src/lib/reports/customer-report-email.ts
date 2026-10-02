@@ -125,7 +125,6 @@ export function buildCustomerReportEmail(d: CustomerReportData, opts: { companyN
   ${issues ? section('งานที่ต้องติดตาม', issues) : section('งานที่ต้องติดตาม', `<div style="font-size:14px;color:${C.good}">✓ ไม่มีงานส่งช้าหรือส่งไม่สำเร็จในช่วงนี้</div>`)}
   ${d.carbon ? section('การปล่อยคาร์บอน (ESG)', `<div style="font-size:14px"><b>${num(d.carbon.co2Kg)} kgCO₂e</b> · เฉลี่ย ${d.carbon.kgPerJob} kg/งาน</div><div style="font-size:12px;color:${C.muted};margin-top:4px">คำนวณตาม GLEC Framework / ISO 14083 จาก ${num(d.carbon.jobsCounted)} งานที่มีระยะทาง · เทียบเท่าการดูดซับของต้นไม้ ${num(Math.round(d.carbon.trees))} ต้น/ปี</div>`) : ''}
   <tr><td style="padding:22px 24px 22px;font-size:11px;color:${C.muted};text-align:center;line-height:1.6">
-    ส่งตรงเวลา = ส่งถึงภายในวันส่งที่กำหนด หรือก่อน 08:00 น. ของวันถัดไปสำหรับรอบกลางคืน (วัดจากเวลาในหลักฐานการส่ง) · ตัวเลขตามข้อมูล ณ วันที่สร้างรายงาน<br>
     อีเมลนี้ส่งจากระบบ DRouteMind ของ ${esc(opts.companyName)} หากต้องการเปลี่ยนผู้รับ กรุณาตอบกลับอีเมลนี้
   </td></tr>
 </table></td></tr></table></body></html>`

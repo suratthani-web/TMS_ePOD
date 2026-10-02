@@ -9,7 +9,7 @@ import { computeCustomerReport, type CustomerReportData } from '@/lib/reports/cu
 import { isValidYmd, periodOf, type PeriodType } from '@/lib/reports/period'
 import {
     defaultSettings, generateReports, isValidEmail, loadSettings, sendReadyReports, sendReport,
-    type ReportRow, type ReportSettings,
+    withRecipientFlag, type ReportRow, type ReportSettings,
 } from '@/lib/reports/customer-report-service'
 
 /** Admin's branch scope: null = all branches (super admin without a branch selected). */
@@ -38,7 +38,12 @@ export async function listCustomerReports(type: PeriodType, start: string): Prom
         if (error) return { items: [], error: error.code === 'PGRST205' ? 'ยังไม่ได้รัน SQL 20261002_customer_reports.sql' : error.message }
         const rows = (data || []) as ReportRow[]
         const settings = await loadSettings(db, rows.map(r => r.Customer_ID))
-        return { items: rows.map(r => ({ ...r, settings: settings.get(r.Customer_ID) || defaultSettings(r.Customer_ID) })) }
+        return {
+            items: rows.map(r => {
+                const st = settings.get(r.Customer_ID) || defaultSettings(r.Customer_ID)
+                return { ...r, Flags_Json: withRecipientFlag(r.Flags_Json, st), settings: st }
+            }),
+        }
     } catch (e) {
         return { items: [], error: (e as Error).message }
     }

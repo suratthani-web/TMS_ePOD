@@ -110,7 +110,6 @@ export async function generateReports(db: DB, opts: { type: PeriodType; start: s
         if (sent.has(c.Customer_ID) && !opts.force) { keptSent++; continue }
         const data = await computeCustomerReport(db, { customerId: c.Customer_ID, customerName: c.Customer_Name, period, carbonFactors })
         const flags = [...data.flags]
-        if (st.Recipients_To.length === 0) flags.push({ level: 'warning', code: 'no_recipients', message: 'ยังไม่ได้ตั้งอีเมลผู้รับ' })
         const { error } = await db.from('Customer_Reports').upsert({
             Customer_ID: c.Customer_ID,
             Customer_Name: c.Customer_Name,
@@ -131,6 +130,17 @@ export async function generateReports(db: DB, opts: { type: PeriodType; start: s
 }
 
 export const hasBlockingFlags = (flags: ReportFlag[] | null | undefined) => (flags || []).some(f => f.level === 'warning')
+
+/**
+ * Stored flags + the live "no recipients" check. Recipients change after a draft
+ * is generated, so this flag is derived from current settings (and any copy
+ * frozen into older rows is dropped) — saving recipients clears it immediately.
+ */
+export function withRecipientFlag(flags: ReportFlag[] | null | undefined, settings: Pick<ReportSettings, 'Recipients_To'>): ReportFlag[] {
+    const out = (flags || []).filter(f => f.code !== 'no_recipients')
+    if (settings.Recipients_To.length === 0) out.push({ level: 'warning', code: 'no_recipients', message: 'ยังไม่ได้ตั้งอีเมลผู้รับ' })
+    return out
+}
 
 export async function sendReport(db: DB, reportId: string, opts: { sentBy: string; note?: string | null }) {
     const { data: row } = await db.from('Customer_Reports').select('*').eq('Report_ID', reportId).single()
@@ -171,7 +181,7 @@ export async function sendReadyReports(db: DB, opts: { type: PeriodType; start: 
     const errors: string[] = []
     for (const r of rows) {
         const st = settings.get(r.Customer_ID)!
-        if (hasBlockingFlags(r.Flags_Json) || (opts.onlyAutoSend && !st.Auto_Send)) { held++; continue }
+        if (hasBlockingFlags(withRecipientFlag(r.Flags_Json, st)) || (opts.onlyAutoSend && !st.Auto_Send)) { held++; continue }
         const res = await sendReport(db, r.Report_ID, { sentBy: opts.sentBy })
         if (res.success) sent++
         else { failed++; errors.push(res.error || '') }
