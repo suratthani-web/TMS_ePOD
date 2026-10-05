@@ -277,7 +277,7 @@ export default function CustomerBillingClient({ customers, initialBillingNotes }
       
       <div className="mt-20 text-center mb-24">
         <div className="inline-flex items-center gap-4 px-8 py-3 glass-panel rounded-full text-base font-bold font-black text-muted-foreground uppercase tracking-[0.6em] opacity-40 hover:opacity-100 transition-opacity">
-            <ShieldCheck size={14} className="text-primary" /> LogisPro Ledger Engine • Certified Financial Accuracy
+            <ShieldCheck size={14} className="text-primary" /> DRouteMind Ledger Engine • Certified Financial Accuracy
         </div>
       </div>
     </DashboardLayout>

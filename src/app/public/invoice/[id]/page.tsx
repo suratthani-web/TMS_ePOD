@@ -72,7 +72,7 @@ export default async function PublicInvoicePage({ params, searchParams }: PagePr
                     </div>
                     <div>
                         <h1 className="font-black text-slate-900 uppercase tracking-tighter leading-none">Digital Original</h1>
-                        <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mt-1">Verified by LogisPro TMS</p>
+                        <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mt-1">Verified by DRouteMind TMS</p>
                     </div>
                 </div>
                 <div className="flex gap-2">
@@ -226,11 +226,11 @@ export default async function PublicInvoicePage({ params, searchParams }: PagePr
                         <ShieldCheck size={24} className="text-emerald-500/30" />
                         <div>
                             <p className="text-[10px] font-black uppercase tracking-widest leading-none">Tamper-proof Digital Document</p>
-                            <p className="text-[8px] font-bold mt-1">Verified securely via LogisPro Blockchain-ready Matrix</p>
+                            <p className="text-[8px] font-bold mt-1">Verified securely via DRouteMind Blockchain-ready Matrix</p>
                         </div>
                     </div>
                     <div className="text-[10px] font-black uppercase tracking-[0.5em] italic">
-                        © {new Date().getFullYear()} LogisPro Fleet Intelligence
+                        © {new Date().getFullYear()} DRouteMind Fleet Intelligence
                     </div>
                 </div>
             </div>

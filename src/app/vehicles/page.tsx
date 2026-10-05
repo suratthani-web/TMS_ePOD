@@ -143,7 +143,7 @@ export default function VehiclesPage() {
                             Sub_ID: "SUB-001",
                             Branch_ID: "HQ"
                         }]}
-                        templateFilename="logispro_vehicles_template.xlsx"
+                        templateFilename="droutemind_vehicles_template.xlsx"
                     />
                     <VehicleDialog 
                         onSuccess={() => setRefreshTrigger(prev => prev + 1)}

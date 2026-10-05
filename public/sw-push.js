@@ -1,5 +1,5 @@
 // ─────────────────────────────────────────────────────────────────
-// LOGIS-PRO Service Worker — Push Notification Handler
+// DRouteMind Service Worker — Push Notification Handler
 // Handles Web Push for both Admin (desktop) and Driver (mobile web)
 // ─────────────────────────────────────────────────────────────────
 
@@ -19,7 +19,7 @@ self.addEventListener("push", function (event) {
     }
   }
 
-  const title = data.title || "LOGIS-PRO";
+  const title = data.title || "DRouteMind";
   const notifType = data.type || "general";
 
   // ── Vibration patterns per event type ──

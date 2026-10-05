@@ -1,5 +1,5 @@
 -- =============================================
--- LOGIS-PRO TMS: Multi-Branch Data Separation (Fixed Types)
+-- DRouteMind TMS: Multi-Branch Data Separation (Fixed Types)
 -- Run this in Supabase SQL Editor
 -- =============================================
 -- 1. Add Branch_ID to Master_Customers

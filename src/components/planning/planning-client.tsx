@@ -261,7 +261,7 @@ export function PlanningClient({
         const wb = utils.book_new()
         utils.book_append_sheet(wb, ws1, "Template")
         utils.book_append_sheet(wb, ws2, "DATA")
-        writeFile(wb, "logispro_jobs_template_with_data.xlsx")
+        writeFile(wb, "droutemind_jobs_template_with_data.xlsx")
     }
 
     const setYesterday = () => {

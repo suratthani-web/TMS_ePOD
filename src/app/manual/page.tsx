@@ -121,7 +121,7 @@ export default function SmartManual() {
                                 </div>
                             </div>
                             <p className="text-muted-foreground text-xl max-w-3xl font-bold leading-relaxed uppercase tracking-tight italic">
-                                ยินดีต้อนรับสู่ศูนย์กลางข้อมูล LOGISPRO นี่คือคู่มือการปฏิบัติงานและใช้งานระบบบริหารจัดการขนส่งอย่างเต็มประสิทธิภาพ
+                                ยินดีต้อนรับสู่ศูนย์กลางข้อมูล DRouteMind นี่คือคู่มือการปฏิบัติงานและใช้งานระบบบริหารจัดการขนส่งอย่างเต็มประสิทธิภาพ
                             </p>
                         </div>
                     </div>
@@ -213,7 +213,7 @@ export default function SmartManual() {
                 <div className="flex flex-col items-center gap-10 py-12">
                     <div className="flex items-center gap-6 text-muted-foreground font-black uppercase tracking-[0.4em] text-base font-bold opacity-30 group-hover:opacity-100 transition-opacity">
                         <div className="w-16 h-px bg-slate-300 dark:bg-slate-800" />
-                        LOGISPRO SYSTEM
+                        DRouteMind SYSTEM
                         <div className="w-16 h-px bg-slate-300 dark:bg-slate-800" />
                     </div>
                 </div>

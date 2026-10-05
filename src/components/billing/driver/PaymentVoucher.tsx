@@ -75,7 +75,7 @@ export const PaymentVoucher = ({
                 <div className="space-y-4">
                     <div className="space-y-1">
                         <h2 className="font-black text-3xl tracking-tight text-foreground">
-                            {companyProfile?.company_name || "LogisPro Transport"}
+                            {companyProfile?.company_name || "DD Transport"}
                         </h2>
                         {companyProfile?.company_name_en && (
                             <p className="text-primary font-black text-lg font-bold uppercase tracking-[0.2em]">
@@ -351,7 +351,7 @@ export const PaymentVoucher = ({
         {/* Footer Audit Path — in-flow (เดิม absolute ทำให้ทับส่วนลายเซ็นเมื่อรายการยาว) */}
         <div className="relative z-10 mx-16 mt-16 flex justify-between items-center border-t border-slate-100 pt-8 opacity-40">
             <p className="text-base font-bold font-black text-muted-foreground uppercase tracking-[0.3em]">
-                {t('billing_driver.system_log')} LOGISPRO-FIN-{new Date().toISOString()} | {t('billing_driver.node_production')}
+                {t('billing_driver.system_log')} DRM-FIN-{new Date().toISOString()} | {t('billing_driver.node_production')}
             </p>
             <div className="flex gap-4 items-center">
                 <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />

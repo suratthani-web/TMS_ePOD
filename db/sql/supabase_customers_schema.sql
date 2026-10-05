@@ -1,5 +1,5 @@
 -- =============================================
--- LOGIS-PRO TMS: Customers Schema
+-- DRouteMind TMS: Customers Schema
 -- Run this in Supabase SQL Editor
 -- =============================================
 CREATE TABLE IF NOT EXISTS Master_Customers (

@@ -165,7 +165,7 @@ export default function VehicleTypesPage() {
                             description: "4-Wheel Truck (1.5 Ton)",
                             active_status: "Active"
                         }]}
-                        templateFilename="logispro_vehicle_types_template.xlsx"
+                        templateFilename="droutemind_vehicle_types_template.xlsx"
                     />
                     <PremiumButton onClick={handleOpenCreate} className="h-12 px-6 rounded-xl bg-primary text-primary-foreground border-0 shadow-sm gap-3 text-sm font-bold">
                         <Plus size={24} strokeWidth={3} />

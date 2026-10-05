@@ -310,7 +310,7 @@ export default function BranchSettingsPage() {
                                 <Input 
                                   value={editState[branch.Branch_ID]?.Email || ""}
                                   onChange={(e) => handleInputChange(branch.Branch_ID, 'Email', e.target.value)}
-                                  placeholder="node@logispro.io"
+                                  placeholder="branch@ddservicegroup.com"
                                   className="h-16 bg-muted/25 border-border rounded-[1.5rem] focus:border-emerald-500/50 transition-all text-foreground font-black italic tracking-normal pl-8 shadow-inner"
                                 />
                              </div>
@@ -319,7 +319,7 @@ export default function BranchSettingsPage() {
                                 <Input 
                                   value={editState[branch.Branch_ID]?.Sender_Name || ""}
                                   onChange={(e) => handleInputChange(branch.Branch_ID, 'Sender_Name', e.target.value)}
-                                  placeholder="LOGISPRO_COMMAND_UNIT"
+                                  placeholder="DROUTEMIND_BRANCH"
                                   className="h-16 bg-muted/25 border-border rounded-[1.5rem] focus:border-emerald-500/50 transition-all text-foreground font-black italic tracking-normal pl-8 shadow-inner"
                                 />
                              </div>

@@ -1,5 +1,5 @@
 -- ==========================================================
--- LOGIS-PRO TMS: Add Image / Avatar Support for Masters
+-- DRouteMind TMS: Add Image / Avatar Support for Masters
 -- Adds Image_Url to Master_Drivers and Master_Vehicles,
 -- and Avatar_Url to Master_Users.
 -- ==========================================================

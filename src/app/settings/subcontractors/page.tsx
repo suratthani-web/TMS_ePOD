@@ -197,7 +197,7 @@ export default function SubcontractorsPage() {
                             Bank_Account_Name: "บริษัท ขนส่ง จำกัด",
                             Branch_ID: "HQ"
                         }]}
-                        templateFilename="logispro_subcontractors_template.xlsx"
+                        templateFilename="droutemind_subcontractors_template.xlsx"
                     />
                     <PremiumButton onClick={() => handleOpenDialog()} className="h-14 px-10 rounded-2xl shadow-xl shadow-primary/20">
                         <Plus size={24} className="mr-3" strokeWidth={3} />

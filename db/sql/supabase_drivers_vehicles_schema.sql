@@ -1,5 +1,5 @@
 -- =============================================
--- LOGIS-PRO TMS: Drivers & Vehicles Schema
+-- DRouteMind TMS: Drivers & Vehicles Schema
 -- Run this in Supabase SQL Editor
 -- =============================================
 -- Drivers Table

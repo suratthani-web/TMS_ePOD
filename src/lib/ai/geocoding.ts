@@ -564,7 +564,7 @@ export async function geocodeAddress(address: string, context?: string): Promise
       const url = `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(query)}&format=json&limit=1&addressdetails=1&countrycodes=th`;
       const response = await fetch(url, {
         headers: {
-          'User-Agent': 'TMS-Logistics-Platform-v2 (contact@logispro-epod.app)' 
+          'User-Agent': 'DRouteMind-TMS/2 (+https://tms-e-pod.vercel.app)' 
         },
         signal: AbortSignal.timeout(5000)
       });
@@ -653,7 +653,7 @@ export async function reverseGeocode(lat: number, lng: number): Promise<string |
   try {
     const url = `https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lng}&format=json&addressdetails=1&accept-language=th`;
     const res = await fetch(url, {
-      headers: { 'User-Agent': 'TMS-Logistics-Platform-v2 (contact@logispro-epod.app)' },
+      headers: { 'User-Agent': 'DRouteMind-TMS/2 (+https://tms-e-pod.vercel.app)' },
       signal: AbortSignal.timeout(5000)
     });
     if (!res.ok) return null;

@@ -22,9 +22,20 @@ interface SendBillingEmailProps {
     attachments?: EmailAttachment[];
 }
 
+// Display name shown in the recipient's inbox. Taken from SMTP_FROM ("Name <addr>") so
+// every e-mail shows the same sender name — a bare branch address used to appear as
+// just "suratthani@…" while mails without a branch showed "DD Transport".
+const SENDER_NAME = (process.env.SMTP_FROM?.match(/^\s*"?([^"<]+?)"?\s*</)?.[1] || process.env.SENDER_NAME || 'DRouteMind').trim()
+
+function formatSender(addr: string): string {
+    const a = addr.trim()
+    if (!a || a.includes('<')) return a
+    return `"${SENDER_NAME}" <${a}>`
+}
+
 export async function sendBillingEmail({ from, to, cc, subject, html, attachments }: SendBillingEmailProps) {
     let smtpHost = process.env.SMTP_HOST || 'smtp.gmail.com';
-    let smtpPort = Number(process.env.SMTP_PORT || 587);
+    const smtpPort = Number(process.env.SMTP_PORT || 587);
     let smtpUser = process.env.SMTP_USER;
     let smtpPass = process.env.SMTP_PASS;
 
@@ -47,7 +58,7 @@ export async function sendBillingEmail({ from, to, cc, subject, html, attachment
         } catch { /* ignore */ }
     }
 
-    const senderEmail = from || process.env.SMTP_FROM || process.env.DEFAULT_SENDER_EMAIL || 'billing@logispro.io';
+    const senderEmail = formatSender(from || process.env.SMTP_FROM || process.env.DEFAULT_SENDER_EMAIL || smtpUser || '');
     const ccList = cc ? cc.split(',').map(e => e.trim()).filter(Boolean) : undefined;
 
     // 1. Try Custom SMTP Transport if configured
@@ -89,7 +100,7 @@ export async function sendBillingEmail({ from, to, cc, subject, html, attachment
     if (resend) {
         try {
             // Resend delivery sender rule
-            const deliverySender = process.env.RESEND_VERIFIED_FROM || 'Logis-Pro <onboarding@resend.dev>';
+            const deliverySender = process.env.RESEND_VERIFIED_FROM || `${SENDER_NAME} <onboarding@resend.dev>`;
             const replyToAddress = from || undefined;
 
             const { data, error } = await resend.emails.send({

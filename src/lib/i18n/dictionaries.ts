@@ -963,7 +963,7 @@ export const dictionaries = {
         temporal_id: 'รหัสประจำตัว (Temporal ID)',
         identified: 'ยืนยันตัวตนแล้ว',
         secure_pending: 'รอการเชื่อมต่อปลอดภัย',
-        terminal_version: 'LogisPro Terminal v3.2.0-STABLE',
+        terminal_version: 'DRouteMind Terminal v3.2.0-STABLE',
         encrypted_op: 'การปฏิบัติงานแบบเข้ารหัส // ปลายทางปลอดภัย',
         sections: {
             profile: 'โปรไฟล์ผู้ใช้งาน',
@@ -1830,7 +1830,7 @@ export const dictionaries = {
             account_number: 'เลขที่บัญชี',
             fiscal_warn: '* ข้อมูลทางการเงินนี้จะแสดงในใบแจ้งหนี้และเอกสารทางภาษีที่ระบบสร้างขึ้น',
             tactical_advisory: 'ข้อควรระวังเกี่ยวกับข้อมูลบริษัท',
-            advisory_desc: 'ข้อมูลทั้งหมดในส่วนนี้จะถูกใช้เพื่อออกเอกสารทางกฎหมายในระบบ LogisPro กรุณาตรวจสอบเลขผู้เสียภาษีและข้อมูลบัญชีให้ถูกต้องตามระเบียบข้อบังคับ',
+            advisory_desc: 'ข้อมูลทั้งหมดในส่วนนี้จะถูกใช้เพื่อออกเอกสารทางกฎหมายในระบบ DRouteMind กรุณาตรวจสอบเลขผู้เสียภาษีและข้อมูลบัญชีให้ถูกต้องตามระเบียบข้อบังคับ',
             verify_identity: 'ยืนยันข้อมูลนิติบุคคล',
             placeholders: {
                 company_name_th: 'ระบุชื่อบริษัทภาษาไทย...',
@@ -2970,7 +2970,7 @@ export const dictionaries = {
         temporal_id: 'Temporal ID',
         identified: 'IDENTIFIED',
         secure_pending: 'SECURE_CHANNEL_PENDING',
-        terminal_version: 'LogisPro Terminal v3.2.0-STABLE',
+        terminal_version: 'DRouteMind Terminal v3.2.0-STABLE',
         encrypted_op: 'ENCRYPTED OPERATION // SECURE ENDPOINT',
         sections: {
             profile: 'Profile',

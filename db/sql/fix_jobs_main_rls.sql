@@ -1,5 +1,5 @@
 -- =============================================
--- LOGIS-PRO TMS: Jobs_Main RLS Fix
+-- DRouteMind TMS: Jobs_Main RLS Fix
 -- Ensures that server-side operations (Service Role) are preferred,
 -- but provides a basic policy for authenticated roles if needed.
 -- =============================================

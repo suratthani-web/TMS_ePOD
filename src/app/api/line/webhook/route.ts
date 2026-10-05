@@ -20,7 +20,7 @@ import fs from 'fs'
 const TRANSLATIONS: Record<string, Record<string, string>> = {
     TH: {
         welcome: 'ยินดีต้อนรับสู่ระบบ TMS & ePOD ครับ!',
-        help: '🤖 LogisPro AI — คำสั่งที่ใช้ได้...',
+        help: '🤖 DRouteMind AI — คำสั่งที่ใช้ได้...',
         no_jobs: 'ไม่มีงานจัดส่งสำหรับวันนี้ครับ',
         job_started: 'เริ่มงานจัดส่งเรียบร้อยแล้วครับ! 🚛💨',
         job_delivered: 'จัดส่งพัสดุสำเร็จเรียบร้อยแล้วครับ! 📸✨',
@@ -29,7 +29,7 @@ const TRANSLATIONS: Record<string, Record<string, string>> = {
     },
     MM: {
         welcome: 'TMS & ePOD စနစ်မှ ကြိုဆိုပါသည်! 🇲🇲',
-        help: '🤖 LogisPro AI — ရရှိနိုင်သော လုပ်ဆောင်ချက်များ...',
+        help: '🤖 DRouteMind AI — ရရှိနိုင်သော လုပ်ဆောင်ချက်များ...',
         no_jobs: 'ယနေ့အတွက် ပို့ဆောင်ရမည့် လုပ်ငန်းမရှိသေးပါ။',
         job_started: 'ပို့ဆောင်မှုလုပ်ငန်းကို စတင်လိုက်ပါပြီ။ 🚛💨',
         job_delivered: 'ပစ္စည်းပို့ဆောင်မှု အောင်မြင်စွာ ပြီးဆုံးပါပြီ။ 📸✨',
@@ -38,7 +38,7 @@ const TRANSLATIONS: Record<string, Record<string, string>> = {
     },
     KH: {
         welcome: 'សូមស្វាគមន៍មកកាន់ប្រព័ន្ធ TMS & ePOD! 🇰🇭',
-        help: '🤖 LogisPro AI — ពាក្យបញ្ជាដែលអាចប្រើបាន...',
+        help: '🤖 DRouteMind AI — ពាក្យបញ្ជាដែលអាចប្រើបាន...',
         no_jobs: 'មិនមានការងារដឹកជញ្ជូនសម្រាប់ថ្ងៃនេះទេ។',
         job_started: 'ការងារដឹកជញ្ជូនត្រូវបានចាប់ផ្តើមដោយជោគជ័យ! 🚛💨',
         job_delivered: 'ការដឹកជញ្ជូនទំនិញត្រូវបានបញ្ចប់ដោយជោគជ័យ! 📸✨',
@@ -47,7 +47,7 @@ const TRANSLATIONS: Record<string, Record<string, string>> = {
     },
     EN: {
         welcome: 'Welcome to TMS & ePOD System! 🇬🇧',
-        help: '🤖 LogisPro AI — Available commands...',
+        help: '🤖 DRouteMind AI — Available commands...',
         no_jobs: 'You have no delivery jobs scheduled for today.',
         job_started: 'Delivery job has successfully started! 🚛💨',
         job_delivered: 'Package successfully delivered! 📸✨',
@@ -404,7 +404,7 @@ async function buildAIContext(branchId?: string, userName: string = 'ผู้�
     })
 
     return `
-คุณคือ "LogisPro AI" ผู้ช่วยอัจฉริยะและ Super Admin ของระบบบริหารการขนส่ง (TMS)
+คุณคือ "DRouteMind AI" ผู้ช่วยอัจฉริยะและ Super Admin ของระบบบริหารการขนส่ง (TMS)
 เวลาปัจจุบัน: ${now}
 ผู้ใช้: ${userName} | บทบาท: ${role} | สาขาที่ดูแล: ${branchId || 'ทุกสาขา'}
 
@@ -960,7 +960,7 @@ export async function POST(req: NextRequest) {
                 // 1. HELP / MENU
                 if (['HELP', 'MENU', 'เมนู', 'ช่วยเหลือ'].includes(text)) {
                     await replyToUser(replyToken, [
-                        '🤖 LogisPro AI — คำสั่งที่ใช้ได้',
+                        '🤖 DRouteMind AI — คำสั่งที่ใช้ได้',
                         '',
                         '📌 ทั่วไป',
                         '  BIND [รหัส] [เบอร์โทร] — ผูกบัญชี',

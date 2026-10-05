@@ -1,6 +1,6 @@
 # DESIGN.md
 
-Design system guidance for TMS_ePOD / LOGIS-PRO 360.
+Design system guidance for TMS_ePOD / DRouteMind.
 
 Use this file when changing UI, UX, layout, theme, components, or visual behavior. The product is not a marketing site. It is an operational transport management system for dispatchers, admins, drivers, customers, finance users, and fleet teams.
 
@@ -8,7 +8,7 @@ Use this file when changing UI, UX, layout, theme, components, or visual behavio
 
 Product names used in the app:
 
-- LOGIS-PRO 360
+- DRouteMind
 - TMS_ePOD
 - COMMAND CENTRE
 
@@ -130,7 +130,7 @@ Do not use "one component style everywhere" if it makes operational tasks slower
 
 The current corporate identity is defined in `src/app/globals.css` under:
 
-`LOGIS-PRO PREMIUM - CI REDESIGN`
+`DRouteMind PREMIUM - CI REDESIGN`
 
 Core CI palette:
 
@@ -324,4 +324,4 @@ High-risk anti-patterns:
 
 When asking an AI to work on UI, include:
 
-`Use DESIGN.md. Keep LOGIS-PRO CI colors, support light/dark mode, use theme tokens, keep the UI operational and dense, avoid generic AI-looking layouts and AI-sounding copy, and do not change business logic unless required.`
+`Use DESIGN.md. Keep DRouteMind CI colors, support light/dark mode, use theme tokens, keep the UI operational and dense, avoid generic AI-looking layouts and AI-sounding copy, and do not change business logic unless required.`

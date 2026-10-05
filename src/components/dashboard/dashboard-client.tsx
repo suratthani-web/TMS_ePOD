@@ -223,7 +223,7 @@ export function DashboardClient({
 
                 <ExcelExport 
                     data={weeklyStats.length ? weeklyStats : [{ message: "No data in selected range" }]}
-                    filename="logispro_dashboard_summary"
+                    filename="droutemind_dashboard_summary"
                     trigger={
                         <button className="px-5 h-10 bg-emerald-500/10 text-emerald-500 font-black uppercase tracking-widest text-[10px] rounded-xl hover:bg-emerald-500 hover:text-white transition-all flex items-center gap-2 border border-emerald-500/20 shadow-sm">
                             <FileSpreadsheet size={14} />

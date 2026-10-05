@@ -151,7 +151,7 @@ export default function InvoicesClient({ initialInvoices, billableJobs, customer
         <div className="flex flex-wrap gap-3 relative z-10">
             <ExcelExport 
                 data={filteredInvoices}
-                filename="logispro_invoices_export"
+                filename="droutemind_invoices_export"
                 trigger={
                     <PremiumButton variant="outline" className="h-12 px-6 rounded-xl border-border/5 bg-emerald-500/10 text-emerald-500 hover:bg-emerald-500 hover:text-white transition-all duration-300 ring-1 ring-border/5" >
                         <FileSpreadsheet size={18} className="mr-2" />
@@ -539,7 +539,7 @@ export default function InvoicesClient({ initialInvoices, billableJobs, customer
 
       <div className="mt-12 text-center mb-16">
         <div className="inline-flex items-center gap-3 px-6 py-2 glass-panel rounded-full text-[10px] font-black text-muted-foreground uppercase tracking-[0.4em] opacity-40 hover:opacity-100 transition-opacity">
-            <Zap size={12} className="text-primary" /> LogisPro {t('invoices.engine_title')} • Matrix Synchronization v4.2
+            <Zap size={12} className="text-primary" /> DRouteMind {t('invoices.engine_title')} • Matrix Synchronization v4.2
         </div>
       </div>
     </DashboardLayout>

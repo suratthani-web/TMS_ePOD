@@ -100,7 +100,7 @@ export async function getDrivingDistance(
 
     const response = await fetch(url, {
       headers: {
-        'User-Agent': 'TMS-Logistics-Platform-v2 (contact@logispro-epod.app)'
+        'User-Agent': 'DRouteMind-TMS/2 (+https://tms-e-pod.vercel.app)'
       }
     });
 
@@ -252,7 +252,7 @@ export async function optimizeRouteSequence(
 
     const response = await fetch(url, {
       headers: {
-        'User-Agent': 'TMS-Logistics-Platform-v2 (contact@logispro-epod.app)'
+        'User-Agent': 'DRouteMind-TMS/2 (+https://tms-e-pod.vercel.app)'
       }
     });
 

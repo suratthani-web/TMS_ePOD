@@ -79,7 +79,7 @@ export async function generatePodPdf(job: PublicJobDetails) {
         
         const pSub = document.createElement('p')
         pSub.style.cssText = 'margin: 10px 0 0 0; opacity: 0.8; font-size: 14px; font-weight: bold; text-transform: uppercase; letter-spacing: 2px;'
-        pSub.textContent = 'Certificate of Completion • LOGIS-PRO 360 Enterprise'
+        pSub.textContent = 'Certificate of Completion • DRouteMind Enterprise'
         headerLeft.appendChild(pSub)
         header.appendChild(headerLeft)
 

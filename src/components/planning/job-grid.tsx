@@ -125,7 +125,7 @@ export function JobGrid({
                 {jobs.length > 0 && (
                     <div className="p-4 bg-muted/20 text-center border-t border-border">
                         <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-[0.2em] opacity-50">
-                            LOGIS-PRO 360 • Transport Management System
+                            DRouteMind • Transport Management System
                         </p>
                     </div>
                 )}

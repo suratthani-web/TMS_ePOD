@@ -170,7 +170,7 @@ export default function LocationPicker({
 
       const res = await fetch(
         `https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lng}&format=json&addressdetails=1&accept-language=th`,
-        { headers: { 'User-Agent': 'TMS-Logistics-Platform-v2 (contact@logispro-epod.app)' }, signal: AbortSignal.timeout(4000) }
+        { headers: { 'User-Agent': 'DRouteMind-TMS/2 (+https://tms-e-pod.vercel.app)' }, signal: AbortSignal.timeout(4000) }
       )
       if (!res.ok) return
       const data = await res.json()
@@ -343,7 +343,7 @@ export default function LocationPicker({
           try {
             const nres = await fetch(
               `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(q)}&format=json&limit=5&countrycodes=th&accept-language=th&addressdetails=1`,
-              { headers: { 'User-Agent': 'TMS-Logistics-Platform-v2 (contact@logispro-epod.app)' }, signal: ctrl.signal }
+              { headers: { 'User-Agent': 'DRouteMind-TMS/2 (+https://tms-e-pod.vercel.app)' }, signal: ctrl.signal }
             )
             if (nres.ok) {
               const ndata: Array<{ lat: string; lon: string; display_name: string; name?: string }> = await nres.json()

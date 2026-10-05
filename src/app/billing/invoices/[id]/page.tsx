@@ -65,7 +65,7 @@ export default async function InvoiceViewPage({ params }: { params: Promise<{ id
             <div className="flex justify-between items-start mb-8">
                 <div>
                      {/* Company Logo/Name logic here (Hardcoded for now as placeholder) */}
-                     <h1 className="text-2xl font-bold text-indigo-800">LOGIS-PRO 360</h1>
+                     <h1 className="text-2xl font-bold text-indigo-800">DRouteMind</h1>
                      <p className="text-xl text-muted-foreground">
                         123 Transport Lane, Logistics City<br/>
                         Bangkok, 10110<br/>
@@ -131,7 +131,7 @@ export default async function InvoiceViewPage({ params }: { params: Promise<{ id
                         </div>
                         <div>
                             <h4 className="text-xs font-black text-emerald-800 uppercase tracking-widest mb-1">{t.co2_summary_title}</h4>
-                            <p className="text-[10px] text-emerald-600 font-bold opacity-60">LogisPro ESG Protocol v2.5</p>
+                            <p className="text-[10px] text-emerald-600 font-bold opacity-60">DRouteMind ESG Protocol v2.5</p>
                         </div>
                      </div>
                      <div className="text-right">
@@ -176,7 +176,7 @@ export default async function InvoiceViewPage({ params }: { params: Promise<{ id
                 <div className="text-center">
                     <div className="border-b border-black mb-2 w-3/4 mx-auto h-8"></div>
                     <p className="text-xl font-bold">{t.authorized_signature}</p>
-                    <p className="text-lg font-bold text-muted-foreground mt-1">LOGIS-PRO 360</p>
+                    <p className="text-lg font-bold text-muted-foreground mt-1">DRouteMind</p>
                     <p className="text-lg font-bold text-gray-400 mt-1">Date: ____/____/____</p>
                 </div>
                 <div className="text-center">

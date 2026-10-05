@@ -211,7 +211,7 @@ export default function CustomersSettingsPage() {
               <>
                 <ExcelExport 
                     data={customers}
-                    filename="logispro_customers_export"
+                    filename="droutemind_customers_export"
                     trigger={
                         <PremiumButton variant="outline" className="h-11 px-5 rounded-xl border-border bg-emerald-500/10 text-emerald-500 hover:bg-emerald-500 hover:text-white transition-all text-[10px] font-black uppercase tracking-widest" >
                             <FileSpreadsheet size={16} className="mr-2" />
@@ -239,7 +239,7 @@ export default function CustomersSettingsPage() {
                         Credit_Term: 30,
                         Price_Per_Unit: 1500.00
                     }]}
-                    templateFilename="logispro_client_template.xlsx"
+                    templateFilename="droutemind_client_template.xlsx"
                 />
                 <PremiumButton onClick={() => handleOpenDialog()} className="h-11 px-6 rounded-xl shadow-lg bg-primary text-foreground font-black uppercase tracking-widest text-[10px]">
                   <Plus size={18} className="mr-2" strokeWidth={3} />
@@ -353,7 +353,7 @@ export default function CustomersSettingsPage() {
                       <Input
                         value={formData.Email || ""}
                         onChange={(e) => updateForm("Email", e.target.value)}
-                        placeholder="partner@logispro.matrix"
+                        placeholder="contact@customer.co.th"
                         className="bg-muted/50 border-border rounded-2xl h-14 font-black px-8 text-foreground focus:ring-primary/40 focus:bg-secondary/50 transition-all uppercase tracking-normal text-xl"
                       />
                     </div>
@@ -685,7 +685,7 @@ export default function CustomersSettingsPage() {
               <div className="px-6 py-4 bg-muted/30 border-t border-border flex items-center justify-between">
                 <div className="flex items-center gap-2">
                     <Mail size={10} className="text-muted-foreground opacity-40" />
-                    <span className="text-[9px] font-black text-muted-foreground uppercase tracking-normal truncate max-w-[120px] italic">{customer.Email || "registry-pending@logispro.io"}</span>
+                    <span className="text-[9px] font-black text-muted-foreground uppercase tracking-normal truncate max-w-[120px] italic">{customer.Email || "ยังไม่มีอีเมล"}</span>
                 </div>
                 <div className="flex items-center gap-2">
                     <span className={cn("text-[9px] font-black tracking-normal px-2.5 py-1 rounded-lg border shadow-sm", customer.Line_Notify_Disabled ? "bg-rose-500/10 border-rose-500/30 text-rose-500" : "bg-emerald-500/10 border-emerald-500/30 text-emerald-500")}>

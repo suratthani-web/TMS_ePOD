@@ -347,7 +347,7 @@ export default function RoutesPage() {
               <>
                 <ExcelExport
                     data={locations}
-                    filename="logispro_locations_export"
+                    filename="droutemind_locations_export"
                     trigger={
                         <PremiumButton variant="outline" className="h-11 px-5 rounded-xl border-border/5 bg-emerald-500/10 text-emerald-500 hover:bg-emerald-500 hover:text-white transition-all text-[10px] font-black uppercase tracking-widest" >
                             <FileSpreadsheet size={16} className="mr-2" />
@@ -372,7 +372,7 @@ export default function RoutesPage() {
                         Latitude: 13.7563,
                         Longitude: 100.5018
                     }]}
-                    templateFilename="logispro_locations_template.xlsx"
+                    templateFilename="droutemind_locations_template.xlsx"
                 />
                 <PremiumButton onClick={() => handleOpenDialog()} className="h-11 px-6 rounded-xl shadow-lg bg-primary text-foreground font-black uppercase tracking-widest text-[10px]">
                   <Plus size={18} className="mr-2" strokeWidth={3} />

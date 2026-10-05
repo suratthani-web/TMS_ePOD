@@ -14,7 +14,7 @@ import { getDriverSession } from "./auth-actions"
 
 // In a real production app, RP_ID should be your domain
 const RP_ID = process.env.NEXT_PUBLIC_RP_ID || 'localhost'
-const RP_NAME = 'LogisPro Tactical'
+const RP_NAME = 'DRouteMind Tactical'
 const ORIGIN = process.env.NEXT_PUBLIC_APP_URL || `http://${RP_ID}:3000`
 
 /**

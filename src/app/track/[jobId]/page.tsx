@@ -604,7 +604,7 @@ export default async function TrackingPage(props: { params: Promise<{ jobId: str
                 <div className="w-8 h-px bg-slate-200" />
             </div>
             <p className="text-[10px] font-bold text-slate-400 uppercase tracking-[0.2em]">
-                พัฒนาระบบโดย LOGISPRO TMS • 2026
+                พัฒนาระบบโดย DRouteMind TMS • 2026
             </p>
         </div>
 
