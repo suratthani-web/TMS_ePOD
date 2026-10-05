@@ -22,10 +22,10 @@ interface SendBillingEmailProps {
     attachments?: EmailAttachment[];
 }
 
-// Display name shown in the recipient's inbox. Taken from SMTP_FROM ("Name <addr>") so
+// Display name shown in the recipient's inbox: SMTP_FROM's "Name <addr>" if given, else SENDER_NAME, else the company name — so
 // every e-mail shows the same sender name — a bare branch address used to appear as
 // just "suratthani@…" while mails without a branch showed "DD Transport".
-const SENDER_NAME = (process.env.SMTP_FROM?.match(/^\s*"?([^"<]+?)"?\s*</)?.[1] || process.env.SENDER_NAME || 'DRouteMind').trim()
+const SENDER_NAME = (process.env.SMTP_FROM?.match(/^\s*"?([^"<]+?)"?\s*</)?.[1] || process.env.SENDER_NAME || 'DD Transport').trim()
 
 function formatSender(addr: string): string {
     const a = addr.trim()
