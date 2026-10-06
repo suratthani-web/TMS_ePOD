@@ -20,6 +20,15 @@ export function hasTelegramBot(): boolean {
     return !!process.env.TELEGRAM_BOT_TOKEN
 }
 
+/**
+ * ตรวจสอบว่าเปิดส่งแจ้งเตือน Telegram หรือไม่
+ * ปิดการแจ้งเตือนชั่วคราว (เนื่องจากยังไม่มีผู้ใช้งาน)
+ * หากต้องการเปิดใช้งาน ให้ตั้งค่า TELEGRAM_NOTIFICATIONS_ENABLED=true ใน Environment Variables
+ */
+export function isTelegramNotificationsEnabled(): boolean {
+    return process.env.TELEGRAM_NOTIFICATIONS_ENABLED === 'true'
+}
+
 /** มีทั้ง token + กลุ่มแอดมิน → sendTelegramAlert() ใช้งานได้ */
 export function isTelegramConfigured(): boolean {
     return !!(process.env.TELEGRAM_BOT_TOKEN && process.env.TELEGRAM_CHAT_ID)
@@ -35,6 +44,9 @@ function escapeMarkdown(text: string): string {
  * ตั้งใจให้เรียกแบบ fire-and-forget โดยไม่บล็อก flow หลัก
  */
 async function sendRaw(chatId: string, text: string, useMarkdown: boolean): Promise<boolean> {
+    // ปิดแจ้งเตือนถ้าไม่ได้เปิด opt-in ผ่าน TELEGRAM_NOTIFICATIONS_ENABLED=true
+    if (!isTelegramNotificationsEnabled()) return false
+
     const token = process.env.TELEGRAM_BOT_TOKEN
     if (!token || !chatId) return false
 
@@ -77,7 +89,7 @@ type TelegramAlert = {
  * ส่งแจ้งเตือน (markdown) เข้ากลุ่มแอดมินภายใน (env TELEGRAM_CHAT_ID)
  */
 export async function sendTelegramAlert(alert: TelegramAlert): Promise<boolean> {
-    if (!isTelegramConfigured()) return false
+    if (!isTelegramNotificationsEnabled() || !isTelegramConfigured()) return false
 
     const lines = [`*${escapeMarkdown(alert.title)}*`]
     if (alert.body) lines.push(escapeMarkdown(alert.body))

@@ -4,7 +4,7 @@ import webpush from 'web-push'
 import { createAdminClient } from '@/utils/supabase/server'
 import { createNotification } from './notification-actions'
 import { logActivity } from '@/lib/supabase/logs'
-import { sendTelegramAlert } from '@/lib/integrations/telegram'
+import { sendTelegramAlert, isTelegramNotificationsEnabled } from '@/lib/integrations/telegram'
 import * as admin from 'firebase-admin'
 import { join } from 'path'
 import { readFileSync } from 'fs'
@@ -263,13 +263,14 @@ export async function sendPushToDriver(driverId: string, payload: PushPayload) {
 export async function sendPushToAdmins(payload: PushPayload, branchId?: string | null) {
     const supabase = await createAdminClient()
 
-    // Mirror ทุก admin alert ไป Telegram (ถ้าตั้ง env ไว้) — fire-and-forget ไม่บล็อก
-    // ทำนอกเงื่อนไข subscription เพื่อให้ได้แจ้งเตือนแม้ยังไม่มีแอดมิน subscribe web push
-    void sendTelegramAlert({
-        title: payload.title,
-        body: payload.body,
-        url: payload.url,
-    }).catch(() => {})
+    // Mirror ทุก admin alert ไป Telegram เฉพาะเมื่อเปิดใช้งาน (ปิดไว้เป็นค่าเริ่มต้น เนื่องจากยังไม่มีผู้ใช้งาน)
+    if (isTelegramNotificationsEnabled()) {
+        void sendTelegramAlert({
+            title: payload.title,
+            body: payload.body,
+            url: payload.url,
+        }).catch(() => {})
+    }
 
     // 1. Fetch all admin subscriptions (Web Push)
     // We fetch them all because the DB join is broken and identity is ambiguous (User_ID vs Username)

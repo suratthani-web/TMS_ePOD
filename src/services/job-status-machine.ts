@@ -689,13 +689,15 @@ async function sendDeliveryCompletionNotification(jobId: string) {
       console.log(`[Notification] Sent completion to ${sent} team contact(s) for job ${jobId}.`);
     }
 
-    // Telegram: ส่งข้อความเดียวกันไปยัง chat_id ที่ผูกไว้ (ส่วนตัว/รายคน) — ฟรี ไม่กินโควต้า LINE
+    // Telegram: ส่งข้อความเดียวกันไปยัง chat_id ที่ผูกไว้ (ส่วนตัว/รายคน) — ปิดไว้เป็นค่าเริ่มต้นหากยังไม่มีผู้ใช้งาน
     if (telegramChatIds.size > 0) {
-      const { sendTelegramText } = await import('@/lib/integrations/telegram');
-      console.log(`[Notification] Sending Telegram completion to ${telegramChatIds.size} chat(s)...`);
-      await Promise.allSettled(
-        Array.from(telegramChatIds).map(id => sendTelegramText(id, message))
-      );
+      const { sendTelegramText, isTelegramNotificationsEnabled } = await import('@/lib/integrations/telegram');
+      if (isTelegramNotificationsEnabled()) {
+        console.log(`[Notification] Sending Telegram completion to ${telegramChatIds.size} chat(s)...`);
+        await Promise.allSettled(
+          Array.from(telegramChatIds).map(id => sendTelegramText(id, message))
+        );
+      }
     }
 
   } catch (err) {
