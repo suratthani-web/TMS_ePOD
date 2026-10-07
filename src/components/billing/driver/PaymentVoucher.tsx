@@ -3,7 +3,8 @@
 import React from "react"
 import { Job } from "@/lib/supabase/jobs"
 import { CompanyProfile } from "@/lib/supabase/settings"
-import { ShieldCheck, Banknote, MapPin, Globe, Phone } from "lucide-react"
+import { ShieldCheck, Banknote, MapPin, Globe, Phone, IdCard } from "lucide-react"
+import { formatThaiId } from "@/lib/utils/thai-id"
 
 interface ExtraCost {
     cost_driver?: string | number
@@ -17,6 +18,8 @@ interface PaymentVoucherProps {
     Bank_Name?: string | null
     Bank_Account_No?: string | null
     Bank_Account_Name?: string | null
+    ID_Card_No?: string | null // คนขับ
+    Tax_ID?: string | null     // บริษัทรถร่วม
   } | null
   today: string
   selectedData: Job[]
@@ -164,6 +167,24 @@ export const PaymentVoucher = ({
                                     </div>
                                 </div>
                             )}
+                            {/* เลขบัตรประชาชน/เลขผู้เสียภาษี — ตั้งค่าที่หน้าคนขับ (หรือรถร่วม) */}
+                            <div className="flex items-center gap-4">
+                                <div className="w-10 h-10 rounded-xl bg-white border border-slate-100 flex items-center justify-center shadow-sm">
+                                    <IdCard className="w-5 h-5 text-muted-foreground" />
+                                </div>
+                                <div>
+                                    <p className="text-base font-bold font-black text-muted-foreground uppercase tracking-widest">
+                                        {entityInfo.Tax_ID && !entityInfo.ID_Card_No ? 'เลขประจำตัวผู้เสียภาษี' : 'เลขบัตรประชาชน'}
+                                    </p>
+                                    {entityInfo.ID_Card_No || entityInfo.Tax_ID ? (
+                                        <p className="text-lg font-black text-foreground tracking-wider font-mono">
+                                            {entityInfo.ID_Card_No ? formatThaiId(entityInfo.ID_Card_No) : entityInfo.Tax_ID}
+                                        </p>
+                                    ) : (
+                                        <p className="text-base font-bold text-amber-600">ยังไม่ได้ใส่ — ตั้งค่าที่หน้าคนขับ</p>
+                                    )}
+                                </div>
+                            </div>
                          </div>
                     ) : (
                         <div className="mt-8 p-4 bg-rose-50 border border-rose-100 rounded-2xl flex items-center gap-3">

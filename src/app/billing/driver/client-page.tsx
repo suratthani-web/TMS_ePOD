@@ -21,6 +21,7 @@ import { Subcontractor } from "@/types/subcontractor"
 import { getBankCode } from "@/lib/constants/banks"
 import { toast } from "sonner"
 import { exportToCSV } from "@/lib/utils/export"
+import { formatThaiId } from "@/lib/utils/thai-id"
 import { generateCrewPaymentXlsx } from "@/lib/actions/crew-payment-export"
 import { PaymentVoucher } from "@/components/billing/driver/PaymentVoucher"
 import { cn } from "@/lib/utils"
@@ -186,6 +187,9 @@ export default function DriverPaymentClient({
     ? drivers.find(d => d.Driver_Name === selectedEntityId)
     : subcontractors.find(s => s.Sub_ID === selectedEntityId)
 
+  const payeeInfo = entityInfo as (Partial<Driver> & Partial<Subcontractor>) | undefined
+  const payeeIdNo = payeeInfo?.ID_Card_No ? formatThaiId(payeeInfo.ID_Card_No) : (payeeInfo?.Tax_ID || '')
+
   const resetToStart = () => { setStep(1); setSelectedEntityId(""); setSelectedItems([]) }
 
   const goToJobs = () => {
@@ -272,7 +276,7 @@ export default function DriverPaymentClient({
     if (selectedData.length === 0) return
     setCrewLoading(true)
     try {
-      const info = entityInfo as (Partial<Driver> & Partial<Subcontractor>) | undefined
+      const info = payeeInfo
       const res = await generateCrewPaymentXlsx({
         jobIds: selectedData.map(j => j.Job_ID),
         payee: {
@@ -546,6 +550,12 @@ export default function DriverPaymentClient({
                         <p className="text-xs text-muted-foreground font-bold uppercase tracking-wider mb-1">ผู้รับเงิน</p>
                         <p className="text-xl font-black">{entityName}</p>
                         <p className="text-sm text-muted-foreground mt-1">{selectedData.length} งาน</p>
+                        {/* เลขบัตรประชาชน (คนขับ) / เลขผู้เสียภาษี (รถร่วม) — ใช้ในใบสำคัญจ่ายและไฟล์จ่ายพนักงาน */}
+                        {payeeIdNo ? (
+                            <p className="text-sm mt-1"><span className="text-muted-foreground">{mode === 'individual' ? 'เลขบัตรประชาชน' : 'เลขผู้เสียภาษี'} </span><span className="font-mono font-bold">{payeeIdNo}</span></p>
+                        ) : (
+                            <p className="text-sm mt-1 text-amber-600 font-bold">ยังไม่มี{mode === 'individual' ? 'เลขบัตรประชาชน — ใส่ได้ที่หน้าตั้งค่าคนขับ' : 'เลขผู้เสียภาษี — ใส่ได้ที่หน้ารถร่วม'}</p>
+                        )}
                     </div>
                     <div className="sm:text-right space-y-1">
                         <div className="flex sm:justify-end gap-3 text-sm"><span className="text-muted-foreground">ยอดรวม (ค่าเที่ยว)</span><span className="font-bold">฿{selectedSubtotal.toLocaleString(undefined,{minimumFractionDigits:2})}</span></div>
