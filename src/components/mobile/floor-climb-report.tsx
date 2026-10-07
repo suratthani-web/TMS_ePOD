@@ -114,7 +114,9 @@ export const FloorClimbReport = forwardRef<HTMLDivElement, Props>(({ job, data }
 
           {/* Row 3b: แยกจำนวนกล่องต่อชั้น (เมื่อขึ้นมากกว่า 1 ชั้น) */}
           {floorCount > 1 && (
-            <div className="border border-black/40 rounded-lg p-4">
+            // ห้ามใช้ opacity modifier (เช่น border-black/40) — Tailwind 4 แปลงเป็น color-mix(oklab)
+            // ซึ่ง html2canvas 1.4.1 parse ไม่ได้ → ใบขึ้นชั้น "ภาพว่าง" เฉพาะตอนขึ้น >1 ชั้น
+            <div className="border rounded-lg p-4" style={{ borderColor: "rgba(0,0,0,0.4)" }}>
               <p className="font-bold mb-2">รายละเอียดต่อชั้น</p>
               <div className="grid grid-cols-2 gap-x-8 gap-y-1">
                 {floors.map((f) => (
