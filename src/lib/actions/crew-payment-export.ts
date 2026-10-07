@@ -1,17 +1,18 @@
 "use server"
 
 /**
- * สร้างไฟล์ Excel "ใบจ่ายพนักงาน" ตามแม่แบบแอดมิน PCG (3 แท็บ):
- *   1) สรุปจ่าย   — 1 แถวต่อผู้รับเงิน (คนขับ + เด็กรถ) พร้อม WHT 3% / ยอดโอน (สูตร)
- *   2) <ชื่อคนขับ> — 1 แถวต่องาน: ราคา + ค่าใช้จ่ายแยกคอลัมน์ + รวม (สูตร)
- *   3) <ชื่อเด็กรถ> — โครงเดียวกับคนขับ แต่ ราคา = คนขับ − 200, ค่าขึ้นชั้น = เท่าคนขับ (สูตรอ้างอิงแท็บคนขับ)
+ * สร้างไฟล์ Excel "จ่ายพนักงาน PCG" ตามแม่แบบแอดมิน (2 แท็บ):
+ *   1) สรุปจ่าย  — แบบฟอร์มสรุปการจ่ายเงินรถร่วม: 1 แถวต่อผู้รับเงิน + หัก(ค่าเคลม/หักค่ารถ/ค่าโทรศัพท์/อื่นๆ)
+ *                  + หัก ณ ที่จ่าย + ยอดโอน (สูตร)
+ *   2) <ชื่อคนขับ> — 1 แถวต่องาน: ราคา + ค่าใช้จ่ายแยกคอลัมน์ (รวม "ค่าเด็กรถ" — จ่ายรวมไปกับคนขับ)
+ *                  + รวม / หัก ณ ที่จ่าย / ค่าโทรศัพท์ / คงเหลือ
  *
- * ช่องที่ระบบยังไม่มีข้อมูล (เลขบัตรปชช./ที่อยู่/หักค่ารถ/ค่าประกันสินค้า/TRACKING)
- * เว้นว่างให้แอดมินคีย์มือ — คอลัมน์ยึดตามแม่แบบครบ
+ * ช่องที่ระบบไม่มีข้อมูล (TRACKING/ที่อยู่/หักค่ารถ/ค่าโทรศัพท์/อื่นๆ) เว้นว่างให้แอดมินคีย์มือ
  */
 
 import ExcelJS from "exceljs"
-import { createAdminClient } from "@/utils/supabase/server"
+import { createAdminClient, createClient } from "@/utils/supabase/server"
+import { isAdmin } from "@/lib/permissions"
 
 type JobRow = {
     Job_ID: string
@@ -21,24 +22,29 @@ type JobRow = {
     Route_Name: string | null
     Est_Distance_KM: number | null
     Cost_Driver_Total: number | null
-    Driver_Name: string | null
     extra_costs_json: string | unknown[] | null
     original_destinations_json: string | unknown[] | null
 }
 
 type ExtraCost = { type?: string; cost_driver?: number | string }
 
-const HELPER_RATE_DISCOUNT = 200 // เด็กรถ = คนขับ − 200
+export type CrewPaymentPayee = {
+    name: string
+    accountName?: string | null
+    accountNo?: string | null
+    bankName?: string | null
+    idCardNo?: string | null
+}
 
 // keyword จับค่าใช้จ่ายเข้าคอลัมน์ย่อยของแม่แบบ
 const KW = {
     addStop: ['เพิ่มจุด'],
     floor: ['ขึ้นชั้น', 'แรงงาน', 'ยกของ'],
-    arrange: ['จัดเรียง'],
+    helper: ['เด็กรถ'],
     unload: ['ลงสินค้า', 'ลงของ'],
     fuel: ['ประหยัดน้ำมัน', 'น้ำมัน'],
 }
-const ALL_KW = [...KW.addStop, ...KW.floor, ...KW.arrange, ...KW.unload, ...KW.fuel]
+const ALL_KW = Object.values(KW).flat()
 
 function parseExtras(raw: unknown): ExtraCost[] {
     let v = raw
@@ -49,7 +55,7 @@ function sumKw(extras: ExtraCost[], kw: string[]): number {
     return extras.filter(e => kw.some(k => (e.type || '').includes(k)))
         .reduce((s, e) => s + (Number(e.cost_driver) || 0), 0)
 }
-// ค่าที่ไม่เข้ากลุ่มไหน → รวมเข้าคอลัมน์สุดท้าย (ค่าประหยัดน้ำมัน/อื่นๆ) กันเงินตกหล่น
+// ค่าที่ไม่เข้ากลุ่มไหน → รวมเข้าคอลัมน์สุดท้าย (ค่าประหยัดน้ำมัน) กันเงินตกหล่น
 function sumUnmatched(extras: ExtraCost[]): number {
     return extras.filter(e => !ALL_KW.some(k => (e.type || '').includes(k)))
         .reduce((s, e) => s + (Number(e.cost_driver) || 0), 0)
@@ -60,9 +66,17 @@ function allDrops(job: JobRow): string {
     if (typeof v === 'string') { try { v = JSON.parse(v) } catch { v = null } }
     if (Array.isArray(v)) {
         const names = v.map(d => String((d as { name?: unknown })?.name ?? '').trim()).filter(Boolean)
-        if (names.length > 0) return names.join(' , ')
+        if (names.length > 0) return names.join(' - ')
     }
     return job.Dest_Location || job.Route_Name || ''
+}
+
+// "2026-09-16" → "16/9/2569" (พ.ศ. แบบแม่แบบ)
+function fmtDateTH(s: string | null): string {
+    const d = String(s || '').slice(0, 10)
+    const [y, m, day] = d.split('-').map(Number)
+    if (!y || !m || !day) return ''
+    return `${day}/${m}/${y + 543}`
 }
 
 function fmtPeriod(dates: string[]): string {
@@ -74,174 +88,207 @@ function fmtPeriod(dates: string[]): string {
     return `${a.d}/${a.m}/${a.y}-${b.d}/${b.m}/${b.y}`
 }
 
-// ชื่อชีตปลอดภัย (ตัดอักขระต้องห้าม + ยาวไม่เกิน 31)
-function safeSheetName(name: string, fallback: string): string {
-    const cleaned = (name || fallback).replace(/[\[\]\:\*\?\/\\]/g, ' ').trim().slice(0, 31)
-    return cleaned || fallback
+// ชื่อแท็บแบบแม่แบบ = ชื่อต้น (ตัดคำนำหน้า) + ปลอดภัยสำหรับ Excel (ไม่มีอักขระต้องห้าม, ≤31)
+function detailSheetName(name: string): string {
+    const first = (name || '').trim()
+        .replace(/^(นาย|นางสาว|นาง|น\.ส\.|ด\.ช\.|ด\.ญ\.)\s*/, '')
+        .split(/\s+/)[0] || ''
+    const cleaned = first.replace(/[\[\]\:\*\?\/\\]/g, ' ').trim().slice(0, 31)
+    return cleaned && cleaned !== 'สรุปจ่าย' ? cleaned : 'คนขับ'
 }
 
 const DETAIL_HEADERS = ['วันที่', 'TRACKING', 'ที่ขึ้นของ', 'จุดลงสินค้า', 'ระยะทาง', 'ราคา',
-    'เพิ่มจุด', 'ค่าขึ้นชั้น', 'ค่าจัดเรียง', 'ค่าลงสินค้า', 'ค่าประหยัดน้ำมัน', 'รวม']
+    'เพิ่มจุด', 'ค่าขึ้นชั้น', 'ค่าเด็กรถ', 'ค่าลงสินค้า', 'ค่าประหยัดน้ำมัน', 'รวม']
 
-const SUMMARY_HEADERS = ['ลำดับที่', 'ผู้รับเงิน/คู่ค้า', 'ชื่อ-นามสกุล', 'เลขที่บัญชี', 'ธนาคาร', 'ที่อยู่',
-    'เลขบัตรประชาชน', 'รายได้', 'ค่าเคลม', 'หักค่ารถ', 'ค่าประกันสินค้า', 'อื่นๆ', 'คงเหลือ',
-    'หัก ณ ที่จ่าย 3%', 'ยอดโอน', 'รอบวันที่', 'หมายเหตุ', 'ภงด.']
+const THIN: Partial<ExcelJS.Borders> = {
+    top: { style: 'thin' }, left: { style: 'thin' }, bottom: { style: 'thin' }, right: { style: 'thin' },
+}
+const MONEY = '#,##0.00'
 
-function buildDetailSheet(
-    ws: ExcelJS.Worksheet,
-    jobs: JobRow[],
-    opts: {
-        helperOf?: string        // ถ้าเป็นแท็บเด็กรถ → อ้างอิงราคา/ขึ้นชั้นจากแท็บคนขับชื่อนี้
-        splitWithHelper?: boolean // แท็บคนขับที่มีเด็กรถ → ราคาคนขับ = (ยอดรวม+200)/2
-    }
-) {
+/** แท็บรายละเอียดคนขับ — คืนเลขแถว "รวม" (ให้แท็บสรุปจ่ายอ้างอิง) */
+function buildDetailSheet(ws: ExcelJS.Worksheet, jobs: JobRow[], payee: CrewPaymentPayee, whtRate: number): number {
     ws.addRow(DETAIL_HEADERS)
-    ws.getRow(1).font = { bold: true }
-    const helperRef = opts.helperOf ? `'${opts.helperOf.replace(/'/g, "''")}'` : null
+    const header = ws.getRow(1)
+    header.font = { bold: true }
+    header.alignment = { horizontal: 'center', vertical: 'middle' }
 
     jobs.forEach((job, i) => {
         const r = i + 2 // แถวข้อมูลเริ่มที่ 2
         const extras = parseExtras(job.extra_costs_json)
-        const date = job.Plan_Date ? new Date(job.Plan_Date) : null
-
-        // Cost_Driver_Total = ยอดรวมทั้งคู่ (คนขับ+เด็กรถ) เมื่อมีเด็กรถ
-        // แยกจ่าย: คนขับ = (รวม+200)/2, เด็กรถ = (รวม−200)/2 = คนขับ−200
-        const total = Number(job.Cost_Driver_Total) || 0
-        const floor = sumKw(extras, KW.floor)
-        const addStop = sumKw(extras, KW.addStop)
-        const arrange = sumKw(extras, KW.arrange)
-        const unload = sumKw(extras, KW.unload)
-        const fuelPlusOther = sumKw(extras, KW.fuel) + sumUnmatched(extras)
-
-        // ราคาฝั่งคนขับ (แท็บคนขับ): มีเด็กรถ → split, ไม่มี → เต็มยอด
-        const driverPrice = total > 0
-            ? (opts.splitWithHelper ? (total + HELPER_RATE_DISCOUNT) / 2 : total)
-            : ''
-
-        const row = ws.addRow([
-            date ? new Date(date.getFullYear(), date.getMonth(), date.getDate()) : '',
-            '', // TRACKING — เว้นให้คีย์มือ
-            job.Origin_Location || '',
+        const price = Number(job.Cost_Driver_Total) || 0
+        ws.addRow([
+            fmtDateTH(job.Plan_Date),
+            null, // TRACKING — เว้นให้คีย์มือ
+            job.Origin_Location || null,
             allDrops(job),
-            Number(job.Est_Distance_KM) || '',
-            helperRef ? { formula: `MAX(${helperRef}!F${r}-${HELPER_RATE_DISCOUNT},0)` } : driverPrice,
-            helperRef ? '' : (addStop || ''),
-            helperRef ? { formula: `${helperRef}!H${r}` } : (floor || ''),
-            helperRef ? '' : (arrange || ''),
-            helperRef ? '' : (unload || ''),
-            helperRef ? '' : (fuelPlusOther || ''),
-            { formula: `F${r}+G${r}+H${r}+I${r}+J${r}+K${r}` }, // รวม
+            job.Est_Distance_KM ? Math.round(Number(job.Est_Distance_KM)) : null,
+            price || null,
+            sumKw(extras, KW.addStop) || null,
+            sumKw(extras, KW.floor) || null,
+            sumKw(extras, KW.helper) || null,
+            sumKw(extras, KW.unload) || null,
+            (sumKw(extras, KW.fuel) + sumUnmatched(extras)) || null,
+            { formula: `SUM(F${r}:K${r})` },
         ])
-        if (date) row.getCell(1).numFmt = 'd/m/yyyy'
     })
 
     const lastRow = jobs.length + 1
-    const totalRow = jobs.length + 3
-    ws.getCell(`K${totalRow}`).value = 'รวม'
-    ws.getCell(`L${totalRow}`).value = jobs.length > 0 ? { formula: `SUM(L2:L${lastRow})` } : 0
-    ws.getCell(`K${totalRow + 1}`).value = 'หัก ณ ที่จ่าย 3%'
-    ws.getCell(`L${totalRow + 1}`).value = { formula: `L${totalRow}*0.03` }
-    ws.getCell(`K${totalRow + 2}`).value = 'คงเหลือ'
-    ws.getCell(`L${totalRow + 2}`).value = { formula: `L${totalRow}-L${totalRow + 1}` }
-    ws.getRow(totalRow).font = { bold: true }
+    for (let r = 1; r <= lastRow; r++) {
+        const row = ws.getRow(r)
+        for (let c = 1; c <= DETAIL_HEADERS.length; c++) {
+            const cell = row.getCell(c)
+            cell.border = THIN
+            if (r > 1 && c >= 6) cell.numFmt = MONEY
+            if (r > 1 && c === 4) cell.alignment = { wrapText: true, vertical: 'top' }
+            else if (r > 1) cell.alignment = { vertical: 'top' }
+        }
+    }
 
-    // ความกว้างคอลัมน์อ่านง่าย
+    // ท้ายแท็บตามแม่แบบ: รวม / หัก ณ ที่จ่าย / ค่าโทรศัพท์ (คีย์มือ) / คงเหลือ + บัญชีโอน
+    const totalRow = lastRow + 1
+    const label = (row: number, text: string) => {
+        ws.mergeCells(`J${row}:K${row}`)
+        ws.getCell(`J${row}`).value = text
+        ws.getCell(`J${row}`).font = { bold: true }
+        ws.getCell(`J${row}`).alignment = { horizontal: 'right' }
+    }
+    label(totalRow, 'รวม')
+    ws.getCell(`L${totalRow}`).value = jobs.length > 0 ? { formula: `SUM(L2:L${lastRow})` } : 0
+    label(totalRow + 1, `หัก ณ ที่จ่าย ${whtRate}%`)
+    ws.getCell(`L${totalRow + 1}`).value = { formula: `L${totalRow}*${whtRate}/100` }
+    label(totalRow + 2, 'ค่าโทรศัพท์')
+    label(totalRow + 3, 'คงเหลือ')
+    ws.getCell(`L${totalRow + 3}`).value = { formula: `L${totalRow}-L${totalRow + 1}+L${totalRow + 2}` }
+    for (let r = totalRow; r <= totalRow + 3; r++) {
+        ws.getCell(`L${r}`).numFmt = MONEY
+        ws.getCell(`L${r}`).border = THIN
+        ws.getCell(`L${r}`).font = { bold: r === totalRow || r === totalRow + 3 }
+    }
+
+    if (payee.accountNo) {
+        ws.mergeCells(`C${totalRow + 3}:E${totalRow + 3}`)
+        ws.getCell(`C${totalRow + 3}`).value = payee.accountNo
+        ws.mergeCells(`C${totalRow + 4}:E${totalRow + 4}`)
+        const holder = payee.accountName || payee.name
+        ws.getCell(`C${totalRow + 4}`).value = payee.bankName ? `${holder} (${payee.bankName})` : holder
+    }
+
     ws.getColumn(1).width = 12
-    ws.getColumn(3).width = 10
+    ws.getColumn(2).width = 12
+    ws.getColumn(3).width = 12
     ws.getColumn(4).width = 60
     for (const c of [5, 6, 7, 8, 9, 10, 11, 12]) ws.getColumn(c).width = 12
+    ws.views = [{ state: 'frozen', ySplit: 1 }]
+    return totalRow
+}
+
+/** แท็บสรุปจ่าย — หัวตาราง 2 ชั้น (กลุ่ม "หัก" แตกเป็น 4 คอลัมน์) ตามแม่แบบ */
+function buildSummarySheet(
+    ws: ExcelJS.Worksheet,
+    opts: { payee: CrewPaymentPayee; detailSheet: string; detailTotalRow: number; whtRate: number; claimRate: number; period: string }
+) {
+    const { payee, detailSheet, detailTotalRow, whtRate, claimRate, period } = opts
+
+    ws.mergeCells('A1:Q1')
+    ws.getCell('A1').value = 'แบบฟอร์มสรุปการจ่ายเงินรถร่วมสุราษฎร์ธานี'
+    ws.getCell('A1').font = { bold: true, size: 14 }
+    ws.getCell('A1').alignment = { horizontal: 'center' }
+
+    const singles: [string, string][] = [
+        ['A', 'ลำดับที่'], ['B', 'ผู้รับเงิน/คู่ค้า'], ['C', 'ชื่อ-นามสกุล'], ['D', 'เลขที่บัญชี'],
+        ['E', 'ธนาคาร'], ['F', 'ที่อยู่'], ['G', 'เลขบัตรประชาชน'], ['H', 'รายได้'], ['M', 'คงเหลือ'],
+        ['N', `หัก ณ ที่จ่าย ${whtRate}%`], ['O', 'ยอดโอน'], ['P', 'รอบวันที่'], ['Q', 'หมายเหตุ'], ['R', 'ภงด.'],
+    ]
+    for (const [col, text] of singles) {
+        ws.mergeCells(`${col}2:${col}3`)
+        ws.getCell(`${col}2`).value = text
+    }
+    ws.mergeCells('I2:L2')
+    ws.getCell('I2').value = 'หัก'
+    ;['ค่าเคลม', 'หักค่ารถ', 'ค่าโทรศัพท์', 'อื่นๆ'].forEach((t, i) => {
+        ws.getCell(3, 9 + i).value = t
+    })
+
+    // แถวผู้รับเงิน (แถว 4) — รายได้อ้างอิงยอดรวมแท็บคนขับ
+    const q = `'${detailSheet.replace(/'/g, "''")}'`
+    const r = 4
+    // ช่องว่างต้องเป็น null (ไม่ใช่ '') — สตริงว่างทำสูตรลบเลขเป็น #VALUE!
+    ws.getRow(r).values = [
+        1,
+        null,                                 // ผู้รับเงิน/คู่ค้า (คีย์มือ)
+        payee.accountName || payee.name,      // ชื่อ-นามสกุล
+        payee.accountNo || null,
+        payee.bankName || null,
+        null,                                 // ที่อยู่ (คีย์มือ)
+        payee.idCardNo || null,
+        { formula: `${q}!L${detailTotalRow}` },
+        claimRate > 0 ? { formula: `ROUND(H${r}*${claimRate}/100,2)` } : null, // ค่าเคลม
+        null,                                 // หักค่ารถ (คีย์มือ)
+        // ค่าโทรศัพท์: คีย์มือที่แท็บคนขับจุดเดียว → ดึงมา และ "บวก" เข้ายอด (ไม่อยู่ในฐานหัก ณ ที่จ่าย)
+        { formula: `IF(${q}!L${detailTotalRow + 2}="","",${q}!L${detailTotalRow + 2})` },
+        null,                                 // อื่นๆ (คีย์มือ)
+        { formula: `H${r}-I${r}-J${r}+N(K${r})-L${r}` },
+        { formula: `H${r}*${whtRate}/100` },
+        { formula: `M${r}-N${r}` },
+        period,
+        null, null,
+    ]
+
+    for (let row = 2; row <= r; row++) {
+        for (let c = 1; c <= 18; c++) {
+            const cell = ws.getCell(row, c)
+            cell.border = THIN
+            if (row < r) {
+                cell.font = { bold: true }
+                cell.alignment = { horizontal: 'center', vertical: 'middle', wrapText: true }
+            } else if (c >= 8 && c <= 15) {
+                cell.numFmt = MONEY
+            }
+        }
+    }
+    ws.getCell(`D${r}`).numFmt = '@'
+    ws.getCell(`G${r}`).numFmt = '@'
+
+    const widths = [8, 16, 24, 16, 14, 20, 16, 12, 10, 10, 12, 10, 12, 14, 12, 14, 14, 8]
+    widths.forEach((w, i) => { ws.getColumn(i + 1).width = w })
 }
 
 export async function generateCrewPaymentXlsx(input: {
     jobIds: string[]
-    driverName: string
-    helperName?: string
+    payee: CrewPaymentPayee
+    whtRate?: number
+    claimRate?: number
 }): Promise<{ success: true; filename: string; base64: string } | { success: false; message: string }> {
     try {
-        const { jobIds, driverName } = input
-        const helperName = (input.helperName || '').trim()
+        const { jobIds, payee } = input
+        const whtRate = Number(input.whtRate) >= 0 ? Number(input.whtRate) : 3
+        const claimRate = Number(input.claimRate) || 0
         if (!jobIds || jobIds.length === 0) return { success: false, message: 'ยังไม่ได้เลือกงาน' }
+        if (!payee?.name) return { success: false, message: 'ยังไม่ได้เลือกผู้รับเงิน' }
 
-        const supabase = createAdminClient()
+        const supabase = (await isAdmin()) ? await createAdminClient() : await createClient()
         const { data: jobsRaw, error } = await supabase
             .from('Jobs_Main')
-            .select('Job_ID, Plan_Date, Origin_Location, Dest_Location, Route_Name, Est_Distance_KM, Cost_Driver_Total, Driver_Name, extra_costs_json, original_destinations_json')
+            .select('Job_ID, Plan_Date, Origin_Location, Dest_Location, Route_Name, Est_Distance_KM, Cost_Driver_Total, extra_costs_json, original_destinations_json')
             .in('Job_ID', jobIds)
         if (error) return { success: false, message: error.message }
         const jobs = ((jobsRaw || []) as JobRow[]).sort((a, b) =>
             String(a.Plan_Date || '').localeCompare(String(b.Plan_Date || '')))
         if (jobs.length === 0) return { success: false, message: 'ไม่พบงานที่เลือก' }
 
-        // ธนาคารคนขับ
-        const { data: driver } = await supabase
-            .from('Master_Drivers')
-            .select('Driver_Name, Bank_Name, Bank_Account_No, Bank_Account_Name')
-            .eq('Driver_Name', driverName)
-            .maybeSingle()
-
         const period = fmtPeriod(jobs.map(j => j.Plan_Date || ''))
         const wb = new ExcelJS.Workbook()
-
-        const hasHelper = !!helperName
-        const driverSheetName = safeSheetName(driverName, 'คนขับ')
-        const wsDriver = wb.addWorksheet(driverSheetName)
-        buildDetailSheet(wsDriver, jobs, { splitWithHelper: hasHelper })
-
-        let helperSheetName: string | null = null
-        if (hasHelper) {
-            helperSheetName = safeSheetName(helperName, 'เด็กรถ')
-            if (helperSheetName === driverSheetName) helperSheetName = safeSheetName(`${helperName} (เด็กรถ)`, 'เด็กรถ')
-            const wsHelper = wb.addWorksheet(helperSheetName)
-            buildDetailSheet(wsHelper, jobs, { helperOf: driverSheetName })
-        }
-
-        // ===== แท็บสรุปจ่าย (วางเป็นแท็บแรก) =====
         const wsSum = wb.addWorksheet('สรุปจ่าย')
-        wb.worksheets.unshift(wb.worksheets.pop()!) // ย้ายสรุปจ่ายขึ้นหน้าสุด
+        const detailName = detailSheetName(payee.accountName || payee.name)
+        const wsDetail = wb.addWorksheet(detailName)
 
-        wsSum.mergeCells(1, 1, 1, SUMMARY_HEADERS.length)
-        wsSum.getCell('A1').value = 'แบบฟอร์มสรุปการจ่ายเงินรถร่วมสุราษฎร์ธานี'
-        wsSum.getCell('A1').font = { bold: true, size: 14 }
-        wsSum.getCell('A1').alignment = { horizontal: 'center' }
-        wsSum.addRow(SUMMARY_HEADERS)
-        wsSum.getRow(2).font = { bold: true }
-
-        const recipients: { seq: number; name: string; sheet: string }[] = [
-            { seq: 1, name: driverName, sheet: driverSheetName },
-        ]
-        if (helperSheetName) recipients.push({ seq: 2, name: helperName, sheet: helperSheetName })
-
-        const detailTotalRow = jobs.length + 3 // แถว "รวม" ในแท็บ detail
-        recipients.forEach((rc) => {
-            const r = wsSum.rowCount + 1
-            const q = `'${rc.sheet.replace(/'/g, "''")}'`
-            const isDriver = rc.seq === 1
-            const bank = isDriver ? driver : null
-            wsSum.addRow([
-                rc.seq,
-                '',                                   // ผู้รับเงิน/คู่ค้า (คีย์มือ)
-                bank?.Bank_Account_Name || rc.name,   // ชื่อ-นามสกุล
-                bank?.Bank_Account_No || '',          // เลขที่บัญชี (เด็กรถเว้นให้คีย์)
-                bank?.Bank_Name || '',                // ธนาคาร
-                '',                                   // ที่อยู่ (คีย์มือ)
-                '',                                   // เลขบัตรประชาชน (คีย์มือ)
-                { formula: `${q}!L${detailTotalRow}` },      // รายได้ = ยอดรวมแท็บนั้น
-                '', '', '', '',                        // ค่าเคลม/หักค่ารถ/ค่าประกัน/อื่นๆ (คีย์มือ)
-                { formula: `H${r}-I${r}-J${r}-K${r}-L${r}` }, // คงเหลือ
-                { formula: `M${r}*0.03` },                    // หัก ณ ที่จ่าย 3%
-                { formula: `M${r}-N${r}` },                   // ยอดโอน
-                period,                                // รอบวันที่
-                '', '',                                // หมายเหตุ/ภงด.
-            ])
-        })
-
-        const widths = [8, 16, 24, 16, 14, 20, 16, 12, 10, 10, 12, 10, 12, 14, 12, 14, 14, 8]
-        widths.forEach((w, i) => { wsSum.getColumn(i + 1).width = w })
+        const detailTotalRow = buildDetailSheet(wsDetail, jobs, payee, whtRate)
+        buildSummarySheet(wsSum, { payee, detailSheet: detailName, detailTotalRow, whtRate, claimRate, period })
 
         const buf = await wb.xlsx.writeBuffer()
         const base64 = Buffer.from(buf).toString('base64')
-        const safeDriver = driverName.replace(/[^\p{L}\p{N}]+/gu, '_').slice(0, 30)
-        return { success: true, filename: `จ่ายพนักงาน_${safeDriver}_${period}.xlsx`, base64 }
+        const safeName = payee.name.replace(/[^\p{L}\p{N}]+/gu, '_').slice(0, 30)
+        return { success: true, filename: `จ่ายพนักงาน PCG_${safeName}_${period.replace(/\//g, '.')}.xlsx`, base64 }
     } catch (err) {
         return { success: false, message: err instanceof Error ? err.message : 'สร้างไฟล์ไม่สำเร็จ' }
     }

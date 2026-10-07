@@ -21,6 +21,7 @@ import { Subcontractor } from "@/types/subcontractor"
 import { getBankCode } from "@/lib/constants/banks"
 import { toast } from "sonner"
 import { exportToCSV } from "@/lib/utils/export"
+import { generateCrewPaymentXlsx } from "@/lib/actions/crew-payment-export"
 import { PaymentVoucher } from "@/components/billing/driver/PaymentVoucher"
 import { cn } from "@/lib/utils"
 
@@ -119,6 +120,7 @@ export default function DriverPaymentClient({
   const [vatRate, setVatRate] = useState<number>(0)
   const [whtRate, setWhtRate] = useState<number>(1)
   const [claimRate, setClaimRate] = useState<number>(0)
+  const [crewLoading, setCrewLoading] = useState(false)
   const [entitySearch, setEntitySearch] = useState("")
 
   // Jobs belonging to the chosen recipient (and date range). This is the ONLY
@@ -264,6 +266,38 @@ export default function DriverPaymentClient({
     exportToCSV(rows, `Driver_Payment_${entityName}`)
   }
 
+
+  // ไฟล์จ่ายพนักงานตามแม่แบบ PCG (สรุปจ่าย + แท็บคนขับ; ค่าเด็กรถจ่ายรวมไปกับคนขับ)
+  const handleExportCrewXlsx = async () => {
+    if (selectedData.length === 0) return
+    setCrewLoading(true)
+    try {
+      const info = entityInfo as (Partial<Driver> & Partial<Subcontractor>) | undefined
+      const res = await generateCrewPaymentXlsx({
+        jobIds: selectedData.map(j => j.Job_ID),
+        payee: {
+          name: entityName,
+          accountName: info?.Bank_Account_Name,
+          accountNo: info?.Bank_Account_No,
+          bankName: info?.Bank_Name,
+          idCardNo: info?.ID_Card_No || info?.Tax_ID,
+        },
+        whtRate,
+        claimRate,
+      })
+      if (!res.success) { toast.error(res.message); return }
+      const href = `data:application/vnd.openxmlformats-officedocument.spreadsheetml.sheet;base64,${res.base64}`
+      const link = document.createElement("a")
+      link.href = href
+      link.setAttribute("download", res.filename)
+      document.body.appendChild(link); link.click(); document.body.removeChild(link)
+      toast.success("สร้างไฟล์จ่ายพนักงานแล้ว")
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "สร้างไฟล์ไม่สำเร็จ")
+    } finally {
+      setCrewLoading(false)
+    }
+  }
 
   const entityOptions = mode === 'individual'
     ? drivers.filter(d => !d.Sub_ID).map(d => ({ id: d.Driver_Name || "", label: d.Driver_Name || "-" }))
@@ -556,6 +590,10 @@ export default function DriverPaymentClient({
                     </button>
                     <button onClick={handleExportCSV} className="h-12 px-6 rounded-xl bg-muted/50 border border-border/10 hover:bg-muted transition-all font-bold flex items-center gap-2">
                         <Download size={18} /> Export CSV
+                    </button>
+                    <button onClick={handleExportCrewXlsx} disabled={crewLoading}
+                        className="h-12 px-6 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-600 hover:bg-emerald-500 hover:text-white transition-all font-bold flex items-center gap-2 disabled:opacity-50">
+                        {crewLoading ? <Loader2 size={18} className="animate-spin" /> : <FileDown size={18} />} ไฟล์จ่ายพนักงาน (แม่แบบ PCG)
                     </button>
                 </div>
             </div>
