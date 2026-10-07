@@ -7,6 +7,7 @@ type VoucherJob = {
     Route_Name?: string | null
     Cost_Driver_Total?: number | null
     extra_costs_json?: unknown
+    original_destinations_json?: unknown
 }
 
 type VoucherPayment = {
@@ -52,6 +53,16 @@ function parseExtraCosts(raw: unknown): { type?: string; cost_driver?: number }[
         try { parsed = JSON.parse(parsed) } catch { return [] }
     }
     return Array.isArray(parsed) ? parsed.filter(c => Number(c?.cost_driver) > 0) : []
+}
+
+// ชื่อจุดส่งทั้งหมดของงาน (multi-drop) — Route_Name เก็บแค่ต้นทาง → จุดสุดท้าย
+function dropNames(raw: unknown): string[] {
+    let v = raw
+    for (let i = 0; i < 2 && typeof v === 'string'; i++) {
+        try { v = JSON.parse(v) } catch { return [] }
+    }
+    if (!Array.isArray(v)) return []
+    return v.map(d => String((d as { name?: unknown })?.name ?? '').trim()).filter(Boolean)
 }
 
 /**
@@ -155,6 +166,14 @@ export function PaymentVoucher({ payment: p, jobs, company, bankInfo }: PaymentV
                                     <div className="text-slate-700">
                                         {job.Route_Name || '-'}
                                     </div>
+                                    {(() => {
+                                        const drops = dropNames(job.original_destinations_json)
+                                        return drops.length > 1 ? (
+                                            <div className="text-[10.5px] leading-snug text-slate-500 mt-0.5">
+                                                ส่ง {drops.length} จุด: {drops.join(' · ')}
+                                            </div>
+                                        ) : null
+                                    })()}
                                 </td>
                                 <td className="py-1 px-2 text-right tabular-nums">{money(base)}</td>
                                 <td className="py-1 px-2 text-right tabular-nums">{extraSum > 0 ? money(extraSum) : '-'}</td>
