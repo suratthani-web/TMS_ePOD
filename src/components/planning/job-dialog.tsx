@@ -92,6 +92,37 @@ function generateJobId() {
   return `JOB-${year}${month}${day}-${random}`
 }
 
+// ข้อมูลหลัก (ประเภทรถ/ประเภทค่าใช้จ่าย) โหลดครั้งเดียวต่อหน้า แชร์ทุก JobDialog —
+// หน้าประวัติงาน render dialog ซ่อนไว้ทุกแถว ถ้าแต่ละตัวโหลดเองตอน mount จะได้ server action
+// เป็นร้อยตัวต่อคิว (Next รัน action จาก client ทีละตัว) แล้ว getFreshJob ตอนกดแก้ไขต้องรอท้ายคิว
+// อายุแคช 1 นาที — เพิ่มประเภทใหม่ในหน้าตั้งค่าแล้วกลับมาโดยไม่รีเฟรชก็ยังเห็น
+const MASTER_CACHE_MS = 60_000
+type Cached<T> = { at: number; p: Promise<T> }
+let vehicleTypesCache: Cached<MasterVehicleType[]> | null = null
+let expenseTypesCache: Cached<ExpenseType[]> | null = null
+function loadVehicleTypesOnce() {
+  if (!vehicleTypesCache || Date.now() - vehicleTypesCache.at > MASTER_CACHE_MS) {
+    vehicleTypesCache = {
+      at: Date.now(),
+      p: getVehicleTypes()
+        .then(types => (types || []) as MasterVehicleType[])
+        .catch(() => { vehicleTypesCache = null; return [] }),
+    }
+  }
+  return vehicleTypesCache.p
+}
+function loadExpenseTypesOnce() {
+  if (!expenseTypesCache || Date.now() - expenseTypesCache.at > MASTER_CACHE_MS) {
+    expenseTypesCache = {
+      at: Date.now(),
+      p: getExpenseTypes()
+        .then(types => ((types || []) as ExpenseType[]).filter(et => et.is_active))
+        .catch(() => { expenseTypesCache = null; return [] }),
+    }
+  }
+  return expenseTypesCache.p
+}
+
 export function JobDialog({
   mode = 'create',
   job,
@@ -320,34 +351,34 @@ export function JobDialog({
   const [expenseTypes, setExpenseTypes] = useState<ExpenseType[]>([])
 
   // 3. Effects (Must be after state declarations)
-  // Fetch master vehicle types
+  // Master data: load only once the dialog is actually open (shared cache above).
+  // Deferred a tick so the edit dialog's getFreshJob — which unlocks the form — is
+  // queued ahead of these in the one-at-a-time server-action queue.
   useEffect(() => {
-    getVehicleTypes().then(types => {
-      setMasterVehicleTypes(types || [])
-    })
-  }, [])
-
-  // Fetch expense types from database (active only)
-  useEffect(() => {
-    getExpenseTypes().then(types => {
-      setExpenseTypes((types || []).filter((et: ExpenseType) => et.is_active))
-    })
-  }, [])
+    if (!show) return
+    let alive = true
+    const t = setTimeout(() => {
+      loadVehicleTypesOnce().then(types => { if (alive) setMasterVehicleTypes(types) })
+      loadExpenseTypesOnce().then(types => { if (alive) setExpenseTypes(types) })
+    }, 0)
+    return () => { alive = false; clearTimeout(t) }
+  }, [show])
   // Fetch fuel price for plan date
   useEffect(() => {
-    if (show && formData.Plan_Date) {
+    if (show && !hydrating && formData.Plan_Date) {
         getFuelPrice(formData.Plan_Date).then(data => {
             setFuelPrice(data.price)
             setFuelPriceTomorrow(data.priceTomorrow)
         })
     }
-  }, [show, formData.Plan_Date])
+  }, [show, hydrating, formData.Plan_Date])
 
   // Check for suggested rate
   useEffect(() => {
     const origin = origins[0]
     const destination = destinations[destinations.length - 1]
     
+    if (hydrating) return // รอข้อมูลงานล่าสุดก่อน ไม่ต้องยิงซ้ำ 2 รอบ (สำเนาลิสต์ + สำเนาจริง)
     if (formData.Customer_ID && fuelPrice) {
       setCheckingRate(true)
 
@@ -384,7 +415,7 @@ export function JobDialog({
         setSuggestedRate(null)
         setIsPerPieceMode(false)
     }
-  }, [formData.Customer_ID, formData.Vehicle_Type, origins, destinations, fuelPrice, routes])  // 4. Handlers
+  }, [formData.Customer_ID, formData.Vehicle_Type, origins, destinations, fuelPrice, routes, hydrating])  // 4. Handlers
   const handleSyncFuel = async () => {
     if (isSyncingFuel) return
     setIsSyncingFuel(true)
@@ -442,10 +473,10 @@ export function JobDialog({
         }
     }
 
-    if (show) {
+    if (show && !hydrating) {
         calculateDistance()
     }
-  }, [origins, destinations, show])
+  }, [origins, destinations, show, hydrating])
 
   const handleOptimizeRoute = async () => {
     // Collect all valid points
