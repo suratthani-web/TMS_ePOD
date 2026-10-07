@@ -267,7 +267,7 @@ export default function DriverPaymentClient({
   }
 
 
-  // ไฟล์จ่ายพนักงานตามแม่แบบ PCG (สรุปจ่าย + แท็บคนขับ; ค่าเด็กรถจ่ายรวมไปกับคนขับ)
+  // ไฟล์จ่ายพนักงาน (แบบฟอร์มกลางทุกคนขับ: สรุปจ่าย + แท็บคนขับ; ค่าเด็กรถจ่ายรวมไปกับคนขับ)
   const handleExportCrewXlsx = async () => {
     if (selectedData.length === 0) return
     setCrewLoading(true)
@@ -593,7 +593,7 @@ export default function DriverPaymentClient({
                     </button>
                     <button onClick={handleExportCrewXlsx} disabled={crewLoading}
                         className="h-12 px-6 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-600 hover:bg-emerald-500 hover:text-white transition-all font-bold flex items-center gap-2 disabled:opacity-50">
-                        {crewLoading ? <Loader2 size={18} className="animate-spin" /> : <FileDown size={18} />} ไฟล์จ่ายพนักงาน (แม่แบบ PCG)
+                        {crewLoading ? <Loader2 size={18} className="animate-spin" /> : <FileDown size={18} />} ไฟล์จ่ายพนักงาน (Excel)
                     </button>
                 </div>
             </div>

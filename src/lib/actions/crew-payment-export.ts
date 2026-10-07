@@ -1,11 +1,14 @@
 "use server"
 
 /**
- * สร้างไฟล์ Excel "จ่ายพนักงาน PCG" ตามแม่แบบแอดมิน (2 แท็บ):
+ * สร้างไฟล์ Excel "จ่ายพนักงาน" — แบบฟอร์มกลางใช้กับคนขับทุกคน/ทุกลูกค้า (2 แท็บ):
  *   1) สรุปจ่าย  — แบบฟอร์มสรุปการจ่ายเงินรถร่วม: 1 แถวต่อผู้รับเงิน + หัก(ค่าเคลม/หักค่ารถ/ค่าโทรศัพท์/อื่นๆ)
  *                  + หัก ณ ที่จ่าย + ยอดโอน (สูตร)
  *   2) <ชื่อคนขับ> — 1 แถวต่องาน: ราคา + ค่าใช้จ่ายแยกคอลัมน์ (รวม "ค่าเด็กรถ" — จ่ายรวมไปกับคนขับ)
  *                  + รวม / หัก ณ ที่จ่าย / ค่าโทรศัพท์ / คงเหลือ
+ *
+ * ระยะทาง = ไป-กลับ (Est_Distance_KM เก็บเที่ยวเดียว → ×2 เหมือน sync ชีต MASTER)
+ * ค่าประหยัดน้ำมัน: ไม่คำนวณเอง — มาจากค่าใช้จ่ายเพิ่มเติมที่แอดมินใส่ในงาน หรือคีย์มือในไฟล์
  *
  * ช่องที่ระบบไม่มีข้อมูล (TRACKING/ที่อยู่/หักค่ารถ/ค่าโทรศัพท์/อื่นๆ) เว้นว่างให้แอดมินคีย์มือ
  */
@@ -38,7 +41,7 @@ export type CrewPaymentPayee = {
 
 // keyword จับค่าใช้จ่ายเข้าคอลัมน์ย่อยของแม่แบบ
 const KW = {
-    addStop: ['เพิ่มจุด'],
+    addStop: ['เพิ่มจุด', 'เพิ่มดรอป'],
     floor: ['ขึ้นชั้น', 'แรงงาน', 'ยกของ'],
     helper: ['เด็กรถ'],
     unload: ['ลงสินค้า', 'ลงของ'],
@@ -55,10 +58,9 @@ function sumKw(extras: ExtraCost[], kw: string[]): number {
     return extras.filter(e => kw.some(k => (e.type || '').includes(k)))
         .reduce((s, e) => s + (Number(e.cost_driver) || 0), 0)
 }
-// ค่าที่ไม่เข้ากลุ่มไหน → รวมเข้าคอลัมน์สุดท้าย (ค่าประหยัดน้ำมัน) กันเงินตกหล่น
-function sumUnmatched(extras: ExtraCost[]): number {
-    return extras.filter(e => !ALL_KW.some(k => (e.type || '').includes(k)))
-        .reduce((s, e) => s + (Number(e.cost_driver) || 0), 0)
+// ค่าที่ไม่เข้ากลุ่มไหน (ทางด่วน/งานพ่วง/ตีกลับ ฯลฯ) → รวมเข้าคอลัมน์สุดท้าย กันเงินตกหล่น
+function unmatchedExtras(extras: ExtraCost[]): ExtraCost[] {
+    return extras.filter(e => !ALL_KW.some(k => (e.type || '').includes(k)) && (Number(e.cost_driver) || 0) !== 0)
 }
 
 function allDrops(job: JobRow): string {
@@ -104,9 +106,20 @@ const THIN: Partial<ExcelJS.Borders> = {
     top: { style: 'thin' }, left: { style: 'thin' }, bottom: { style: 'thin' }, right: { style: 'thin' },
 }
 const MONEY = '#,##0.00'
+const YELLOW: ExcelJS.Fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFFFF00' } }
+const RED: ExcelJS.Fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFF0000' } }
+
+function stripTitle(name: string): string {
+    return (name || '').trim().replace(/^(นาย|นางสาว|นาง|น\.ส\.)\s*/, '')
+}
 
 /** แท็บรายละเอียดคนขับ — คืนเลขแถว "รวม" (ให้แท็บสรุปจ่ายอ้างอิง) */
-function buildDetailSheet(ws: ExcelJS.Worksheet, jobs: JobRow[], payee: CrewPaymentPayee, whtRate: number): number {
+function buildDetailSheet(
+    ws: ExcelJS.Worksheet,
+    jobs: JobRow[],
+    payee: CrewPaymentPayee,
+    whtRate: number
+): number {
     ws.addRow(DETAIL_HEADERS)
     const header = ws.getRow(1)
     header.font = { bold: true }
@@ -116,20 +129,25 @@ function buildDetailSheet(ws: ExcelJS.Worksheet, jobs: JobRow[], payee: CrewPaym
         const r = i + 2 // แถวข้อมูลเริ่มที่ 2
         const extras = parseExtras(job.extra_costs_json)
         const price = Number(job.Cost_Driver_Total) || 0
-        ws.addRow([
+        const others = unmatchedExtras(extras)
+        const row = ws.addRow([
             fmtDateTH(job.Plan_Date),
             null, // TRACKING — เว้นให้คีย์มือ
             job.Origin_Location || null,
             allDrops(job),
-            job.Est_Distance_KM ? Math.round(Number(job.Est_Distance_KM)) : null,
+            job.Est_Distance_KM ? Math.round(Number(job.Est_Distance_KM) * 2) : null, // ไป-กลับ
             price || null,
             sumKw(extras, KW.addStop) || null,
             sumKw(extras, KW.floor) || null,
             sumKw(extras, KW.helper) || null,
             sumKw(extras, KW.unload) || null,
-            (sumKw(extras, KW.fuel) + sumUnmatched(extras)) || null,
+            (sumKw(extras, KW.fuel) + others.reduce((s, e) => s + (Number(e.cost_driver) || 0), 0)) || null,
             { formula: `SUM(F${r}:K${r})` },
         ])
+        // แม่แบบไม่มีคอลัมน์ "อื่นๆ" — บอกในโน้ตว่าช่องนี้รวมค่าอะไรมาบ้าง
+        if (others.length > 0) {
+            row.getCell(11).note = 'รวม: ' + others.map(e => `${e.type || 'อื่นๆ'} ${Number(e.cost_driver).toLocaleString()}`).join(', ')
+        }
     })
 
     const lastRow = jobs.length + 1
@@ -164,20 +182,46 @@ function buildDetailSheet(ws: ExcelJS.Worksheet, jobs: JobRow[], payee: CrewPaym
         ws.getCell(`L${r}`).border = THIN
         ws.getCell(`L${r}`).font = { bold: r === totalRow || r === totalRow + 3 }
     }
+    // ไฮไลต์แบบไฟล์ต้นฉบับ: ยอดรวมพื้นเหลือง, ป้ายค่าโทรศัพท์พื้นแดง (ช่องคีย์มือ), คงเหลือตัวแดง
+    ws.getCell(`L${totalRow}`).fill = YELLOW
+    ws.getCell(`J${totalRow + 2}`).fill = RED
+    ws.getCell(`J${totalRow + 2}`).font = { bold: true, color: { argb: 'FFFFFFFF' } }
+    ws.getCell(`L${totalRow + 3}`).font = { bold: true, color: { argb: 'FFFF0000' } }
 
-    if (payee.accountNo) {
-        ws.mergeCells(`C${totalRow + 3}:E${totalRow + 3}`)
-        ws.getCell(`C${totalRow + 3}`).value = payee.accountNo
-        ws.mergeCells(`C${totalRow + 4}:E${totalRow + 4}`)
-        const holder = payee.accountName || payee.name
-        ws.getCell(`C${totalRow + 4}`).value = payee.bankName ? `${holder} (${payee.bankName})` : holder
+    // กล่องบัญชีโอน (เปลี่ยนตามผู้รับเงินที่เลือก): เลขบัญชีแดง + ชื่อบัญชี (ธนาคาร) ตัวใหญ่ พื้นเหลือง
+    const boxTop = totalRow + 2
+    ws.mergeCells(`C${boxTop}:E${boxTop}`)
+    ws.mergeCells(`C${boxTop + 1}:E${boxTop + 1}`)
+    const holder = stripTitle(payee.accountName || payee.name)
+    const acct = ws.getCell(`C${boxTop}`)
+    acct.value = payee.accountNo || null
+    acct.font = { bold: true, size: 16, color: { argb: 'FFFF0000' } }
+    const nameCell = ws.getCell(`C${boxTop + 1}`)
+    nameCell.value = payee.bankName ? `${holder} (${payee.bankName})` : holder
+    nameCell.font = { bold: true, size: 16 }
+    for (const c of [acct, nameCell]) {
+        c.fill = YELLOW
+        c.alignment = { horizontal: 'center', vertical: 'middle' }
     }
+    ws.getRow(boxTop).height = 24
+    ws.getRow(boxTop + 1).height = 24
+
+    // ยอดโอนสุทธิ ตัวใหญ่ พื้นเหลือง ใต้ตาราง (= คงเหลือ)
+    const payRow = totalRow + 5
+    ws.mergeCells(`J${payRow}:K${payRow}`)
+    const pay = ws.getCell(`J${payRow}`)
+    pay.value = { formula: `L${totalRow + 3}` }
+    pay.numFmt = MONEY
+    pay.fill = YELLOW
+    pay.font = { bold: true, size: 14, color: { argb: 'FFFF0000' } }
+    pay.alignment = { horizontal: 'center' }
 
     ws.getColumn(1).width = 12
     ws.getColumn(2).width = 12
     ws.getColumn(3).width = 12
     ws.getColumn(4).width = 60
-    for (const c of [5, 6, 7, 8, 9, 10, 11, 12]) ws.getColumn(c).width = 12
+    for (const c of [5, 6, 7, 8, 9, 10, 12]) ws.getColumn(c).width = 12
+    ws.getColumn(11).width = 16 // ค่าประหยัดน้ำมัน
     ws.views = [{ state: 'frozen', ySplit: 1 }]
     return totalRow
 }
@@ -287,8 +331,8 @@ export async function generateCrewPaymentXlsx(input: {
 
         const buf = await wb.xlsx.writeBuffer()
         const base64 = Buffer.from(buf).toString('base64')
-        const safeName = payee.name.replace(/[^\p{L}\p{N}]+/gu, '_').slice(0, 30)
-        return { success: true, filename: `จ่ายพนักงาน PCG_${safeName}_${period.replace(/\//g, '.')}.xlsx`, base64 }
+        const safeName = payee.name.replace(/[^\p{L}\p{M}\p{N}]+/gu, '_').slice(0, 30)
+        return { success: true, filename: `จ่ายพนักงาน_${safeName}_${period.replace(/\//g, '.')}.xlsx`, base64 }
     } catch (err) {
         return { success: false, message: err instanceof Error ? err.message : 'สร้างไฟล์ไม่สำเร็จ' }
     }
