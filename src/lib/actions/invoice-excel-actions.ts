@@ -37,10 +37,24 @@ const normalizeVehicleType = (v: string) => {
     return v
 }
 
+const ORIGIN_COL_WIDTH = 21.3
+const MIN_TABLE_ROWS = 10 // แถวขั้นต่ำของตารางงาน (รวมแถวว่าง)
+const DEST_COL_WIDTH = 27.7
+
 const asString = (value: unknown) => typeof value === 'string' ? value : value == null ? '' : String(value)
 const asDateInput = (value: unknown): string | number | Date | null => {
     if (typeof value === 'string' || typeof value === 'number' || value instanceof Date) return value
     return null
+}
+
+// ความยาวที่ "กินที่" จริง — สระบน/ล่าง/วรรณยุกต์ไทย (combining marks) ไม่เพิ่มความกว้าง
+const visibleLength = (text: string) => text.replace(/\p{M}/gu, '').length
+
+// ประมาณจำนวนบรรทัดเมื่อ wrap ในคอลัมน์กว้าง `width` (หน่วยความกว้างคอลัมน์ Excel) ที่ฟอนต์ 11pt
+const PLACE_FONT_SIZE = 11
+const estimateLines = (text: string, width: number) => {
+    const perLine = Math.max(8, Math.floor(width * 1.25))
+    return Math.max(1, Math.ceil(visibleLength(text) / perLine))
 }
 
 export async function exportInvoiceExcel(invoiceId: string) {
@@ -92,6 +106,9 @@ export async function exportInvoiceExcel(invoiceId: string) {
         await workbook.xlsx.load(templateBuffer as unknown as ArrayBuffer)
         const worksheet = workbook.getWorksheet(1)
         if (!worksheet) throw new Error("Worksheet not found")
+
+        // ปลายทางกว้างขึ้น (ไฟล์ที่ฝ่ายบัญชีปรับเอง: 19.8 → 27.7) ให้รายชื่อดรอปอ่านได้
+        worksheet.getColumn(6).width = DEST_COL_WIDTH
 
         // 3. Clear Dynamic Range ONLY (Protect Main Headers and Footer)
         // Clear only I7-L7 (Dynamic headers - Only for Lump Sum)
@@ -196,6 +213,18 @@ export async function exportInvoiceExcel(invoiceId: string) {
                     targetCell.style = cell.style
                 })
             }
+        }
+
+        // ล้าง merge ทั้งหมดตั้งแต่แถวข้อมูลลงไป ก่อนเขียนข้อมูล แล้วค่อยสร้างใหม่เฉพาะที่ต้องใช้
+        // insertRows ของ ExcelJS ย้าย merge ระดับเซลล์ตามแถว แต่ไม่อัปเดตดัชนี _merges; และการตั้งค่า
+        // ให้เซลล์ลูกของ merge จะไปเขียนทับเซลล์หลักแทน → ป้ายเซ็นซ้ำ, merge ซ้อน (Excel เปิดไม่ได้), ค่าผิดช่อง
+        const mergeIndex = (worksheet as unknown as { _merges: Record<string, { top: number }> })._merges
+        for (const [addr, range] of Object.entries(mergeIndex)) {
+            if (range.top >= 10) delete mergeIndex[addr]
+        }
+        for (let r = 10; r <= worksheet.rowCount; r++) {
+            const row = worksheet.getRow(r)
+            for (let c = 1; c <= 13; c++) row.getCell(c).unmerge()
         }
 
         // 5. Identify Extra Cost Types (Only for Lump Sum)
@@ -351,11 +380,31 @@ export async function exportInvoiceExcel(invoiceId: string) {
                 summaryTotals[13] += (basePrice + totalRowExtras)
             }
 
-            // Styling for data rows
-            row.eachCell({ includeEmpty: true }, (cell) => {
-                if (Number(cell.col) >= 8) cell.numFmt = '#,##0.00'
-            })
+            // Styling for data rows — ฟอนต์เท่ากันทุกแถว, จัดกึ่งกลางแนวตั้งทั้งแถว,
+            // ต้นทาง/ปลายทาง wrap และสูงตามความยาวข้อความ (งานหลายดรอปไม่โดนตัด)
+            for (let c = 1; c <= 13; c++) {
+                const cell = row.getCell(c)
+                const isPlace = c === 5 || c === 6
+                // เทมเพลตใช้ style object ร่วมกันหลายเซลล์ — clone ก่อน ไม่งั้นแก้เซลล์หนึ่งไปทับอีกเซลล์
+                cell.style = JSON.parse(JSON.stringify(cell.style || {}))
+                cell.font = { ...(cell.font || {}), size: isPlace ? PLACE_FONT_SIZE : 14 }
+                cell.alignment = {
+                    horizontal: c >= 8 ? 'right' : 'center',
+                    vertical: 'middle',
+                    wrapText: isPlace,
+                }
+                if (c >= 8) cell.numFmt = '#,##0.00'
+            }
+            const lines = Math.max(
+                estimateLines(asString(row.getCell(5).value), ORIGIN_COL_WIDTH),
+                estimateLines(asString(row.getCell(6).value), DEST_COL_WIDTH),
+            )
+            row.height = Math.max(30, lines * 14 + 3)
         }
+
+        // แถวว่างของเทมเพลต: คงไว้ให้ตารางมีอย่างน้อย MIN_TABLE_ROWS แถว (งานน้อยเอกสารไม่ดูโล่ง)
+        // ที่เกินจากนั้นซ่อน — ไม่ให้แถวว่างดันส่วนสรุปไปอีกหน้าเมื่องานหลายดรอปสูง
+        for (let r = 10 + Math.max(jobsCount, MIN_TABLE_ROWS); r < summaryBaseRow; r++) worksheet.getRow(r).hidden = true
 
         // 7. Summary and Totals (Precise Fixed Layout)
         const firstDataRow = 10
@@ -369,16 +418,36 @@ export async function exportInvoiceExcel(invoiceId: string) {
         const summaryRow = worksheet.getRow(summaryBaseRow)
         summaryRow.height = 25
         
-        // Label in Col 5 (E)
-        summaryRow.getCell(5).value = "รวมปริมาณคาร์บอนฟรุตพริ้น (kgCO2) "
+        const lastUsedRow = Math.max(worksheet.rowCount, summaryBaseRow + 16)
+        for (let r = summaryBaseRow + 1; r <= lastUsedRow; r++) {
+            const row = worksheet.getRow(r)
+            row.height = 20
+            for (let c = 1; c <= 13; c++) {
+                const cell = row.getCell(c)
+                cell.value = null
+                cell.style = {}
+            }
+        }
+
+        // Label (E:F)
+        safeMergeCells(summaryBaseRow, 5, summaryBaseRow, 6)
+        for (let c = 1; c <= 13; c++) {
+            const cell = summaryRow.getCell(c)
+            cell.style = JSON.parse(JSON.stringify(cell.style || {}))
+        }
+        summaryRow.getCell(2).value = null // เศษ "." จากเทมเพลต
+        summaryRow.getCell(5).value = "รวมปริมาณคาร์บอนฟุตพริ้นท์ (kgCO2e)"
         summaryRow.getCell(5).font = { bold: true, size: 9 }
-        summaryRow.getCell(5).alignment = { horizontal: 'right' }
+        summaryRow.getCell(5).alignment = { horizontal: 'right', vertical: 'middle' }
 
         summaryRow.getCell(7).value = { formula: `SUM(G${firstDataRow}:G${lastDataRow})`, result: finalCO2 }
-        summaryRow.getCell(8).value = { formula: `SUM(H${firstDataRow}:H${lastDataRow})`, result: finalQty }
+        summaryRow.getCell(8).value = { formula: `SUM(H${firstDataRow}:H${lastDataRow})`, result: isPerUnit ? finalQty : summaryTotals[8] }
+        for (let c = 9; c <= 12; c++) {
+            const col = String.fromCharCode(64 + c)
+            summaryRow.getCell(c).value = { formula: `SUM(${col}${firstDataRow}:${col}${lastDataRow})`, result: summaryTotals[c] || 0 }
+        }
         summaryRow.getCell(13).value = { formula: `SUM(M${firstDataRow}:M${lastDataRow})`, result: finalSubtotal }
 
-        // Style cells (ExcelJS handles merges correctly if we target the master cell)
         for (const c of [7, 8, 13]) {
             const cell = summaryRow.getCell(c)
             cell.font = { bold: true, size: 11 }
@@ -386,37 +455,11 @@ export async function exportInvoiceExcel(invoiceId: string) {
             cell.border = { bottom: { style: 'double' } }
         }
 
-        // 7.1 Financial Breakdown (Perfect 100% replica of the reference design)
+        // 7.1 ส่วนสรุปยอด + ช่องเซ็น — สร้างใหม่ทั้งหมดใต้แถวรวม (ล้างพื้นที่ไว้แล้วด้านบน)
         const discountAmount = Math.abs(Number(finalDoc.Discount_Amount || 0))
         const vatAmount = Math.abs(Number(finalDoc.VAT_Amount || 0))
         const vatRate = Number(finalDoc.VAT_Rate || 0)
         const calculatedGrandTotal = finalSubtotal - discountAmount + vatAmount
-        const subtotalRef = `M${summaryBaseRow}`
-
-        // Insert exactly 3 empty rows at summaryBaseRow + 3 for VAT, WHT, and Net Total
-        const vatRowIndex = summaryBaseRow + 3
-        worksheet.insertRows(vatRowIndex, Array(3).fill([]))
-
-        // Shift merges down manually in ExcelJS model
-        shiftMerges(worksheet, vatRowIndex, 3)
-
-        // Clear dynamic merges in the breakdown area (J to M) to prevent overlapping merge issues
-        const clearStart = summaryBaseRow + 2
-        const clearEnd = summaryBaseRow + 6
-        if (worksheet.model.merges) {
-            const mergesToClear = worksheet.model.merges.filter((range: string) => {
-                const parts = range.split(':');
-                const startRow = parseInt(parts[0].replace(/[^0-9]/g, ''), 10);
-                return (startRow >= clearStart && startRow <= clearEnd);
-            });
-            for (const range of mergesToClear) {
-                try {
-                    worksheet.unMergeCells(range)
-                } catch (e) {
-                    // Ignore
-                }
-            }
-        }
 
         const borderStyle = {
             top: { style: 'thin' as const },
@@ -424,174 +467,136 @@ export async function exportInvoiceExcel(invoiceId: string) {
             bottom: { style: 'thin' as const },
             right: { style: 'thin' as const }
         }
-
-        // 1. รวมเป็นเงิน (Subtotal) - Row summaryBaseRow + 1
-        const subRowIndex = summaryBaseRow + 1
-        const subRow = worksheet.getRow(subRowIndex)
-        subRow.height = 15
-        
-        // Ensure no stray values/borders in Columns J-M on the Subtotal row
-        for (let c = 10; c <= 13; c++) {
-            subRow.getCell(c).value = null
-            subRow.getCell(c).fill = { type: 'pattern', pattern: 'none' }
-            subRow.getCell(c).border = {}
+        const RED = 'FFFF0000'
+        // ป้าย H:L (กึ่งกลาง) + ค่าในคอลัมน์ M
+        const writeLine = (r: number, label: string, value: ExcelJS.CellValue, red = false) => {
+            safeMergeCells(r, 8, r, 12)
+            const row = worksheet.getRow(r)
+            const color = { argb: red ? RED : 'FF000000' }
+            const labelCell = row.getCell(8)
+            labelCell.value = label
+            labelCell.font = { bold: true, size: 11, color }
+            labelCell.alignment = { horizontal: 'center', vertical: 'middle' }
+            const valueCell = row.getCell(13)
+            valueCell.value = value
+            valueCell.font = { bold: true, size: 11, color }
+            valueCell.numFmt = '#,##0.00'
+            valueCell.alignment = { horizontal: 'right', vertical: 'middle' }
+            for (let c = 8; c <= 13; c++) row.getCell(c).border = borderStyle
         }
 
-        // 2. ส่วนลด (Discount) - Row summaryBaseRow + 2
-        const discRowIndex = summaryBaseRow + 2
-        const discRow = worksheet.getRow(discRowIndex)
-        discRow.height = 20
-
-        // 2.1 Write Note in Column E (5)
-        if (finalDoc.Notes) {
-            safeMergeCells(discRowIndex, 5, discRowIndex, 8)
-            const noteCell = discRow.getCell(5)
-            noteCell.value = `หมายเหตุ: ${finalDoc.Notes}`
-            noteCell.font = { bold: true, size: 12, color: { argb: 'FFFF0000' } }
-            noteCell.alignment = { horizontal: 'center', vertical: 'middle' }
-        }
-
-        // 2.2 Discount Label & Value
-        const dRate = finalDoc.Discount_Rate || finalDoc.Discount_Percent || 0
-        const dRateLabel = dRate > 0 ? `${dRate}%` : '-%'
-        safeMergeCells(discRowIndex, 10, discRowIndex, 12)
-        const discLabelCell = discRow.getCell(10)
-        discLabelCell.value = `ส่วนลด (Discount) ${dRateLabel}:`
-        discLabelCell.font = { bold: true, size: 11 }
-        discLabelCell.alignment = { horizontal: 'right', vertical: 'middle' }
-
-        const discValueCell = discRow.getCell(13)
-        discValueCell.value = { formula: `-M${summaryBaseRow}*(${Number(dRate)/100})`, result: -discountAmount }
-        discValueCell.font = { bold: true, size: 11, color: { argb: discountAmount > 0 ? 'FFFF0000' : 'FF000000' } }
-        discValueCell.numFmt = '#,##0.00'
-        discValueCell.alignment = { horizontal: 'right', vertical: 'middle' }
-
-        // Apply borders only to J-M cells on the Discount row
-        for (let c = 10; c <= 13; c++) {
-            const cell = discRow.getCell(c)
-            cell.border = borderStyle
-        }
-
-        // 3. ภาษีมูลค่าเพิ่ม (VAT) - Row summaryBaseRow + 3 (Newly inserted)
-        const vatRow = worksheet.getRow(vatRowIndex)
-        vatRow.height = 20
-        safeMergeCells(vatRowIndex, 10, vatRowIndex, 12)
-
-        const vRateLabel = vatRate > 0 ? `${vatRate}%` : '%'
-        const vatLabelCell = vatRow.getCell(10)
-        vatLabelCell.value = `ภาษีมูลค่าเพิ่ม (VAT) ${vRateLabel}:`
-        vatLabelCell.font = { bold: true, size: 11 }
-        vatLabelCell.alignment = { horizontal: 'right', vertical: 'middle' }
-
-        const vatValueCell = vatRow.getCell(13)
-        if (vatRate > 0) {
-            vatValueCell.value = { formula: `(M${summaryBaseRow}+M${discRowIndex})*(${Number(vatRate)/100})`, result: vatAmount }
-        } else {
-            vatValueCell.value = "-"
-        }
-        vatValueCell.font = { bold: true, size: 11 }
-        vatValueCell.numFmt = '#,##0.00'
-        vatValueCell.alignment = { horizontal: 'right', vertical: 'middle' }
-
-        for (let c = 10; c <= 13; c++) {
-            vatRow.getCell(c).border = borderStyle
-        }
-
-        // 4. จำนวนเงินรวมทั้งสิ้น (Grand Total) - Row summaryBaseRow + 4 (Newly inserted)
-        const gtRowIndex = summaryBaseRow + 4
-        const gtRow = worksheet.getRow(gtRowIndex)
-        gtRow.height = 20
-        safeMergeCells(gtRowIndex, 10, gtRowIndex, 12)
-
-        const gtLabelCell = gtRow.getCell(10)
-        gtLabelCell.value = "จำนวนเงินรวมทั้งสิ้น (Grand Total):"
-        gtLabelCell.font = { bold: true, size: 11, color: { argb: 'FFFF0000' } }
-        gtLabelCell.alignment = { horizontal: 'right', vertical: 'middle' }
-
-        const gtValueCell = gtRow.getCell(13)
-        if (vatRate > 0) {
-            gtValueCell.value = { formula: `(M${summaryBaseRow}+M${discRowIndex}+M${vatRowIndex})`, result: calculatedGrandTotal }
-        } else {
-            gtValueCell.value = { formula: `(M${summaryBaseRow}+M${discRowIndex})`, result: finalSubtotal - discountAmount }
-        }
-        gtValueCell.font = { bold: true, size: 11, color: { argb: 'FFFF0000' } }
-        gtValueCell.numFmt = '#,##0.00'
-        gtValueCell.alignment = { horizontal: 'right', vertical: 'middle' }
-
-        for (let c = 10; c <= 13; c++) {
-            gtRow.getCell(c).border = borderStyle
-        }
-
-        // 5. หักภาษี ณ ที่จ่าย (WHT) - Row summaryBaseRow + 5 (Newly inserted)
-        const whtRowIndex = summaryBaseRow + 5
-        const whtRow = worksheet.getRow(whtRowIndex)
-        whtRow.height = 20
-        safeMergeCells(whtRowIndex, 10, whtRowIndex, 12)
-
+        // แสดงเฉพาะรายการที่ระบุตอนสร้างเอกสาร (ส่วนลด/VAT/หัก ณ ที่จ่าย) — ไม่เติมค่าเริ่มต้นเอง
+        // และไม่ให้มียอดรวมซ้ำ: ไม่มีหัก ณ ที่จ่าย → "จำนวนเงินรวมทั้งสิ้น" เป็นบรรทัดสุดท้าย (ไม่มียอดจ่ายสุทธิ)
+        const dRate = Number(finalDoc.Discount_Rate || finalDoc.Discount_Percent || 0)
+        const hasDiscount = discountAmount > 0 || dRate > 0
+        const hasVat = vatRate > 0 || vatAmount > 0
         const wRate = Number(finalDoc.WHT_Rate || 0)
-        const wRateLabel = wRate > 0 ? `${wRate}%` : '1%'
-        const whtLabelCell = whtRow.getCell(10)
-        whtLabelCell.value = `หักภาษี ณ ที่จ่าย (WHT) ${wRateLabel}:`
-        whtLabelCell.font = { bold: true, size: 11, color: { argb: 'FFFF0000' } }
-        whtLabelCell.alignment = { horizontal: 'right', vertical: 'middle' }
-
         const totalBeforeTax = finalSubtotal - discountAmount
-        const whtAmount = (finalDoc.WHT_Amount && Number(finalDoc.WHT_Amount) > 0)
+        const whtAmount = Number(finalDoc.WHT_Amount) > 0
             ? Number(finalDoc.WHT_Amount)
-            : totalBeforeTax * (Number(wRate || 1) / 100)
-        const whtValueCell = whtRow.getCell(13)
-        const whtFormula = vatRate > 0
-            ? `(M${summaryBaseRow}+M${discRowIndex})*(${Number(wRate || 1)/100})`
-            : `M${gtRowIndex}*(${Number(wRate || 1)/100})`
-        whtValueCell.value = { formula: whtFormula, result: whtAmount }
-        whtValueCell.font = { bold: true, size: 11, color: { argb: 'FFFF0000' } }
-        whtValueCell.numFmt = '#,##0.00'
-        whtValueCell.alignment = { horizontal: 'right', vertical: 'middle' }
+            : Math.round(totalBeforeTax * wRate) / 100
+        const hasWht = wRate > 0 || whtAmount > 0
 
-        for (let c = 10; c <= 13; c++) {
-            whtRow.getCell(c).border = borderStyle
+        let nextRow = summaryBaseRow + 1
+        const firstSummaryRow = nextRow
+
+        // หมายเหตุ (A:G ข้างส่วนสรุป)
+        if (finalDoc.Notes) {
+            safeMergeCells(firstSummaryRow, 1, firstSummaryRow + 1, 7)
+            const noteCell = worksheet.getRow(firstSummaryRow).getCell(1)
+            noteCell.value = `หมายเหตุ: ${finalDoc.Notes}`
+            noteCell.font = { bold: true, size: 12, color: { argb: RED } }
+            noteCell.alignment = { horizontal: 'left', vertical: 'middle', wrapText: true }
         }
 
-        // 6. ยอดจ่ายสุทธิ (Net Total) - Row summaryBaseRow + 6 (Newly inserted)
-        const netRowIndex = summaryBaseRow + 6
-        const netRow = worksheet.getRow(netRowIndex)
-        netRow.height = 20
-        // Clear any ghost text shifted from original template row 30 (such as col 9 "จำนวนเงินรวมทั้งสิ้น (Grand Total)")
-        for (let c = 1; c <= 9; c++) {
-            netRow.getCell(c).value = null
-        }
-        safeMergeCells(netRowIndex, 10, netRowIndex, 12)
-
-        const netLabelCell = netRow.getCell(10)
-        netLabelCell.value = "ยอดจ่ายสุทธิ (Net Total):"
-        netLabelCell.font = { bold: true, size: 11 }
-        netLabelCell.alignment = { horizontal: 'right', vertical: 'middle' }
-
-        const calculatedNetTotal = calculatedGrandTotal - whtAmount
-        const netValueCell = netRow.getCell(13)
-        netValueCell.value = { formula: `M${gtRowIndex}-M${whtRowIndex}`, result: calculatedNetTotal }
-        netValueCell.font = { bold: true, size: 11 }
-        netValueCell.numFmt = '#,##0.00'
-        netValueCell.alignment = { horizontal: 'right', vertical: 'middle' }
-
-        // Apply borders only to J-M cells on the Net Total row
-        for (let c = 10; c <= 13; c++) {
-            const cell = netRow.getCell(c)
-            cell.border = borderStyle
+        // ฐานก่อนภาษี = ยอดรวม (+ ส่วนลดที่เป็นค่าติดลบ ถ้ามี)
+        let baseRef = `M${summaryBaseRow}`
+        if (hasDiscount) {
+            const discRow = nextRow++
+            writeLine(discRow, `ส่วนลด (Discount)${dRate > 0 ? ` ${dRate}%` : ''}:`,
+                dRate > 0
+                    ? { formula: `-M${summaryBaseRow}*(${dRate / 100})`, result: -discountAmount }
+                    : -discountAmount, true)
+            baseRef = `(M${summaryBaseRow}+M${discRow})`
         }
 
+        let vatRef = ''
+        if (hasVat) {
+            const vatRow = nextRow++
+            writeLine(vatRow, `ภาษีมูลค่าเพิ่ม (VAT)${vatRate > 0 ? ` ${vatRate}%` : ''}:`,
+                vatRate > 0
+                    ? { formula: `${baseRef}*(${vatRate / 100})`, result: vatAmount }
+                    : vatAmount)
+            vatRef = `+M${vatRow}`
+        }
 
+        const gtRow = nextRow++
+        writeLine(gtRow, 'จำนวนเงินรวมทั้งสิ้น (Grand Total):',
+            { formula: `${baseRef}${vatRef}`, result: calculatedGrandTotal }, true)
 
+        let lastSummaryRow = gtRow
+        if (hasWht) {
+            const whtRow = nextRow++
+            // หัก ณ ที่จ่ายคิดจากยอดก่อน VAT (สูตรเดียวกับฟอร์มสร้างใบแจ้งหนี้)
+            writeLine(whtRow, `หักภาษี ณ ที่จ่าย (WHT)${wRate > 0 ? ` ${wRate}%` : ''}:`,
+                wRate > 0
+                    ? { formula: `ROUND(${baseRef}*${wRate}/100,2)`, result: whtAmount }
+                    : whtAmount, true)
+            const netRow = nextRow++
+            writeLine(netRow, 'ยอดจ่ายสุทธิ (Net Total):',
+                { formula: `M${gtRow}-M${whtRow}`, result: calculatedGrandTotal - whtAmount })
+            lastSummaryRow = netRow
+        }
+        const netRowIndex = lastSummaryRow
 
+        // ช่องเซ็น: ป้ายเดียวต่อช่อง (I:J / L:M) + กล่องเซ็น 2 แถว + วันที่
+        const signLabelRow = netRowIndex + 2
+        worksheet.getRow(netRowIndex + 1).height = 8 // เว้นนิดเดียว ให้ช่องเซ็นอยู่หน้าเดียวกับยอดรวม
+        const signBoxes: [number, number, string][] = [[9, 10, 'ผู้จัดทำ'], [12, 13, 'ผู้รับเอกสาร']]
+        for (const [c1, c2, label] of signBoxes) {
+            safeMergeCells(signLabelRow, c1, signLabelRow, c2)
+            const lab = worksheet.getRow(signLabelRow).getCell(c1)
+            lab.value = label
+            lab.font = { size: 14 }
+            lab.alignment = { horizontal: 'center', vertical: 'middle' }
+            safeMergeCells(signLabelRow + 1, c1, signLabelRow + 2, c2)
+            for (let r = signLabelRow; r <= signLabelRow + 2; r++) {
+                for (let c = c1; c <= c2; c++) worksheet.getRow(r).getCell(c).border = borderStyle
+            }
+            const dateCell = worksheet.getRow(signLabelRow + 3).getCell(c1)
+            dateCell.value = 'วันที่'
+            dateCell.font = { bold: true, size: 14 }
+        }
 
-
-
-
+        // พิมพ์: กว้างพอดี 1 หน้า สูงไม่จำกัด (งานหลายดรอปขึ้นหน้าใหม่ได้ ไม่ย่อจนอ่านไม่ออก)
+        // + หัวตารางซ้ำทุกหน้า
+        worksheet.pageSetup.fitToPage = true
+        worksheet.pageSetup.fitToWidth = 1
+        worksheet.pageSetup.fitToHeight = 0
+        worksheet.pageSetup.printTitlesRow = '7:9'
+        worksheet.pageSetup.printArea = `A1:M${signLabelRow + 3}`
 
         // 8. Static Headers
         // Clear "ต้นฉบับ" (Original) label if it exists in top-right cells (L1, M1)
         worksheet.getCell('L1').value = null
         worksheet.getCell('M1').value = null
+        worksheet.getCell('A1').value = null
+        // "ต้นฉบับ" มุมขวาบนเหนือกรอบ (M1) + หัวเรื่องเต็มความกว้าง A2:M2 กึ่งกลาง มีกรอบ
+        safeMergeCells(1, 1, 1, 12) // แถว 1 (A1:M1 ในเทมเพลต) → A1:L1 ว่าง เหลือ M1 ให้ป้าย
+        const originalCell = worksheet.getCell('M1')
+        originalCell.style = {}
+        originalCell.value = 'ต้นฉบับ'
+        originalCell.font = { bold: true, size: 16 }
+        originalCell.alignment = { horizontal: 'right', vertical: 'bottom' }
+        safeMergeCells(2, 1, 2, 13)
+        const titleCell = worksheet.getCell('A2')
+        titleCell.style = JSON.parse(JSON.stringify(titleCell.style || {}))
+        titleCell.alignment = { horizontal: 'center', vertical: 'middle' }
+        const thin = { style: 'thin' as const }
+        for (let c = 1; c <= 13; c++) {
+            const cell = worksheet.getRow(2).getCell(c)
+            cell.border = { top: thin, bottom: thin, left: c === 1 ? thin : undefined, right: c === 13 ? thin : undefined }
+        }
 
         worksheet.getCell('C3').value = accountingProfile.company_name_th
         worksheet.getCell('C5').value = accountingProfile.address
