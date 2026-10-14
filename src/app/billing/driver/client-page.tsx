@@ -23,7 +23,7 @@ import { toast } from "sonner"
 import { exportToCSV } from "@/lib/utils/export"
 import { formatThaiId } from "@/lib/utils/thai-id"
 import { generateCrewPaymentXlsx } from "@/lib/actions/crew-payment-export"
-import { PaymentVoucher } from "@/components/billing/driver/PaymentVoucher"
+import { PaymentVoucher, voucherPrintCss } from "./print/[id]/payment-voucher"
 import { cn } from "@/lib/utils"
 
 interface ExtraCost { cost_driver: string | number; type: string }
@@ -311,22 +311,29 @@ export default function DriverPaymentClient({
     ? entityOptions.filter(o => o.label.toLowerCase().includes(entitySearch.trim().toLowerCase()))
     : entityOptions
 
+  // ใช้ component เดียวกับหน้า /billing/driver/print/[id] — ตัวอย่างก่อนยืนยันจะหน้าตาตรงกับใบจริง
+  const previewJobs = [...selectedData].sort((a, b) =>
+    (a.Plan_Date || '').localeCompare(b.Plan_Date || '') || a.Job_ID.localeCompare(b.Job_ID))
   const voucher = (
     <PaymentVoucher
-        companyProfile={companyProfile}
-        entityName={entityName}
-        entityInfo={entityInfo ?? null}
-        today={new Date().toLocaleDateString('th-TH', { year: 'numeric', month: 'long', day: 'numeric' })}
-        selectedData={selectedData}
-        selectedSubtotal={selectedSubtotal}
-        selectedWithholding={selectedWithholding}
-        selectedNetTotal={selectedNetTotal}
-        selectedVat={selectedVat}
-        selectedClaim={selectedClaim}
-        vatRate={vatRate}
-        whtRate={whtRate}
-        claimRate={claimRate}
-        t={t}
+        payment={{
+            Driver_Payment_ID: '(ออกเลขเมื่อยืนยัน)',
+            Driver_Name: entityName,
+            Payment_Date: todayTH(),
+            Total_Amount: selectedSubtotal,
+            VAT_Rate: vatRate, VAT_Amount: selectedVat,
+            WHT_Rate: whtRate, Withholding_Tax: selectedWithholding,
+            Claim_Rate: claimRate, Claim_Amount: selectedClaim,
+            Net_Amount: selectedNetTotal,
+        }}
+        jobs={previewJobs}
+        company={companyProfile}
+        bankInfo={{
+            Bank_Name: payeeInfo?.Bank_Name,
+            Bank_Account_No: payeeInfo?.Bank_Account_No,
+            Bank_Account_Name: payeeInfo?.Bank_Account_Name,
+            Payee_Tax_ID: payeeInfo?.ID_Card_No || payeeInfo?.Tax_ID || null,
+        }}
     />
   )
 
@@ -643,6 +650,7 @@ export default function DriverPaymentClient({
     {/* Print */}
     {/* print wrapper: เดิม fixed inset-0 บีบให้เหลือ 1 หน้า — เปลี่ยนเป็น block ปกติให้ไหลข้ามหน้าได้ */}
     <div className="hidden print:block printable-content bg-white p-0">{voucher}</div>
+    <style type="text/css" media="print">{voucherPrintCss}</style>
     </>
   )
 }
