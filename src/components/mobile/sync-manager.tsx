@@ -63,7 +63,7 @@ export function SyncManager() {
     if (pendingCount === 0 && !showSuccess) return null
 
     return (
-        <div className="fixed top-2 left-1/2 -translate-x-1/2 z-[60] w-[90%] max-w-sm">
+        <div className="fixed top-[calc(0.5rem+var(--sat))] left-1/2 -translate-x-1/2 z-[60] w-[90%] max-w-sm">
             <div className={`p-3 rounded-2xl shadow-2xl border backdrop-blur-md flex items-center justify-between gap-4 transition-all duration-500 ${
                 showSuccess ? 'bg-emerald-500/95 border-emerald-400/50 text-white' : 'bg-card/95 border-border text-foreground'
             }`}>

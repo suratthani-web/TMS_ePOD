@@ -64,7 +64,7 @@ export function LocationGate() {
   if (phase === "ok" || phase === "checking") return null
 
   return (
-    <div className="fixed inset-0 z-[300] bg-background flex flex-col items-center justify-center p-8 text-center gap-6">
+    <div className="fixed inset-0 z-[300] bg-background flex flex-col items-center justify-center p-8 pt-[calc(2rem+var(--sat))] pb-[calc(2rem+var(--sab))] text-center gap-6">
       <div className="w-20 h-20 rounded-3xl bg-primary/10 text-primary flex items-center justify-center">
         <MapPin size={40} />
       </div>

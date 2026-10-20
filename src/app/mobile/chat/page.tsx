@@ -199,7 +199,7 @@ export default function MobileChatPage() {
 
 
   return (
-    <div className="fixed inset-0 z-[160] flex flex-col bg-background overflow-hidden">
+    <div className="fixed inset-0 z-[160] flex flex-col bg-background overflow-hidden pt-[var(--sat)] pb-[var(--sab)]">
       <MobileHeader title="แชทกับเจ้าหน้าที่" showBack />
 
       <div className="flex-1 overflow-y-auto p-4 space-y-4 pt-24" ref={scrollRef}>

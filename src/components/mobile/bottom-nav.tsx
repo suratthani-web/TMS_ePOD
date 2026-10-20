@@ -21,7 +21,7 @@ export function BottomNav() {
 
   return (
     <nav
-      className="w-full bg-card border-t border-border px-4 pb-[env(safe-area-inset-bottom)] h-[calc(64px+env(safe-area-inset-bottom))] grid grid-flow-col auto-cols-fr items-center relative z-50"
+      className="w-full bg-card border-t border-border px-4 pb-[var(--sab)] h-[calc(64px+var(--sab))] grid grid-flow-col auto-cols-fr items-center relative z-50"
       style={{ boxShadow: '0 -4px 16px rgba(24,27,24,0.04)', touchAction: 'manipulation' }}
     >
       {navItems.map((item) => {

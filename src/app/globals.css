@@ -597,3 +597,11 @@ body[style*="pointer-events: none"] {
 .dark .font-extrabold,
 .dark .font-bold { font-weight: 600; }
 .dark .tracking-tighter { letter-spacing: -0.01em; }
+
+/* SAFE AREA (notch / Dynamic Island / status bar): Capacitor 8 injects
+   --safe-area-inset-* (old Android WebView reports env() as 0); iOS/PWA uses env().
+   Use var(--sat) / var(--sab) instead of env(). */
+:root {
+  --sat: max(var(--safe-area-inset-top, 0px), env(safe-area-inset-top, 0px));
+  --sab: max(var(--safe-area-inset-bottom, 0px), env(safe-area-inset-bottom, 0px));
+}

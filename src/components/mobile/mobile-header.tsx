@@ -53,7 +53,7 @@ export function MobileHeader({ title, showBack, rightElement }: Props) {
   }
 
   return (
-    <header className="fixed top-0 left-0 right-0 h-[calc(56px+env(safe-area-inset-top))] pt-[env(safe-area-inset-top)] bg-background/80 backdrop-blur-2xl border-b border-border flex items-center justify-between px-6 z-[100] transition-colors duration-300">
+    <header className="fixed top-0 left-0 right-0 h-[calc(56px+var(--sat))] pt-[var(--sat)] bg-background/80 backdrop-blur-2xl border-b border-border flex items-center justify-between px-6 z-[100] transition-colors duration-300">
       <div className="flex items-center gap-4">
         {shouldShowBack && (
             <button

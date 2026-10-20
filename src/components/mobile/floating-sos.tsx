@@ -80,7 +80,7 @@ export function FloatingSOS() {
     }
 
     return (
-        <div className="fixed top-24 right-4 z-[100] flex flex-col items-center">
+        <div className="fixed top-[calc(6rem+var(--sat))] right-4 z-[100] flex flex-col items-center">
             <motion.div
                 onMouseDown={startPress}
                 onMouseUp={cancelPress}

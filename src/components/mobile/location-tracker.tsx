@@ -274,7 +274,7 @@ export function LocationTracker({ driverId }: { driverId?: string, branchId?: st
 
   return (
     <>
-      <div className="fixed top-2 right-2 z-50 pointer-events-none flex flex-col items-end gap-1">
+      <div className="fixed top-[calc(0.5rem+var(--sat))] right-2 z-50 pointer-events-none flex flex-col items-end gap-1">
         {status === "tracking" && (
           <span className="flex h-2 w-2 relative">
             <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
@@ -289,7 +289,7 @@ export function LocationTracker({ driverId }: { driverId?: string, branchId?: st
 
       {/* Warn-only: location permission missing on APK. Work is NOT blocked. */}
       {activeJobId && isNative && locBlocked && (
-        <div className="fixed top-0 inset-x-0 z-40 flex justify-center px-3 pt-[env(safe-area-inset-top)]">
+        <div className="fixed top-0 inset-x-0 z-40 flex justify-center px-3 pt-[var(--sat)]">
           <button
             type="button"
             onClick={() => {
@@ -306,7 +306,7 @@ export function LocationTracker({ driverId }: { driverId?: string, branchId?: st
 
       {/* On PWA, the browser can't track once the app is closed — tell the driver. */}
       {activeJobId && !isNative && (
-        <div className="fixed top-0 inset-x-0 z-40 pointer-events-none flex justify-center px-3 pt-[env(safe-area-inset-top)]">
+        <div className="fixed top-0 inset-x-0 z-40 pointer-events-none flex justify-center px-3 pt-[var(--sat)]">
           <div className="mt-1 flex items-center gap-1.5 rounded-full bg-primary/10 px-3 py-1 text-[11px] font-medium text-primary border border-primary/20">
             <MapPin className="h-3 w-3 shrink-0" />
             <span>กำลังบันทึกตำแหน่งระหว่างส่งงาน — เปิดแอปค้างไว้</span>

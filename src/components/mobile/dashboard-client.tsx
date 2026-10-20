@@ -152,7 +152,7 @@ export function DashboardClient({ session, currentJob, activeJobs = [], gamifica
             variants={container}
             initial="hidden"
             animate="show"
-            className="space-y-4 pb-32 pt-[env(safe-area-inset-top)] px-4"
+            className="space-y-4 pb-32 px-4"
         >
             {/* IDENTITY + SHIFT: header merged into the payload */}
             <motion.div variants={item} className="flex items-center justify-between pt-2">

@@ -20,7 +20,7 @@ export default async function MobileLayout({
   const session = await getDriverSession()
   
   return (
-    <div className="tms-driver flex flex-col h-[100dvh] w-screen overflow-hidden bg-background text-foreground relative">
+    <div className="tms-driver flex flex-col h-[100dvh] w-screen overflow-hidden bg-background text-foreground relative pt-[var(--sat)]">
       <SyncManager />
       <SWUpdater />
       <SessionStabilizer session={session} />
@@ -31,9 +31,9 @@ export default async function MobileLayout({
       {session?.driverId && <RealtimeJobsTrigger driverId={session.driverId} />}
       {session?.driverId && <JobReminder driverId={session.driverId} />}
       
-      {/* pt เผื่อ safe-area (รอยบาก) จุดเดียว → เนื้อหาทุกหน้าเคลียร์ fixed MobileHeader
-          บนเครื่องไม่มีรอยบาก safe-area=0 จึงไม่กระทบ layout เดิม */}
-      <main className="flex-1 overflow-y-auto custom-scrollbar relative z-0 pt-[env(safe-area-inset-top)]">
+      {/* safe-area (รอยบาก/แถบสถานะ) เว้นที่ wrapper ด้านบน ไม่ใช่ใน main ที่ scroll
+          → เลื่อนแล้วเนื้อหาไม่ไหลขึ้นไปซ้อนใต้นาฬิกา/แบต; เครื่องไม่มีรอยบาก --sat=0 */}
+      <main className="flex-1 overflow-y-auto custom-scrollbar relative z-0">
         {children}
       </main>
 

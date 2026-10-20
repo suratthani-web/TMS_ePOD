@@ -88,7 +88,7 @@ export function JobDetailClient({ job, success, initialTab = 'mission', expected
         : job?.original_destinations_json || [];
 
     return (
-        <div className="min-h-full bg-background pb-40 pt-[calc(56px+env(safe-area-inset-top))] relative overflow-hidden flex flex-col">
+        <div className="min-h-full bg-background pb-40 pt-14 relative overflow-hidden flex flex-col">
             <MobileHeader title="รายละเอียดงาน" showBack />
 
             <div className="flex-1 px-4 overflow-y-auto pb-10 pt-4 space-y-4">
@@ -413,7 +413,7 @@ export function JobDetailClient({ job, success, initialTab = 'mission', expected
             </div>
 
             {/* FLOATING ACTION CENTER - RELIABLE POSITIONING */}
-            <div className="fixed bottom-[90px] left-5 right-5 z-[140] animate-in slide-in-from-bottom-10 duration-700">
+            <div className="fixed bottom-[calc(90px+var(--sab))] left-5 right-5 z-[140] animate-in slide-in-from-bottom-10 duration-700">
                 <div className="shadow-lg rounded-2xl bg-background/95 backdrop-blur border border-border overflow-hidden">
 
                     <JobActionButton 
