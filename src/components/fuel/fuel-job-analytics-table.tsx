@@ -30,6 +30,9 @@ type ViewMode = 'job' | 'daily' | 'weekly' | 'monthly'
 export function FuelJobAnalyticsTable({ data }: { data: FuelIntelligenceSummary }) {
   const [viewMode, setViewMode] = useState<ViewMode>('job')
   const [search, setSearch] = useState('')
+  const recon = data.billReconciliation
+  // Bills not landing on any job: no-job vehicles' bills, minus estimates that have no bill behind them
+  const billGap = +(recon.billCost - (data.totalFuelCost - recon.noBillEstimateCost)).toFixed(2)
 
   // Export current view to Excel
   const handleExport = () => {
@@ -47,7 +50,9 @@ export function FuelJobAnalyticsTable({ data }: { data: FuelIntelligenceSummary 
         "เส้นทาง": j.routeName,
         "ระยะทาง (กม.)": j.distanceKm,
         "น้ำมันที่ใช้ (ลิตร)": j.allocatedLiters,
-        "ค่าน้ำมันจัดสรร (บาท)": j.allocatedFuelCost,
+        "ค่าน้ำมันตามระยะ (บาท)": j.directFuelCost,
+        "ส่วนต่าง กม.เปล่ากลับฐาน (บาท)": j.gapFuelCost,
+        "ค่าน้ำมันลงงาน ตามบิล (บาท)": j.allocatedFuelCost,
         "อัตราสิ้นเปลือง (km/L)": j.kmPerLiter,
         "ต้นทุนน้ำมัน/กม. (บาท/กม.)": j.fuelCostPerKm,
         "รายได้ (บาท)": j.revenue,
@@ -64,7 +69,7 @@ export function FuelJobAnalyticsTable({ data }: { data: FuelIntelligenceSummary 
         "ระยะทางรวม (กม.)": d.totalDistanceKm,
         "น้ำมันเติมเข้าถัง (ลิตร)": d.totalRefueledLiters,
         "น้ำมันที่ใช้ (ลิตร)": d.totalConsumedLiters,
-        "ค่าน้ำมันจัดสรรรวม (บาท)": d.totalFuelCost,
+        "ค่าน้ำมันลงงานรวม (บาท)": d.totalFuelCost,
         "อัตราเฉลี่ย (km/L)": d.avgKmPerLiter,
         "ต้นทุน/กม. (บาท/กม.)": d.avgCostPerKm,
         "รายได้รวม (บาท)": d.totalRevenue,
@@ -77,7 +82,7 @@ export function FuelJobAnalyticsTable({ data }: { data: FuelIntelligenceSummary 
         "จำนวนงาน": w.totalJobs,
         "ระยะทางรวม (กม.)": w.totalDistanceKm,
         "น้ำมันที่ใช้ (ลิตร)": w.totalLiters,
-        "ค่าน้ำมันจัดสรรรวม (บาท)": w.totalFuelCost,
+        "ค่าน้ำมันลงงานรวม (บาท)": w.totalFuelCost,
         "อัตราเฉลี่ย (km/L)": w.avgKmPerLiter,
         "รายได้รวม (บาท)": w.totalRevenue,
         "กำไรหลังหักน้ำมัน (บาท)": w.totalProfit
@@ -89,7 +94,7 @@ export function FuelJobAnalyticsTable({ data }: { data: FuelIntelligenceSummary 
         "จำนวนงาน": m.totalJobs,
         "ระยะทางรวม (กม.)": m.totalDistanceKm,
         "น้ำมันที่ใช้ (ลิตร)": m.totalLiters,
-        "ค่าน้ำมันจัดสรรรวม (บาท)": m.totalFuelCost,
+        "ค่าน้ำมันลงงานรวม (บาท)": m.totalFuelCost,
         "อัตราเฉลี่ย (km/L)": m.avgKmPerLiter,
         "รายได้รวม (บาท)": m.totalRevenue,
         "กำไรหลังหักน้ำมัน (บาท)": m.totalProfit
@@ -185,7 +190,22 @@ export function FuelJobAnalyticsTable({ data }: { data: FuelIntelligenceSummary 
   return (
     <div className="space-y-6">
       {/* KPI Highlight Summary Cards */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
+        <PremiumCard className="p-5 bg-background border border-border rounded-2xl relative overflow-hidden">
+          <div className="flex items-center justify-between mb-2">
+            <span className="text-[11px] font-black text-muted-foreground uppercase tracking-widest">บิลน้ำมันจริง</span>
+            <div className="p-2 rounded-xl bg-amber-500/10 text-amber-500">
+              <Fuel size={16} />
+            </div>
+          </div>
+          <p className="text-2xl font-black italic text-amber-500 tracking-tight">
+            ฿{recon.billCost.toLocaleString()}
+          </p>
+          <p className="text-[10px] font-black text-muted-foreground uppercase tracking-wider mt-1">
+            {recon.billCount.toLocaleString()} บิล · {recon.billLiters.toLocaleString()} ลิตร
+          </p>
+        </PremiumCard>
+
         <PremiumCard className="p-5 bg-background border border-border rounded-2xl relative overflow-hidden">
           <div className="flex items-center justify-between mb-2">
             <span className="text-[11px] font-black text-muted-foreground uppercase tracking-widest">ระยะทางรวมทั้งสิ้น</span>
@@ -198,12 +218,13 @@ export function FuelJobAnalyticsTable({ data }: { data: FuelIntelligenceSummary 
           </p>
           <p className="text-[10px] font-black text-muted-foreground uppercase tracking-wider mt-1">
             {data.totalJobs.toLocaleString()} งานขนส่ง
+            {recon.odometerKm > 0 && <> · ไมล์จริง {recon.odometerKm.toLocaleString()} กม.</>}
           </p>
         </PremiumCard>
 
         <PremiumCard className="p-5 bg-background border border-border rounded-2xl relative overflow-hidden">
           <div className="flex items-center justify-between mb-2">
-            <span className="text-[11px] font-black text-muted-foreground uppercase tracking-widest">ค่าน้ำมันจัดสรรรวม</span>
+            <span className="text-[11px] font-black text-muted-foreground uppercase tracking-widest">ค่าน้ำมันลงงานรวม</span>
             <div className="p-2 rounded-xl bg-emerald-500/10 text-emerald-500">
               <DollarSign size={16} />
             </div>
@@ -212,7 +233,7 @@ export function FuelJobAnalyticsTable({ data }: { data: FuelIntelligenceSummary 
             ฿{data.totalFuelCost.toLocaleString()}
           </p>
           <p className="text-[10px] font-black text-muted-foreground uppercase tracking-wider mt-1">
-            {data.totalLiters.toLocaleString()} ลิตร (เฉลี่ย ฿{data.fleetAvgCostPerKm}/กม.)
+            ตามบิลจริง · เฉลี่ย ฿{data.fleetAvgCostPerKm}/กม.งาน
           </p>
         </PremiumCard>
 
@@ -246,6 +267,49 @@ export function FuelJobAnalyticsTable({ data }: { data: FuelIntelligenceSummary 
           </p>
         </PremiumCard>
       </div>
+
+      {/* Bill reconciliation: where the real bill total goes */}
+      {recon.billCost > 0 && (
+        <PremiumCard className="p-4 bg-background border border-border rounded-2xl">
+          <div className="flex items-center gap-2 mb-3">
+            {Math.abs(billGap) < 1 ? <CheckCircle2 size={14} className="text-emerald-500" /> : <AlertCircle size={14} className="text-amber-500" />}
+            <span className="text-[11px] font-black text-muted-foreground uppercase tracking-widest">กระทบยอดบิลจริง</span>
+          </div>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-xs">
+            <div className="rounded-xl bg-muted/40 p-3">
+              <p className="text-[10px] font-black text-muted-foreground">ค่าน้ำมันตามระยะงาน</p>
+              <p className="text-base font-black text-foreground">฿{recon.directJobCost.toLocaleString()}</p>
+              <p className="text-[10px] text-muted-foreground">{recon.jobKmWithBills.toLocaleString()} กม.ตามงาน</p>
+            </div>
+            <div className="rounded-xl bg-amber-500/10 p-3">
+              <p className="text-[10px] font-black text-muted-foreground">ส่วนต่าง กม.เปล่ากลับฐาน</p>
+              <p className="text-base font-black text-amber-600">฿{recon.gapCost.toLocaleString()}</p>
+              <p className="text-[10px] text-muted-foreground">
+                {recon.odometerKm > 0
+                  ? <>ไมล์จริง {recon.odometerKm.toLocaleString()} − งาน {recon.jobKmWithBills.toLocaleString()} = {Math.max(0, +(recon.odometerKm - recon.jobKmWithBills).toFixed(2)).toLocaleString()} กม.</>
+                  : 'กระจายลงงานตามสัดส่วนระยะทาง'}
+              </p>
+            </div>
+            <div className="rounded-xl bg-muted/40 p-3">
+              <p className="text-[10px] font-black text-muted-foreground">บิลช่วงไม่มีงานในระบบ</p>
+              <p className={cn("text-base font-black", recon.noJobVehicleCost > 0 ? "text-rose-500" : "text-foreground")}>฿{recon.noJobVehicleCost.toLocaleString()}</p>
+              <p className="text-[10px] text-muted-foreground truncate" title={recon.noJobVehiclePlates.join(', ')}>
+                {recon.noJobVehiclePlates.length > 0 ? recon.noJobVehiclePlates.join(', ') : 'ไม่มี'} · ไม่ได้ลงงาน
+              </p>
+            </div>
+            <div className="rounded-xl bg-muted/40 p-3">
+              <p className="text-[10px] font-black text-muted-foreground">ประมาณการ (รถไม่มีบิล)</p>
+              <p className="text-base font-black text-foreground">฿{recon.noBillEstimateCost.toLocaleString()}</p>
+              <p className="text-[10px] text-muted-foreground">ไม่อยู่ในยอดบิล</p>
+            </div>
+          </div>
+          <p className="text-[10px] text-muted-foreground mt-3">
+            ค่าน้ำมันลงงาน ฿{data.totalFuelCost.toLocaleString()} = ตามระยะงาน + ส่วนต่าง + ประมาณการ ·
+            บิลจริง ฿{recon.billCost.toLocaleString()} = ตามระยะงาน + ส่วนต่าง + บิลช่วงไม่มีงาน
+            {Math.abs(billGap) >= 1 && <> (ต่างกัน ฿{billGap.toLocaleString()})</>}
+          </p>
+        </PremiumCard>
+      )}
 
       {/* Control Bar: View Mode Switcher + Search + Export */}
       <div className="flex flex-col md:flex-row items-stretch md:items-center justify-between gap-4 bg-background p-4 rounded-2xl border border-border shadow-sm">
@@ -306,9 +370,9 @@ export function FuelJobAnalyticsTable({ data }: { data: FuelIntelligenceSummary 
                   <th className="p-3.5">ลูกค้า / เส้นทาง</th>
                   <th className="p-3.5 text-right">ระยะทาง (กม.)</th>
                   <th className="p-3.5 text-right" title="น้ำมันที่งานนี้ใช้จริง = ระยะทาง ÷ อัตราสิ้นเปลือง (km/L)">น้ำมันที่ใช้ (L)</th>
-                  <th className="p-3.5 text-right" title="ค่าน้ำมันที่ใช้จริงของเที่ยว = ลิตรที่ใช้ × ราคาเฉลี่ยต่อลิตรจริง (ไม่ใช่ยอดเงินในบิลเติม)">
-                    <div>ค่าน้ำมันจัดสรร (฿)</div>
-                    <span className="text-[8px] font-normal text-muted-foreground block -mt-0.5 normal-case">(ตามระยะทาง)</span>
+                  <th className="p-3.5 text-right" title="บิลน้ำมันจริงของรถคันนี้ในช่วงที่เลือก กระจายลงงานตามสัดส่วนระยะทาง (รวม กม.เปล่ากลับฐาน/วันไม่มีงาน) — รถที่ไม่มีบิลใช้ค่าประมาณตามระยะ">
+                    <div>ค่าน้ำมันลงงาน (฿)</div>
+                    <span className="text-[8px] font-normal text-muted-foreground block -mt-0.5 normal-case">(ตามบิลจริง)</span>
                   </th>
                   <th className="p-3.5 text-right">km/L</th>
                   <th className="p-3.5 text-right">รายได้ (฿)</th>
@@ -348,6 +412,11 @@ export function FuelJobAnalyticsTable({ data }: { data: FuelIntelligenceSummary 
                       </td>
                       <td className="p-3.5 text-right font-black text-emerald-500">
                         ฿{j.allocatedFuelCost.toLocaleString()}
+                        {j.gapFuelCost !== 0 && (
+                          <p className="text-[9px] font-bold text-muted-foreground whitespace-nowrap">
+                            ระยะ ฿{j.directFuelCost.toLocaleString()} {j.gapFuelCost >= 0 ? '+' : '−'} เปล่า ฿{Math.abs(j.gapFuelCost).toLocaleString()}
+                          </p>
+                        )}
                       </td>
                       <td className="p-3.5 text-right font-black">
                         <span className={cn(
@@ -390,7 +459,7 @@ export function FuelJobAnalyticsTable({ data }: { data: FuelIntelligenceSummary 
                   <th className="p-3.5 text-right">ระยะทางรวม (กม.)</th>
                   <th className="p-3.5 text-right" title="ยอดรวมลิตรที่แวะเติมเข้าถังรถจากบิลปั๊ม">น้ำมันเติมเข้าถัง (L)</th>
                   <th className="p-3.5 text-right" title="ยอดรวมลิตรที่วิ่งงานใช้ไปจริงตามระยะทาง">น้ำมันที่ใช้ (L)</th>
-                  <th className="p-3.5 text-right" title="ค่าน้ำมันจัดสรรรวมตามระยะทางวิ่งจริงของงานในวัน">ค่าน้ำมันจัดสรรรวม (฿)</th>
+                  <th className="p-3.5 text-right" title="ค่าน้ำมันลงงานรวมตามระยะทางวิ่งจริงของงานในวัน">ค่าน้ำมันลงงานรวม (฿)</th>
                   <th className="p-3.5 text-right">อัตราเฉลี่ย (km/L)</th>
                   <th className="p-3.5 text-right">รายได้รวม (฿)</th>
                   <th className="p-3.5 text-right pr-6" title="กำไรขั้นต้นรวมหลังหักคนขับและน้ำมันจัดสรร">กำไรหลังหักน้ำมัน (฿)</th>
@@ -435,7 +504,7 @@ export function FuelJobAnalyticsTable({ data }: { data: FuelIntelligenceSummary 
                   <th className="p-3.5 text-center">จำนวนงาน</th>
                   <th className="p-3.5 text-right">ระยะทางรวม (กม.)</th>
                   <th className="p-3.5 text-right">น้ำมันที่ใช้รวม (L)</th>
-                  <th className="p-3.5 text-right">ค่าน้ำมันจัดสรรรวม (฿)</th>
+                  <th className="p-3.5 text-right">ค่าน้ำมันลงงานรวม (฿)</th>
                   <th className="p-3.5 text-right">อัตราเฉลี่ย (km/L)</th>
                   <th className="p-3.5 text-right">รายได้รวม (฿)</th>
                   <th className="p-3.5 text-right pr-6">กำไรหลังหักน้ำมัน (฿)</th>
@@ -477,7 +546,7 @@ export function FuelJobAnalyticsTable({ data }: { data: FuelIntelligenceSummary 
                   <th className="p-3.5 text-center">จำนวนงาน</th>
                   <th className="p-3.5 text-right">ระยะทางรวม (กม.)</th>
                   <th className="p-3.5 text-right">น้ำมันที่ใช้รวม (L)</th>
-                  <th className="p-3.5 text-right">ค่าน้ำมันจัดสรรรวม (฿)</th>
+                  <th className="p-3.5 text-right">ค่าน้ำมันลงงานรวม (฿)</th>
                   <th className="p-3.5 text-right">อัตราเฉลี่ย (km/L)</th>
                   <th className="p-3.5 text-right">รายได้รวม (฿)</th>
                   <th className="p-3.5 text-right pr-6">กำไรหลังหักน้ำมัน (฿)</th>

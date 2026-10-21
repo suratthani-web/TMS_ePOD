@@ -3,7 +3,8 @@
 import { createClient, createAdminClient } from '@/utils/supabase/server'
 import { getUserBranchId, getCustomerId, isAdmin } from "@/lib/permissions"
 import { fetchAllRows } from "@/lib/supabase/analytics-helpers"
-import { getWearRates, DEFAULT_WEAR_RATE_PER_KM, type WearRateSource } from "@/lib/supabase/wear-rate"
+import { getWearRates, type WearRateSource } from "@/lib/supabase/wear-rate"
+import { allocateFuelBills, normalizePlate, FUEL_RUN_STATUSES, type FuelBillLog, type RunJob } from "@/lib/fuel/bill-allocation"
 
 export interface TripCost {
   Job_ID: string
@@ -15,34 +16,62 @@ export interface TripCost {
   Driver_Name: string | null
   Vehicle_Plate: string | null
   Job_Status: string
+  /** Revenue = ค่าเที่ยวลูกค้า + extra + ค่าใช้จ่ายอื่นที่เก็บลูกค้า (same basis as the invoice) */
   Cost_Customer_Total: number
+  /** ค่าเที่ยวคนขับ (base) */
   Cost_Driver_Total: number
+  /** ค่าใช้จ่ายอื่นฝั่งคนขับ (เด็กรถ/ขึ้นชั้น/ทางด่วน ฯลฯ) — base + this = Driver_Payments.Total_Amount */
+  extra_cost: number
+  extra_items: { type: string; amount: number }[]
   fuel_real: number
+  fuel_liters: number
+  /** bill = real bills spread by distance; estimate = company truck without bills; subcontract = รถร่วม (fuel is theirs) */
+  fuel_source: 'bill' | 'estimate' | 'subcontract'
   maint_real: number
-  fuel_est: number
-  maint_est: number
   /** ฿/km wear rate applied to this trip and where it came from. */
   maint_rate: number
   maint_rate_source: WearRateSource
   toll_cost: number
-  extra_cost: number
   total_cost: number
   profit: number
   profit_pct: number
+  /** Real km (odometer, bill-to-bill share) when the vehicle has bills; else job km */
   distance_km: number
+  /** Planned/system route distance of the job (Est_Distance_KM) */
+  est_km: number
+  real_km_source: 'odometer' | 'job'
+  drop_count: number
+  drops: string[]
   loaded_qty: number | null
-  fuel_price: number | null
 }
 
 export interface CostSummary {
   totalTrips: number
+  totalDrops: number
   totalRevenue: number
+  totalDriverCost: number
+  totalFuelCost: number
+  totalWearCost: number
   totalCost: number
   totalProfit: number
+  /** Real km where available (odometer), job km otherwise */
   totalDistance: number
+  totalEstKm: number
   avgProfitPerTrip: number
   avgProfitPct: number
   avgCostPerKm: number
+  /** Bills of the vehicles in this report vs what landed on the trips shown */
+  fuelBills: {
+    cost: number
+    count: number
+    liters: number
+    allocatedToTrips: number
+    /** Bills with no job in the system between them and the previous bill */
+    noJobCost: number
+    noJobKm: number
+    noJobCount: number
+    noJobDates: string[]
+  }
 }
 
 type CostTripSourceRow = {
@@ -66,11 +95,8 @@ type CostTripSourceRow = {
   Vehicle_Plate?: string | null
   Job_Status?: string | null
   Loaded_Qty?: number | string | null
-}
-
-type FuelPriceRow = {
-  Date: string
-  Price: number
+  Total_Drop?: number | string | null
+  original_destinations_json?: string | unknown[] | null
 }
 
 export async function getCostPerTrip(startDate?: string, endDate?: string, customerNames?: string[]): Promise<{ trips: TripCost[], summary: CostSummary }> {
@@ -92,7 +118,7 @@ export async function getCostPerTrip(startDate?: string, endDate?: string, custo
   const data = await fetchAllRows<CostTripSourceRow>(() => {
     let query = supabase
       .from('Jobs_Main')
-      .select('Job_ID, Plan_Date, Customer_Name, Route_Name, Origin_Location, Dest_Location, Driver_Name, Vehicle_Plate, Job_Status, Price_Cust_Total, Cost_Driver_Total, Price_Cust_Extra, Cost_Driver_Extra, extra_costs_json, Est_Distance_KM, Loaded_Qty')
+      .select('Job_ID, Plan_Date, Customer_Name, Route_Name, Origin_Location, Dest_Location, Driver_Name, Vehicle_Plate, Job_Status, Price_Cust_Total, Cost_Driver_Total, Price_Cust_Extra, Cost_Driver_Extra, extra_costs_json, Est_Distance_KM, Loaded_Qty, Total_Drop, original_destinations_json')
       // Include Billed/Paid and Verified so completed work that has moved into
       // invoicing/verification still counts toward profitability.
       .in('Job_Status', ['Completed', 'Delivered', 'Finished', 'Closed', 'Billed', 'Paid', 'Verified'])
@@ -109,126 +135,114 @@ export async function getCostPerTrip(startDate?: string, endDate?: string, custo
   })
   if (!data) return { trips: [], summary: emptySummary() }
 
-  // Fetch all unique fuel prices for the relevant dates in one go
   const rows = data as CostTripSourceRow[]
-  const uniqueDates = Array.from(new Set(rows.map((d) => d.Plan_Date).filter(Boolean))) as string[]
   const uniquePlates = Array.from(new Set(rows.map((d) => d.Vehicle_Plate).filter(Boolean))) as string[]
 
-  const { data: fuelData } = await supabase
-    .from('daily_fuel_prices')
-    .select('Date, Price')
-    .in('Date', uniqueDates)
-  
-  const fuelMap = new Map((fuelData as FuelPriceRow[] | null)?.map((f) => [f.Date, f.Price]) || [])
-  
-  // Get latest price as global fallback
-  const { data: latestFuel } = await supabase
-    .from('daily_fuel_prices')
-    .select('Price')
-    .order('Date', { ascending: false })
-    .limit(1)
-    .maybeSingle()
-  const globalFallbackPrice = latestFuel?.Price || 35.0 // Baht/Litre
+  // Fleet-level data (bills, every job of these trucks, wear) is read with the
+  // admin client: a customer/branch-scoped client would hide other customers'
+  // jobs on the same truck and dump that truck's whole bill onto these rows.
+  const admin = createAdminClient()
+  const priorFrom = new Date(new Date(`${start}T00:00:00`).getTime() - 60 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10)
+  const [fuelLogs, priorLogs, runJobs, wearRates] = await Promise.all([
+    uniquePlates.length > 0
+      ? fetchAllRows<FuelBillLog>(() => admin
+          .from('Fuel_Logs')
+          .select('Vehicle_Plate, Date_Time, Price_Total, Liters, Odometer, Trip_Fill_Type')
+          .in('Vehicle_Plate', uniquePlates)
+          .gte('Date_Time', `${start}T00:00:00`)
+          .lte('Date_Time', `${end}T23:59:59`))
+      : Promise.resolve([] as FuelBillLog[]),
+    // Last bill before the period anchors the odometer (bill-to-bill km)
+    uniquePlates.length > 0
+      ? fetchAllRows<FuelBillLog>(() => admin
+          .from('Fuel_Logs')
+          .select('Vehicle_Plate, Date_Time, Price_Total, Liters, Odometer, Trip_Fill_Type')
+          .in('Vehicle_Plate', uniquePlates)
+          .gte('Date_Time', `${priorFrom}T00:00:00`)
+          .lt('Date_Time', `${start}T00:00:00`))
+      : Promise.resolve([] as FuelBillLog[]),
+    // Every job these trucks ran in the period (all customers) — the denominator
+    // for spreading each truck's bills
+    uniquePlates.length > 0
+      ? fetchAllRows<RunJob>(() => admin
+          .from('Jobs_Main')
+          .select('Vehicle_Plate, Plan_Date, Est_Distance_KM')
+          .in('Vehicle_Plate', uniquePlates)
+          .in('Job_Status', FUEL_RUN_STATUSES)
+          .gte('Plan_Date', start)
+          .lte('Plan_Date', end))
+      : Promise.resolve([] as RunJob[]),
+    // Wear (ค่าสึกหรอ) ฿/km per vehicle from the trailing year of completed repairs
+    // + tires, so a big repair is spread over the km it serves instead of hitting
+    // only the trips on the day it was reported.
+    getWearRates(admin, end),
+  ])
 
-  // Fetch actual Fuel Logs for the vehicles & date range
-  let fuelLogs: { Vehicle_Plate: string | null; Date_Time: string | null; Price_Total: number | null; Liters: number | null; Odometer: number | null }[] = []
-  if (uniquePlates.length > 0) {
-    fuelLogs = await fetchAllRows(() => {
-      const fQuery = supabase
-        .from('Fuel_Logs')
-        .select('Vehicle_Plate, Date_Time, Price_Total, Liters, Odometer')
-        .in('Vehicle_Plate', uniquePlates)
-        .gte('Date_Time', `${start}T00:00:00`)
-        .lte('Date_Time', `${end}T23:59:59`)
-      return fQuery
-    })
-  }
+  const { vehicles: vehicleBills, share: billShare } = allocateFuelBills(fuelLogs || [], priorLogs || [], runJobs || [])
 
-  // Wear (ค่าสึกหรอ) ฿/km per vehicle from the trailing year of completed repairs
-  // + tires, so a big repair is spread over the km it serves instead of hitting
-  // only the trips on the day it was reported. Rate tables are read with the
-  // admin client — they're fleet-level, not customer data.
-  const wearRates = await getWearRates(createAdminClient(), end)
-
-  const normalizePlate = (plate?: string | null) => (plate || '').replace(/\s+/g, '').trim()
-
-  // 1. Compute Vehicle-Level Baselines (Actual km/L and unit price from Refuels)
-  const vehicleRefuels = new Map<string, typeof fuelLogs>()
-  for (const log of fuelLogs) {
-    if (!log.Vehicle_Plate) continue
-    const norm = normalizePlate(log.Vehicle_Plate)
-    const list = vehicleRefuels.get(norm) || []
-    list.push(log)
-    vehicleRefuels.set(norm, list)
-  }
-
-  const vehicleEfficiencyMap = new Map<string, { kmPerLiter: number; avgUnitPrice: number }>()
-  vehicleRefuels.forEach((logs, plateNorm) => {
-    const sorted = [...logs].sort((a, b) => (a.Date_Time || '').localeCompare(b.Date_Time || ''))
-    let totalDist = 0
-    let totalLiters = 0
-    let totalCost = 0
-
-    for (let i = 1; i < sorted.length; i++) {
-      const prev = sorted[i - 1]
-      const curr = sorted[i]
-      if (prev.Odometer && curr.Odometer && curr.Odometer > prev.Odometer && (Number(curr.Liters) || 0) > 0) {
-        totalDist += (curr.Odometer - prev.Odometer)
-        totalLiters += Number(curr.Liters) || 0
-      }
-    }
-
-    logs.forEach(l => {
-      totalCost += Number(l.Price_Total) || 0
-      if (!totalLiters) totalLiters += Number(l.Liters) || 0
-    })
-
-    const kmPerLiter = totalDist > 0 && totalLiters > 0 ? +(totalDist / totalLiters).toFixed(2) : 8.5
-    const avgUnitPrice = totalCost > 0 && totalLiters > 0 ? +(totalCost / totalLiters).toFixed(2) : 38.0
-    vehicleEfficiencyMap.set(plateNorm, { kmPerLiter, avgUnitPrice })
+  // Baseline km/L + ฿/L per vehicle — only used for company trucks with no covering bill
+  const vehicleEff = new Map<string, { kmPerLiter: number; unitPrice: number }>()
+  vehicleBills.forEach((b, plate) => {
+    if (b.total.liters > 0) vehicleEff.set(plate, { kmPerLiter: b.total.km > 0 ? b.total.km / b.total.liters : 8.5, unitPrice: b.total.cost / b.total.liters })
   })
 
+  const round2 = (n: number) => Math.round(n * 100) / 100
+
   const trips: TripCost[] = rows.map((d) => {
-    const dist = Number(d.Est_Distance_KM) || 0
+    const estKm = Number(d.Est_Distance_KM) || 0
     const planDate = d.Plan_Date || null
     const loadedQty = Number(d.Loaded_Qty) || 0
-    const normPlate = normalizePlate(d.Vehicle_Plate)
-
-    // Estimates (For reference only)
-    const dailyPrice = planDate ? fuelMap.get(planDate) || 0 : 0
-    const fuelEst = dist > 0 ? dist * 3.5 : 0
-    const maintEst = dist * DEFAULT_WEAR_RATE_PER_KM
-
-    // Real fuel cost: calculated from actual vehicle efficiency (KM/L) & actual unit fuel price
-    const eff = vehicleEfficiencyMap.get(normPlate) || { kmPerLiter: 8.5, avgUnitPrice: 38.0 }
-    let fuelReal = 0
-    if (dist > 0) {
-      const consumedLiters = +(dist / eff.kmPerLiter).toFixed(2)
-      fuelReal = Math.round(consumedLiters * eff.avgUnitPrice)
-    }
-
-    // Wear cost: trip km × the vehicle's actual ฿/km (0 for subcontracted trucks)
     const wear = wearRates.get(d.Vehicle_Plate)
-    const maintReal = Math.round(dist * wear.ratePerKm)
+
+    // Fuel: the truck's real bills spread by distance share. No bill → รถร่วม pays
+    // their own fuel (0); a company truck gets an estimate and is flagged as such.
+    const share = billShare(d.Vehicle_Plate, estKm)
+    let fuelReal: number
+    let fuelLiters: number
+    let fuelSource: TripCost['fuel_source']
+    if (share) {
+      fuelReal = share.fuelCost
+      fuelLiters = share.liters
+      fuelSource = 'bill'
+    } else if (wear.source === 'not_company') {
+      fuelReal = 0
+      fuelLiters = 0
+      fuelSource = 'subcontract'
+    } else {
+      const eff = vehicleEff.get(normalizePlate(d.Vehicle_Plate)) || { kmPerLiter: 8.5, unitPrice: 38 }
+      fuelLiters = estKm > 0 ? round2(estKm / eff.kmPerLiter) : 0
+      fuelReal = round2(fuelLiters * eff.unitPrice)
+      fuelSource = 'estimate'
+    }
+    const realKm = share && share.realKm > 0 ? share.realKm : 0
+
+    // Wear rate is ฿ per job-km (repairs ÷ Est_Distance_KM), so it multiplies job km
+    const maintReal = Math.round(estKm * wear.ratePerKm)
 
     const tollCost = 0
     const driverCost = Number(d.Cost_Driver_Total) || 0
 
     // "ค่าใช้จ่ายอื่นๆ" line items (extra_costs_json) — the driver-cost portion is
     // folded into extra_cost (shown together with ค่าคนขับ), and the customer-charge
-    // portion into revenue, matching the P&L shown in the job dialog.
+    // portion into revenue. base + driver extras = Driver_Payments.Total_Amount.
     const extraItems = parseExtraCosts(d.extra_costs_json ?? d.extra_costs)
     const extraItemsDriver = extraItems.reduce((s, c) => s + (Number(c?.cost_driver) || 0), 0)
     const extraItemsCharge = extraItems.reduce((s, c) => s + (Number(c?.charge_cust) || 0), 0)
+    const extraBreakdown = extraItems
+      .filter(c => (Number(c?.cost_driver) || 0) !== 0)
+      .map(c => ({ type: String(c?.type || 'อื่นๆ'), amount: Number(c?.cost_driver) || 0 }))
+    if (Number(d.Cost_Driver_Extra)) extraBreakdown.push({ type: 'ค่าใช้จ่ายเพิ่ม', amount: Number(d.Cost_Driver_Extra) })
 
     const extraCost = (Number(d.Cost_Driver_Extra) || 0) + extraItemsDriver
 
     const revenue = (Number(d.Price_Cust_Total) || 0) + (Number(d.Price_Cust_Extra) || 0) + extraItemsCharge
-    
-    // Total cost now includes actual allocated fuel and actual maintenance
-    const totalCost = driverCost + fuelReal + maintReal + tollCost + extraCost
+
+    const totalCost = driverCost + extraCost + fuelReal + maintReal + tollCost
     const profit = revenue - totalCost
     const profitPct = revenue > 0 ? (profit / revenue) * 100 : 0
+
+    const drops = parseDrops(d.original_destinations_json, d.Dest_Location)
+    const dropCount = drops.length || Number(d.Total_Drop) || 1
 
     return {
       Job_ID: d.Job_ID || "",
@@ -242,44 +256,82 @@ export async function getCostPerTrip(startDate?: string, endDate?: string, custo
       Job_Status: d.Job_Status || "",
       Cost_Customer_Total: revenue,
       Cost_Driver_Total: driverCost,
+      extra_cost: extraCost,
+      extra_items: extraBreakdown,
       fuel_real: fuelReal,
+      fuel_liters: fuelLiters,
+      fuel_source: fuelSource,
       maint_real: maintReal,
-      fuel_est: fuelEst,
-      maint_est: maintEst,
       maint_rate: wear.ratePerKm,
       maint_rate_source: wear.source,
       toll_cost: tollCost,
-      extra_cost: extraCost,
-      total_cost: totalCost,
-      profit,
+      total_cost: round2(totalCost),
+      profit: round2(profit),
       profit_pct: Math.round(profitPct * 10) / 10,
-      distance_km: dist,
+      distance_km: realKm > 0 ? realKm : estKm,
+      est_km: estKm,
+      real_km_source: realKm > 0 ? 'odometer' : 'job',
+      drop_count: dropCount,
+      drops,
       loaded_qty: loadedQty,
-      fuel_price: (planDate ? fuelMap.get(planDate) : 0) || (loadedQty > 0 ? (revenue / loadedQty) : globalFallbackPrice)
     }
   })
 
+  const sum = (f: (t: TripCost) => number) => round2(trips.reduce((s, t) => s + f(t), 0))
   const totalTrips = trips.length
-  const totalRevenue = trips.reduce((s, t) => s + t.Cost_Customer_Total, 0)
-  const totalCostSum = trips.reduce((s, t) => s + t.total_cost, 0)
-  const totalProfit = totalRevenue - totalCostSum
-  const totalDistance = trips.reduce((s, t) => s + t.distance_km, 0)
+  const totalRevenue = sum(t => t.Cost_Customer_Total)
+  const totalCostSum = sum(t => t.total_cost)
+  const totalProfit = round2(totalRevenue - totalCostSum)
+  const totalDistance = sum(t => t.distance_km)
+
+  let billCost = 0, billCount = 0, billLiters = 0, noJobCost = 0, noJobKm = 0, noJobCount = 0
+  const noJobDates = new Set<string>()
+  vehicleBills.forEach(b => {
+    billCost += b.total.cost; billCount += b.total.count; billLiters += b.total.liters
+    noJobCost += b.uncovered.cost; noJobKm += b.uncovered.km; noJobCount += b.uncovered.count
+    b.uncovered.dates.forEach(d => noJobDates.add(d))
+  })
 
   const summary: CostSummary = {
     totalTrips,
+    totalDrops: sum(t => t.drop_count),
     totalRevenue,
+    totalDriverCost: sum(t => t.Cost_Driver_Total + t.extra_cost),
+    totalFuelCost: sum(t => t.fuel_real),
+    totalWearCost: sum(t => t.maint_real),
     totalCost: totalCostSum,
     totalProfit,
     totalDistance,
+    totalEstKm: sum(t => t.est_km),
     avgProfitPerTrip: totalTrips > 0 ? totalProfit / totalTrips : 0,
     avgProfitPct: totalRevenue > 0 ? (totalProfit / totalRevenue) * 100 : 0,
-    avgCostPerKm: totalDistance > 0 ? totalCostSum / totalDistance : 0
+    avgCostPerKm: totalDistance > 0 ? totalCostSum / totalDistance : 0,
+    fuelBills: {
+      cost: round2(billCost),
+      count: billCount,
+      liters: round2(billLiters),
+      allocatedToTrips: sum(t => (t.fuel_source === 'bill' ? t.fuel_real : 0)),
+      noJobCost: round2(noJobCost),
+      noJobKm: round2(noJobKm),
+      noJobCount,
+      noJobDates: Array.from(noJobDates).sort(),
+    },
   }
 
   return { trips, summary }
 }
 
-function parseExtraCosts(raw: string | unknown[] | null | undefined): { cost_driver?: number | string; charge_cust?: number | string }[] {
+function parseDrops(raw: string | unknown[] | null | undefined, fallback?: string | null): string[] {
+  let v: unknown = raw
+  if (typeof v === 'string') { try { v = JSON.parse(v) } catch { v = null } }
+  if (Array.isArray(v)) {
+    const names = v.map(d => String((d as { name?: unknown })?.name ?? '').trim()).filter(Boolean)
+    if (names.length > 0) return names
+  }
+  return fallback ? [fallback] : []
+}
+
+function parseExtraCosts(raw: string | unknown[] | null | undefined): { type?: string; cost_driver?: number | string; charge_cust?: number | string }[] {
   if (!raw) return []
   try {
     const arr = Array.isArray(raw) ? raw : JSON.parse(String(raw))
@@ -290,5 +342,5 @@ function parseExtraCosts(raw: string | unknown[] | null | undefined): { cost_dri
 }
 
 function emptySummary(): CostSummary {
-  return { totalTrips: 0, totalRevenue: 0, totalCost: 0, totalProfit: 0, totalDistance: 0, avgProfitPerTrip: 0, avgProfitPct: 0, avgCostPerKm: 0 }
+  return { totalTrips: 0, totalDrops: 0, totalRevenue: 0, totalDriverCost: 0, totalFuelCost: 0, totalWearCost: 0, totalCost: 0, totalProfit: 0, totalDistance: 0, totalEstKm: 0, avgProfitPerTrip: 0, avgProfitPct: 0, avgCostPerKm: 0, fuelBills: { cost: 0, count: 0, liters: 0, allocatedToTrips: 0, noJobCost: 0, noJobKm: 0, noJobCount: 0, noJobDates: [] } }
 }

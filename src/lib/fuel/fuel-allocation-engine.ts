@@ -6,6 +6,7 @@ import { cookies } from "next/headers"
 import type { FuelLog } from "@/lib/supabase/fuel"
 import type { Job } from "@/lib/supabase/jobs"
 import { parseExtraCosts } from "@/lib/supabase/analytics-helpers"
+import { allocateFuelBills, normalizePlate, type FuelBillLog, type RunJob } from "@/lib/fuel/bill-allocation"
 
 export interface JobFuelAllocation {
   jobId: string;
@@ -20,6 +21,10 @@ export interface JobFuelAllocation {
   distanceKm: number;
   allocatedLiters: number;
   allocatedFuelCost: number;
+  /** Fuel cost of the trip's own distance (distance ÷ km/L × price) */
+  directFuelCost: number;
+  /** Share of the vehicle's real bills not covered by job distance (empty returns / no-job days) */
+  gapFuelCost: number;
   kmPerLiter: number;
   fuelCostPerKm: number;
   revenue: number;
@@ -64,6 +69,25 @@ export interface MonthlyFuelAggregation {
   totalProfit: number;
 }
 
+export interface FuelBillReconciliation {
+  billCount: number;
+  billCost: number;
+  billLiters: number;
+  /** Odometer span (max − min) of the bills, summed per vehicle */
+  odometerKm: number;
+  /** Job distance of vehicles that have bills (comparable to odometerKm) */
+  jobKmWithBills: number;
+  /** Fuel cost by job distance alone */
+  directJobCost: number;
+  /** Bills − direct cost for vehicles with jobs, spread onto their jobs by distance */
+  gapCost: number;
+  /** Bills with no job in the system since the previous bill — not allocated to any job */
+  noJobVehicleCost: number;
+  noJobVehiclePlates: string[];
+  /** Estimated cost of jobs whose vehicle has no bill (e.g. subcontractors) */
+  noBillEstimateCost: number;
+}
+
 export interface FuelIntelligenceSummary {
   totalJobs: number;
   totalDistanceKm: number;
@@ -74,6 +98,8 @@ export interface FuelIntelligenceSummary {
   totalRevenue: number;
   totalProfit: number;
   avgProfitMarginPct: number;
+  /** Reconciliation against the real refuel bills in the period */
+  billReconciliation: FuelBillReconciliation;
   jobAllocations: JobFuelAllocation[];
   dailyAggregations: DailyFuelAggregation[];
   weeklyAggregations: WeeklyFuelAggregation[];
@@ -321,6 +347,8 @@ export async function getFuelIntelligenceAnalytics(
       distanceKm: dist,
       allocatedLiters: consumedLiters,
       allocatedFuelCost: fuelCost,
+      directFuelCost: fuelCost,
+      gapFuelCost: 0,
       kmPerLiter,
       fuelCostPerKm,
       revenue,
@@ -329,6 +357,78 @@ export async function getFuelIntelligenceAnalytics(
       profitMarginPct
     });
   }
+
+  // 4b. Reconcile with real bills (shared with the Trip Performance report).
+  // Job distance misses empty returns to base, so distance-based cost undershoots
+  // the bills. Bills with a job in their window are spread over the vehicle's
+  // jobs by distance share; bills from stretches with no job in the system stay
+  // unallocated and are reported separately.
+  let priorQuery = supabase
+    .from('Fuel_Logs')
+    .select('Vehicle_Plate, Date_Time, Price_Total, Liters, Odometer, Trip_Fill_Type')
+    .gte('Date_Time', `${new Date(new Date(`${start}T00:00:00`).getTime() - 60 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10)}T00:00:00`)
+    .lt('Date_Time', `${start}T00:00:00`);
+  if (effectiveBranch && effectiveBranch !== 'All') priorQuery = priorQuery.eq('Branch_ID', effectiveBranch);
+  if (selectedVehicles && selectedVehicles.length > 0) priorQuery = priorQuery.in('Vehicle_Plate', selectedVehicles);
+  const { data: priorLogs } = await priorQuery;
+
+  const { vehicles: vehicleBills, share: billShare } = allocateFuelBills(
+    rawFuelLogs,
+    (priorLogs || []) as FuelBillLog[],
+    rawJobs as RunJob[],
+  );
+
+  const vehicleDirectCost = new Map<string, number>();
+  for (const a of jobAllocations) {
+    const p = normalizePlate(a.vehiclePlate);
+    vehicleDirectCost.set(p, (vehicleDirectCost.get(p) || 0) + a.directFuelCost);
+  }
+
+  for (const a of jobAllocations) {
+    const share = billShare(a.vehiclePlate, a.distanceKm);
+    if (!share) continue; // no covering bill → keep estimate
+    a.allocatedFuelCost = share.fuelCost;
+    a.gapFuelCost = +(a.allocatedFuelCost - a.directFuelCost).toFixed(2);
+    a.fuelCostPerKm = a.distanceKm > 0 ? +(a.allocatedFuelCost / a.distanceKm).toFixed(2) : 0;
+    a.netProfit = +(a.revenue - a.driverCost - a.allocatedFuelCost).toFixed(2);
+    a.profitMarginPct = a.revenue > 0 ? +((a.netProfit / a.revenue) * 100).toFixed(1) : 0;
+  }
+
+  const billReconciliation: FuelBillReconciliation = {
+    billCount: rawFuelLogs.length,
+    billCost: 0,
+    billLiters: 0,
+    odometerKm: 0,
+    jobKmWithBills: 0,
+    directJobCost: +jobAllocations.reduce((s, j) => s + j.directFuelCost, 0).toFixed(2),
+    gapCost: 0,
+    noJobVehicleCost: 0,
+    noJobVehiclePlates: [],
+    noBillEstimateCost: 0,
+  };
+  vehicleBills.forEach((v, plate) => {
+    billReconciliation.billCost += v.total.cost;
+    billReconciliation.billLiters += v.total.liters;
+    if (v.covered.cost > 0) {
+      billReconciliation.odometerKm += v.covered.km;
+      billReconciliation.jobKmWithBills += v.jobKm;
+      billReconciliation.gapCost += v.covered.cost - (vehicleDirectCost.get(plate) || 0);
+    }
+    if (v.uncovered.cost > 0) {
+      billReconciliation.noJobVehicleCost += v.uncovered.cost;
+      billReconciliation.noJobVehiclePlates.push(`${plate} (${v.uncovered.dates.map(d => d.slice(8, 10) + '/' + d.slice(5, 7)).join(', ')})`);
+    }
+  });
+  vehicleDirectCost.forEach((cost, plate) => {
+    if (!((vehicleBills.get(plate)?.covered.cost || 0) > 0)) billReconciliation.noBillEstimateCost += cost;
+  });
+  billReconciliation.billCost = +billReconciliation.billCost.toFixed(2);
+  billReconciliation.billLiters = +billReconciliation.billLiters.toFixed(2);
+  billReconciliation.odometerKm = +billReconciliation.odometerKm.toFixed(2);
+  billReconciliation.jobKmWithBills = +billReconciliation.jobKmWithBills.toFixed(2);
+  billReconciliation.gapCost = +billReconciliation.gapCost.toFixed(2);
+  billReconciliation.noJobVehicleCost = +billReconciliation.noJobVehicleCost.toFixed(2);
+  billReconciliation.noBillEstimateCost = +billReconciliation.noBillEstimateCost.toFixed(2);
 
   // 5. Daily Aggregation
   const dailyMap = new Map<string, DailyFuelAggregation>();
@@ -471,6 +571,7 @@ export async function getFuelIntelligenceAnalytics(
     totalRevenue,
     totalProfit,
     avgProfitMarginPct,
+    billReconciliation,
     jobAllocations,
     dailyAggregations,
     weeklyAggregations,

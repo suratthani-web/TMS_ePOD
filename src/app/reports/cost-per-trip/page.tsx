@@ -21,6 +21,16 @@ function formatMoney(n: number) {
   return n.toLocaleString('th-TH', { minimumFractionDigits: 0, maximumFractionDigits: 0 })
 }
 
+function formatKm(n: number) {
+  return (n || 0).toLocaleString('th-TH', { maximumFractionDigits: 0 })
+}
+
+const FUEL_SOURCE_LABEL = {
+  bill: 'บิลจริง',
+  estimate: 'ประมาณ (ไม่มีบิล)',
+  subcontract: 'รถร่วม',
+} as const
+
 interface PageProps {
   searchParams: Promise<{ 
     start?: string; 
@@ -85,19 +95,24 @@ export default async function CostPerTripPage(props: PageProps) {
           <div className="bg-card rounded-2xl border border-border p-5 shadow-sm">
             <p className="text-sm font-medium text-muted-foreground mb-1">จำนวนเที่ยว</p>
             <p className="text-3xl font-semibold text-foreground">{summary.totalTrips}</p>
+            <p className="text-sm font-medium text-muted-foreground mt-1">{summary.totalDrops.toLocaleString()} ดรอป</p>
           </div>
           <div className="bg-card rounded-2xl border border-border p-5 shadow-sm">
-            <p className="text-sm font-medium text-muted-foreground mb-1">ระยะทางรวม</p>
-            <p className="text-2xl font-semibold text-foreground">{(summary.totalDistance || 0).toLocaleString()} KM</p>
-            <p className="text-sm font-medium text-muted-foreground mt-1">฿{summary.avgCostPerKm.toFixed(2)} / KM</p>
+            <p className="text-sm font-medium text-muted-foreground mb-1">ระยะทางรวม (ไมล์จริง)</p>
+            <p className="text-2xl font-semibold text-foreground">{formatKm(summary.totalDistance)} KM</p>
+            <p className="text-sm font-medium text-muted-foreground mt-1">ตามงาน {formatKm(summary.totalEstKm)} KM · ฿{summary.avgCostPerKm.toFixed(2)}/KM</p>
           </div>
           <div className="bg-card rounded-2xl border border-border p-5 shadow-sm">
             <p className="text-sm font-medium text-muted-foreground mb-1">รายได้รวม</p>
             <p className="text-2xl font-semibold text-primary">฿{formatMoney(summary.totalRevenue)}</p>
+            <p className="text-sm font-medium text-muted-foreground mt-1">฿{formatMoney(summary.totalTrips > 0 ? summary.totalRevenue / summary.totalTrips : 0)} / เที่ยว</p>
           </div>
           <div className="bg-card rounded-2xl border border-border p-5 shadow-sm">
             <p className="text-sm font-medium text-muted-foreground mb-1">ต้นทุนรวม</p>
             <p className="text-2xl font-semibold text-red-500">฿{formatMoney(summary.totalCost)}</p>
+            <p className="text-xs font-medium text-muted-foreground mt-1 leading-relaxed">
+              คนขับ ฿{formatMoney(summary.totalDriverCost)} · น้ำมัน ฿{formatMoney(summary.totalFuelCost)} · สึกหรอ ฿{formatMoney(summary.totalWearCost)}
+            </p>
           </div>
           <div className={`rounded-2xl border p-5 shadow-sm ${summary.totalProfit >= 0 ? 'bg-emerald-500/10 border-emerald-500/20' : 'bg-red-500/10 border-red-500/20'}`}>
             <p className="text-sm font-medium text-muted-foreground mb-1">กำไรรวม</p>
@@ -114,9 +129,22 @@ export default async function CostPerTripPage(props: PageProps) {
         <div className="bg-card rounded-2xl border border-border shadow-sm overflow-hidden">
           <div className="px-6 py-4 border-b border-border bg-muted/30 flex flex-col lg:flex-row lg:justify-between lg:items-center gap-3">
             <h2 className="font-semibold text-foreground">รายละเอียดกำไร-ขาดทุนรายเที่ยว</h2>
-            <div className="text-xs font-medium text-amber-600 dark:text-amber-400 bg-amber-500/10 px-3 py-1 rounded-xl">
-              * ต้นทุนคาดการณ์ (น้ำมัน/ซ่อมบำรุง) ใช้เป็นข้อมูลอ้างอิงเท่านั้น และไม่ถูกนำมาหักลบในกำไรจริง<br />
-              * ค่าสึกหรอ(จริง) = ระยะทาง × อัตรา ฿/กม. ของรถคันนั้น (ค่าซ่อมที่ปิดงานแล้ว + ค่ายาง ย้อนหลัง 12 เดือน ÷ กม.ที่วิ่ง); รถที่ข้อมูลยังไม่พอใช้ค่าเฉลี่ยกองรถ หรือค่าตั้งต้น {DEFAULT_WEAR_RATE_PER_KM} ฿/กม.
+            <div className="text-xs font-medium text-amber-700 dark:text-amber-400 bg-amber-500/10 px-3 py-1.5 rounded-xl leading-relaxed">
+              * ค่าคนขับ = ค่าเที่ยว + ค่าใช้จ่ายอื่นฝั่งคนขับ (เด็กรถ/ขึ้นชั้น/ทางด่วน ฯลฯ) — ยอดเดียวกับใบทำจ่ายคนขับ (ก่อนหัก ณ ที่จ่าย)<br />
+              * น้ำมัน = บิลเติมจริงของรถคันนั้นที่มีงานอยู่ระหว่างบิลก่อนหน้ากับบิลนั้น กระจายลงงานตามสัดส่วนระยะทาง (รวมขาวิ่งเปล่ากลับฐาน); รถร่วม = 0 (น้ำมันเป็นของรถร่วม)<br />
+              * ระยะทาง = ไมล์จริงจากบิลชนบิล (เลขไมล์บิลนี้ − บิลก่อนหน้า) ของบิลชุดเดียวกัน กระจายตามสัดส่วนระยะงาน; รถที่ไม่มีบิลใช้ระยะตามงาน<br />
+              * ค่าสึกหรอ = ระยะตามงาน × อัตรา ฿/กม. ของรถคันนั้น (ค่าซ่อมที่ปิดงาน + ค่ายาง ย้อนหลัง 12 เดือน); ข้อมูลไม่พอใช้ค่าเฉลี่ยกองรถ หรือค่าตั้งต้น {DEFAULT_WEAR_RATE_PER_KM} ฿/กม.
+              {summary.fuelBills.count > 0 && (
+                <>
+                  <br />* บิลน้ำมันของรถในรายงาน ฿{formatMoney(summary.fuelBills.cost)} ({summary.fuelBills.count} บิล, {summary.fuelBills.liters.toLocaleString()} ลิตร) · ลงเที่ยวในตารางนี้ ฿{formatMoney(summary.fuelBills.allocatedToTrips)}
+                  {summary.fuelBills.noJobCost > 0 && (
+                    <> · <span className="font-semibold text-red-600 dark:text-red-400">ไม่มีงานในระบบ ฿{formatMoney(summary.fuelBills.noJobCost)} ({summary.fuelBills.noJobCount} บิล, {formatKm(summary.fuelBills.noJobKm)} กม.; {summary.fuelBills.noJobDates.map(d => d.slice(8, 10) + '/' + d.slice(5, 7)).join(', ')})</span> — รถวิ่งแต่ไม่มีงาน ควรตรวจว่าลืมเปิดงาน (รายได้หาย) หรือใช้นอกงาน</>
+                  )}
+                  {Math.abs(summary.fuelBills.cost - summary.fuelBills.allocatedToTrips - summary.fuelBills.noJobCost) >= 1 && (
+                    <> · ส่วนที่เหลือ ฿{formatMoney(summary.fuelBills.cost - summary.fuelBills.allocatedToTrips - summary.fuelBills.noJobCost)} เป็นของงานที่ยังไม่ปิด / ลูกค้าอื่นบนรถคันเดียวกัน</>
+                  )}
+                </>
+              )}
             </div>
           </div>
 
@@ -132,14 +160,13 @@ export default async function CostPerTripPage(props: PageProps) {
                   <tr className="bg-muted/95 backdrop-blur-md text-xs font-medium text-muted-foreground border-b border-border">
                     <th className="text-left px-4 py-4 font-medium">วันที่ / งาน</th>
                     <th className="text-left px-4 py-4 font-medium">ลูกค้า / เส้นทาง</th>
-                    <th className="text-right px-4 py-4 font-medium">ระยะทาง</th>
+                    <th className="text-center px-4 py-4 font-medium">ดรอป</th>
+                    <th className="text-right px-4 py-4 font-medium">ระยะทาง (ไมล์จริง)</th>
                     <th className="text-right px-4 py-4 font-medium text-primary">รายได้</th>
                     <th className="text-right px-4 py-4 font-medium">ค่าคนขับ</th>
-                    <th className="text-right px-4 py-4 font-medium">น้ำมัน(จริง)</th>
-                    <th className="text-right px-4 py-4 font-medium text-amber-600 dark:text-amber-400">น้ำมัน(อ้างอิง)</th>
-                    <th className="text-right px-4 py-4 font-medium">ค่าสึกหรอ(จริง)</th>
-                    <th className="text-right px-4 py-4 font-medium text-amber-600 dark:text-amber-400">ซ่อมบำรุง(อ้างอิง)</th>
-                    <th className="text-right px-4 py-4 font-medium text-red-500">ต้นทุนรวม(จริง)</th>
+                    <th className="text-right px-4 py-4 font-medium">น้ำมัน (บิลจริง)</th>
+                    <th className="text-right px-4 py-4 font-medium">ค่าสึกหรอ</th>
+                    <th className="text-right px-4 py-4 font-medium text-red-500">ต้นทุนรวม</th>
                     <th className="text-right px-4 py-4 font-medium">กำไร</th>
                   </tr>
                 </thead>
@@ -152,7 +179,7 @@ export default async function CostPerTripPage(props: PageProps) {
                       <React.Fragment key={trip.Job_ID}>
                         {showDateHeader && (
                           <tr className="bg-muted/80 sticky top-[52px] z-20 backdrop-blur-sm">
-                            <td colSpan={11} className="px-6 py-2.5">
+                            <td colSpan={10} className="px-6 py-2.5">
                               <div className="flex items-center gap-2 text-muted-foreground font-medium text-xs">
                                 <Calendar size={14} className="text-muted-foreground" />
                                 {trip.Plan_Date ? new Date(trip.Plan_Date + 'T00:00:00').toLocaleDateString('th-TH', { day: 'numeric', month: 'long', year: 'numeric' }) : 'ไม่ระบุวันที่'}
@@ -179,25 +206,49 @@ export default async function CostPerTripPage(props: PageProps) {
                             </div>
                           </td>
                           <td className="px-4 py-4">
-                            <p className="font-semibold text-foreground max-w-[200px] truncate">{trip.Customer_Name || '-'}</p>
-                            <span className="flex items-center gap-1 text-xs font-medium text-muted-foreground truncate opacity-80">
-                              <MapPin size={10} /> {trip.Route_Name || '-'}
+                            <p className="font-semibold text-foreground max-w-[260px] truncate">{trip.Customer_Name || '-'}</p>
+                            <span
+                              className="flex items-start gap-1 text-xs font-medium text-muted-foreground opacity-80 max-w-[260px] line-clamp-2"
+                              title={[trip.Origin_Location, ...trip.drops].filter(Boolean).join(' → ')}
+                            >
+                              <MapPin size={10} className="mt-0.5 shrink-0" />
+                              {trip.drops.length > 0
+                                ? [trip.Origin_Location, ...trip.drops].filter(Boolean).join(' → ')
+                                : (trip.Route_Name || '-')}
                             </span>
                           </td>
-                          <td className="px-4 py-4 text-right font-medium text-muted-foreground">
-                            {trip.distance_km.toLocaleString()} KM
+                          <td className="px-4 py-4 text-center">
+                            <span className="inline-flex min-w-7 justify-center rounded-lg bg-muted px-2 py-0.5 text-xs font-semibold text-foreground border border-border">
+                              {trip.drop_count}
+                            </span>
+                          </td>
+                          <td className="px-4 py-4 text-right font-medium text-foreground whitespace-nowrap">
+                            {formatKm(trip.distance_km)} KM
+                            <div className="text-[10px] text-muted-foreground">
+                              {trip.real_km_source === 'odometer' ? `ตามงาน ${formatKm(trip.est_km)} กม.` : 'ตามงาน (ไม่มีบิล)'}
+                            </div>
                           </td>
                           <td className="px-4 py-4 text-right font-semibold text-primary whitespace-nowrap">
                             ฿{formatMoney(trip.Cost_Customer_Total)}
                           </td>
-                          <td className="px-4 py-4 text-right text-foreground whitespace-nowrap font-medium">
+                          <td
+                            className="px-4 py-4 text-right text-foreground whitespace-nowrap font-medium"
+                            title={[`ค่าเที่ยว ฿${formatMoney(trip.Cost_Driver_Total)}`, ...trip.extra_items.map(e => `${e.type} ฿${formatMoney(e.amount)}`)].join('\n')}
+                          >
                             ฿{formatMoney(trip.Cost_Driver_Total + trip.extra_cost)}
+                            {trip.extra_cost !== 0 && (
+                              <div className="text-[10px] text-muted-foreground font-normal">
+                                เที่ยว ฿{formatMoney(trip.Cost_Driver_Total)} + {trip.extra_items.map(e => `${e.type.replace(/^ค่า/, '')} ฿${formatMoney(e.amount)}`).join(' + ')}
+                              </div>
+                            )}
                           </td>
                           <td className="px-4 py-4 text-right text-foreground whitespace-nowrap">
                             ฿{formatMoney(trip.fuel_real)}
-                          </td>
-                          <td className="px-4 py-4 text-right text-amber-600 dark:text-amber-400 whitespace-nowrap text-sm">
-                            ฿{formatMoney(trip.fuel_est)}
+                            <div className={`text-[10px] ${trip.fuel_source === 'estimate' ? 'text-amber-600 dark:text-amber-400' : 'text-muted-foreground'}`}>
+                              {trip.fuel_source === 'subcontract'
+                                ? FUEL_SOURCE_LABEL.subcontract
+                                : `${trip.fuel_liters.toLocaleString('th-TH', { maximumFractionDigits: 1 })} ลิตร · ${FUEL_SOURCE_LABEL[trip.fuel_source]}`}
+                            </div>
                           </td>
                           <td className="px-4 py-4 text-right text-foreground whitespace-nowrap">
                             ฿{formatMoney(trip.maint_real)}
@@ -206,9 +257,6 @@ export default async function CostPerTripPage(props: PageProps) {
                                 ? 'รถร่วม/อิสระ'
                                 : `${trip.maint_rate.toFixed(2)} ฿/กม. · ${WEAR_SOURCE_LABEL[trip.maint_rate_source]}`}
                             </div>
-                          </td>
-                          <td className="px-4 py-4 text-right text-amber-600 dark:text-amber-400 whitespace-nowrap text-sm">
-                            ฿{formatMoney(trip.maint_est)}
                           </td>
                           <td className="px-4 py-4 text-right font-semibold text-red-500 whitespace-nowrap bg-red-500/5">
                             ฿{formatMoney(trip.total_cost)}
@@ -245,17 +293,17 @@ export default async function CostPerTripPage(props: PageProps) {
               </h3>
             </div>
             <div className="p-4 space-y-3">
-              {trips.filter(t => t.profit_pct < 10).slice(0, 5).map(trip => (
+              {trips.filter(t => t.profit_pct < 10).sort((a, b) => a.profit_pct - b.profit_pct).slice(0, 5).map(trip => (
                 <div key={trip.Job_ID} className="flex items-center justify-between p-3 bg-muted/40 rounded-2xl border border-border">
                   <div>
-                    <p className="font-semibold text-foreground text-sm">{trip.Route_Name || 'Unknown Route'}</p>
-                    <p className="text-xs font-medium text-muted-foreground">{trip.Customer_Name}</p>
+                    <p className="font-semibold text-foreground text-sm">{trip.Job_ID} · {trip.drop_count} ดรอป</p>
+                    <p className="text-xs font-medium text-muted-foreground">{trip.Plan_Date} · {trip.Customer_Name}</p>
                   </div>
                   <div className="text-right">
                     <p className={`font-semibold ${trip.profit < 0 ? 'text-red-600 dark:text-red-400' : 'text-amber-600 dark:text-amber-400'}`}>
                       {trip.profit_pct}% Margin
                     </p>
-                    <p className="text-xs font-medium text-muted-foreground">Loss: ฿{formatMoney(Math.abs(trip.profit))}</p>
+                    <p className="text-xs font-medium text-muted-foreground">{trip.profit < 0 ? 'ขาดทุน' : 'กำไร'} ฿{formatMoney(Math.abs(trip.profit))}</p>
                   </div>
                 </div>
               ))}
