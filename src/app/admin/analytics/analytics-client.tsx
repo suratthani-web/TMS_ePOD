@@ -2,6 +2,7 @@
 
 import { useLanguage } from "@/components/providers/language-provider"
 import Link from "next/link"
+import { usePathname } from "next/navigation"
 import { AlertTriangle, ArrowLeft, ShieldAlert, BarChart3, Zap, Building2, Users, MessageSquare, BrainCircuit } from "lucide-react"
 import { PremiumButton } from "@/components/ui/premium-button"
 import { MonthFilter } from "@/components/analytics/month-filter"
@@ -15,6 +16,7 @@ interface AnalyticsClientProps {
 
 export function AnalyticsClient({ overdueCount, isSuperAdmin }: AnalyticsClientProps) {
   const { t } = useLanguage()
+  const pathname = usePathname()
   const content = !isSuperAdmin ? (
     <div className="flex flex-col items-center justify-center min-h-[60vh] gap-6 text-center bg-card rounded-2xl border border-border m-10 p-10">
       <div className="p-6 bg-rose-500/10 rounded-full text-rose-500 border border-rose-500/20">
@@ -89,25 +91,66 @@ export function AnalyticsClient({ overdueCount, isSuperAdmin }: AnalyticsClientP
           </div>
         </div>
 
-        {/* Specialized Analytics Sub-modules */}
-        <div className="relative z-10 pt-5 mt-6 border-t border-border flex flex-wrap items-center gap-2">
-          <span className="text-xs font-semibold text-muted-foreground mr-1">รายงานเฉพาะทาง:</span>
-          <Link href="/admin/analytics/regional" className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-muted/60 hover:bg-muted text-foreground border border-border transition-colors">
-            <Building2 size={13} className="text-emerald-500" />
-            <span>วิเคราะห์รายสาขา</span>
-          </Link>
-          <Link href="/admin/analytics/drivers" className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-muted/60 hover:bg-muted text-foreground border border-border transition-colors">
-            <Users size={13} className="text-indigo-500" />
-            <span>ผลงานคนขับเชิงลึก</span>
-          </Link>
-          <Link href="/admin/analytics/feedback" className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-muted/60 hover:bg-muted text-foreground border border-border transition-colors">
-            <MessageSquare size={13} className="text-amber-500" />
-            <span>ความพึงพอใจลูกค้า</span>
-          </Link>
-          <Link href="/admin/analytics/intelligence" className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-muted/60 hover:bg-muted text-foreground border border-border transition-colors">
-            <BrainCircuit size={13} className="text-purple-500" />
-            <span>วิเคราะห์ความเสี่ยง AI</span>
-          </Link>
+        {/* Specialized Analytics Sub-tabs (Matching Main Tabs UX/UI & i18n) */}
+        <div className="relative z-10 pt-6 mt-6 border-t border-border flex flex-col md:flex-row md:items-center justify-between gap-3">
+          <div className="flex items-center gap-2 text-xs font-semibold text-muted-foreground">
+            <div className="w-1.5 h-1.5 rounded-full bg-primary" />
+            <span>{t('analytics.specialized_reports')}</span>
+          </div>
+
+          <div className="bg-muted/50 p-1 rounded-lg border border-border inline-flex flex-wrap items-center gap-1 h-auto">
+            <Link
+              href="/admin/analytics/regional"
+              className={cn(
+                "px-4 py-2 rounded-md text-xs font-semibold transition-all inline-flex items-center gap-2",
+                pathname === "/admin/analytics/regional"
+                  ? "bg-emerald-600 text-white shadow-xs"
+                  : "text-muted-foreground hover:text-emerald-600 dark:hover:text-emerald-400 hover:bg-background/80"
+              )}
+            >
+              <Building2 size={15} className={pathname === "/admin/analytics/regional" ? "text-white" : "text-emerald-500"} />
+              <span>{t('analytics.deep_dive_regional')}</span>
+            </Link>
+
+            <Link
+              href="/admin/analytics/drivers"
+              className={cn(
+                "px-4 py-2 rounded-md text-xs font-semibold transition-all inline-flex items-center gap-2",
+                pathname === "/admin/analytics/drivers"
+                  ? "bg-indigo-600 text-white shadow-xs"
+                  : "text-muted-foreground hover:text-indigo-600 dark:hover:text-indigo-400 hover:bg-background/80"
+              )}
+            >
+              <Users size={15} className={pathname === "/admin/analytics/drivers" ? "text-white" : "text-indigo-500"} />
+              <span>{t('analytics.deep_dive_drivers')}</span>
+            </Link>
+
+            <Link
+              href="/admin/analytics/feedback"
+              className={cn(
+                "px-4 py-2 rounded-md text-xs font-semibold transition-all inline-flex items-center gap-2",
+                pathname === "/admin/analytics/feedback"
+                  ? "bg-amber-600 text-white shadow-xs"
+                  : "text-muted-foreground hover:text-amber-600 dark:hover:text-amber-400 hover:bg-background/80"
+              )}
+            >
+              <MessageSquare size={15} className={pathname === "/admin/analytics/feedback" ? "text-white" : "text-amber-500"} />
+              <span>{t('analytics.deep_dive_feedback')}</span>
+            </Link>
+
+            <Link
+              href="/admin/analytics/intelligence"
+              className={cn(
+                "px-4 py-2 rounded-md text-xs font-semibold transition-all inline-flex items-center gap-2",
+                pathname === "/admin/analytics/intelligence"
+                  ? "bg-purple-600 text-white shadow-xs"
+                  : "text-muted-foreground hover:text-purple-600 dark:hover:text-purple-400 hover:bg-background/80"
+              )}
+            >
+              <BrainCircuit size={15} className={pathname === "/admin/analytics/intelligence" ? "text-white" : "text-purple-500"} />
+              <span>{t('analytics.deep_dive_intelligence')}</span>
+            </Link>
+          </div>
         </div>
       </div>
     </div>
