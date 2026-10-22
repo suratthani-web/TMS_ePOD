@@ -17,6 +17,7 @@ import {
 import { CO2_COEFFICIENTS } from '../utils/esg-utils'
 import { getCarbonFactors } from '@/lib/actions/carbon-factors'
 import { getWearRates } from '@/lib/supabase/wear-rate'
+import { getPeriodFuel } from '@/lib/fuel/period-fuel'
 
 // อัตราดูดซับคาร์บอนของต้นไม้มาตรฐาน TGO (kgCO2/ต้น/ปี) — ให้ตรงกับ esg-utils
 const TREE_ABSORB_KG_PER_YEAR = 22
@@ -72,37 +73,11 @@ export async function getExecutiveDashboardUnified(branchId?: string, startDate?
     const { hasPermission } = await import("@/lib/permissions")
     const canViewProfit = await hasPermission('financial.view_profit')
 
-    // Use the new Super RPC for Current Month (Only if no specific customer names are filtered)
-    let currentData, rpcError;
-    if (!customerNames || customerNames.length === 0) {
-        try {
-            const response = await supabase.rpc('get_executive_summary', {
-                start_date: sDateCurrent,
-                end_date: eDateCurrent,
-                filter_branch_id: effectiveBranchId || null,
-                filter_customer_id: finalCustomerId
-            })
-            currentData = response.data
-            rpcError = response.error
-        } catch (err) { const e = err as Error;
-            console.warn('[getExecutiveDashboardUnified] RPC call failed, switching to fallback.')
-        }
-    } else {
-        // Force fallback to manual aggregation if filtering by customer names
-        rpcError = { message: 'Manual filtering required for customer names' }
-    }
-
-    const hasNoData = currentData && (!currentData.financial || (currentData.financial.revenue === 0 && currentData.kpi?.jobs?.current === 0))
-    
-    // Fallback if Restricted, RPC fails, or is missing/zero data
-    if (isRestricted || rpcError || !currentData || hasNoData) {
-        if (isRestricted) {
-             console.debug('[getExecutiveDashboardUnified] Restricted access (Customer role but no Customer_ID)')
-        } else if (rpcError) {
-            console.warn('[getExecutiveDashboardUnified] RPC failed or type mismatch, using manual fallback:', rpcError.message || rpcError)
-        }
-        
-        // Manual fallback: Fetch Current & Previous for Comparison
+    // P&L is aggregated here, not via the get_executive_summary RPC: the RPC leaves out
+    // extra_costs_json driver costs (เด็กรถ/ขึ้นชั้น/ทางด่วน) and fuel, and get_dashboard_metrics
+    // fails on a date/text mismatch. Fuel comes from the real bills (getPeriodFuel), matched
+    // to the period's jobs the same way as the fuel page and Trip Performance.
+    {
         const fetchRange = async (start: string, end: string) => {
             // page ครบทุกแถว (กัน cap 1000 ทำให้ยอดตกหล่นเมื่องาน > 1000)
             return fetchAllRows(() => {
@@ -165,45 +140,27 @@ export async function getExecutiveDashboardUnified(branchId?: string, startDate?
             return ((c - p) / p) * 100
         }
 
-        // Fetch Fuel and Maint for Fallback
-        let fuelQuery = supabase.from('Fuel_Logs').select('Price_Total')
-            .gte('Date_Time', sDateCurrent)
-            .lte('Date_Time', eDateCurrent)
-        
+        const [periodFuel, prevPeriodFuel] = isRestricted
+            ? [null, null]
+            : await Promise.all([
+                getPeriodFuel({ start: sDateCurrent, end: eDateCurrent, branchId: effectiveBranchId, customerId: finalCustomerId, customerNames }),
+                getPeriodFuel({ start: sDatePrev, end: eDatePrev, branchId: effectiveBranchId, customerId: finalCustomerId, customerNames }),
+            ])
+        const fuelCost = periodFuel?.total || 0
+        prev.profit -= prevPeriodFuel?.total || 0
+
         let maintQuery = supabase.from('Repair_Tickets').select('Cost_Total')
             .in('Status', ['Completed', 'เสร็จสิ้น'])
             .gte('Date_Finish', sDateCurrent)
             .lte('Date_Finish', eDateCurrent)
-
-        if (effectiveBranchId) {
-            fuelQuery = fuelQuery.ilike('Branch_ID', effectiveBranchId)
-            maintQuery = maintQuery.ilike('Branch_ID', effectiveBranchId)
-        }
-
+        if (effectiveBranchId) maintQuery = maintQuery.ilike('Branch_ID', effectiveBranchId)
         if (finalCustomerId) {
-            if (dedicatedVehiclePlates.length > 0 || dedicatedDriverIds.length > 0) {
-                const fuelOrFilters = []
-                const maintOrFilters = []
-                if (dedicatedVehiclePlates.length > 0) {
-                    fuelOrFilters.push(`Vehicle_Plate.in.(${dedicatedVehiclePlates.join(',')})`)
-                    maintOrFilters.push(`Vehicle_Plate.in.(${dedicatedVehiclePlates.join(',')})`)
-                }
-                if (dedicatedDriverIds.length > 0) {
-                    fuelOrFilters.push(`Driver_ID.in.(${dedicatedDriverIds.join(',')})`)
-                    maintOrFilters.push(`Driver_ID.in.(${dedicatedDriverIds.join(',')})`)
-                }
-                fuelQuery = fuelQuery.or(fuelOrFilters.join(','))
-                maintQuery = maintQuery.or(maintOrFilters.join(','))
-            } else {
-                fuelQuery = fuelQuery.eq('Log_ID', 'FORCE_EMPTY_RESULTS')
-                maintQuery = maintQuery.eq('Ticket_ID', 'FORCE_EMPTY_RESULTS')
-            }
+            maintQuery = dedicatedVehiclePlates.length > 0
+                ? maintQuery.in('Vehicle_Plate', dedicatedVehiclePlates)
+                : maintQuery.eq('Ticket_ID', 'FORCE_EMPTY_RESULTS')
         }
-
-        const [fuelData, maintData] = await Promise.all([fuelQuery, maintQuery])
-
-        const fuelCost = (fuelData.data || []).reduce((sum: number, l: { Price_Total?: number | string }) => sum + (Number(l.Price_Total) || 0), 0)
-        const maintCost = (maintData.data || []).reduce((sum: number, r: { Cost_Total?: number | string }) => sum + (Number(r.Cost_Total) || 0), 0)
+        const { data: maintRows } = await maintQuery
+        const maintCost = (maintRows || []).reduce((sum: number, r: { Cost_Total?: number | string }) => sum + (Number(r.Cost_Total) || 0), 0)
         
         const totalCostManual = curr.cost + fuelCost + maintCost
 
@@ -226,6 +183,8 @@ export async function getExecutiveDashboardUnified(branchId?: string, startDate?
                 }
             }
         })
+        // fuel of each day's jobs (real bills matched to the jobs)
+        periodFuel?.byDate.forEach((cost, d) => { if (trendMap[d]) trendMap[d].cost += cost })
         const trend = Object.entries(trendMap)
             .map(([date, counts]) => {
                 const count = Math.max(counts.total || 0, counts.completed || 0)
@@ -250,7 +209,8 @@ export async function getExecutiveDashboardUnified(branchId?: string, startDate?
         const fuelSaved = co2Saved / 2.68
         const treesSaved = co2Saved / TREE_ABSORB_KG_PER_YEAR
 
-        const predictedFuelCost = (curr.distance / 10) * 38 // 10km/L, 38 THB/L
+        // no km-based fuel forecasts: fuel is always the real bills
+        const predictedFuelCost = fuelCost
         const predictedMaintCost = curr.distance * (await getWearRates(supabase)).fleet.ratePerKm
 
         // IF NO PERMISSION: Mask financial values
@@ -305,311 +265,69 @@ export async function getExecutiveDashboardUnified(branchId?: string, startDate?
         }
     }
 
-    // Get Previous Month Financials for Growth Calculation
-    const { data: prevData, error: prevRpcError } = await supabase.rpc('get_dashboard_metrics', {
-        start_date: sDatePrev,
-        end_date: eDatePrev,
-        filter_branch_id: effectiveBranchId || null,
-        filter_customer_id: finalCustomerId
-    })
-
-    // TMS 2026: Manual aggregation for Pipeline Revenue, Fuel, and Maintenance
-    let revenuePipeline = 0;
-    let fuelCost = 0;
-    let maintenanceCost = 0;
-
-    try {
-        const fetchPipeline = supabase
-            .from('Jobs_Main')
-            .select('Price_Cust_Total')
-            .in('Job_Status', PIPELINE_STATUSES)
-            .gte('Plan_Date', sDateCurrent)
-            .lte('Plan_Date', eDateCurrent)
-        
-        const fetchFuel = supabase
-            .from('Fuel_Logs')
-            .select('Price_Total')
-            .gte('Date_Time', `${sDateCurrent}T00:00:00`)
-            .lte('Date_Time', `${eDateCurrent}T23:59:59`)
-
-        const fetchMaint = supabase
-            .from('Repair_Tickets')
-            .select('Cost_Total')
-            .in('Status', ['Completed', 'เสร็จสิ้น'])
-            .gte('Date_Finish', `${sDateCurrent}T00:00:00`)
-            .lte('Date_Finish', `${eDateCurrent}T23:59:59`)
-
-        if (effectiveBranchId) {
-            fetchPipeline.eq('Branch_ID', effectiveBranchId)
-            fetchFuel.eq('Branch_ID', effectiveBranchId)
-            fetchMaint.eq('Branch_ID', effectiveBranchId)
-        }
-
-        if (finalCustomerId) {
-            fetchPipeline.eq('Customer_ID', finalCustomerId)
-            if (dedicatedVehiclePlates.length > 0 || dedicatedDriverIds.length > 0) {
-                const fuelOrFilters = []
-                const maintOrFilters = []
-                if (dedicatedVehiclePlates.length > 0) {
-                    fuelOrFilters.push(`Vehicle_Plate.in.(${dedicatedVehiclePlates.join(',')})`)
-                    maintOrFilters.push(`Vehicle_Plate.in.(${dedicatedVehiclePlates.join(',')})`)
-                }
-                if (dedicatedDriverIds.length > 0) {
-                    fuelOrFilters.push(`Driver_ID.in.(${dedicatedDriverIds.join(',')})`)
-                    maintOrFilters.push(`Driver_ID.in.(${dedicatedDriverIds.join(',')})`)
-                }
-                fetchFuel.or(fuelOrFilters.join(','))
-                fetchMaint.or(maintOrFilters.join(','))
-            } else {
-                fetchFuel.eq('Log_ID', 'FORCE_EMPTY_RESULTS')
-                fetchMaint.eq('Ticket_ID', 'FORCE_EMPTY_RESULTS')
-            }
-        } else if (customerNames && customerNames.length > 0) {
-            fetchPipeline.in('Customer_Name', customerNames)
-        }
-        
-        const [pipeRes, fuelRes, maintRes] = await Promise.all([
-            fetchPipeline,
-            fetchFuel,
-            fetchMaint
-        ])
-
-        revenuePipeline = (pipeRes.data || []).reduce((sum: number, j: { Price_Cust_Total?: number | string }) => sum + (Number(j.Price_Cust_Total) || 0), 0)
-        fuelCost = (fuelRes.data || []).reduce((sum: number, f: { Price_Total?: number | string }) => sum + (Number(f.Price_Total) || 0), 0)
-        maintenanceCost = (maintRes.data || []).reduce((sum: number, m: { Cost_Total?: number | string }) => sum + (Number(m.Cost_Total) || 0), 0)
-
-    } catch (err) { const e = err as Error;
-        console.warn('[getExecutiveDashboardUnified] Operational cost aggregation failed', e)
-    }
-
-    if (prevRpcError) {
-        console.error('[getExecutiveDashboardUnified] get_dashboard_metrics RPC Error:', prevRpcError)
-    }
-
-    // 1. Process Financials from RPC data
-    const fin = currentData?.financial || {}
-    const revenue = Number(fin.revenue) || 0
-    const driverCost = Number(fin.driver_cost) || 0
-    const extraCost = Number(fin.extra_cost) || 0
-    
-    const totalCost = driverCost + extraCost + fuelCost + maintenanceCost
-    const netProfit = revenue - totalCost
-    const margin = revenue > 0 ? (netProfit / revenue) * 100 : 0
-
-    // 2. Process KPI Growth
-    const prevRevenue = Number(prevData?.revenue) || 0
-    const prevNetProfit = Number(prevData?.net_profit) || 0
-    const prevMargin = prevRevenue > 0 ? (prevNetProfit / prevRevenue) * 100 : 0
-    
-    const calculateGrowth = (curr: number, prev: number) => {
-        if (prev <= 0) return curr > 0 ? 100 : 0
-        return ((curr - prev) / prev) * 100
-    }
-
-    // 3. ESG Intelligence (Dynamic)
-    // Formula: Total Distance * Efficiency Factor * Improvement %
-    // Heuristic: Use real distance or 12.5km per job if distance data is missing
-    const rawDistance = Number(currentData?.financial?.total_distance) || 0
-    const jobCount = Number(currentData?.financial?.job_count) || 0
-    const effectiveDistance = Math.max(rawDistance, jobCount * 12.5)
-    
-    // TMS 2026 Goal: 8.2% Efficiency Gain Benchmark
-    const totalSavedKm = effectiveDistance * 0.082
-    const wtwPerKm = await getDefaultWTWPerKm() // WTW EF (DB) — สอดคล้องกับการคำนวณจริง
-    const co2Saved = totalSavedKm * wtwPerKm
-    const fuelSaved = co2Saved / 2.68
-    const treesSaved = co2Saved / TREE_ABSORB_KG_PER_YEAR
-
-    const predictedFuelCost = (effectiveDistance / 10) * 38
-    const predictedMaintCost = effectiveDistance * (await getWearRates(supabase)).fleet.ratePerKm
-
-    // IF NO PERMISSION: Mask financial values
-    if (!canViewProfit) {
-        return {
-            financial: { revenue: 0, revenuePipeline: 0, cost: { total: 0, driver: 0, extra: 0, fuel: 0, maintenance: 0, predictedFuel: 0, predictedMaintenance: 0 }, netProfit: 0, profitMargin: 0 },
-            trend: (currentData?.trend || []).map((t: { date: string, job_count?: number, completed_count?: number, total_count?: number, total_jobs?: number, completed_jobs?: number, total?: number, completed?: number, revenue?: number, cost?: number }) => {
-                const completed = Number(t.completed ?? t.completed_count ?? t.completed_jobs ?? t.job_count) || 0
-                const total = Number(t.total ?? t.total_count ?? t.total_jobs ?? t.job_count) || 0
-                const count = Math.max(total, completed)
-                return {
-                    date: t.date,
-                    total: count,
-                    completed: completed,
-                    jobCount: count,
-                    revenue: 0,
-                    cost: 0
-                }
-            }),
-            statusDist: Object.entries(currentData?.status_dist || {}).map(([name, value]) => ({ name, value: Number(value) })),
-            kpi: {
-                revenue: { current: 0, previous: 0, growth: 0, target: 250000, attainment: 0 },
-                profit: { current: 0, previous: 0, growth: 0 },
-                margin: { current: 0, growth: 0, target: 15 },
-                jobs: { current: Number(fin.job_count) || 0 }
-            },
-            esg: { fuelSaved: Math.round(fuelSaved), co2Saved: Math.round(co2Saved), treesSaved: Number(treesSaved.toFixed(1)) },
-            vehicles: [],
-            debug: { masked: true }
-        }
-    }
-
-    return {
-        financial: {
-            revenue,
-            revenuePipeline,
-            cost: { 
-                total: totalCost, 
-                driver: driverCost, 
-                extra: extraCost, 
-                fuel: fuelCost, 
-                maintenance: maintenanceCost,
-                predictedFuel: predictedFuelCost,
-                predictedMaintenance: predictedMaintCost
-            },
-            netProfit,
-            profitMargin: margin
-        },
-        trend: (currentData?.trend || []).map((t: { date: string, job_count?: number, completed_count?: number, total_count?: number, total_jobs?: number, completed_jobs?: number, total?: number, completed?: number, revenue?: number, cost?: number }) => {
-            const completed = Number(t.completed ?? t.completed_count ?? t.completed_jobs ?? t.job_count) || 0
-            const total = Number(t.total ?? t.total_count ?? t.total_jobs ?? t.job_count) || 0
-            const count = Math.max(total, completed)
-            return {
-                date: t.date,
-                total: count,
-                completed: completed,
-                jobCount: count,
-                revenue: Number(t.revenue) || 0,
-                cost: Number(t.cost) || 0
-            }
-        }),
-        statusDist: Object.entries(currentData?.status_dist || {}).map(([name, value]) => ({ name, value: Number(value) })),
-        kpi: {
-            revenue: { current: revenue, previous: prevRevenue, growth: calculateGrowth(revenue, prevRevenue), target: 250000, attainment: (revenue / 250000) * 100 },
-            profit: { current: netProfit, previous: prevNetProfit, growth: calculateGrowth(netProfit, prevNetProfit) },
-            margin: { current: margin, growth: margin - prevMargin, target: 15 },
-            jobs: { current: Number(fin.job_count) || 0 }
-        },
-        esg: {
-            fuelSaved: Math.round(fuelSaved),
-            co2Saved: Math.round(co2Saved),
-            treesSaved: Number(treesSaved.toFixed(1))
-        },
-        vehicles: []
-    }
 }
 
-// 2. Optimized getFinancialStats using the RPC
+// 2. Financial stats for a period (driver incl. extras, fuel from real bills)
 export async function getFinancialStats(startDate?: string, endDate?: string, branchId?: string) {
   const supabase = await createAdminClient()
   const customerId = await getCustomerId()
   const effectiveBranchId = await getEffectiveBranchId(branchId)
 
-  const sDate = formatDateSafe(startDate) || formatDateSafe(new Date(new Date().getFullYear(), new Date().getMonth(), 1))
-  const eDate = formatDateSafe(endDate) || formatDateSafe(new Date())
+  const sDate = formatDateSafe(startDate) || formatDateSafe(new Date(new Date().getFullYear(), new Date().getMonth(), 1))!
+  const eDate = formatDateSafe(endDate) || formatDateSafe(new Date())!
 
-  const { data: metrics, error } = await supabase.rpc('get_dashboard_metrics', {
-      start_date: sDate,
-      end_date: eDate,
-      filter_branch_id: effectiveBranchId || null,
-      filter_customer_id: customerId || null
-  })
-
-  if (!error && metrics) {
-    const fin = metrics.financial || {}
-    const rev = Number(fin.revenue) || 0
-    const nProfit = rev - (Number(fin.total_cost) || 0)
-
-    return {
-      revenue: rev,
-      cost: { 
-          total: Number(fin.total_cost) || 0, 
-          driver: Number(fin.driver_cost) || 0, 
-          fuel: Number(fin.fuel_cost) || 0, 
-          maintenance: Number(fin.maintenance_cost) || 0, 
-          extra: Number(fin.extra_cost) || 0,
-          secondary: Number(fin.extra_cost) || 0 
-      },
-      netProfit: nProfit,
-      profitMargin: rev > 0 ? (nProfit / rev) * 100 : 0
-    }
-  }
-
-  // Fallback: Manual aggregation in JavaScript to bypass RPC type-casting errors
-  console.log('[getFinancialStats] Falling back to manual aggregation due to RPC error:', error)
+  // Aggregated here (the get_dashboard_metrics RPC fails on a date/text mismatch and
+  // leaves out extra_costs_json driver costs). Fuel = real bills matched to the jobs.
   try {
-      let query = supabase
-          .from('Jobs_Main')
-          .select('Price_Cust_Total, Cost_Driver_Total, Price_Cust_Extra, Cost_Driver_Extra, Job_Status')
-          .gte('Plan_Date', sDate!)
-          .lte('Plan_Date', eDate!)
-          
-      if (customerId) query = query.eq('Customer_ID', customerId)
-      if (effectiveBranchId) query = query.eq('Branch_ID', effectiveBranchId)
+      const jobs = await fetchAllRows<{ Job_Status?: string | null, Price_Cust_Total?: number | null, Cost_Driver_Total?: number | null, Price_Cust_Extra?: number | null, Cost_Driver_Extra?: number | null, extra_costs_json?: unknown }>(() => {
+          let query = supabase
+              .from('Jobs_Main')
+              .select('Price_Cust_Total, Cost_Driver_Total, Price_Cust_Extra, Cost_Driver_Extra, extra_costs_json, Job_Status')
+              .gte('Plan_Date', sDate)
+              .lte('Plan_Date', eDate)
+          if (customerId) query = query.eq('Customer_ID', customerId)
+          if (effectiveBranchId) query = query.ilike('Branch_ID', effectiveBranchId)
+          return query
+      })
 
-      const { data: jobs, error: jobsErr } = await query
-      if (!jobsErr && jobs) {
-          let rev = 0
-          let costTotal = 0
-          let costDriver = 0
-          let costExtra = 0
-          
-          jobs.forEach((j: { Job_Status?: string | null, Price_Cust_Total?: number | null, Cost_Driver_Total?: number | null, Price_Cust_Extra?: number | null, Cost_Driver_Extra?: number | null, Plan_Date?: string | null, Est_Distance_KM?: number | null, Loaded_Qty?: number | null, Weight_Kg?: number | null, Volume_Cbm?: number | null, Vehicle_Type?: string | null, Customer_Name?: string | null, Branch_ID?: string | null, Vehicle_Plate?: string | null }) => {
-              if (REVENUE_STATUSES.includes(j.Job_Status || '')) {
-                  const jobRev = (Number(j.Price_Cust_Total) || 0) + (Number(j.Price_Cust_Extra) || 0)
-                  const jobCost = (Number(j.Cost_Driver_Total) || 0) + (Number(j.Cost_Driver_Extra) || 0)
-                  
-                  rev += jobRev
-                  costTotal += jobCost
-                  costDriver += (Number(j.Cost_Driver_Total) || 0)
-                  costExtra += (Number(j.Cost_Driver_Extra) || 0)
-              }
-          })
-          
-          // Also fetch fuel logs for this month to add to cost if applicable
-          let fuelCost = 0
-          try {
-              let fuelQuery = supabase
-                  .from('Fuel_Logs')
-                  .select('Cost_Total')
-                  .gte('Refuel_Date', sDate!)
-                  .lte('Refuel_Date', eDate!)
-              
-              if (effectiveBranchId) {
-                  // Helper to get vehicle plates for branch
-                  const { getBranchPlates } = await import('./analytics-helpers')
-                  const plates = await getBranchPlates(effectiveBranchId)
-                  if (plates.length > 0) {
-                      fuelQuery = fuelQuery.in('Vehicle_Plate', plates)
-                  } else {
-                      fuelQuery = fuelQuery.eq('Vehicle_Plate', 'NON_EXISTENT')
-                  }
-              }
-              const { data: fuelLogs } = await fuelQuery
-              if (fuelLogs) {
-              fuelCost = fuelLogs.reduce((sum: number, f: { Cost_Total?: number | string }) => sum + (Number(f.Cost_Total) || 0), 0)
-              }
-          } catch (err) { const e = err as Error;
-              console.warn('[getFinancialStats] Fuel fetch error:', e)
-          }
+      let rev = 0
+      let costDriver = 0
+      let costExtra = 0
+      for (const j of jobs) {
+          if (!REVENUE_STATUSES.includes(j.Job_Status || '')) continue
+          const extraItems = parseExtraCosts(j.extra_costs_json)
+          rev += (Number(j.Price_Cust_Total) || 0) + (Number(j.Price_Cust_Extra) || 0) + extraItems.reduce((s, c) => s + (Number(c?.charge_cust) || 0), 0)
+          costDriver += Number(j.Cost_Driver_Total) || 0
+          costExtra += (Number(j.Cost_Driver_Extra) || 0) + extraItems.reduce((s, c) => s + (Number(c?.cost_driver) || 0), 0)
+      }
 
-          costTotal += fuelCost
+      let maintQuery = supabase.from('Repair_Tickets').select('Cost_Total')
+          .in('Status', ['Completed', 'เสร็จสิ้น'])
+          .gte('Date_Finish', sDate)
+          .lte('Date_Finish', `${eDate}T23:59:59`)
+      if (effectiveBranchId) maintQuery = maintQuery.ilike('Branch_ID', effectiveBranchId)
+      const [fuel, { data: maintRows }] = await Promise.all([
+          getPeriodFuel({ start: sDate, end: eDate, branchId: effectiveBranchId, customerId }),
+          customerId ? Promise.resolve({ data: [] as { Cost_Total?: number | string }[] }) : maintQuery,
+      ])
+      const maintenance = (maintRows || []).reduce((sum: number, r: { Cost_Total?: number | string }) => sum + (Number(r.Cost_Total) || 0), 0)
 
-          return {
-              revenue: rev,
-              cost: {
-                  total: costTotal,
-                  driver: costDriver,
-                  fuel: fuelCost,
-                  maintenance: 0,
-                  extra: costExtra,
-                  secondary: costExtra
-              },
-              netProfit: rev - costTotal,
-              profitMargin: rev > 0 ? ((rev - costTotal) / rev) * 100 : 0
-          }
+      const costTotal = costDriver + costExtra + fuel.total + maintenance
+      return {
+          revenue: rev,
+          cost: {
+              total: costTotal,
+              driver: costDriver,
+              fuel: fuel.total,
+              maintenance,
+              extra: costExtra,
+              secondary: costExtra
+          },
+          netProfit: rev - costTotal,
+          profitMargin: rev > 0 ? ((rev - costTotal) / rev) * 100 : 0
       }
   } catch (err) { const e = err as Error;
-      console.error('[getFinancialStats] Fallback execution error:', e)
+      console.error('[getFinancialStats] aggregation error:', e)
   }
 
   return { revenue: 0, cost: { total: 0, driver: 0, fuel: 0, maintenance: 0, extra: 0, secondary: 0 }, netProfit: 0, profitMargin: 0 }
@@ -774,51 +492,40 @@ export async function getVehicleUtilizationSummary(startDate?: string, endDate?:
 export async function getRevenueTrend(startDate?: string, endDate?: string, branchId?: string) {
   try {
     const supabase = await createAdminClient()
-    const start = formatDateSafe(startDate) || formatDateSafe(subDays(new Date(), 30))
-    const end = formatDateSafe(endDate) || formatDateSafe(new Date())
+    const start = formatDateSafe(startDate) || formatDateSafe(subDays(new Date(), 30))!
+    const end = formatDateSafe(endDate) || formatDateSafe(new Date())!
     const effectiveBranchId = await getEffectiveBranchId(branchId)
     const customerId = await getCustomerId()
 
-    const { data, error } = await supabase.rpc('get_executive_summary', {
-        start_date: start,
-        end_date: end,
-        filter_branch_id: effectiveBranchId || null,
-        filter_customer_id: customerId || null
-    })
+    // Aggregated here: the RPC trend's cost is base driver pay only (no extras, no fuel).
+    // cost per day = driver pay incl. extras + fuel of that day's jobs (real bills).
+    const [jobs, fuel] = await Promise.all([
+        fetchAllRows<{ Job_Status?: string | null, Price_Cust_Total?: number | null, Cost_Driver_Total?: number | null, Price_Cust_Extra?: number | null, Cost_Driver_Extra?: number | null, extra_costs_json?: unknown, Plan_Date?: string | null }>(() => {
+            let query = supabase
+                .from('Jobs_Main')
+                .select('Price_Cust_Total, Cost_Driver_Total, Price_Cust_Extra, Cost_Driver_Extra, extra_costs_json, Job_Status, Plan_Date')
+                .gte('Plan_Date', start)
+                .lte('Plan_Date', end)
+            if (customerId) query = query.eq('Customer_ID', customerId)
+            if (effectiveBranchId) query = query.ilike('Branch_ID', effectiveBranchId)
+            return query
+        }),
+        getPeriodFuel({ start, end, branchId: effectiveBranchId, customerId }),
+    ])
 
-    if (!error && data?.trend) {
-        return (data.trend || []).map((t: { date: string, job_count?: number, completed_count?: number, revenue?: number, cost?: number }) => ({
-            date: t.date,
-            revenue: Number(t.revenue),
-            cost: Number(t.cost),
-            jobCount: Number(t.job_count)
-        }))
-    }
-
-    // Fallback: Manual aggregation
-    let query = supabase
-        .from('Jobs_Main')
-        .select('Price_Cust_Total, Cost_Driver_Total, Price_Cust_Extra, Cost_Driver_Extra, Job_Status, Plan_Date')
-        .gte('Plan_Date', start!)
-        .lte('Plan_Date', end!)
-    
-    if (customerId) query = query.eq('Customer_ID', customerId)
-    if (effectiveBranchId) query = query.eq('Branch_ID', effectiveBranchId)
-
-    const { data: jobs } = await query
-    const trendMap: Record<string, { revenue: number, cost: number, jobCount: number }> = {};
-    
-    (jobs || []).forEach((j: { Job_Status?: string | null, Price_Cust_Total?: number | null, Cost_Driver_Total?: number | null, Price_Cust_Extra?: number | null, Cost_Driver_Extra?: number | null, Plan_Date?: string | null, Est_Distance_KM?: number | null, Loaded_Qty?: number | null, Weight_Kg?: number | null, Volume_Cbm?: number | null, Vehicle_Type?: string | null, Customer_Name?: string | null, Branch_ID?: string | null, Vehicle_Plate?: string | null }) => {
-        const d = j.Plan_Date ? String(j.Plan_Date).split('T')[0] : 'Unknown'
-        if (d !== 'Unknown') {
-            if (!trendMap[d]) trendMap[d] = { revenue: 0, cost: 0, jobCount: 0 }
-            trendMap[d].jobCount++
-            if (REVENUE_STATUSES.includes(j.Job_Status || '')) {
-                trendMap[d].revenue += (Number(j.Price_Cust_Total) || 0)
-                trendMap[d].cost += (Number(j.Cost_Driver_Total) || 0) + (Number(j.Price_Cust_Extra) || 0) + (Number(j.Cost_Driver_Extra) || 0)
-            }
+    const trendMap: Record<string, { revenue: number, cost: number, jobCount: number }> = {}
+    for (const j of jobs) {
+        const d = j.Plan_Date ? String(j.Plan_Date).split('T')[0] : ''
+        if (!d) continue
+        if (!trendMap[d]) trendMap[d] = { revenue: 0, cost: 0, jobCount: 0 }
+        trendMap[d].jobCount++
+        if (REVENUE_STATUSES.includes(j.Job_Status || '')) {
+            const extraItems = parseExtraCosts(j.extra_costs_json)
+            trendMap[d].revenue += (Number(j.Price_Cust_Total) || 0) + (Number(j.Price_Cust_Extra) || 0) + extraItems.reduce((s, c) => s + (Number(c?.charge_cust) || 0), 0)
+            trendMap[d].cost += (Number(j.Cost_Driver_Total) || 0) + (Number(j.Cost_Driver_Extra) || 0) + extraItems.reduce((s, c) => s + (Number(c?.cost_driver) || 0), 0)
         }
-    })
+    }
+    fuel.byDate.forEach((cost, d) => { if (trendMap[d]) trendMap[d].cost += cost })
 
     return Object.entries(trendMap).map(([date, stats]) => ({
         date,
@@ -917,43 +624,66 @@ export async function getBranchPerformance(startDate?: string, endDate?: string)
     const { data: branches } = await supabase.from('Master_Branches').select('Branch_ID, Branch_Name')
     if (!branches) return []
 
-    const sDate = formatDateSafe(startDate)
-    const eDate = formatDateSafe(endDate)
-    const jobs = await fetchAllRows(() => {
-        let query = supabase.from('Jobs_Main').select('Branch_ID, Price_Cust_Total, Cost_Driver_Total').in('Job_Status', REVENUE_STATUSES)
-        if (sDate) query = query.gte('Plan_Date', sDate)
-        if (eDate) query = query.lte('Plan_Date', eDate)
-        return query
-    })
+    const { start: monthStart, end: monthEnd } = getThaiMonthBoundaries()
+    const sDate = formatDateSafe(startDate) || formatDateSafe(monthStart)!
+    const eDate = formatDateSafe(endDate) || formatDateSafe(monthEnd)!
+    const jobs = await fetchAllRows<{ Branch_ID?: string | null; Price_Cust_Total?: number | null; Price_Cust_Extra?: number | null; Cost_Driver_Total?: number | null; Cost_Driver_Extra?: number | null; extra_costs_json?: unknown }>(() =>
+        supabase.from('Jobs_Main')
+            .select('Branch_ID, Price_Cust_Total, Price_Cust_Extra, Cost_Driver_Total, Cost_Driver_Extra, extra_costs_json')
+            .in('Job_Status', REVENUE_STATUSES)
+            .gte('Plan_Date', sDate)
+            .lte('Plan_Date', eDate))
+
+    // profit = revenue − driver pay (incl. extras) − fuel (real bills matched to the branch's jobs)
+    const fuelByBranch = new Map<string, number>()
+    await Promise.all(branches.map(async (b: { Branch_ID: string }) => {
+        const f = await getPeriodFuel({ start: sDate, end: eDate, branchId: b.Branch_ID })
+        fuelByBranch.set(b.Branch_ID, f.total)
+    }))
+
     return branches.map((branch: { Branch_ID: string; Branch_Name: string }) => {
-        const branchJobs = jobs?.filter((j: { Job_Status?: string | null, Price_Cust_Total?: number | null, Cost_Driver_Total?: number | null, Price_Cust_Extra?: number | null, Cost_Driver_Extra?: number | null, Plan_Date?: string | null, Est_Distance_KM?: number | null, Loaded_Qty?: number | null, Weight_Kg?: number | null, Volume_Cbm?: number | null, Vehicle_Type?: string | null, Customer_Name?: string | null, Branch_ID?: string | null, Vehicle_Plate?: string | null }) => j.Branch_ID === branch.Branch_ID) || []
-        const revenue = branchJobs.reduce((sum: number, j: { Price_Cust_Total?: string | number, Cost_Driver_Total?: string | number }) => sum + (Number(j.Price_Cust_Total) || 0), 0)
-        const cost = branchJobs.reduce((sum: number, j: { Price_Cust_Total?: string | number, Cost_Driver_Total?: string | number }) => sum + (Number(j.Cost_Driver_Total) || 0), 0)
-        return { branchId: branch.Branch_ID, branchName: branch.Branch_Name, revenue, jobsCount: branchJobs.length, profit: revenue - cost }
+        const branchJobs = jobs.filter(j => j.Branch_ID === branch.Branch_ID)
+        let revenue = 0, driverCost = 0
+        for (const j of branchJobs) {
+            const extraItems = parseExtraCosts(j.extra_costs_json)
+            revenue += (Number(j.Price_Cust_Total) || 0) + (Number(j.Price_Cust_Extra) || 0) + extraItems.reduce((s, c) => s + (Number(c?.charge_cust) || 0), 0)
+            driverCost += (Number(j.Cost_Driver_Total) || 0) + (Number(j.Cost_Driver_Extra) || 0) + extraItems.reduce((s, c) => s + (Number(c?.cost_driver) || 0), 0)
+        }
+        const fuelCost = fuelByBranch.get(branch.Branch_ID) || 0
+        return { branchId: branch.Branch_ID, branchName: branch.Branch_Name, revenue, jobsCount: branchJobs.length, driverCost, fuelCost, profit: revenue - driverCost - fuelCost }
     }).sort((a: { revenue: number }, b: { revenue: number }) => b.revenue - a.revenue)
 }
 
 export async function getSubcontractorPerformance(startDate?: string, endDate?: string, branchId?: string) {
     const supabase = await createAdminClient()
     const effectiveBranchId = await getEffectiveBranchId(branchId)
-    const sDate = formatDateSafe(startDate)
-    const eDate = formatDateSafe(endDate)
+    const { start: monthStart, end: monthEnd } = getThaiMonthBoundaries()
+    const sDate = formatDateSafe(startDate) || formatDateSafe(monthStart)!
+    const eDate = formatDateSafe(endDate) || formatDateSafe(monthEnd)!
 
-    const jobs = await fetchAllRows(() => {
-        let query = supabase.from('Jobs_Main').select('Price_Cust_Total, Cost_Driver_Total, Sub_ID').in('Job_Status', REVENUE_STATUSES)
-        if (sDate) query = query.gte('Plan_Date', sDate)
-        if (eDate) query = query.lte('Plan_Date', eDate)
-        if (effectiveBranchId) query = query.eq('Branch_ID', effectiveBranchId)
-        return query
-    })
+    const [jobs, fuel] = await Promise.all([
+        fetchAllRows<{ Price_Cust_Total?: number | null; Price_Cust_Extra?: number | null; Cost_Driver_Total?: number | null; Cost_Driver_Extra?: number | null; extra_costs_json?: unknown; Sub_ID?: string | null }>(() => {
+            let query = supabase.from('Jobs_Main')
+                .select('Price_Cust_Total, Price_Cust_Extra, Cost_Driver_Total, Cost_Driver_Extra, extra_costs_json, Sub_ID')
+                .in('Job_Status', REVENUE_STATUSES)
+                .gte('Plan_Date', sDate)
+                .lte('Plan_Date', eDate)
+            if (effectiveBranchId) query = query.ilike('Branch_ID', effectiveBranchId)
+            return query
+        }),
+        // company trucks' fuel = real bills; subcontractors pay their own fuel
+        getPeriodFuel({ start: sDate, end: eDate, branchId: effectiveBranchId }),
+    ])
     const stats = { internal: { revenue: 0, cost: 0, count: 0 }, subcontractor: { revenue: 0, cost: 0, count: 0 } }
 
-    jobs?.forEach((job: { Price_Cust_Total?: number | string; Cost_Driver_Total?: number | string; Sub_ID?: string }) => {
+    for (const job of jobs) {
         const target = job.Sub_ID ? stats.subcontractor : stats.internal
-        target.revenue += (Number(job.Price_Cust_Total) || 0)
-        target.cost += (Number(job.Cost_Driver_Total) || 0)
+        const extraItems = parseExtraCosts(job.extra_costs_json)
+        target.revenue += (Number(job.Price_Cust_Total) || 0) + (Number(job.Price_Cust_Extra) || 0) + extraItems.reduce((s, c) => s + (Number(c?.charge_cust) || 0), 0)
+        target.cost += (Number(job.Cost_Driver_Total) || 0) + (Number(job.Cost_Driver_Extra) || 0) + extraItems.reduce((s, c) => s + (Number(c?.cost_driver) || 0), 0)
         target.count++
-    })
+    }
+    stats.internal.cost += fuel.total
 
     return [
         { name: 'รถบริษัท (Internal)', ...stats.internal },
@@ -974,30 +704,39 @@ export async function getExecutiveKPIs(startDate?: string, endDate?: string, bra
 export async function getRouteEfficiency(startDate?: string, endDate?: string, branchId?: string) {
     const supabase = await createAdminClient()
     const effectiveBranchId = await getEffectiveBranchId(branchId)
-    const sDate = formatDateSafe(startDate)
-    const eDate = formatDateSafe(endDate)
+    const { start: monthStart, end: monthEnd } = getThaiMonthBoundaries()
+    const sDate = formatDateSafe(startDate) || formatDateSafe(monthStart)!
+    const eDate = formatDateSafe(endDate) || formatDateSafe(monthEnd)!
 
-    const jobs = await fetchAllRows(() => {
-        let query = supabase.from('Jobs_Main').select('Route_Name, Price_Cust_Total, Cost_Driver_Total, Price_Cust_Extra, Cost_Driver_Extra, Est_Distance_KM').in('Job_Status', REVENUE_STATUSES)
-        if (sDate) query = query.gte('Plan_Date', sDate)
-        if (eDate) query = query.lte('Plan_Date', eDate)
-        if (effectiveBranchId) query = query.eq('Branch_ID', effectiveBranchId)
-        return query
-    })
-    const routeStats: Record<string, { route: string; revenue: number; cost: number; count: number; extra: number; totalKm: number }> = {}
+    const [jobs, fuel] = await Promise.all([
+        fetchAllRows<{ Job_ID?: string; Route_Name?: string | null; Price_Cust_Total?: number | null; Cost_Driver_Total?: number | null; Price_Cust_Extra?: number | null; Cost_Driver_Extra?: number | null; extra_costs_json?: unknown; Est_Distance_KM?: number | null }>(() => {
+            let query = supabase.from('Jobs_Main')
+                .select('Job_ID, Route_Name, Price_Cust_Total, Cost_Driver_Total, Price_Cust_Extra, Cost_Driver_Extra, extra_costs_json, Est_Distance_KM')
+                .in('Job_Status', REVENUE_STATUSES)
+                .gte('Plan_Date', sDate)
+                .lte('Plan_Date', eDate)
+            if (effectiveBranchId) query = query.ilike('Branch_ID', effectiveBranchId)
+            return query
+        }),
+        getPeriodFuel({ start: sDate, end: eDate, branchId: effectiveBranchId }),
+    ])
+    // cost = driver pay (incl. extras) + fuel of the route's jobs (real bills); "extra" kept = driver extras
+    const routeStats: Record<string, { route: string; revenue: number; cost: number; count: number; extra: number; fuel: number; totalKm: number }> = {}
 
-    jobs?.forEach((job: { Route_Name?: string; Price_Cust_Total?: number | string; Cost_Driver_Total?: number | string; Price_Cust_Extra?: number | string; Cost_Driver_Extra?: number | string; Est_Distance_KM?: number | string }) => {
+    for (const job of jobs) {
         const route = job.Route_Name || 'Unknown Route'
-        if (!routeStats[route]) routeStats[route] = { route, revenue: 0, cost: 0, count: 0, extra: 0, totalKm: 0 }
-        routeStats[route].revenue += (Number(job.Price_Cust_Total) || 0)
-        routeStats[route].cost += (Number(job.Cost_Driver_Total) || 0)
-        routeStats[route].extra += (Number(job.Price_Cust_Extra) || 0) + (Number(job.Cost_Driver_Extra) || 0)
-        routeStats[route].totalKm += (Number(job.Est_Distance_KM) || 0)
+        if (!routeStats[route]) routeStats[route] = { route, revenue: 0, cost: 0, count: 0, extra: 0, fuel: 0, totalKm: 0 }
+        const extraItems = parseExtraCosts(job.extra_costs_json)
+        routeStats[route].revenue += (Number(job.Price_Cust_Total) || 0) + (Number(job.Price_Cust_Extra) || 0) + extraItems.reduce((s, c) => s + (Number(c?.charge_cust) || 0), 0)
+        routeStats[route].cost += Number(job.Cost_Driver_Total) || 0
+        routeStats[route].extra += (Number(job.Cost_Driver_Extra) || 0) + extraItems.reduce((s, c) => s + (Number(c?.cost_driver) || 0), 0)
+        routeStats[route].fuel += fuel.byJob.get(String(job.Job_ID || '')) || 0
+        routeStats[route].totalKm += Number(job.Est_Distance_KM) || 0
         routeStats[route].count++
-    })
+    }
 
-    return Object.values(routeStats).map((r: { route: string, revenue: number, cost: number, extra: number, totalKm: number }) => {
-        const profit = r.revenue - (r.cost + r.extra)
+    return Object.values(routeStats).map(r => {
+        const profit = r.revenue - (r.cost + r.extra + r.fuel)
         return { ...r, netProfit: profit, margin: r.revenue > 0 ? (profit / r.revenue) * 100 : 0, profitPerKm: r.totalKm > 0 ? (profit / r.totalKm) : 0 }
     }).sort((a, b) => b.netProfit - a.netProfit)
 }
@@ -1006,12 +745,12 @@ export async function getExecutiveEfficiencyScores(branchId?: string) {
     const stats = await getFinancialStats(undefined, undefined, branchId)
     const routeEfficiency = await getRouteEfficiency(undefined, undefined, branchId)
     const avgProfitPerKm = routeEfficiency.reduce((sum, r) => sum + r.profitPerKm, 0) / (routeEfficiency.length || 1)
-    
+
     let grade = 'C'
     if (stats.profitMargin > 20 && avgProfitPerKm > 15) grade = 'A+'
     else if (stats.profitMargin > 15 && avgProfitPerKm > 10) grade = 'A'
     else if (stats.profitMargin > 10) grade = 'B'
-    
+
     return { avgProfitPerKm, grade, topEfficiencyRoute: routeEfficiency[0]?.route || 'N/A' }
 }
 
@@ -1019,30 +758,36 @@ export async function getDetailedProfitability(startDate?: string, endDate?: str
     const supabase = await createAdminClient()
     const customerId = await getCustomerId()
     const effectiveBranchId = await getEffectiveBranchId(branchId)
-    const sDate = formatDateSafe(startDate)
-    const eDate = formatDateSafe(endDate)
+    const { start: monthStart, end: monthEnd } = getThaiMonthBoundaries()
+    const sDate = formatDateSafe(startDate) || formatDateSafe(monthStart)!
+    const eDate = formatDateSafe(endDate) || formatDateSafe(monthEnd)!
 
-    let query = supabase.from('Jobs_Main').select('Job_ID, Customer_Name, Route_Name, Price_Cust_Total, Cost_Driver_Total, Price_Cust_Extra, Cost_Driver_Extra, Plan_Date').in('Job_Status', REVENUE_STATUSES).order('Plan_Date', { ascending: false }).limit(50)
-    
+    let query = supabase.from('Jobs_Main').select('Job_ID, Customer_Name, Route_Name, Price_Cust_Total, Cost_Driver_Total, Price_Cust_Extra, Cost_Driver_Extra, extra_costs_json, Plan_Date').in('Job_Status', REVENUE_STATUSES).order('Plan_Date', { ascending: false }).limit(50)
+
     if (customerId) query = query.eq('Customer_ID', customerId)
     else if (await isCustomer()) query = query.eq('Customer_ID', 'RESTRICTED_ACCESS')
-    else if (effectiveBranchId) query = query.eq('Branch_ID', effectiveBranchId)
+    else if (effectiveBranchId) query = query.ilike('Branch_ID', effectiveBranchId)
+    query = query.gte('Plan_Date', sDate).lte('Plan_Date', eDate)
 
-    if (sDate) query = query.gte('Plan_Date', sDate)
-    if (eDate) query = query.lte('Plan_Date', eDate)
-
-    const { data: jobs } = await query
-    return (jobs || []).map((job: { Job_ID?: string; Customer_Name?: string; Route_Name?: string; Price_Cust_Total?: number | string; Cost_Driver_Total?: number | string; Price_Cust_Extra?: number | string; Cost_Driver_Extra?: number | string; Plan_Date?: string }) => {
-        const rev = (Number(job.Price_Cust_Total) || 0) + (Number(job.Price_Cust_Extra) || 0)
-        const cost = (Number(job.Cost_Driver_Total) || 0) + (Number(job.Cost_Driver_Extra) || 0)
-        return { id: job.Job_ID, date: job.Plan_Date, customer: job.Customer_Name, route: job.Route_Name, revenue: rev, cost, profit: rev - cost, margin: rev > 0 ? ((rev - cost) / rev) * 100 : 0 }
+    const [{ data: jobs }, fuel] = await Promise.all([
+        query,
+        getPeriodFuel({ start: sDate, end: eDate, branchId: effectiveBranchId, customerId }),
+    ])
+    return (jobs || []).map((job: { Job_ID?: string; Customer_Name?: string; Route_Name?: string; Price_Cust_Total?: number | string; Cost_Driver_Total?: number | string; Price_Cust_Extra?: number | string; Cost_Driver_Extra?: number | string; extra_costs_json?: unknown; Plan_Date?: string }) => {
+        const extraItems = parseExtraCosts(job.extra_costs_json)
+        const rev = (Number(job.Price_Cust_Total) || 0) + (Number(job.Price_Cust_Extra) || 0) + extraItems.reduce((s, c) => s + (Number(c?.charge_cust) || 0), 0)
+        const fuelCost = fuel.byJob.get(String(job.Job_ID || '')) || 0
+        const cost = (Number(job.Cost_Driver_Total) || 0) + (Number(job.Cost_Driver_Extra) || 0) + extraItems.reduce((s, c) => s + (Number(c?.cost_driver) || 0), 0) + fuelCost
+        return { id: job.Job_ID, date: job.Plan_Date, customer: job.Customer_Name, route: job.Route_Name, revenue: rev, cost, fuel: fuelCost, profit: rev - cost, margin: rev > 0 ? ((rev - cost) / rev) * 100 : 0 }
     })
 }
 
 export async function getRegionalDeepDive(startDate?: string, endDate?: string) {
-    const performance = await getBranchPerformance(startDate, endDate)
-    const cStart = formatDateSafe(startDate) || formatDateSafe(subDays(new Date(), 30))!
-    const cEnd = formatDateSafe(endDate) || formatDateSafe(new Date())!
+    // same default window as getBranchPerformance (current month) so the comparison lines up
+    const { start: monthStart, end: monthEnd } = getThaiMonthBoundaries()
+    const cStart = formatDateSafe(startDate) || formatDateSafe(monthStart)!
+    const cEnd = formatDateSafe(endDate) || formatDateSafe(monthEnd)!
+    const performance = await getBranchPerformance(cStart, cEnd)
     const duration = differenceInDays(new Date(cEnd), new Date(cStart))
     const prevPerformance = await getBranchPerformance(formatDateSafe(subDays(new Date(cStart), duration + 1))!, formatDateSafe(subDays(new Date(cStart), 1))!)
 
@@ -1120,39 +865,50 @@ export async function getVehicleProfitability(startDate?: string, endDate?: stri
     const supabase = await createAdminClient()
     const customerId = await getCustomerId()
     const effectiveBranchId = await getEffectiveBranchId(branchId)
-    const sDate = formatDateSafe(startDate); const eDate = formatDateSafe(endDate)
+    const { start: monthStart, end: monthEnd } = getThaiMonthBoundaries()
+    const sDate = formatDateSafe(startDate) || formatDateSafe(monthStart)!
+    const eDate = formatDateSafe(endDate) || formatDateSafe(monthEnd)!
 
     const isCust = await isCustomer()
-    const jobs = await fetchAllRows(() => {
-        let query = supabase.from('Jobs_Main').select('Vehicle_Plate, Price_Cust_Total, Cost_Driver_Total, Est_Distance_KM').in('Job_Status', REVENUE_STATUSES)
-        if (customerId) query = query.eq('Customer_ID', customerId)
-        else if (isCust) query = query.eq('Customer_ID', 'RESTRICTED_ACCESS')
-        else if (effectiveBranchId) query = query.eq('Branch_ID', effectiveBranchId)
-        if (sDate) query = query.gte('Plan_Date', sDate)
-        if (eDate) query = query.lte('Plan_Date', eDate)
-        return query
-    })
-    const wearRates = await getWearRates(supabase, eDate || undefined)
+    const [jobs, fuel, wearRates] = await Promise.all([
+        fetchAllRows<{ Vehicle_Plate?: string | null, Price_Cust_Total?: number | null, Price_Cust_Extra?: number | null, Cost_Driver_Total?: number | null, Cost_Driver_Extra?: number | null, extra_costs_json?: unknown, Est_Distance_KM?: number | null }>(() => {
+            let query = supabase.from('Jobs_Main')
+                .select('Vehicle_Plate, Price_Cust_Total, Price_Cust_Extra, Cost_Driver_Total, Cost_Driver_Extra, extra_costs_json, Est_Distance_KM')
+                .in('Job_Status', REVENUE_STATUSES)
+                .gte('Plan_Date', sDate)
+                .lte('Plan_Date', eDate)
+            if (customerId) query = query.eq('Customer_ID', customerId)
+            else if (isCust) query = query.eq('Customer_ID', 'RESTRICTED_ACCESS')
+            else if (effectiveBranchId) query = query.ilike('Branch_ID', effectiveBranchId)
+            return query
+        }),
+        // real fuel bills per truck (matched to its jobs + its no-job running)
+        getPeriodFuel({ start: sDate, end: eDate, branchId: effectiveBranchId, customerId }),
+        getWearRates(supabase, eDate),
+    ])
+
     const stats: Record<string, { plate: string; revenue: number; driverCost: number; fuelCost: number; maintenanceCost: number; totalKm: number; count: number; predictedFuel: number; predictedMaintenance: number; netProfit: number }> = {}
-    jobs?.forEach((j: { Job_Status?: string | null, Price_Cust_Total?: number | null, Cost_Driver_Total?: number | null, Price_Cust_Extra?: number | null, Cost_Driver_Extra?: number | null, Plan_Date?: string | null, Est_Distance_KM?: number | null, Loaded_Qty?: number | null, Weight_Kg?: number | null, Volume_Cbm?: number | null, Vehicle_Type?: string | null, Customer_Name?: string | null, Branch_ID?: string | null, Vehicle_Plate?: string | null }) => {
+    for (const j of jobs) {
         const p = j.Vehicle_Plate || 'Unknown'
         if (!stats[p]) stats[p] = { plate: p, revenue: 0, driverCost: 0, fuelCost: 0, maintenanceCost: 0, totalKm: 0, count: 0, predictedFuel: 0, predictedMaintenance: 0, netProfit: 0 }
-        stats[p].revenue += Number(j.Price_Cust_Total) || 0
-        stats[p].driverCost += Number(j.Cost_Driver_Total) || 0
-        stats[p].totalKm += Number(j.Est_Distance_KM) || 0
-        stats[p].count++
-        
-        // Grouping logic for predicted
+        const extraItems = parseExtraCosts(j.extra_costs_json)
         const km = Number(j.Est_Distance_KM) || 0
-        stats[p].predictedFuel += (km / 10) * 38
-        stats[p].predictedMaintenance += km * wearRates.get(j.Vehicle_Plate).ratePerKm
-        
-        // Net Profit only subtracts Driver Cost (Actual known cost in Jobs_Main)
-        // Fuel/Maintenance actuals are handled separately if data is available, 
-        // but for this ledger we show predicted as reference.
-        stats[p].netProfit = stats[p].revenue - stats[p].driverCost
-    })
-    return Object.values(stats).sort((a: { netProfit: number }, b: { netProfit: number }) => b.netProfit - a.netProfit).slice(0, 10) // Show more for the ledger
+        stats[p].revenue += (Number(j.Price_Cust_Total) || 0) + (Number(j.Price_Cust_Extra) || 0) + extraItems.reduce((s, c) => s + (Number(c?.charge_cust) || 0), 0)
+        stats[p].driverCost += (Number(j.Cost_Driver_Total) || 0) + (Number(j.Cost_Driver_Extra) || 0) + extraItems.reduce((s, c) => s + (Number(c?.cost_driver) || 0), 0)
+        stats[p].totalKm += km
+        stats[p].count++
+        // wear = job km × the truck's real ฿/km (repairs + tires, trailing year)
+        stats[p].maintenanceCost += km * wearRates.get(j.Vehicle_Plate).ratePerKm
+    }
+    for (const s of Object.values(stats)) {
+        s.fuelCost = fuel.byPlate.get(s.plate.replace(/\s+/g, '').trim()) || 0
+        s.maintenanceCost = Math.round(s.maintenanceCost)
+        // kept for older callers: now the real values, not km-based forecasts
+        s.predictedFuel = s.fuelCost
+        s.predictedMaintenance = s.maintenanceCost
+        s.netProfit = Math.round((s.revenue - s.driverCost - s.fuelCost - s.maintenanceCost) * 100) / 100
+    }
+    return Object.values(stats).sort((a, b) => b.netProfit - a.netProfit).slice(0, 10)
 }
 
 export async function getProfitHeatmapData(startDate?: string, endDate?: string, branchId?: string, customerId?: string | null) {

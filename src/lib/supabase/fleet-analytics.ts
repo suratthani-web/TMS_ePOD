@@ -6,8 +6,10 @@ import {
     formatDateSafe,
     getBranchPlates,
     getEffectiveBranchId,
-    fetchAllRows
+    fetchAllRows,
+    parseExtraCosts
 } from './analytics-helpers'
+import { getPeriodFuel } from '@/lib/fuel/period-fuel'
 
 // 4. Operational Stats
 export async function getOperationalStats(branchId?: string, startDate?: string, endDate?: string) {
@@ -194,7 +196,7 @@ export async function getDetailedDriverAnalytics(startDate?: string, endDate?: s
     const [driversResult, allJobs] = await Promise.all([
         supabase.from('Master_Drivers').select('Driver_ID, Driver_Name, Vehicle_Plate, Vehicle_Type, Branch_ID, Active_Status, Sub_ID'),
         fetchAllRows<Record<string, unknown>>(() => supabase.from('Jobs_Main')
-            .select('Driver_ID, Job_Status, Plan_Date, Actual_Delivery_Time, Cost_Driver_Total, Rating, Est_Distance_KM, Weight_Kg')
+            .select('Driver_ID, Job_Status, Plan_Date, Delivery_Date, Actual_Delivery_Time, Cost_Driver_Total, Cost_Driver_Extra, extra_costs_json, Rating, Est_Distance_KM, Weight_Kg')
             .gte('Plan_Date', sDate || '')
             .lte('Plan_Date', eDate || '')
             .not('Driver_ID', 'is', null))
@@ -219,7 +221,7 @@ export async function getDetailedDriverAnalytics(startDate?: string, endDate?: s
         }
     })
 
-    jobsResult.data?.forEach((job: { Driver_ID?: string; Job_Status?: string; Cost_Driver_Total?: number | string; Est_Distance_KM?: number | string; Weight_Kg?: number | string; Rating?: number; Plan_Date?: string; Actual_Delivery_Time?: string }) => {
+    jobsResult.data?.forEach((job: { Driver_ID?: string; Job_Status?: string; Cost_Driver_Total?: number | string; Cost_Driver_Extra?: number | string; extra_costs_json?: unknown; Est_Distance_KM?: number | string; Weight_Kg?: number | string; Rating?: number; Plan_Date?: string; Delivery_Date?: string | null; Actual_Delivery_Time?: string }) => {
         const id = job.Driver_ID!
         if (!driverStats[id]) return
 
@@ -235,15 +237,20 @@ export async function getDetailedDriverAnalytics(startDate?: string, endDate?: s
         
         if (isCompleted) {
             stats.completedJobs++
-            stats.totalEarnings += Number(job.Cost_Driver_Total) || 0
+            // pay incl. extras (เด็กรถ/ขึ้นชั้น/ทางด่วน…) = what the payment voucher pays
+            stats.totalEarnings += (Number(job.Cost_Driver_Total) || 0) + (Number(job.Cost_Driver_Extra) || 0)
+                + parseExtraCosts(job.extra_costs_json).reduce((sum, c) => sum + (Number(c?.cost_driver) || 0), 0)
             stats.totalDistance += Number(job.Est_Distance_KM) || 0
             stats.totalWeight += Number(job.Weight_Kg) || 0
             
             if (job.Rating) stats.ratings.push(job.Rating)
 
-            if (job.Actual_Delivery_Time && job.Plan_Date) {
-                const actualDate = job.Actual_Delivery_Time.split('T')[0]
-                if (actualDate === job.Plan_Date) stats.onTimeJobs++
+            // Actual_Delivery_Time is often a bare time ("09:21:43") — only a full timestamp
+            // can be compared; on time = delivered by the target date (Delivery_Date, else Plan_Date)
+            const actual = String(job.Actual_Delivery_Time || '')
+            const due = String(job.Delivery_Date || job.Plan_Date || '').slice(0, 10)
+            if (/^\d{4}-\d{2}-\d{2}/.test(actual) && due) {
+                if (actual.slice(0, 10) <= due) stats.onTimeJobs++
             } else {
                 stats.onTimeJobs++
             }
@@ -286,7 +293,7 @@ export async function getVehicleProfitability(startDate?: string, endDate?: stri
     const jobs = await fetchAllRows<Record<string, unknown>>(() => {
         let jobsQuery = supabase
             .from('Jobs_Main')
-            .select('Vehicle_Plate, Price_Cust_Total, Cost_Driver_Total, Est_Distance_KM')
+            .select('Vehicle_Plate, Price_Cust_Total, Price_Cust_Extra, Cost_Driver_Total, Cost_Driver_Extra, extra_costs_json, Est_Distance_KM')
             .gte('Plan_Date', firstDay)
             .lte('Plan_Date', lastDay)
             .in('Job_Status', REVENUE_STATUSES)
@@ -296,11 +303,9 @@ export async function getVehicleProfitability(startDate?: string, endDate?: stri
     })
     console.log(`[getVehicleProfitability] Found ${jobs.length} jobs for range ${firstDay} to ${lastDay}, branchId=${effectiveBranchId}`)
 
-    const fuel = await fetchAllRows<Record<string, unknown>>(() => plateFilter(supabase
-        .from('Fuel_Logs')
-        .select('Vehicle_Plate, Price_Total')
-        .gte('Date_Time', `${firstDay}T00:00:00`)
-        .lte('Date_Time', `${lastDay}T23:59:59`)))
+    // Fuel = real bills matched to each truck's jobs in the period (+ its no-job running),
+    // the same numbers as the fuel page / Trip Performance
+    const periodFuel = await getPeriodFuel({ start: firstDay, end: lastDay, branchId: effectiveBranchId })
 
     const maintenance = await fetchAllRows<Record<string, unknown>>(() => plateFilter(supabase
         .from('Repair_Tickets')
@@ -319,19 +324,20 @@ export async function getVehicleProfitability(startDate?: string, endDate?: stri
 
     const stats: Record<string, { plate: string, revenue: number, driverCost: number, fuelCost: number, maintenanceCost: number, tireCost: number, totalCost: number, netProfit: number, totalKm: number, count: number }> = {}
 
-    jobs?.forEach((job: { Vehicle_Plate?: string; Price_Cust_Total?: number | string; Cost_Driver_Total?: number | string; Est_Distance_KM?: number | string }) => {
+    jobs?.forEach((job: { Vehicle_Plate?: string; Price_Cust_Total?: number | string; Price_Cust_Extra?: number | string; Cost_Driver_Total?: number | string; Cost_Driver_Extra?: number | string; extra_costs_json?: unknown; Est_Distance_KM?: number | string }) => {
         const plate = job.Vehicle_Plate!
         if (!stats[plate]) stats[plate] = { plate, revenue: 0, driverCost: 0, fuelCost: 0, maintenanceCost: 0, tireCost: 0, totalCost: 0, netProfit: 0, totalKm: 0, count: 0 }
-        stats[plate].revenue += Number(job.Price_Cust_Total) || 0
-        stats[plate].driverCost += Number(job.Cost_Driver_Total) || 0
+        const extraItems = parseExtraCosts(job.extra_costs_json)
+        stats[plate].revenue += (Number(job.Price_Cust_Total) || 0) + (Number(job.Price_Cust_Extra) || 0) + extraItems.reduce((sum, c) => sum + (Number(c?.charge_cust) || 0), 0)
+        stats[plate].driverCost += (Number(job.Cost_Driver_Total) || 0) + (Number(job.Cost_Driver_Extra) || 0) + extraItems.reduce((sum, c) => sum + (Number(c?.cost_driver) || 0), 0)
         stats[plate].totalKm += Number(job.Est_Distance_KM) || 0
         stats[plate].count += 1
     })
 
-    fuel?.forEach((f: { Vehicle_Plate?: string; Price_Total?: number | string }) => {
-        const plate = f.Vehicle_Plate!
+    periodFuel.byPlate.forEach((cost, plateKey) => {
+        const plate = Object.keys(stats).find(p => p.replace(/s+/g, '') === plateKey) || plateKey
         if (!stats[plate]) stats[plate] = { plate, revenue: 0, driverCost: 0, fuelCost: 0, maintenanceCost: 0, tireCost: 0, totalCost: 0, netProfit: 0, totalKm: 0, count: 0 }
-        stats[plate].fuelCost += Number(f.Price_Total) || 0
+        stats[plate].fuelCost += cost
     })
 
     maintenance?.forEach((m: { Vehicle_Plate?: string; Cost_Total?: number | string }) => {
