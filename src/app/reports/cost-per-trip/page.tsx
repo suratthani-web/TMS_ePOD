@@ -140,11 +140,12 @@ export default async function CostPerTripPage(props: PageProps) {
               {summary.fuelBills.count > 0 && (
                 <>
                   <br />* บิลน้ำมันของรถในรายงาน ฿{formatMoney(summary.fuelBills.cost)} ({summary.fuelBills.count} บิล, {summary.fuelBills.liters.toLocaleString()} ลิตร) · ลงเที่ยวในตารางนี้ ฿{formatMoney(summary.fuelBills.allocatedToTrips)}
+                  {summary.fuelBills.trailingCost > 0 && <> (รวมบิลหลังวันสิ้นสุดที่ปิดงานในช่วงนี้ ฿{formatMoney(summary.fuelBills.trailingCost)})</>}
                   {summary.fuelBills.noJobCost > 0 && (
-                    <> · <span className="font-semibold text-red-600 dark:text-red-400">ไม่มีงานในระบบ ฿{formatMoney(summary.fuelBills.noJobCost)} ({summary.fuelBills.noJobCount} บิล, {formatKm(summary.fuelBills.noJobKm)} กม.; {summary.fuelBills.noJobDates.map(d => d.slice(8, 10) + '/' + d.slice(5, 7)).join(', ')})</span> — รถวิ่งแต่ไม่มีงาน ควรตรวจว่าลืมเปิดงาน (รายได้หาย) หรือใช้นอกงาน</>
+                    <> · <span className="font-semibold text-red-600 dark:text-red-400">ไม่ได้ลงงานในช่วงนี้ ฿{formatMoney(summary.fuelBills.noJobCost)} ({summary.fuelBills.noJobCount} บิล, {formatKm(summary.fuelBills.noJobKm)} กม.; {summary.fuelBills.noJobDates.map(d => d.slice(8, 10) + '/' + d.slice(5, 7)).join(', ')})</span> — ของงานก่อนช่วงนี้ (ตามที่ผูก) หรือรถวิ่งแต่ไม่มีงาน ควรตรวจว่าลืมเปิดงาน</>
                   )}
-                  {Math.abs(summary.fuelBills.cost - summary.fuelBills.allocatedToTrips - summary.fuelBills.noJobCost) >= 1 && (
-                    <> · ส่วนที่เหลือ ฿{formatMoney(summary.fuelBills.cost - summary.fuelBills.allocatedToTrips - summary.fuelBills.noJobCost)} เป็นของงานที่ยังไม่ปิด / ลูกค้าอื่นบนรถคันเดียวกัน</>
+                  {Math.abs(summary.fuelBills.cost + summary.fuelBills.trailingCost - summary.fuelBills.allocatedToTrips - summary.fuelBills.noJobCost) >= 1 && (
+                    <> · ส่วนที่เหลือ ฿{formatMoney(summary.fuelBills.cost + summary.fuelBills.trailingCost - summary.fuelBills.allocatedToTrips - summary.fuelBills.noJobCost)} เป็นของงานที่ยังไม่ปิด / ลูกค้าอื่นบนรถคันเดียวกัน</>
                   )}
                 </>
               )}

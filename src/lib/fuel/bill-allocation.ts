@@ -29,7 +29,7 @@ export type FuelBillLog = {
   Odometer: number | null
   /** "enroute" = mid-trip top-up (doesn't close a cycle); "end"/unset closes it */
   Trip_Fill_Type?: string | null
-  /** Admin link: the job this end fill closes (overrides the auto rule) */
+  /** Admin link: job(s) this end fill closes, comma-separated (overrides the auto rule) */
   Closes_Job_ID?: string | null
 }
 
@@ -51,6 +51,10 @@ export type VehicleBillTotals = {
   uncovered: Pool & { dates: string[] }
   /** job km (Est_Distance_KM) of the vehicle's jobs in the period */
   jobKm: number
+  /** bills after the period pulled in because an admin linked them to a job in the period (inside total/covered) */
+  trailing: Pool
+  /** bills dated in the period that belong to a job before it (linked, or the leading cycle) — inside uncovered */
+  beforePeriod: Pool
 }
 
 /** confirmed = closing fill linked to the job by an admin */
@@ -94,6 +98,10 @@ const MORNING_CUTOFF_HOUR = 12
 const FIT = { high: [0.8, 1.25], medium: [0.67, 1.5] } as const
 const MAX_GROUP_CYCLES = 6
 
+/** Closes_Job_ID holds one or more job ids, comma-separated. */
+export const parseJobLinks = (v?: string | null): string[] =>
+  Array.from(new Set(String(v || '').split(',').map(s => s.trim()).filter(Boolean)))
+
 export const normalizePlate = (plate?: string | null) => (plate || '').replace(/\s+/g, '').trim()
 
 /** Bill timestamps are mostly local ("2026-10-01T14:49:12") but some are UTC ("…Z"). → "YYYY-MM-DDTHH:MM" local */
@@ -112,10 +120,10 @@ const fmtFill = (stamp: string, type?: string | null) =>
 const emptyPool = (): Pool => ({ cost: 0, liters: 0, km: 0, count: 0 })
 
 type Job = { id: string; date: string; km: number }
-type Cycle = Pool & { bills: FuelBillLog[]; stamps: string[]; closed: boolean; linkedJob: string | null }
+type Cycle = Pool & { bills: FuelBillLog[]; stamps: string[]; closed: boolean; linkedJobs: string[] }
 /** leading = closes a job from before the period (not a no-job run) */
 type Group = { cycles: Cycle[]; jobs: Job[]; leading: boolean }
-const isLinked = (g: Group) => g.cycles.some(c => !!c.linkedJob)
+const isLinked = (g: Group) => g.cycles.some(c => c.linkedJobs.length > 0)
 
 const groupKm = (g: Group) => g.cycles.reduce((s, c) => s + c.km, 0)
 const groupExpected = (g: Group) => g.jobs.reduce((s, j) => s + j.km * ROUND_TRIP, 0)
@@ -130,8 +138,12 @@ const isOff = (g: Group) => (g.jobs.length ? !fits(g, FIT.high) : groupKm(g) > 0
  * @param priorLogs bills before the period — the latest per vehicle anchors the odometer
  * @param runJobs   every job of these vehicles in the period (all customers, FUEL_RUN_STATUSES),
  *                  not just the rows on screen — otherwise a filtered view absorbs the whole bill
+ * @param trailingLogs bills after the period (a couple of weeks). Only those up to the last end fill
+ *                  linked to a job in the period are used — the fill that closes the period's last
+ *                  job often comes the next morning or after a holiday. Linked-only, so the next
+ *                  period never counts the same bill (there it is linked to a job outside its range).
  */
-export function allocateFuelBills(logs: FuelBillLog[], priorLogs: FuelBillLog[], runJobs: RunJob[]) {
+export function allocateFuelBills(logs: FuelBillLog[], priorLogs: FuelBillLog[], runJobs: RunJob[], trailingLogs: FuelBillLog[] = []) {
   const jobsByPlate = new Map<string, Job[]>()
   for (const j of runJobs) {
     const plate = normalizePlate(j.Vehicle_Plate)
@@ -146,6 +158,20 @@ export function allocateFuelBills(logs: FuelBillLog[], priorLogs: FuelBillLog[],
     const cur = anchor.get(plate)
     if (!cur || (l.Date_Time || '') > (cur.Date_Time || '')) anchor.set(plate, l)
   }
+
+  const periodJobIds = new Set(runJobs.map(j => String(j.Job_ID || '')).filter(Boolean))
+  const trailingSet = new Set<FuelBillLog>()
+  const trailingByPlate = new Map<string, FuelBillLog[]>()
+  for (const l of trailingLogs) {
+    const plate = normalizePlate(l.Vehicle_Plate)
+    if (plate) trailingByPlate.set(plate, [...(trailingByPlate.get(plate) || []), l])
+  }
+  trailingByPlate.forEach(list => {
+    const sorted = [...list].sort((a, b) => localStamp(a.Date_Time).localeCompare(localStamp(b.Date_Time)))
+    let lastIdx = -1
+    sorted.forEach((b, i) => { if (b.Trip_Fill_Type !== 'enroute' && parseJobLinks(b.Closes_Job_ID).some(id => periodJobIds.has(id))) lastIdx = i })
+    sorted.slice(0, lastIdx + 1).forEach(b => { trailingSet.add(b); logs = [...logs, b] })
+  })
 
   const byPlate = new Map<string, FuelBillLog[]>()
   for (const l of logs) {
@@ -164,7 +190,7 @@ export function allocateFuelBills(logs: FuelBillLog[], priorLogs: FuelBillLog[],
     // 1. fill cycles
     const cycles: Cycle[] = []
     let prevOdo = Number(anchor.get(plate)?.Odometer) || 0
-    let cur: Cycle = { ...emptyPool(), bills: [], stamps: [], closed: false, linkedJob: null }
+    let cur: Cycle = { ...emptyPool(), bills: [], stamps: [], closed: false, linkedJobs: [] }
     for (const b of bills) {
       const odo = Number(b.Odometer) || 0
       cur.cost += Number(b.Price_Total) || 0
@@ -175,45 +201,75 @@ export function allocateFuelBills(logs: FuelBillLog[], priorLogs: FuelBillLog[],
       cur.stamps.push(localStamp(b.Date_Time))
       if (odo > 0) prevOdo = odo // a bill without odometer can't anchor the next span
       else flags.push({ plate, at: localStamp(b.Date_Time), logId: b.Log_ID ?? null, kind: 'no_odometer', message: 'บิลไม่มีเลขไมล์ — ระยะของรอบนี้ไปรวมกับรอบถัดไป', jobIds: [] })
-      if (b.Trip_Fill_Type !== 'enroute') { cur.closed = true; cur.linkedJob = b.Closes_Job_ID || null; cycles.push(cur); cur = { ...emptyPool(), bills: [], stamps: [], closed: false, linkedJob: null } }
+      if (b.Trip_Fill_Type !== 'enroute') { cur.closed = true; cur.linkedJobs = parseJobLinks(b.Closes_Job_ID); cycles.push(cur); cur = { ...emptyPool(), bills: [], stamps: [], closed: false, linkedJobs: [] } }
     }
     if (cur.count) cycles.push(cur) // trailing enroute fills, no end fill yet
 
     // 2. each end fill closes the latest not-yet-closed jobs.
-    //    An admin link (Closes_Job_ID) is a hard boundary: that fill closes every
-    //    unclosed job up to and including the linked one, and earlier auto-matched
-    //    fills may not take the linked job (or anything after it).
+    //    Admin links (Closes_Job_ID) are hard boundaries and work both ways:
+    //    - one fill → several jobs (short runs cut in one fill)
+    //    - several fills → one job (all their fuel goes to that job)
+    //    A linked fill takes its linked jobs plus every earlier unclosed job;
+    //    auto-matched fills never take a linked job nor pass a job that a later
+    //    fill is linked to.
     const jobIndex = new Map(jobs.map((j, i) => [j.id, i]))
-    const linkedAt = new Map<number, number>() // job index → cycle index that links it
-    cycles.forEach((c, ci) => { const k = c.linkedJob ? jobIndex.get(c.linkedJob) : undefined; if (k !== undefined && !linkedAt.has(k)) linkedAt.set(k, ci) })
+    const linkers = new Map<number, number[]>() // job index → cycle indexes linking it
+    cycles.forEach((c, ci) => c.linkedJobs.forEach(id => {
+      const k = jobIndex.get(id)
+      if (k !== undefined) linkers.set(k, [...(linkers.get(k) || []), ci])
+    }))
+    const jobGroup = new Map<number, Group>() // job index → group that took it
 
     const groups: Group[] = []
-    let ji = 0
     cycles.forEach((c, ci) => {
       const last = c.stamps[c.stamps.length - 1]
       const endBill = c.bills[c.bills.length - 1]
-      const taken: Job[] = []
-      let leading = false
 
-      if (c.linkedJob) {
-        const k = jobIndex.get(c.linkedJob)
-        if (k === undefined) {
-          // linked to a job outside this period (e.g. the day before it starts) — the fill belongs to it, not to jobs here
-          leading = true
-        } else if (k < ji) {
-          flags.push({ plate, at: last, logId: endBill.Log_ID ?? null, kind: 'link_conflict', message: `ผูกกับ ${c.linkedJob} แต่งานนี้ถูกบิลก่อนหน้าตัดไปแล้ว — ตรวจลำดับการผูก`, jobIds: [c.linkedJob] })
-        } else {
-          while (ji <= k) taken.push(jobs[ji++])
+      if (c.linkedJobs.length) {
+        const ks = c.linkedJobs.map(id => jobIndex.get(id)).filter((k): k is number => k !== undefined)
+        if (!ks.length) {
+          // linked only to jobs outside this period (e.g. the day before it starts)
+          groups.push({ cycles: [c], jobs: [], leading: true })
+          return
         }
-      } else {
-        const fillDate = last.slice(0, 10)
-        const hour = Number(last.slice(11, 13)) || 0
-        const ranBefore = (d: string) => d < fillDate || (d === fillDate && (hour >= MORNING_CUTOFF_HOUR || !c.closed))
-        const reservedLater = (i: number) => { const at = linkedAt.get(i); return at !== undefined && at > ci }
-        while (ji < jobs.length && ranBefore(jobs[ji].date) && !reservedLater(ji)) taken.push(jobs[ji++])
-        leading = groups.length === 0 && taken.length === 0
+        const maxK = Math.max(...ks)
+        const fresh: number[] = []
+        for (let i = 0; i <= maxK; i++) {
+          if (jobGroup.has(i)) continue
+          const by = linkers.get(i)
+          if (!by || by.includes(ci)) fresh.push(i) // unlinked earlier job, or linked here
+        }
+        // a linked job already taken by an earlier linked fill → this fill joins that group
+        const joined = Array.from(new Set(ks.map(k => jobGroup.get(k)).filter((g): g is Group => !!g)))
+        const target = joined[0]
+        if (joined.length > 1) {
+          flags.push({ plate, at: last, logId: endBill.Log_ID ?? null, kind: 'link_conflict', message: `บิลนี้ผูกกับงานที่อยู่คนละรอบการตัดน้ำมัน (${c.linkedJobs.join(', ')}) — ตรวจการผูก`, jobIds: c.linkedJobs })
+        }
+        if (target) {
+          target.cycles.push(c)
+          fresh.forEach(i => { target.jobs.push(jobs[i]); jobGroup.set(i, target) })
+        } else {
+          const g: Group = { cycles: [c], jobs: fresh.map(i => jobs[i]), leading: false }
+          fresh.forEach(i => jobGroup.set(i, g))
+          groups.push(g)
+        }
+        return
       }
-      groups.push({ cycles: [c], jobs: taken, leading })
+
+      const fillDate = last.slice(0, 10)
+      const hour = Number(last.slice(11, 13)) || 0
+      const ranBefore = (d: string) => d < fillDate || (d === fillDate && (hour >= MORNING_CUTOFF_HOUR || !c.closed))
+      const taken: number[] = []
+      for (let i = 0; i < jobs.length; i++) {
+        if (jobGroup.has(i)) continue
+        const by = linkers.get(i)
+        if (by) { if (Math.min(...by) > ci) break; continue } // reserved by a linked fill
+        if (!ranBefore(jobs[i].date)) break
+        taken.push(i)
+      }
+      const g: Group = { cycles: [c], jobs: taken.map(i => jobs[i]), leading: groups.length === 0 && taken.length === 0 }
+      taken.forEach(i => jobGroup.set(i, g))
+      groups.push(g)
     })
     // jobs after the last fill have no closing bill yet → caller estimates them
 
@@ -245,13 +301,18 @@ export function allocateFuelBills(logs: FuelBillLog[], priorLogs: FuelBillLog[],
     }
 
     // 4. totals, per-job shares, remaining flags
-    const v: VehicleBillTotals = { total: emptyPool(), covered: emptyPool(), uncovered: { ...emptyPool(), dates: [] }, jobKm: round2(jobs.reduce((s, j) => s + j.km, 0)) }
+    const v: VehicleBillTotals = { total: emptyPool(), covered: emptyPool(), uncovered: { ...emptyPool(), dates: [] }, jobKm: round2(jobs.reduce((s, j) => s + j.km, 0)), trailing: emptyPool(), beforePeriod: emptyPool() }
     for (const g of groups) {
       const pool: Pool = g.cycles.reduce((p, c) => ({ cost: p.cost + c.cost, liters: p.liters + c.liters, km: p.km + c.km, count: p.count + c.count }), emptyPool())
       const lastStamp = g.cycles[g.cycles.length - 1].stamps.slice(-1)[0]
       for (const t of [v.total, g.jobs.length ? v.covered : v.uncovered]) { t.cost += pool.cost; t.liters += pool.liters; t.km += pool.km; t.count += pool.count }
+      for (const b of g.cycles.flatMap(c => c.bills)) {
+        if (!trailingSet.has(b)) continue
+        v.trailing.cost += Number(b.Price_Total) || 0; v.trailing.liters += Number(b.Liters) || 0; v.trailing.count += 1
+      }
 
       if (!g.jobs.length) {
+        if (g.leading) { const b = v.beforePeriod; b.cost += pool.cost; b.liters += pool.liters; b.km += pool.km; b.count += pool.count }
         if (!v.uncovered.dates.includes(lastStamp.slice(0, 10))) v.uncovered.dates.push(lastStamp.slice(0, 10))
         if (!g.leading && pool.km > 0) {
           const endBill = g.cycles[g.cycles.length - 1].bills.slice(-1)[0]
@@ -277,7 +338,7 @@ export function allocateFuelBills(logs: FuelBillLog[], priorLogs: FuelBillLog[],
         shares.set(j.id, { fuelCost: round2(pool.cost * s), liters: round2(pool.liters * s), realKm: round2(pool.km * s), confidence, ratio, groupJobs: g.jobs.length, fills, open })
       }
     }
-    for (const t of [v.total, v.covered, v.uncovered]) { t.cost = round2(t.cost); t.liters = round2(t.liters); t.km = round2(t.km) }
+    for (const t of [v.total, v.covered, v.uncovered, v.trailing, v.beforePeriod]) { t.cost = round2(t.cost); t.liters = round2(t.liters); t.km = round2(t.km) }
     vehicles.set(plate, v)
   })
 

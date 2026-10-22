@@ -33,7 +33,7 @@ export function FuelJobAnalyticsTable({ data }: { data: FuelIntelligenceSummary 
   const [search, setSearch] = useState('')
   const recon = data.billReconciliation
   // Bills not landing on any job: no-job vehicles' bills, minus estimates that have no bill behind them
-  const billGap = +(recon.billCost - (data.totalFuelCost - recon.noBillEstimateCost)).toFixed(2)
+  const billGap = +(recon.billCost + recon.trailingCost - (data.totalFuelCost - recon.noBillEstimateCost)).toFixed(2)
 
   // Export current view to Excel
   const handleExport = () => {
@@ -295,10 +295,10 @@ export function FuelJobAnalyticsTable({ data }: { data: FuelIntelligenceSummary 
               </p>
             </div>
             <div className="rounded-xl bg-muted/40 p-3">
-              <p className="text-[10px] font-black text-muted-foreground">บิลช่วงไม่มีงานในระบบ</p>
+              <p className="text-[10px] font-black text-muted-foreground">บิลที่ไม่ได้ลงงานในช่วงนี้</p>
               <p className={cn("text-base font-black", recon.noJobVehicleCost > 0 ? "text-rose-500" : "text-foreground")}>฿{recon.noJobVehicleCost.toLocaleString()}</p>
               <p className="text-[10px] text-muted-foreground truncate" title={recon.noJobVehiclePlates.join(', ')}>
-                {recon.noJobVehiclePlates.length > 0 ? recon.noJobVehiclePlates.join(', ') : 'ไม่มี'} · ไม่ได้ลงงาน
+                {recon.noJobVehiclePlates.length > 0 ? recon.noJobVehiclePlates.join(', ') : 'ไม่มี'} · ของงานก่อนช่วง/ไม่มีงาน
               </p>
             </div>
             <div className="rounded-xl bg-muted/40 p-3">
@@ -309,7 +309,7 @@ export function FuelJobAnalyticsTable({ data }: { data: FuelIntelligenceSummary 
           </div>
           <p className="text-[10px] text-muted-foreground mt-3">
             ค่าน้ำมันลงงาน ฿{data.totalFuelCost.toLocaleString()} = ตามระยะงาน + ส่วนต่าง + ประมาณการ ·
-            บิลจริง ฿{recon.billCost.toLocaleString()} = ตามระยะงาน + ส่วนต่าง + บิลช่วงไม่มีงาน
+            บิลจริงในช่วง ฿{recon.billCost.toLocaleString()} = ตามระยะงาน + ส่วนต่าง + บิลที่ไม่ได้ลงงาน{recon.trailingCost > 0 && <> − บิลหลังวันสิ้นสุดที่ปิดงานในช่วงนี้ ฿{recon.trailingCost.toLocaleString()}</>}
             {Math.abs(billGap) >= 1 && <> (ต่างกัน ฿{billGap.toLocaleString()})</>}
           </p>
         </PremiumCard>

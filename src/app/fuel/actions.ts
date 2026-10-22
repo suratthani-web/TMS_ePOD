@@ -205,15 +205,17 @@ export async function updateFuelLogStatus(logId: string, status: string) {
   return { success: true, message: 'Status updated successfully' }
 }
 
-/** Admin links an end fill to the job it closes (null = back to auto-match). */
-export async function setFuelLogClosingJob(logId: string, jobId: string | null) {
+/** Admin links an end fill to the job(s) it closes ([] = back to auto-match). Stored comma-separated. */
+export async function setFuelLogClosingJob(logId: string, jobIds: string[]) {
+  const ids = Array.from(new Set(jobIds.map(j => j.trim()).filter(Boolean)))
+  const value = ids.length ? ids.join(',') : null
   const { isAdmin } = await import('@/lib/permissions')
   if (!(await isAdmin())) return { success: false, message: 'ไม่มีสิทธิ์' }
 
   const supabase = createAdminClient()
   const { error } = await supabase
     .from('Fuel_Logs')
-    .update({ Closes_Job_ID: jobId || null })
+    .update({ Closes_Job_ID: value })
     .eq('Log_ID', logId)
 
   if (error) {
@@ -225,12 +227,12 @@ export async function setFuelLogClosingJob(logId: string, jobId: string | null) 
     module: 'Fuel',
     action_type: 'UPDATE',
     target_id: logId,
-    details: { closes_job: jobId || 'auto' }
+    details: { closes_job: value || 'auto' }
   })
 
   revalidatePath('/fuel')
   revalidatePath('/reports/cost-per-trip')
-  return { success: true, message: jobId ? `ผูกกับ ${jobId} แล้ว` : 'กลับเป็นให้ระบบเลือกเอง' }
+  return { success: true, message: ids.length ? `ผูกกับ ${ids.length} งานแล้ว` : 'กลับเป็นให้ระบบเลือกเอง' }
 }
 
 /** Jobs an end fill could close: same truck, Plan_Date within 14 days up to the fill. */

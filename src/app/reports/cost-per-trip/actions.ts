@@ -74,6 +74,8 @@ export interface CostSummary {
     noJobKm: number
     noJobCount: number
     noJobDates: string[]
+    /** bills dated after the period that closed jobs in it (included in allocatedToTrips) */
+    trailingCost: number
   }
   /** Fill labels / jobs the admin should review */
   fuelFlags: FuelFlag[]
@@ -148,7 +150,8 @@ export async function getCostPerTrip(startDate?: string, endDate?: string, custo
   // jobs on the same truck and dump that truck's whole bill onto these rows.
   const admin = createAdminClient()
   const priorFrom = new Date(new Date(`${start}T00:00:00`).getTime() - 60 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10)
-  const [fuelLogs, priorLogs, runJobs, wearRates] = await Promise.all([
+  const trailingTo = new Date(new Date(`${end}T00:00:00`).getTime() + 21 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10)
+  const [fuelLogs, priorLogs, trailingLogs, runJobs, wearRates] = await Promise.all([
     uniquePlates.length > 0
       ? fetchAllRows<FuelBillLog>(() => admin
           .from('Fuel_Logs')
@@ -165,6 +168,16 @@ export async function getCostPerTrip(startDate?: string, endDate?: string, custo
           .in('Vehicle_Plate', uniquePlates)
           .gte('Date_Time', `${priorFrom}T00:00:00`)
           .lt('Date_Time', `${start}T00:00:00`))
+      : Promise.resolve([] as FuelBillLog[]),
+    // Bills after the period: the end fill closing the period's last job may come
+    // the next morning / after a holiday (only admin-linked ones are used)
+    uniquePlates.length > 0
+      ? fetchAllRows<FuelBillLog>(() => admin
+          .from('Fuel_Logs')
+          .select('*')
+          .in('Vehicle_Plate', uniquePlates)
+          .gt('Date_Time', `${end}T23:59:59`)
+          .lte('Date_Time', `${trailingTo}T23:59:59`))
       : Promise.resolve([] as FuelBillLog[]),
     // Every job these trucks ran in the period (all customers) — the denominator
     // for spreading each truck's bills
@@ -183,7 +196,7 @@ export async function getCostPerTrip(startDate?: string, endDate?: string, custo
     getWearRates(admin, end),
   ])
 
-  const { vehicles: vehicleBills, share: billShare, flags: fuelFlags } = allocateFuelBills(fuelLogs || [], priorLogs || [], runJobs || [])
+  const { vehicles: vehicleBills, share: billShare, flags: fuelFlags } = allocateFuelBills(fuelLogs || [], priorLogs || [], runJobs || [], trailingLogs || [])
 
   // Baseline km/L + ฿/L per vehicle — only used for company trucks with no covering bill
   const vehicleEff = new Map<string, { kmPerLiter: number; unitPrice: number }>()
@@ -216,7 +229,7 @@ export async function getCostPerTrip(startDate?: string, endDate?: string, custo
       fuelSource = 'subcontract'
     } else {
       const eff = vehicleEff.get(normalizePlate(d.Vehicle_Plate)) || { kmPerLiter: 8.5, unitPrice: 38 }
-      fuelLiters = estKm > 0 ? round2(estKm / eff.kmPerLiter) : 0
+      fuelLiters = estKm > 0 ? round2((estKm * 2) / eff.kmPerLiter) : 0 // job km is one-way; the truck comes back
       fuelReal = round2(fuelLiters * eff.unitPrice)
       fuelSource = 'estimate'
     }
@@ -291,10 +304,12 @@ export async function getCostPerTrip(startDate?: string, endDate?: string, custo
   const totalProfit = round2(totalRevenue - totalCostSum)
   const totalDistance = sum(t => t.distance_km)
 
-  let billCost = 0, billCount = 0, billLiters = 0, noJobCost = 0, noJobKm = 0, noJobCount = 0
+  // bill totals are for bills dated in the period; trailing (post-period) bills are reported separately
+  let billCost = 0, billCount = 0, billLiters = 0, noJobCost = 0, noJobKm = 0, noJobCount = 0, trailingCost = 0
   const noJobDates = new Set<string>()
   vehicleBills.forEach(b => {
-    billCost += b.total.cost; billCount += b.total.count; billLiters += b.total.liters
+    billCost += b.total.cost - b.trailing.cost; billCount += b.total.count - b.trailing.count; billLiters += b.total.liters - b.trailing.liters
+    trailingCost += b.trailing.cost
     noJobCost += b.uncovered.cost; noJobKm += b.uncovered.km; noJobCount += b.uncovered.count
     b.uncovered.dates.forEach(d => noJobDates.add(d))
   })
@@ -318,6 +333,7 @@ export async function getCostPerTrip(startDate?: string, endDate?: string, custo
       count: billCount,
       liters: round2(billLiters),
       allocatedToTrips: sum(t => (t.fuel_source === 'bill' ? t.fuel_real : 0)),
+      trailingCost: round2(trailingCost),
       noJobCost: round2(noJobCost),
       noJobKm: round2(noJobKm),
       noJobCount,
@@ -351,5 +367,5 @@ function parseExtraCosts(raw: string | unknown[] | null | undefined): { type?: s
 }
 
 function emptySummary(): CostSummary {
-  return { totalTrips: 0, totalDrops: 0, totalRevenue: 0, totalDriverCost: 0, totalFuelCost: 0, totalWearCost: 0, totalCost: 0, totalProfit: 0, totalDistance: 0, totalEstKm: 0, avgProfitPerTrip: 0, avgProfitPct: 0, avgCostPerKm: 0, fuelBills: { cost: 0, count: 0, liters: 0, allocatedToTrips: 0, noJobCost: 0, noJobKm: 0, noJobCount: 0, noJobDates: [] }, fuelFlags: [] }
+  return { totalTrips: 0, totalDrops: 0, totalRevenue: 0, totalDriverCost: 0, totalFuelCost: 0, totalWearCost: 0, totalCost: 0, totalProfit: 0, totalDistance: 0, totalEstKm: 0, avgProfitPerTrip: 0, avgProfitPct: 0, avgCostPerKm: 0, fuelBills: { cost: 0, count: 0, liters: 0, allocatedToTrips: 0, noJobCost: 0, noJobKm: 0, noJobCount: 0, noJobDates: [], trailingCost: 0 }, fuelFlags: [] }
 }

@@ -95,6 +95,8 @@ export interface FuelBillReconciliation {
   noJobVehiclePlates: string[];
   /** Estimated cost of jobs whose vehicle has no bill (e.g. subcontractors) */
   noBillEstimateCost: number;
+  /** Bills dated after the period that closed jobs in it (inside gapCost/allocated) */
+  trailingCost: number;
 }
 
 export interface FuelIntelligenceSummary {
@@ -381,15 +383,42 @@ export async function getFuelIntelligenceAnalytics(
   if (selectedVehicles && selectedVehicles.length > 0) priorQuery = priorQuery.in('Vehicle_Plate', selectedVehicles);
   const { data: priorLogs } = await priorQuery;
 
+  // Bills after the period: the end fill that closes the period's last job may
+  // come the next morning or after a holiday (only admin-linked ones are used).
+  let trailingQuery = supabase
+    .from('Fuel_Logs')
+    .select('*')
+    .gt('Date_Time', `${end}T23:59:59`)
+    .lte('Date_Time', `${new Date(new Date(`${end}T00:00:00`).getTime() + 21 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10)}T23:59:59`);
+  if (effectiveBranch && effectiveBranch !== 'All') trailingQuery = trailingQuery.eq('Branch_ID', effectiveBranch);
+  if (selectedVehicles && selectedVehicles.length > 0) trailingQuery = trailingQuery.in('Vehicle_Plate', selectedVehicles);
+  const { data: trailingLogs } = await trailingQuery;
+
   const { vehicles: vehicleBills, share: billShare, flags: fuelFlags } = allocateFuelBills(
     rawFuelLogs,
     (priorLogs || []) as FuelBillLog[],
     rawJobs as RunJob[],
+    (trailingLogs || []) as FuelBillLog[],
   );
+
+  // Jobs no fill has closed yet: company trucks get a round-trip estimate from the
+  // truck's own bills; subcontracted trucks (รถร่วม) pay their own fuel → 0.
+  const runPlates = Array.from(new Set(jobAllocations.map(j => j.vehiclePlate).filter(p => p && p !== '-')));
+  const { data: ownerRows } = runPlates.length
+    ? await supabase.from('Master_Vehicles').select('Vehicle_Plate, Owner_Type').in('Vehicle_Plate', runPlates)
+    : { data: [] as { Vehicle_Plate: string; Owner_Type?: string | null }[] };
+  const companyPlates = new Set((ownerRows || []).filter((v: { Owner_Type?: string | null }) => String(v.Owner_Type || '').toLowerCase() === 'company').map((v: { Vehicle_Plate: string }) => v.Vehicle_Plate));
 
   for (const a of jobAllocations) {
     const share = billShare(a.jobId);
-    if (!share) continue; // no end fill has closed this job yet → keep estimate
+    if (!share) {
+      a.allocatedFuelCost = companyPlates.has(a.vehiclePlate) ? +(a.directFuelCost * 2).toFixed(2) : 0;
+      a.allocatedLiters = companyPlates.has(a.vehiclePlate) ? +(a.allocatedLiters * 2).toFixed(2) : 0;
+      a.fuelCostPerKm = a.distanceKm > 0 ? +(a.allocatedFuelCost / a.distanceKm).toFixed(2) : 0;
+      a.netProfit = +(a.revenue - a.driverCost - a.allocatedFuelCost).toFixed(2);
+      a.profitMarginPct = a.revenue > 0 ? +((a.netProfit / a.revenue) * 100).toFixed(1) : 0;
+      continue;
+    }
     a.allocatedFuelCost = share.fuelCost;
     a.fuelMatch = {
       confidence: share.confidence,
@@ -420,10 +449,13 @@ export async function getFuelIntelligenceAnalytics(
     noJobVehicleCost: 0,
     noJobVehiclePlates: [],
     noBillEstimateCost: +unmatched.reduce((s, j) => s + j.allocatedFuelCost, 0).toFixed(2),
+    trailingCost: 0,
   };
   vehicleBills.forEach((v, plate) => {
-    billReconciliation.billCost += v.total.cost;
-    billReconciliation.billLiters += v.total.liters;
+    // bills dated in the period; post-period bills that closed jobs here are reported apart
+    billReconciliation.billCost += v.total.cost - v.trailing.cost;
+    billReconciliation.billLiters += v.total.liters - v.trailing.liters;
+    billReconciliation.trailingCost += v.trailing.cost;
     if (v.uncovered.cost > 0) {
       billReconciliation.noJobVehicleCost += v.uncovered.cost;
       billReconciliation.noJobVehiclePlates.push(`${plate} (${v.uncovered.dates.map(d => d.slice(8, 10) + '/' + d.slice(5, 7)).join(', ')})`);
@@ -436,6 +468,7 @@ export async function getFuelIntelligenceAnalytics(
   billReconciliation.gapCost = +billReconciliation.gapCost.toFixed(2);
   billReconciliation.noJobVehicleCost = +billReconciliation.noJobVehicleCost.toFixed(2);
   billReconciliation.noBillEstimateCost = +billReconciliation.noBillEstimateCost.toFixed(2);
+  billReconciliation.trailingCost = +billReconciliation.trailingCost.toFixed(2);
 
   // 5. Daily Aggregation
   const dailyMap = new Map<string, DailyFuelAggregation>();
