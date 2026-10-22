@@ -4,6 +4,7 @@
 // a guess. Several jobs = short runs whose fuel is cut in one fill. None = auto
 // (end fill closes the latest jobs + odometer check).
 import { useEffect, useRef, useState, useTransition } from "react"
+import { createPortal } from "react-dom"
 import { toast } from "sonner"
 import { Link2, Loader2, ChevronDown } from "lucide-react"
 import { setFuelLogClosingJob, type FuelClosingCandidate } from "@/app/fuel/actions"
@@ -34,12 +35,14 @@ export function ClosingJobPicker({
   const btnRef = useRef<HTMLButtonElement>(null)
   const [pending, startTransition] = useTransition()
   const boxRef = useRef<HTMLDivElement>(null)
+  const popRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
     if (!open) return
-    const close = (e: MouseEvent) => { if (boxRef.current && !boxRef.current.contains(e.target as Node)) { setOpen(false); setDraft(saved) } }
+    const inside = (t: EventTarget | null) => !!(boxRef.current?.contains(t as Node) || popRef.current?.contains(t as Node))
+    const close = (e: MouseEvent) => { if (!inside(e.target)) { setOpen(false); setDraft(saved) } }
     // page/table scroll closes it (popup is fixed); scrolling its own job list does not
-    const dismiss = (e: Event) => { if (boxRef.current?.contains(e.target as Node)) return; setOpen(false); setDraft(saved) }
+    const dismiss = (e: Event) => { if (inside(e.target)) return; setOpen(false); setDraft(saved) }
     document.addEventListener('mousedown', close)
     window.addEventListener('scroll', dismiss, true)
     return () => { document.removeEventListener('mousedown', close); window.removeEventListener('scroll', dismiss, true) }
@@ -95,8 +98,9 @@ export function ClosingJobPicker({
         <ChevronDown size={11} className="shrink-0 opacity-60" />
       </button>
 
-      {open && (
-        <div style={{ top: pos.top, left: pos.left }} className="fixed z-50 w-[300px] rounded-xl border border-border bg-popover p-2 shadow-xl">
+      {/* portal: the ledger card lifts on hover (transform), which would turn "fixed" into card-relative and clip it */}
+      {open && createPortal(
+        <div ref={popRef} style={{ top: pos.top, left: pos.left }} className="fixed z-50 w-[300px] rounded-xl border border-border bg-popover p-2 shadow-xl">
           <p className="px-1 pb-1.5 text-[10px] font-semibold text-muted-foreground">เลือกงานที่บิลนี้ตัดน้ำมัน (เลือกได้หลายงาน)</p>
           <div className="max-h-56 space-y-0.5 overflow-y-auto">
             {options.length === 0 && <p className="px-1 py-2 text-[11px] text-muted-foreground">ไม่มีงานของรถคันนี้ในช่วง 14 วันก่อนวันเติม</p>}
@@ -118,7 +122,8 @@ export function ClosingJobPicker({
               บันทึก {draft.length ? `(${draft.length} งาน)` : ''}
             </button>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
     </div>
   )

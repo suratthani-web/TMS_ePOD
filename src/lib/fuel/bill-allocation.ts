@@ -76,7 +76,25 @@ export type JobBillShare = {
   open: boolean
 }
 
-export type FuelFlagKind = 'end_mid_trip' | 'no_job' | 'km_mismatch' | 'no_odometer' | 'link_conflict'
+/** One closed fill group (bill-to-bill), as matched to jobs — the unit the anomaly check compares. */
+export type FuelGroupSummary = {
+  plate: string
+  startStamp: string
+  endStamp: string
+  endLogId: string | null
+  billLogIds: string[]
+  km: number
+  liters: number
+  cost: number
+  jobIds: string[]
+  /** ends with an end fill */
+  closed: boolean
+  /** every bill has an odometer and the first span has an anchor → km is the true span */
+  complete: boolean
+  linked: boolean
+}
+
+export type FuelFlagKind = 'end_mid_trip' | 'no_job' | 'km_mismatch' | 'no_odometer' | 'link_conflict' | 'fuel_excess'
 
 export type FuelFlag = {
   plate: string
@@ -120,7 +138,7 @@ const fmtFill = (stamp: string, type?: string | null) =>
 const emptyPool = (): Pool => ({ cost: 0, liters: 0, km: 0, count: 0 })
 
 type Job = { id: string; date: string; km: number }
-type Cycle = Pool & { bills: FuelBillLog[]; stamps: string[]; closed: boolean; linkedJobs: string[] }
+type Cycle = Pool & { bills: FuelBillLog[]; stamps: string[]; closed: boolean; linkedJobs: string[]; gap: boolean }
 /** leading = closes a job from before the period (not a no-job run) */
 type Group = { cycles: Cycle[]; jobs: Job[]; leading: boolean }
 const isLinked = (g: Group) => g.cycles.some(c => c.linkedJobs.length > 0)
@@ -182,6 +200,7 @@ export function allocateFuelBills(logs: FuelBillLog[], priorLogs: FuelBillLog[],
   const vehicles = new Map<string, VehicleBillTotals>()
   const shares = new Map<string, JobBillShare>()
   const flags: FuelFlag[] = []
+  const groupList: FuelGroupSummary[] = []
 
   byPlate.forEach((list, plate) => {
     const bills = [...list].sort((a, b) => localStamp(a.Date_Time).localeCompare(localStamp(b.Date_Time)))
@@ -190,9 +209,10 @@ export function allocateFuelBills(logs: FuelBillLog[], priorLogs: FuelBillLog[],
     // 1. fill cycles
     const cycles: Cycle[] = []
     let prevOdo = Number(anchor.get(plate)?.Odometer) || 0
-    let cur: Cycle = { ...emptyPool(), bills: [], stamps: [], closed: false, linkedJobs: [] }
+    let cur: Cycle = { ...emptyPool(), bills: [], stamps: [], closed: false, linkedJobs: [], gap: false }
     for (const b of bills) {
       const odo = Number(b.Odometer) || 0
+      if (!(odo > 0 && prevOdo > 0 && odo > prevOdo)) cur.gap = true
       cur.cost += Number(b.Price_Total) || 0
       cur.liters += Number(b.Liters) || 0
       cur.km += odo > 0 && prevOdo > 0 && odo > prevOdo ? odo - prevOdo : 0
@@ -201,7 +221,7 @@ export function allocateFuelBills(logs: FuelBillLog[], priorLogs: FuelBillLog[],
       cur.stamps.push(localStamp(b.Date_Time))
       if (odo > 0) prevOdo = odo // a bill without odometer can't anchor the next span
       else flags.push({ plate, at: localStamp(b.Date_Time), logId: b.Log_ID ?? null, kind: 'no_odometer', message: 'บิลไม่มีเลขไมล์ — ระยะของรอบนี้ไปรวมกับรอบถัดไป', jobIds: [] })
-      if (b.Trip_Fill_Type !== 'enroute') { cur.closed = true; cur.linkedJobs = parseJobLinks(b.Closes_Job_ID); cycles.push(cur); cur = { ...emptyPool(), bills: [], stamps: [], closed: false, linkedJobs: [] } }
+      if (b.Trip_Fill_Type !== 'enroute') { cur.closed = true; cur.linkedJobs = parseJobLinks(b.Closes_Job_ID); cycles.push(cur); cur = { ...emptyPool(), bills: [], stamps: [], closed: false, linkedJobs: [], gap: false } }
     }
     if (cur.count) cycles.push(cur) // trailing enroute fills, no end fill yet
 
@@ -305,6 +325,13 @@ export function allocateFuelBills(logs: FuelBillLog[], priorLogs: FuelBillLog[],
     for (const g of groups) {
       const pool: Pool = g.cycles.reduce((p, c) => ({ cost: p.cost + c.cost, liters: p.liters + c.liters, km: p.km + c.km, count: p.count + c.count }), emptyPool())
       const lastStamp = g.cycles[g.cycles.length - 1].stamps.slice(-1)[0]
+      const endBillOf = g.cycles[g.cycles.length - 1].bills.slice(-1)[0]
+      groupList.push({
+        plate, startStamp: g.cycles[0].stamps[0], endStamp: lastStamp, endLogId: endBillOf.Log_ID ?? null,
+        billLogIds: g.cycles.flatMap(c => c.bills.map(b => String(b.Log_ID || ''))).filter(Boolean),
+        km: round2(pool.km), liters: round2(pool.liters), cost: round2(pool.cost), jobIds: g.jobs.map(j => j.id),
+        closed: g.cycles[g.cycles.length - 1].closed, complete: !g.cycles.some(c => c.gap), linked: isLinked(g),
+      })
       for (const t of [v.total, g.jobs.length ? v.covered : v.uncovered]) { t.cost += pool.cost; t.liters += pool.liters; t.km += pool.km; t.count += pool.count }
       for (const b of g.cycles.flatMap(c => c.bills)) {
         if (!trailingSet.has(b)) continue
@@ -346,7 +373,7 @@ export function allocateFuelBills(logs: FuelBillLog[], priorLogs: FuelBillLog[],
   const share = (jobId: string | null | undefined): JobBillShare | null => shares.get(String(jobId || '')) ?? null
 
   flags.sort((a, b) => a.at.localeCompare(b.at))
-  return { vehicles, share, flags }
+  return { vehicles, share, flags, groups: groupList }
 }
 
 function round2(n: number) {

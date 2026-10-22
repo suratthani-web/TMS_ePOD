@@ -12,6 +12,7 @@ import { isSuperAdmin, getUserBranchId } from "@/lib/permissions"
 import { cookies } from "next/headers"
 import { FuelClient } from "./fuel-client"
 import { getFuelClosingCandidates } from "./actions"
+import { getFuelCyclesByIds } from "@/lib/fuel/fuel-cycles"
 
 type Props = {
   searchParams: Promise<{ [key: string]: string | string[] | undefined }>
@@ -59,7 +60,11 @@ export default async function FuelPage(props: Props) {
   ])
 
   // Jobs an end fill on this page could close (admin links fill → job)
-  const closingCandidates = await getFuelClosingCandidates(logs || [])
+  // Fill cycles closed by the bills on this page (abnormal-use check)
+  const [closingCandidates, fuelCycles] = await Promise.all([
+    getFuelClosingCandidates(logs || []),
+    getFuelCyclesByIds((logs || []).map((l: { Log_ID: string }) => l.Log_ID)),
+  ])
 
   // แสดงเฉพาะรถบริษัท (Owner_Type = 'company') — รถร่วม/รถอิสระ (independent/sub)
   // บริษัทไม่ได้เติมน้ำมันให้และไม่รู้ยอดเติม จึงไม่ต้องโชว์ในเมนูบันทึกน้ำมัน
@@ -74,6 +79,7 @@ export default async function FuelPage(props: Props) {
       <FuelClient
           logs={logs}
           closingCandidates={closingCandidates}
+          fuelCycles={fuelCycles}
           count={count}
           drivers={drivers.data}
           vehicles={companyVehicles}

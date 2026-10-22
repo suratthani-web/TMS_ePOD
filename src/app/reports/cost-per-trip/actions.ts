@@ -5,6 +5,7 @@ import { getUserBranchId, getCustomerId, isAdmin } from "@/lib/permissions"
 import { fetchAllRows } from "@/lib/supabase/analytics-helpers"
 import { getWearRates, type WearRateSource } from "@/lib/supabase/wear-rate"
 import { allocateFuelBills, normalizePlate, FUEL_RUN_STATUSES, type FuelBillLog, type RunJob, type FuelFlag } from "@/lib/fuel/bill-allocation"
+import { fuelExcessFlags } from "@/lib/fuel/fuel-cycles"
 import type { FuelMatchInfo } from "@/components/fuel/fuel-match"
 
 export interface TripCost {
@@ -351,7 +352,7 @@ export async function getCostPerTrip(startDate?: string, endDate?: string, custo
       noJobDates: Array.from(noJobDates).sort(),
     },
     // Fleet-level review items — internal only
-    fuelFlags: customerId ? [] : fuelFlags,
+    fuelFlags: customerId ? [] : [...fuelFlags, ...(await fuelExcessFlags({ start, end, plates: uniquePlates }))].sort((a, b) => a.at.localeCompare(b.at)),
     documentChecks: customerId ? [] : await checkDocuments(admin, rows),
   }
 

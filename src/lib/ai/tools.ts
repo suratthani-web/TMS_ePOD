@@ -13,6 +13,7 @@ import { getFleetHealthAlerts } from "@/lib/supabase/fleet-health"
 import { getWorkforceAnalytics } from "@/lib/supabase/workforce-analytics"
 import { createAdminClient } from '@/utils/supabase/server'
 import { fetchAllRows } from '@/lib/supabase/analytics-helpers'
+import { scheduleFuelCycleSync } from '@/lib/fuel/fuel-cycles'
 import { geocodeAddress } from '@/lib/ai/geocoding'
 import { logAction, type ActionRef } from '@/lib/ai/audit-log'
 
@@ -732,6 +733,7 @@ export const aiToolExecutors = {
         Trip_Fill_Type: args.tripFillType === 'enroute' ? 'enroute' : 'end',
         Status: 'Pending',
     }).select().single()
+    if (!error) scheduleFuelCycleSync()
 
     if (!error && args.plate && args.odometer && args.odometer > 0) {
       try {

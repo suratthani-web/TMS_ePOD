@@ -7,6 +7,7 @@ import { revalidatePath } from 'next/cache'
 import { getUserBranchId } from '@/lib/permissions'
 import { logActivity } from '@/lib/supabase/logs'
 import { analyzeFuelLog } from '@/lib/actions/fleet-intelligence-actions'
+import { scheduleFuelCycleSync } from '@/lib/fuel/fuel-cycles'
 
 export type FuelFormData = {
   Date_Time: string | null
@@ -119,6 +120,7 @@ export async function createFuelLog(data: FuelFormData) {
       }
     })
 
+    scheduleFuelCycleSync()
     revalidatePath('/fuel')
     return { success: true, message: 'Fuel Log created successfully' }
   } catch (err: unknown) {
@@ -162,6 +164,7 @@ export async function updateFuelLog(logId: string, data: FuelFormData) {
     }
   })
 
+  scheduleFuelCycleSync()
   revalidatePath('/fuel')
   return { success: true, message: 'Fuel Log updated successfully' }
 }
@@ -201,6 +204,7 @@ export async function updateFuelLogStatus(logId: string, status: string) {
     }
   })
 
+  scheduleFuelCycleSync()
   revalidatePath('/fuel')
   return { success: true, message: 'Status updated successfully' }
 }
@@ -230,6 +234,7 @@ export async function setFuelLogClosingJob(logId: string, jobIds: string[]) {
     details: { closes_job: value || 'auto' }
   })
 
+  scheduleFuelCycleSync()
   revalidatePath('/fuel')
   revalidatePath('/reports/cost-per-trip')
   return { success: true, message: ids.length ? `ผูกกับ ${ids.length} งานแล้ว` : 'กลับเป็นให้ระบบเลือกเอง' }
@@ -276,6 +281,40 @@ export async function deleteFuelLog(logId: string) {
     return { success: false, message: 'Failed to delete log' }
   }
 
+  scheduleFuelCycleSync()
   revalidatePath('/fuel')
   return { success: true, message: 'Fuel Log deleted successfully' }
+}
+
+/** Admin review of an abnormal fuel cycle. ok = explained (stays history), confirmed_issue = real problem (left out of baselines), null = clear. */
+export async function reviewFuelCycle(cycleId: string, review: 'ok' | 'confirmed_issue' | null, note?: string) {
+  const { isAdmin } = await import('@/lib/permissions')
+  if (!(await isAdmin())) return { success: false, message: 'ไม่มีสิทธิ์' }
+  if (review && review !== 'ok' && review !== 'confirmed_issue') return { success: false, message: 'ค่าไม่ถูกต้อง' }
+
+  const { getSession } = await import('@/lib/session')
+  const session = await getSession().catch(() => null)
+  const supabase = createAdminClient()
+  const { error } = await supabase
+    .from('Fuel_Cycles')
+    .update({
+      Review_Status: review,
+      Review_Note: review ? (note || '').trim().slice(0, 500) || null : null,
+      Reviewed_By: review ? (session?.username || session?.userId || null) : null,
+      Reviewed_At: review ? new Date().toISOString() : null,
+    })
+    .eq('Cycle_ID', cycleId)
+
+  if (error) {
+    const missing = /Fuel_Cycles|schema cache|relation/i.test(error.message || '')
+    return { success: false, message: missing ? 'ยังไม่ได้รัน SQL 20261022_fuel_cycles.sql' : 'บันทึกไม่สำเร็จ' }
+  }
+
+  await logActivity({ module: 'Fuel', action_type: 'UPDATE', target_id: cycleId, details: { fuel_cycle_review: review || 'cleared', note: note || null } })
+
+  // confirmed issues leave the baselines → other cycles' verdicts may change
+  scheduleFuelCycleSync()
+  revalidatePath('/fuel')
+  revalidatePath('/reports/cost-per-trip')
+  return { success: true, message: review === 'ok' ? 'บันทึกว่าปกติ (มีเหตุผล) แล้ว' : review === 'confirmed_issue' ? 'บันทึกว่าผิดปกติจริงแล้ว' : 'ล้างการตรวจแล้ว' }
 }

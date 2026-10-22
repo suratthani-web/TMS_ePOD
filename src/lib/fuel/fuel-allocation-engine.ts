@@ -7,6 +7,7 @@ import type { FuelLog } from "@/lib/supabase/fuel"
 import type { Job } from "@/lib/supabase/jobs"
 import { parseExtraCosts } from "@/lib/supabase/analytics-helpers"
 import { allocateFuelBills, type FuelBillLog, type RunJob, type FuelConfidence, type FuelFlag } from "@/lib/fuel/bill-allocation"
+import { fuelExcessFlags } from "@/lib/fuel/fuel-cycles"
 
 export interface JobFuelAllocation {
   jobId: string;
@@ -617,7 +618,7 @@ export async function getFuelIntelligenceAnalytics(
     totalProfit,
     avgProfitMarginPct,
     billReconciliation,
-    fuelFlags,
+    fuelFlags: [...fuelFlags, ...(await fuelExcessFlags({ start, end, plates: selectedVehicles || undefined }))].sort((a, b) => a.at.localeCompare(b.at)),
     jobAllocations,
     dailyAggregations,
     weeklyAggregations,

@@ -12,6 +12,7 @@ import { TMS_SCHEMA_PROMPT } from '@/lib/ai/schema-context'
 import { parseVoiceMessage } from '@/lib/ai/voice-action-parser'
 import { validateFuelSlip, resolveFleetPlate } from '@/lib/fuel/fuel-slip-validator'
 import { suggestFillType } from '@/lib/supabase/fuel'
+import { scheduleFuelCycleSync } from '@/lib/fuel/fuel-cycles'
 import fs from 'fs'
 
 // ─────────────────────────────────────────────────────────────────
@@ -531,6 +532,7 @@ export async function POST(req: NextRequest) {
                         .from('Fuel_Logs')
                         .update({ Trip_Fill_Type: fillType })
                         .eq('Log_ID', logId)
+                    if (!setErr) scheduleFuelCycleSync()
                     await replyToUser(replyToken, setErr
                         ? '❌ อัปเดตประเภทการเติมไม่สำเร็จครับ'
                         : `✅ อัปเดตเป็น "${fillType === 'enroute' ? 'เติมระหว่างทาง (งานยังไม่จบ)' : 'เติมปกติ (ก่อน/หลังงาน)'}" เรียบร้อยครับ`)
@@ -2189,6 +2191,7 @@ export async function POST(req: NextRequest) {
                                 Branch_ID: branchId || 'URT',
                                 Status: 'Pending'
                             })
+                            scheduleFuelCycleSync()
                             await replyToUser(replyToken, `${prefix}\n⛽ บันทึกการเติมน้ำมันสำเร็จ:\n- ทะเบียน: ${plate}\n- ปริมาณ: ${liters} ลิตร\n- ยอดเงิน: ฿${totalAmount.toLocaleString()}\n- เลขไมล์: ${odometer > 0 ? odometer.toLocaleString() + ' กม.' : 'ไม่ระบุ'}\n- ปั๊ม: ${station}`)
                             continue
                         }
@@ -2540,6 +2543,7 @@ If it is NOT a fuel receipt, return {"classification":"other"}. No markdown, JSO
                                 Trip_Fill_Type: drvSuggested,
                                 Status: 'Pending'
                             })
+                            scheduleFuelCycleSync()
 
                             // Sync vehicle odometer forward in Master_Vehicles
                             if (validation.resolvedPlate && validation.odometer > 0) {

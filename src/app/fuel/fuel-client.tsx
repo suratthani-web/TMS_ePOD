@@ -43,11 +43,15 @@ import type { FuelIntelligenceSummary } from "@/lib/fuel/fuel-allocation-engine"
 import { EntityAvatar } from "@/components/ui/entity-avatar"
 import { ClosingJobPicker } from "@/components/fuel/closing-job-picker"
 import type { FuelClosingCandidate } from "./actions"
+import { FuelCycleBadge } from "@/components/fuel/fuel-cycle-badge"
+import type { FuelCycleRow } from "@/lib/fuel/fuel-cycles"
 
 type FuelClientProps = {
   logs: EnrichedFuelLog[]
   /** Jobs an end fill may close, for the admin link picker */
   closingCandidates?: FuelClosingCandidate[]
+  /** Fill cycles closed by these bills (Cycle_ID = end Log_ID) */
+  fuelCycles?: FuelCycleRow[]
   count: number
   drivers: Driver[]
   vehicles: { Vehicle_Plate?: string | null; Vehicle_Type?: string | null }[]
@@ -67,6 +71,7 @@ type MainTab = 'tms_core' | 'dtc_import'
 export function FuelClient({ 
   logs, 
   closingCandidates = [],
+  fuelCycles = [],
   count, 
   drivers, 
   vehicles, 
@@ -502,6 +507,10 @@ export function FuelClient({
                                   candidates={closingCandidates.filter(j => j.Vehicle_Plate === log.Vehicle_Plate)}
                                 />
                               )}
+                              {(() => {
+                                const cycle = fuelCycles.find(c => c.Cycle_ID === log.Log_ID)
+                                return cycle ? <FuelCycleBadge cycle={cycle} /> : null
+                              })()}
                             </td>
                             <td className="px-4 py-3.5 max-w-[180px]">
                               <p className="font-black text-foreground truncate">{log.Station_Name || "ปั๊มน้ำมัน"}</p>
