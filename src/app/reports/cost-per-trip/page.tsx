@@ -76,7 +76,7 @@ export default async function CostPerTripPage(props: PageProps) {
           </div>
 
           <div className="flex flex-wrap items-center gap-3 relative z-10">
-            <ExportCSVButton data={trips} />
+            <ExportCSVButton start={start} end={end} customers={customers} disabled={trips.length === 0} />
             <div className="flex items-center gap-2.5 px-4 py-2 bg-primary/10 rounded-xl border border-primary/20">
               <div className="w-2 h-2 rounded-full bg-primary" />
               <span className="text-xs font-semibold text-primary">Financial audit</span>

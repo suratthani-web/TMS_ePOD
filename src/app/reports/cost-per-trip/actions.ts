@@ -82,6 +82,8 @@ export interface CostSummary {
   }
   /** Fill labels / jobs the admin should review */
   fuelFlags: FuelFlag[]
+  /** issued invoices / driver vouchers that no longer match the jobs (internal only) */
+  documentChecks: DocumentCheck[]
 }
 
 type CostTripSourceRow = {
@@ -107,6 +109,8 @@ type CostTripSourceRow = {
   Loaded_Qty?: number | string | null
   Total_Drop?: number | string | null
   original_destinations_json?: string | unknown[] | null
+  Invoice_ID?: string | null
+  Driver_Payment_ID?: string | null
 }
 
 export async function getCostPerTrip(startDate?: string, endDate?: string, customerNames?: string[]): Promise<{ trips: TripCost[], summary: CostSummary }> {
@@ -128,7 +132,7 @@ export async function getCostPerTrip(startDate?: string, endDate?: string, custo
   const data = await fetchAllRows<CostTripSourceRow>(() => {
     let query = supabase
       .from('Jobs_Main')
-      .select('Job_ID, Plan_Date, Customer_Name, Route_Name, Origin_Location, Dest_Location, Driver_Name, Vehicle_Plate, Job_Status, Price_Cust_Total, Cost_Driver_Total, Price_Cust_Extra, Cost_Driver_Extra, extra_costs_json, Est_Distance_KM, Loaded_Qty, Total_Drop, original_destinations_json')
+      .select('Job_ID, Plan_Date, Customer_Name, Route_Name, Origin_Location, Dest_Location, Driver_Name, Vehicle_Plate, Job_Status, Price_Cust_Total, Cost_Driver_Total, Price_Cust_Extra, Cost_Driver_Extra, extra_costs_json, Est_Distance_KM, Loaded_Qty, Total_Drop, original_destinations_json, Invoice_ID, Driver_Payment_ID')
       // Include Billed/Paid and Verified so completed work that has moved into
       // invoicing/verification still counts toward profitability.
       .in('Job_Status', ['Completed', 'Delivered', 'Finished', 'Closed', 'Billed', 'Paid', 'Verified'])
@@ -348,6 +352,7 @@ export async function getCostPerTrip(startDate?: string, endDate?: string, custo
     },
     // Fleet-level review items — internal only
     fuelFlags: customerId ? [] : fuelFlags,
+    documentChecks: customerId ? [] : await checkDocuments(admin, rows),
   }
 
   return { trips, summary }
@@ -374,5 +379,66 @@ function parseExtraCosts(raw: string | unknown[] | null | undefined): { type?: s
 }
 
 function emptySummary(): CostSummary {
-  return { totalTrips: 0, totalDrops: 0, totalRevenue: 0, totalDriverCost: 0, totalFuelCost: 0, totalWearCost: 0, totalCost: 0, totalProfit: 0, totalDistance: 0, totalEstKm: 0, avgProfitPerTrip: 0, avgProfitPct: 0, avgCostPerKm: 0, fuelBills: { cost: 0, count: 0, liters: 0, allocatedToTrips: 0, noJobCost: 0, noJobKm: 0, noJobCount: 0, noJobDates: [], trailingCost: 0, beforePeriodCost: 0, beforePeriodCount: 0 }, fuelFlags: [] }
+  return { totalTrips: 0, totalDrops: 0, totalRevenue: 0, totalDriverCost: 0, totalFuelCost: 0, totalWearCost: 0, totalCost: 0, totalProfit: 0, totalDistance: 0, totalEstKm: 0, avgProfitPerTrip: 0, avgProfitPct: 0, avgCostPerKm: 0, fuelBills: { cost: 0, count: 0, liters: 0, allocatedToTrips: 0, noJobCost: 0, noJobKm: 0, noJobCount: 0, noJobDates: [], trailingCost: 0, beforePeriodCost: 0, beforePeriodCount: 0 }, fuelFlags: [], documentChecks: [] }
+}
+
+export type DocumentCheck = {
+  kind: 'invoice' | 'driver_payment'
+  docId: string
+  status: string
+  docAmount: number
+  currentAmount: number
+  detail: string
+}
+
+/**
+ * Compares issued documents with the jobs as they are now: invoices (per job line)
+ * and driver payment vouchers (whole voucher vs its jobs' current pay). Jobs edited
+ * after the document was issued show up here so the report and the paperwork agree.
+ */
+async function checkDocuments(admin: ReturnType<typeof createAdminClient>, rows: CostTripSourceRow[]): Promise<DocumentCheck[]> {
+  const out: DocumentCheck[] = []
+  const jobRevenue = (j: CostTripSourceRow) => {
+    const ex = parseExtraCosts(j.extra_costs_json ?? j.extra_costs)
+    return (Number(j.Price_Cust_Total) || 0) + (Number(j.Price_Cust_Extra) || 0) + ex.reduce((s, c) => s + (Number(c?.charge_cust) || 0), 0)
+  }
+  const jobPay = (j: { Cost_Driver_Total?: number | string | null; Cost_Driver_Extra?: number | string | null; extra_costs_json?: string | unknown[] | null }) => {
+    const ex = parseExtraCosts(j.extra_costs_json)
+    return (Number(j.Cost_Driver_Total) || 0) + (Number(j.Cost_Driver_Extra) || 0) + ex.reduce((s, c) => s + (Number(c?.cost_driver) || 0), 0)
+  }
+
+  const invoiceIds = Array.from(new Set(rows.map(r => r.Invoice_ID).filter(Boolean))) as string[]
+  if (invoiceIds.length) {
+    const { data: invoices } = await admin.from('invoices').select('Invoice_ID, Status, Items_JSON').in('Invoice_ID', invoiceIds)
+    for (const inv of (invoices || []) as { Invoice_ID: string; Status: string | null; Items_JSON: unknown }[]) {
+      let items = inv.Items_JSON
+      if (typeof items === 'string') { try { items = JSON.parse(items) } catch { items = [] } }
+      for (const it of (Array.isArray(items) ? items : []) as { Job_ID?: string; Price_Cust_Total?: number | string; Price_Cust_Extra?: number | string }[]) {
+        const job = rows.find(r => r.Job_ID === it.Job_ID)
+        if (!job) continue
+        const docAmount = (Number(it.Price_Cust_Total) || 0) + (Number(it.Price_Cust_Extra) || 0)
+        const now = jobRevenue(job)
+        if (Math.abs(now - docAmount) >= 1) {
+          out.push({ kind: 'invoice', docId: inv.Invoice_ID, status: inv.Status || '-', docAmount, currentAmount: now, detail: `งาน ${job.Job_ID} (${job.Plan_Date || '-'}) — รายได้ในงานถูกแก้หลังออกใบแจ้งหนี้` })
+        }
+      }
+    }
+  }
+
+  const paymentIds = Array.from(new Set(rows.map(r => r.Driver_Payment_ID).filter(Boolean))) as string[]
+  if (paymentIds.length) {
+    const [{ data: pays }, { data: payJobs }] = await Promise.all([
+      admin.from('Driver_Payments').select('Driver_Payment_ID, Status, Total_Amount').in('Driver_Payment_ID', paymentIds),
+      admin.from('Jobs_Main').select('Driver_Payment_ID, Cost_Driver_Total, Cost_Driver_Extra, extra_costs_json').in('Driver_Payment_ID', paymentIds),
+    ])
+    for (const p of (pays || []) as { Driver_Payment_ID: string; Status: string | null; Total_Amount: number | null }[]) {
+      const jobs = ((payJobs || []) as { Driver_Payment_ID: string; Cost_Driver_Total?: number | null; Cost_Driver_Extra?: number | null; extra_costs_json?: string | unknown[] | null }[]).filter(j => j.Driver_Payment_ID === p.Driver_Payment_ID)
+      const now = jobs.reduce((s, j) => s + jobPay(j), 0)
+      const docAmount = Number(p.Total_Amount) || 0
+      if (Math.abs(now - docAmount) >= 1) {
+        out.push({ kind: 'driver_payment', docId: p.Driver_Payment_ID, status: p.Status || '-', docAmount, currentAmount: now, detail: `ค่าคนขับในงาน ${jobs.length} งานของใบนี้ถูกแก้หลังออกใบทำจ่าย` })
+      }
+    }
+  }
+  return out
 }
