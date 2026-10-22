@@ -24,6 +24,7 @@ import { Badge } from "@/components/ui/badge"
 import { cn } from "@/lib/utils"
 import * as XLSX from "xlsx"
 import type { FuelIntelligenceSummary } from "@/lib/fuel/fuel-allocation-engine"
+import { FuelMatchBadge, FuelFlagsPanel } from "@/components/fuel/fuel-match"
 
 type ViewMode = 'job' | 'daily' | 'weekly' | 'monthly'
 
@@ -53,6 +54,9 @@ export function FuelJobAnalyticsTable({ data }: { data: FuelIntelligenceSummary 
         "ค่าน้ำมันตามระยะ (บาท)": j.directFuelCost,
         "ส่วนต่าง กม.เปล่ากลับฐาน (บาท)": j.gapFuelCost,
         "ค่าน้ำมันลงงาน ตามบิล (บาท)": j.allocatedFuelCost,
+        "ความมั่นใจการจับคู่บิล": j.fuelMatch ? { high: 'สูง', medium: 'ปานกลาง', low: 'ต่ำ' }[j.fuelMatch.confidence] : 'ประมาณ',
+        "ไมล์จริง/ระยะงานไป-กลับ (%)": j.fuelMatch ? Math.round(j.fuelMatch.ratio * 100) : '',
+        "บิลที่จับคู่": j.fuelMatch ? j.fuelMatch.fills.join(', ') : '',
         "อัตราสิ้นเปลือง (km/L)": j.kmPerLiter,
         "ต้นทุนน้ำมัน/กม. (บาท/กม.)": j.fuelCostPerKm,
         "รายได้ (บาท)": j.revenue,
@@ -298,7 +302,7 @@ export function FuelJobAnalyticsTable({ data }: { data: FuelIntelligenceSummary 
               </p>
             </div>
             <div className="rounded-xl bg-muted/40 p-3">
-              <p className="text-[10px] font-black text-muted-foreground">ประมาณการ (รถไม่มีบิล)</p>
+              <p className="text-[10px] font-black text-muted-foreground">ประมาณการ (งานยังไม่มีบิลจบงาน)</p>
               <p className="text-base font-black text-foreground">฿{recon.noBillEstimateCost.toLocaleString()}</p>
               <p className="text-[10px] text-muted-foreground">ไม่อยู่ในยอดบิล</p>
             </div>
@@ -310,6 +314,8 @@ export function FuelJobAnalyticsTable({ data }: { data: FuelIntelligenceSummary 
           </p>
         </PremiumCard>
       )}
+
+      <FuelFlagsPanel flags={data.fuelFlags} />
 
       {/* Control Bar: View Mode Switcher + Search + Export */}
       <div className="flex flex-col md:flex-row items-stretch md:items-center justify-between gap-4 bg-background p-4 rounded-2xl border border-border shadow-sm">
@@ -370,7 +376,7 @@ export function FuelJobAnalyticsTable({ data }: { data: FuelIntelligenceSummary 
                   <th className="p-3.5">ลูกค้า / เส้นทาง</th>
                   <th className="p-3.5 text-right">ระยะทาง (กม.)</th>
                   <th className="p-3.5 text-right" title="น้ำมันที่งานนี้ใช้จริง = ระยะทาง ÷ อัตราสิ้นเปลือง (km/L)">น้ำมันที่ใช้ (L)</th>
-                  <th className="p-3.5 text-right" title="บิลน้ำมันจริงของรถคันนี้ในช่วงที่เลือก กระจายลงงานตามสัดส่วนระยะทาง (รวม กม.เปล่ากลับฐาน/วันไม่มีงาน) — รถที่ไม่มีบิลใช้ค่าประมาณตามระยะ">
+                  <th className="p-3.5 text-right" title="บิลจริงที่จับคู่กับงานนี้: เติมจบงานตัดน้ำมันงานล่าสุด ตรวจกับเลขไมล์ (รวมขากลับวิ่งเปล่า) — งานที่ยังไม่มีบิลจบงานใช้ค่าประมาณตามระยะ">
                     <div>ค่าน้ำมันลงงาน (฿)</div>
                     <span className="text-[8px] font-normal text-muted-foreground block -mt-0.5 normal-case">(ตามบิลจริง)</span>
                   </th>
@@ -417,6 +423,7 @@ export function FuelJobAnalyticsTable({ data }: { data: FuelIntelligenceSummary 
                             ระยะ ฿{j.directFuelCost.toLocaleString()} {j.gapFuelCost >= 0 ? '+' : '−'} เปล่า ฿{Math.abs(j.gapFuelCost).toLocaleString()}
                           </p>
                         )}
+                        <FuelMatchBadge match={j.fuelMatch} className="mt-0.5" />
                       </td>
                       <td className="p-3.5 text-right font-black">
                         <span className={cn(

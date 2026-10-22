@@ -8,6 +8,7 @@ import React from "react"
 import { getAllCustomers } from "@/lib/supabase/customers"
 import { ProfitReportFilters } from "./profit-report-filters"
 import { ExportCSVButton } from "./export-csv-button"
+import { FuelMatchBadge, FuelFlagsPanel } from "@/components/fuel/fuel-match"
 import { DEFAULT_WEAR_RATE_PER_KM, type WearRateSource } from "@/lib/supabase/wear-rate"
 
 const WEAR_SOURCE_LABEL: Record<WearRateSource, string> = {
@@ -27,7 +28,7 @@ function formatKm(n: number) {
 
 const FUEL_SOURCE_LABEL = {
   bill: 'บิลจริง',
-  estimate: 'ประมาณ (ไม่มีบิล)',
+  estimate: 'ประมาณ (ยังไม่มีบิลจบงาน)',
   subcontract: 'รถร่วม',
 } as const
 
@@ -125,14 +126,16 @@ export default async function CostPerTripPage(props: PageProps) {
           </div>
         </div>
 
+        <FuelFlagsPanel flags={summary.fuelFlags} />
+
         {/* Cost Breakdown Table */}
         <div className="bg-card rounded-2xl border border-border shadow-sm overflow-hidden">
           <div className="px-6 py-4 border-b border-border bg-muted/30 flex flex-col lg:flex-row lg:justify-between lg:items-center gap-3">
             <h2 className="font-semibold text-foreground">รายละเอียดกำไร-ขาดทุนรายเที่ยว</h2>
             <div className="text-xs font-medium text-amber-700 dark:text-amber-400 bg-amber-500/10 px-3 py-1.5 rounded-xl leading-relaxed">
               * ค่าคนขับ = ค่าเที่ยว + ค่าใช้จ่ายอื่นฝั่งคนขับ (เด็กรถ/ขึ้นชั้น/ทางด่วน ฯลฯ) — ยอดเดียวกับใบทำจ่ายคนขับ (ก่อนหัก ณ ที่จ่าย)<br />
-              * น้ำมัน = บิลเติมจริงของรถคันนั้นที่มีงานอยู่ระหว่างบิลก่อนหน้ากับบิลนั้น กระจายลงงานตามสัดส่วนระยะทาง (รวมขาวิ่งเปล่ากลับฐาน); รถร่วม = 0 (น้ำมันเป็นของรถร่วม)<br />
-              * ระยะทาง = ไมล์จริงจากบิลชนบิล (เลขไมล์บิลนี้ − บิลก่อนหน้า) ของบิลชุดเดียวกัน กระจายตามสัดส่วนระยะงาน; รถที่ไม่มีบิลใช้ระยะตามงาน<br />
+              * น้ำมัน = บิลเติมจริง จับคู่ด้วยกติกา &quot;เติมจบงาน = ตัดน้ำมันงานล่าสุด&quot; (เติมระหว่างทางรวมกับงานที่กำลังวิ่ง) ตรวจกับเลขไมล์ — รอบที่ไมล์เกิน/ขาดสลับกันระบบรวมเป็นกลุ่มเดียว แล้วแบ่งตามระยะงาน; ป้าย = ความมั่นใจ (ชี้ดูบิลที่จับคู่); รถร่วม = 0<br />
+              * ระยะทาง = ไมล์จริงจากบิลชนบิลของบิลที่จับคู่กับงาน (รวมขากลับวิ่งเปล่า); งานที่ยังไม่มีบิลจบงานใช้ระยะตามงาน<br />
               * ค่าสึกหรอ = ระยะตามงาน × อัตรา ฿/กม. ของรถคันนั้น (ค่าซ่อมที่ปิดงาน + ค่ายาง ย้อนหลัง 12 เดือน); ข้อมูลไม่พอใช้ค่าเฉลี่ยกองรถ หรือค่าตั้งต้น {DEFAULT_WEAR_RATE_PER_KM} ฿/กม.
               {summary.fuelBills.count > 0 && (
                 <>
@@ -249,6 +252,7 @@ export default async function CostPerTripPage(props: PageProps) {
                                 ? FUEL_SOURCE_LABEL.subcontract
                                 : `${trip.fuel_liters.toLocaleString('th-TH', { maximumFractionDigits: 1 })} ลิตร · ${FUEL_SOURCE_LABEL[trip.fuel_source]}`}
                             </div>
+                            {trip.fuel_source !== 'subcontract' && <FuelMatchBadge match={trip.fuel_match} className="mt-0.5" />}
                           </td>
                           <td className="px-4 py-4 text-right text-foreground whitespace-nowrap">
                             ฿{formatMoney(trip.maint_real)}

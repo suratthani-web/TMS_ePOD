@@ -4,7 +4,8 @@ import { createClient, createAdminClient } from '@/utils/supabase/server'
 import { getUserBranchId, getCustomerId, isAdmin } from "@/lib/permissions"
 import { fetchAllRows } from "@/lib/supabase/analytics-helpers"
 import { getWearRates, type WearRateSource } from "@/lib/supabase/wear-rate"
-import { allocateFuelBills, normalizePlate, FUEL_RUN_STATUSES, type FuelBillLog, type RunJob } from "@/lib/fuel/bill-allocation"
+import { allocateFuelBills, normalizePlate, FUEL_RUN_STATUSES, type FuelBillLog, type RunJob, type FuelFlag } from "@/lib/fuel/bill-allocation"
+import type { FuelMatchInfo } from "@/components/fuel/fuel-match"
 
 export interface TripCost {
   Job_ID: string
@@ -25,8 +26,10 @@ export interface TripCost {
   extra_items: { type: string; amount: number }[]
   fuel_real: number
   fuel_liters: number
-  /** bill = real bills spread by distance; estimate = company truck without bills; subcontract = รถร่วม (fuel is theirs) */
+  /** bill = real bills matched to the job; estimate = company truck with no end fill closing it yet; subcontract = รถร่วม (fuel is theirs) */
   fuel_source: 'bill' | 'estimate' | 'subcontract'
+  /** How the bills were matched (confidence, odometer fit, fills); null unless fuel_source = bill */
+  fuel_match: FuelMatchInfo
   maint_real: number
   /** ฿/km wear rate applied to this trip and where it came from. */
   maint_rate: number
@@ -72,6 +75,8 @@ export interface CostSummary {
     noJobCount: number
     noJobDates: string[]
   }
+  /** Fill labels / jobs the admin should review */
+  fuelFlags: FuelFlag[]
 }
 
 type CostTripSourceRow = {
@@ -147,7 +152,7 @@ export async function getCostPerTrip(startDate?: string, endDate?: string, custo
     uniquePlates.length > 0
       ? fetchAllRows<FuelBillLog>(() => admin
           .from('Fuel_Logs')
-          .select('Vehicle_Plate, Date_Time, Price_Total, Liters, Odometer, Trip_Fill_Type')
+          .select('Log_ID, Vehicle_Plate, Date_Time, Price_Total, Liters, Odometer, Trip_Fill_Type')
           .in('Vehicle_Plate', uniquePlates)
           .gte('Date_Time', `${start}T00:00:00`)
           .lte('Date_Time', `${end}T23:59:59`))
@@ -156,7 +161,7 @@ export async function getCostPerTrip(startDate?: string, endDate?: string, custo
     uniquePlates.length > 0
       ? fetchAllRows<FuelBillLog>(() => admin
           .from('Fuel_Logs')
-          .select('Vehicle_Plate, Date_Time, Price_Total, Liters, Odometer, Trip_Fill_Type')
+          .select('Log_ID, Vehicle_Plate, Date_Time, Price_Total, Liters, Odometer, Trip_Fill_Type')
           .in('Vehicle_Plate', uniquePlates)
           .gte('Date_Time', `${priorFrom}T00:00:00`)
           .lt('Date_Time', `${start}T00:00:00`))
@@ -166,7 +171,7 @@ export async function getCostPerTrip(startDate?: string, endDate?: string, custo
     uniquePlates.length > 0
       ? fetchAllRows<RunJob>(() => admin
           .from('Jobs_Main')
-          .select('Vehicle_Plate, Plan_Date, Est_Distance_KM')
+          .select('Job_ID, Vehicle_Plate, Plan_Date, Est_Distance_KM')
           .in('Vehicle_Plate', uniquePlates)
           .in('Job_Status', FUEL_RUN_STATUSES)
           .gte('Plan_Date', start)
@@ -178,7 +183,7 @@ export async function getCostPerTrip(startDate?: string, endDate?: string, custo
     getWearRates(admin, end),
   ])
 
-  const { vehicles: vehicleBills, share: billShare } = allocateFuelBills(fuelLogs || [], priorLogs || [], runJobs || [])
+  const { vehicles: vehicleBills, share: billShare, flags: fuelFlags } = allocateFuelBills(fuelLogs || [], priorLogs || [], runJobs || [])
 
   // Baseline km/L + ฿/L per vehicle — only used for company trucks with no covering bill
   const vehicleEff = new Map<string, { kmPerLiter: number; unitPrice: number }>()
@@ -194,9 +199,10 @@ export async function getCostPerTrip(startDate?: string, endDate?: string, custo
     const loadedQty = Number(d.Loaded_Qty) || 0
     const wear = wearRates.get(d.Vehicle_Plate)
 
-    // Fuel: the truck's real bills spread by distance share. No bill → รถร่วม pays
-    // their own fuel (0); a company truck gets an estimate and is flagged as such.
-    const share = billShare(d.Vehicle_Plate, estKm)
+    // Fuel: real bills matched to this job (end fill closes the latest jobs,
+    // odometer-checked). Not closed yet → รถร่วม pays their own fuel (0); a
+    // company truck gets an estimate and is flagged as such.
+    const share = billShare(d.Job_ID)
     let fuelReal: number
     let fuelLiters: number
     let fuelSource: TripCost['fuel_source']
@@ -261,6 +267,7 @@ export async function getCostPerTrip(startDate?: string, endDate?: string, custo
       fuel_real: fuelReal,
       fuel_liters: fuelLiters,
       fuel_source: fuelSource,
+      fuel_match: share ? { confidence: share.confidence, ratio: share.ratio, groupJobs: share.groupJobs, fills: share.fills, open: share.open } : null,
       maint_real: maintReal,
       maint_rate: wear.ratePerKm,
       maint_rate_source: wear.source,
@@ -316,6 +323,8 @@ export async function getCostPerTrip(startDate?: string, endDate?: string, custo
       noJobCount,
       noJobDates: Array.from(noJobDates).sort(),
     },
+    // Fleet-level review items — internal only
+    fuelFlags: customerId ? [] : fuelFlags,
   }
 
   return { trips, summary }
@@ -342,5 +351,5 @@ function parseExtraCosts(raw: string | unknown[] | null | undefined): { type?: s
 }
 
 function emptySummary(): CostSummary {
-  return { totalTrips: 0, totalDrops: 0, totalRevenue: 0, totalDriverCost: 0, totalFuelCost: 0, totalWearCost: 0, totalCost: 0, totalProfit: 0, totalDistance: 0, totalEstKm: 0, avgProfitPerTrip: 0, avgProfitPct: 0, avgCostPerKm: 0, fuelBills: { cost: 0, count: 0, liters: 0, allocatedToTrips: 0, noJobCost: 0, noJobKm: 0, noJobCount: 0, noJobDates: [] } }
+  return { totalTrips: 0, totalDrops: 0, totalRevenue: 0, totalDriverCost: 0, totalFuelCost: 0, totalWearCost: 0, totalCost: 0, totalProfit: 0, totalDistance: 0, totalEstKm: 0, avgProfitPerTrip: 0, avgProfitPct: 0, avgCostPerKm: 0, fuelBills: { cost: 0, count: 0, liters: 0, allocatedToTrips: 0, noJobCost: 0, noJobKm: 0, noJobCount: 0, noJobDates: [] }, fuelFlags: [] }
 }
