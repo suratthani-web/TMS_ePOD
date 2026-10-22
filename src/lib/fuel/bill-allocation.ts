@@ -47,7 +47,7 @@ export type VehicleBillTotals = {
   total: Pool
   /** bills that landed on jobs */
   covered: Pool
-  /** bills of groups with no job (incl. a leading cycle that closes a job from before the period) */
+  /** bills of groups with no job here (incl. beforePeriod); dates = only the true no-job runs */
   uncovered: Pool & { dates: string[] }
   /** job km (Est_Distance_KM) of the vehicle's jobs in the period */
   jobKm: number
@@ -313,7 +313,7 @@ export function allocateFuelBills(logs: FuelBillLog[], priorLogs: FuelBillLog[],
 
       if (!g.jobs.length) {
         if (g.leading) { const b = v.beforePeriod; b.cost += pool.cost; b.liters += pool.liters; b.km += pool.km; b.count += pool.count }
-        if (!v.uncovered.dates.includes(lastStamp.slice(0, 10))) v.uncovered.dates.push(lastStamp.slice(0, 10))
+        if (!g.leading && !v.uncovered.dates.includes(lastStamp.slice(0, 10))) v.uncovered.dates.push(lastStamp.slice(0, 10))
         if (!g.leading && pool.km > 0) {
           const endBill = g.cycles[g.cycles.length - 1].bills.slice(-1)[0]
           flags.push({ plate, at: lastStamp, logId: endBill.Log_ID ?? null, kind: 'no_job', message: `รถวิ่ง ${Math.round(pool.km)} กม. (฿${Math.round(pool.cost).toLocaleString()}) แต่ไม่มีงานในระบบ — ลืมเปิดงาน หรือป้ายเติมผิด`, jobIds: [] })

@@ -90,13 +90,15 @@ export interface FuelBillReconciliation {
   directJobCost: number;
   /** Bills − direct cost for vehicles with jobs, spread onto their jobs by distance */
   gapCost: number;
-  /** Bills with no job in the system since the previous bill — not allocated to any job */
+  /** Bills of trucks running with no job in the system (excl. bills of jobs before the period) */
   noJobVehicleCost: number;
   noJobVehiclePlates: string[];
   /** Estimated cost of jobs whose vehicle has no bill (e.g. subcontractors) */
   noBillEstimateCost: number;
   /** Bills dated after the period that closed jobs in it (inside gapCost/allocated) */
   trailingCost: number;
+  /** Bills dated in the period that close jobs before it (linked) — counted in that period */
+  beforePeriodCost: number;
 }
 
 export interface FuelIntelligenceSummary {
@@ -450,14 +452,16 @@ export async function getFuelIntelligenceAnalytics(
     noJobVehiclePlates: [],
     noBillEstimateCost: +unmatched.reduce((s, j) => s + j.allocatedFuelCost, 0).toFixed(2),
     trailingCost: 0,
+    beforePeriodCost: 0,
   };
   vehicleBills.forEach((v, plate) => {
     // bills dated in the period; post-period bills that closed jobs here are reported apart
     billReconciliation.billCost += v.total.cost - v.trailing.cost;
     billReconciliation.billLiters += v.total.liters - v.trailing.liters;
     billReconciliation.trailingCost += v.trailing.cost;
-    if (v.uncovered.cost > 0) {
-      billReconciliation.noJobVehicleCost += v.uncovered.cost;
+    billReconciliation.beforePeriodCost += v.beforePeriod.cost;
+    if (v.uncovered.cost - v.beforePeriod.cost > 0) {
+      billReconciliation.noJobVehicleCost += v.uncovered.cost - v.beforePeriod.cost;
       billReconciliation.noJobVehiclePlates.push(`${plate} (${v.uncovered.dates.map(d => d.slice(8, 10) + '/' + d.slice(5, 7)).join(', ')})`);
     }
   });
@@ -469,6 +473,7 @@ export async function getFuelIntelligenceAnalytics(
   billReconciliation.noJobVehicleCost = +billReconciliation.noJobVehicleCost.toFixed(2);
   billReconciliation.noBillEstimateCost = +billReconciliation.noBillEstimateCost.toFixed(2);
   billReconciliation.trailingCost = +billReconciliation.trailingCost.toFixed(2);
+  billReconciliation.beforePeriodCost = +billReconciliation.beforePeriodCost.toFixed(2);
 
   // 5. Daily Aggregation
   const dailyMap = new Map<string, DailyFuelAggregation>();

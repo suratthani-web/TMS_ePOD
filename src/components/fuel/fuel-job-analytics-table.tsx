@@ -33,7 +33,8 @@ export function FuelJobAnalyticsTable({ data }: { data: FuelIntelligenceSummary 
   const [search, setSearch] = useState('')
   const recon = data.billReconciliation
   // Bills not landing on any job: no-job vehicles' bills, minus estimates that have no bill behind them
-  const billGap = +(recon.billCost + recon.trailingCost - (data.totalFuelCost - recon.noBillEstimateCost)).toFixed(2)
+  // what is left unexplained after jobs, earlier-period jobs and no-job runs (should be 0)
+  const billGap = +(recon.billCost + recon.trailingCost - (data.totalFuelCost - recon.noBillEstimateCost) - recon.beforePeriodCost - recon.noJobVehicleCost).toFixed(2)
 
   // Export current view to Excel
   const handleExport = () => {
@@ -295,11 +296,14 @@ export function FuelJobAnalyticsTable({ data }: { data: FuelIntelligenceSummary 
               </p>
             </div>
             <div className="rounded-xl bg-muted/40 p-3">
-              <p className="text-[10px] font-black text-muted-foreground">บิลที่ไม่ได้ลงงานในช่วงนี้</p>
+              <p className="text-[10px] font-black text-muted-foreground">รถวิ่งแต่ไม่มีงาน</p>
               <p className={cn("text-base font-black", recon.noJobVehicleCost > 0 ? "text-rose-500" : "text-foreground")}>฿{recon.noJobVehicleCost.toLocaleString()}</p>
               <p className="text-[10px] text-muted-foreground truncate" title={recon.noJobVehiclePlates.join(', ')}>
-                {recon.noJobVehiclePlates.length > 0 ? recon.noJobVehiclePlates.join(', ') : 'ไม่มี'} · ของงานก่อนช่วง/ไม่มีงาน
+                {recon.noJobVehiclePlates.length > 0 ? `${recon.noJobVehiclePlates.join(', ')} · ตรวจว่าลืมเปิดงาน` : 'ไม่มี'}
               </p>
+              {recon.beforePeriodCost > 0 && (
+                <p className="text-[10px] text-muted-foreground mt-1">ของงานก่อนช่วง (ผูกแล้ว) ฿{recon.beforePeriodCost.toLocaleString()} — นับในช่วงของงานนั้น</p>
+              )}
             </div>
             <div className="rounded-xl bg-muted/40 p-3">
               <p className="text-[10px] font-black text-muted-foreground">ประมาณการ (งานยังไม่มีบิลจบงาน)</p>
@@ -309,7 +313,7 @@ export function FuelJobAnalyticsTable({ data }: { data: FuelIntelligenceSummary 
           </div>
           <p className="text-[10px] text-muted-foreground mt-3">
             ค่าน้ำมันลงงาน ฿{data.totalFuelCost.toLocaleString()} = ตามระยะงาน + ส่วนต่าง + ประมาณการ ·
-            บิลจริงในช่วง ฿{recon.billCost.toLocaleString()} = ตามระยะงาน + ส่วนต่าง + บิลที่ไม่ได้ลงงาน{recon.trailingCost > 0 && <> − บิลหลังวันสิ้นสุดที่ปิดงานในช่วงนี้ ฿{recon.trailingCost.toLocaleString()}</>}
+            บิลจริงในช่วง ฿{recon.billCost.toLocaleString()} = ตามระยะงาน + ส่วนต่าง + ของงานก่อนช่วง + รถวิ่งไม่มีงาน{recon.trailingCost > 0 && <> − บิลหลังวันสิ้นสุดที่ปิดงานในช่วงนี้ ฿{recon.trailingCost.toLocaleString()}</>}
             {Math.abs(billGap) >= 1 && <> (ต่างกัน ฿{billGap.toLocaleString()})</>}
           </p>
         </PremiumCard>

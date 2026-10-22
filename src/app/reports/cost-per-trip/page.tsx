@@ -141,11 +141,14 @@ export default async function CostPerTripPage(props: PageProps) {
                 <>
                   <br />* บิลน้ำมันของรถในรายงาน ฿{formatMoney(summary.fuelBills.cost)} ({summary.fuelBills.count} บิล, {summary.fuelBills.liters.toLocaleString()} ลิตร) · ลงเที่ยวในตารางนี้ ฿{formatMoney(summary.fuelBills.allocatedToTrips)}
                   {summary.fuelBills.trailingCost > 0 && <> (รวมบิลหลังวันสิ้นสุดที่ปิดงานในช่วงนี้ ฿{formatMoney(summary.fuelBills.trailingCost)})</>}
-                  {summary.fuelBills.noJobCost > 0 && (
-                    <> · <span className="font-semibold text-red-600 dark:text-red-400">ไม่ได้ลงงานในช่วงนี้ ฿{formatMoney(summary.fuelBills.noJobCost)} ({summary.fuelBills.noJobCount} บิล, {formatKm(summary.fuelBills.noJobKm)} กม.; {summary.fuelBills.noJobDates.map(d => d.slice(8, 10) + '/' + d.slice(5, 7)).join(', ')})</span> — ของงานก่อนช่วงนี้ (ตามที่ผูก) หรือรถวิ่งแต่ไม่มีงาน ควรตรวจว่าลืมเปิดงาน</>
+                  {summary.fuelBills.beforePeriodCost > 0 && (
+                    <> · ของงานก่อนช่วงนี้ (ผูกแล้ว) ฿{formatMoney(summary.fuelBills.beforePeriodCost)} ({summary.fuelBills.beforePeriodCount} บิล) — นับในเดือน/ช่วงของงานนั้น</>
                   )}
-                  {Math.abs(summary.fuelBills.cost + summary.fuelBills.trailingCost - summary.fuelBills.allocatedToTrips - summary.fuelBills.noJobCost) >= 1 && (
-                    <> · ส่วนที่เหลือ ฿{formatMoney(summary.fuelBills.cost + summary.fuelBills.trailingCost - summary.fuelBills.allocatedToTrips - summary.fuelBills.noJobCost)} เป็นของงานที่ยังไม่ปิด / ลูกค้าอื่นบนรถคันเดียวกัน</>
+                  {summary.fuelBills.noJobCost > 0 && (
+                    <> · <span className="font-semibold text-red-600 dark:text-red-400">รถวิ่งแต่ไม่มีงาน ฿{formatMoney(summary.fuelBills.noJobCost)} ({summary.fuelBills.noJobCount} บิล, {formatKm(summary.fuelBills.noJobKm)} กม.; {summary.fuelBills.noJobDates.map(d => d.slice(8, 10) + '/' + d.slice(5, 7)).join(', ')})</span> — ควรตรวจว่าลืมเปิดงาน (รายได้หาย) หรือใช้นอกงาน</>
+                  )}
+                  {Math.abs(summary.fuelBills.cost + summary.fuelBills.trailingCost - summary.fuelBills.allocatedToTrips - summary.fuelBills.noJobCost - summary.fuelBills.beforePeriodCost) >= 1 && (
+                    <> · ส่วนที่เหลือ ฿{formatMoney(summary.fuelBills.cost + summary.fuelBills.trailingCost - summary.fuelBills.allocatedToTrips - summary.fuelBills.noJobCost - summary.fuelBills.beforePeriodCost)} เป็นของงานที่ยังไม่ปิด / ลูกค้าอื่นบนรถคันเดียวกัน</>
                   )}
                 </>
               )}

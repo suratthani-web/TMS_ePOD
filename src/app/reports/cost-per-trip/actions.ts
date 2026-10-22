@@ -76,6 +76,9 @@ export interface CostSummary {
     noJobDates: string[]
     /** bills dated after the period that closed jobs in it (included in allocatedToTrips) */
     trailingCost: number
+    /** bills dated in the period that close jobs before it (not in this report) */
+    beforePeriodCost: number
+    beforePeriodCount: number
   }
   /** Fill labels / jobs the admin should review */
   fuelFlags: FuelFlag[]
@@ -305,12 +308,14 @@ export async function getCostPerTrip(startDate?: string, endDate?: string, custo
   const totalDistance = sum(t => t.distance_km)
 
   // bill totals are for bills dated in the period; trailing (post-period) bills are reported separately
-  let billCost = 0, billCount = 0, billLiters = 0, noJobCost = 0, noJobKm = 0, noJobCount = 0, trailingCost = 0
+  let billCost = 0, billCount = 0, billLiters = 0, noJobCost = 0, noJobKm = 0, noJobCount = 0, trailingCost = 0, beforePeriodCost = 0, beforePeriodCount = 0
   const noJobDates = new Set<string>()
   vehicleBills.forEach(b => {
     billCost += b.total.cost - b.trailing.cost; billCount += b.total.count - b.trailing.count; billLiters += b.total.liters - b.trailing.liters
     trailingCost += b.trailing.cost
-    noJobCost += b.uncovered.cost; noJobKm += b.uncovered.km; noJobCount += b.uncovered.count
+    // bills that close a job before the period (linked by admin) are not "no job" runs
+    beforePeriodCost += b.beforePeriod.cost; beforePeriodCount += b.beforePeriod.count
+    noJobCost += b.uncovered.cost - b.beforePeriod.cost; noJobKm += b.uncovered.km - b.beforePeriod.km; noJobCount += b.uncovered.count - b.beforePeriod.count
     b.uncovered.dates.forEach(d => noJobDates.add(d))
   })
 
@@ -334,6 +339,8 @@ export async function getCostPerTrip(startDate?: string, endDate?: string, custo
       liters: round2(billLiters),
       allocatedToTrips: sum(t => (t.fuel_source === 'bill' ? t.fuel_real : 0)),
       trailingCost: round2(trailingCost),
+      beforePeriodCost: round2(beforePeriodCost),
+      beforePeriodCount,
       noJobCost: round2(noJobCost),
       noJobKm: round2(noJobKm),
       noJobCount,
@@ -367,5 +374,5 @@ function parseExtraCosts(raw: string | unknown[] | null | undefined): { type?: s
 }
 
 function emptySummary(): CostSummary {
-  return { totalTrips: 0, totalDrops: 0, totalRevenue: 0, totalDriverCost: 0, totalFuelCost: 0, totalWearCost: 0, totalCost: 0, totalProfit: 0, totalDistance: 0, totalEstKm: 0, avgProfitPerTrip: 0, avgProfitPct: 0, avgCostPerKm: 0, fuelBills: { cost: 0, count: 0, liters: 0, allocatedToTrips: 0, noJobCost: 0, noJobKm: 0, noJobCount: 0, noJobDates: [], trailingCost: 0 }, fuelFlags: [] }
+  return { totalTrips: 0, totalDrops: 0, totalRevenue: 0, totalDriverCost: 0, totalFuelCost: 0, totalWearCost: 0, totalCost: 0, totalProfit: 0, totalDistance: 0, totalEstKm: 0, avgProfitPerTrip: 0, avgProfitPct: 0, avgCostPerKm: 0, fuelBills: { cost: 0, count: 0, liters: 0, allocatedToTrips: 0, noJobCost: 0, noJobKm: 0, noJobCount: 0, noJobDates: [], trailingCost: 0, beforePeriodCost: 0, beforePeriodCount: 0 }, fuelFlags: [] }
 }
