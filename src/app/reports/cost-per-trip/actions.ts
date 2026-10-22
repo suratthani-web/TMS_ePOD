@@ -152,7 +152,7 @@ export async function getCostPerTrip(startDate?: string, endDate?: string, custo
     uniquePlates.length > 0
       ? fetchAllRows<FuelBillLog>(() => admin
           .from('Fuel_Logs')
-          .select('Log_ID, Vehicle_Plate, Date_Time, Price_Total, Liters, Odometer, Trip_Fill_Type')
+          .select('*') // '*' so Closes_Job_ID is picked up once the column exists (an explicit missing column would fail the whole query)
           .in('Vehicle_Plate', uniquePlates)
           .gte('Date_Time', `${start}T00:00:00`)
           .lte('Date_Time', `${end}T23:59:59`))

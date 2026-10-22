@@ -41,9 +41,13 @@ import type { Driver } from "@/lib/supabase/drivers"
 import type { Branch } from "@/lib/supabase/branches"
 import type { FuelIntelligenceSummary } from "@/lib/fuel/fuel-allocation-engine"
 import { EntityAvatar } from "@/components/ui/entity-avatar"
+import { ClosingJobPicker } from "@/components/fuel/closing-job-picker"
+import type { FuelClosingCandidate } from "./actions"
 
 type FuelClientProps = {
   logs: EnrichedFuelLog[]
+  /** Jobs an end fill may close, for the admin link picker */
+  closingCandidates?: FuelClosingCandidate[]
   count: number
   drivers: Driver[]
   vehicles: { Vehicle_Plate?: string | null; Vehicle_Type?: string | null }[]
@@ -62,6 +66,7 @@ type MainTab = 'tms_core' | 'dtc_import'
 
 export function FuelClient({ 
   logs, 
+  closingCandidates = [],
   count, 
   drivers, 
   vehicles, 
@@ -425,6 +430,7 @@ export function FuelClient({
                             "พนักงานขับรถ": l.Driver_Name || '-',
                             "สถานี/ปั๊มน้ำมัน": l.Station_Name || '-',
                             "ประเภท": l.Trip_Fill_Type === 'enroute' ? 'เติมระหว่างทาง' : 'เติมจบงาน',
+                            "ปิดงาน (ผูกโดยแอดมิน)": l.Closes_Job_ID || '',
                             "เลขไมล์ (กม.)": l.Odometer || '',
                             "ระยะทางช่วงนี้ (กม.)": l.Delta_Km || '',
                             "จำนวนลิตร": l.Liters || 0,
@@ -487,6 +493,14 @@ export function FuelClient({
                                 <span className="text-[8px] px-1.5 py-0.5 rounded-full font-black uppercase tracking-wide bg-amber-500/20 text-amber-500 border border-amber-500/20 inline-block mt-0.5">
                                   🛣️ ระหว่างทาง
                                 </span>
+                              )}
+                              {log.Trip_Fill_Type !== 'enroute' && (
+                                <ClosingJobPicker
+                                  logId={log.Log_ID}
+                                  fillDateTime={log.Date_Time}
+                                  value={log.Closes_Job_ID}
+                                  candidates={closingCandidates.filter(j => j.Vehicle_Plate === log.Vehicle_Plate)}
+                                />
                               )}
                             </td>
                             <td className="px-4 py-3.5 max-w-[180px]">

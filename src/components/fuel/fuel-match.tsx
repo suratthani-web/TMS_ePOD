@@ -5,6 +5,7 @@ import type { FuelConfidence, FuelFlag } from "@/lib/fuel/bill-allocation"
 import { cn } from "@/lib/utils"
 
 const CONFIDENCE_STYLE: Record<FuelConfidence | 'estimate', { label: string; className: string }> = {
+  confirmed: { label: 'ยืนยันแล้ว', className: 'bg-sky-500/10 text-sky-700 dark:text-sky-400 border-sky-500/30' },
   high: { label: 'มั่นใจสูง', className: 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/30' },
   medium: { label: 'ปานกลาง', className: 'bg-amber-500/10 text-amber-700 dark:text-amber-400 border-amber-500/30' },
   low: { label: 'ต่ำ', className: 'bg-rose-500/10 text-rose-600 dark:text-rose-400 border-rose-500/30' },
@@ -26,6 +27,7 @@ export function FuelMatchBadge({ match, className }: { match: FuelMatchInfo; cla
   const title = match
     ? [
         `บิลที่จับคู่: ${match.fills.join(', ')}`,
+        match.confidence === 'confirmed' ? 'แอดมินผูกบิลจบงานกับงานนี้แล้ว' : '',
         match.groupJobs > 1 ? `ใช้บิลชุดนี้ร่วมกัน ${match.groupJobs} งาน (แบ่งตามระยะงาน)` : 'บิลชุดนี้เป็นของงานนี้งานเดียว',
         match.ratio > 0 ? `ไมล์จริง ${Math.round(match.ratio * 100)}% ของระยะงานไป-กลับ` : 'ไม่มีเลขไมล์ให้ตรวจ',
         match.open ? 'ยังไม่มีบิลจบงานปิดรอบ — เป็นน้ำมันเท่าที่เติมถึงตอนนี้' : '',
@@ -45,6 +47,7 @@ const FLAG_LABEL: Record<FuelFlag['kind'], string> = {
   no_job: 'รถวิ่งแต่ไม่มีงาน',
   km_mismatch: 'ไมล์ไม่ตรงระยะงาน',
   no_odometer: 'บิลไม่มีเลขไมล์',
+  link_conflict: 'การผูกงานขัดกัน',
 }
 
 const fmtStamp = (s: string) => `${s.slice(8, 10)}/${s.slice(5, 7)} ${s.slice(11, 16)}`
@@ -62,7 +65,7 @@ export function FuelFlagsPanel({ flags, className }: { flags: FuelFlag[]; classN
         </span>
       </summary>
       <p className="mt-2 text-[11px] text-muted-foreground">
-        ระบบใช้กติกา &quot;เติมจบงาน = ตัดน้ำมันงานล่าสุด&quot; แล้วตรวจกับเลขไมล์ (งานควรใช้ราว 2× ระยะงาน) — แก้ป้ายเติมหรือวันที่งานที่ผิด ตัวเลขจะแม่นขึ้นเอง
+        ระบบใช้กติกา &quot;เติมจบงาน = ตัดน้ำมันงานล่าสุด&quot; แล้วตรวจกับเลขไมล์ (งานควรใช้ราว 2× ระยะงาน) — แก้ป้ายเติม/วันที่งาน หรือผูกบิลจบงานกับงานในแท็บ &quot;ประวัติการเติมน้ำมันละเอียด&quot; ตัวเลขจะแม่นขึ้น
       </p>
       <ul className="mt-2 space-y-1.5">
         {flags.map((f, i) => (

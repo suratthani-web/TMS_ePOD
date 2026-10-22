@@ -11,6 +11,7 @@ import { getAllBranches } from "@/lib/supabase/branches"
 import { isSuperAdmin, getUserBranchId } from "@/lib/permissions"
 import { cookies } from "next/headers"
 import { FuelClient } from "./fuel-client"
+import { getFuelClosingCandidates } from "./actions"
 
 type Props = {
   searchParams: Promise<{ [key: string]: string | string[] | undefined }>
@@ -57,6 +58,9 @@ export default async function FuelPage(props: Props) {
     getAllBranches()
   ])
 
+  // Jobs an end fill on this page could close (admin links fill → job)
+  const closingCandidates = await getFuelClosingCandidates(logs || [])
+
   // แสดงเฉพาะรถบริษัท (Owner_Type = 'company') — รถร่วม/รถอิสระ (independent/sub)
   // บริษัทไม่ได้เติมน้ำมันให้และไม่รู้ยอดเติม จึงไม่ต้องโชว์ในเมนูบันทึกน้ำมัน
   // NB: เดิมกรองด้วย "Sub_ID ว่าง" ซึ่งพลาด รถ independent 32 คัน (Sub_ID ว่างแต่เป็นรถร่วม)
@@ -69,6 +73,7 @@ export default async function FuelPage(props: Props) {
     <DashboardLayout>
       <FuelClient
           logs={logs}
+          closingCandidates={closingCandidates}
           count={count}
           drivers={drivers.data}
           vehicles={companyVehicles}

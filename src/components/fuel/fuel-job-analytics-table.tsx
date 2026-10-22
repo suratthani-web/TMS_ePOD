@@ -54,7 +54,7 @@ export function FuelJobAnalyticsTable({ data }: { data: FuelIntelligenceSummary 
         "ค่าน้ำมันตามระยะ (บาท)": j.directFuelCost,
         "ส่วนต่าง กม.เปล่ากลับฐาน (บาท)": j.gapFuelCost,
         "ค่าน้ำมันลงงาน ตามบิล (บาท)": j.allocatedFuelCost,
-        "ความมั่นใจการจับคู่บิล": j.fuelMatch ? { high: 'สูง', medium: 'ปานกลาง', low: 'ต่ำ' }[j.fuelMatch.confidence] : 'ประมาณ',
+        "ความมั่นใจการจับคู่บิล": j.fuelMatch ? { confirmed: 'ยืนยันแล้ว', high: 'สูง', medium: 'ปานกลาง', low: 'ต่ำ' }[j.fuelMatch.confidence] : 'ประมาณ',
         "ไมล์จริง/ระยะงานไป-กลับ (%)": j.fuelMatch ? Math.round(j.fuelMatch.ratio * 100) : '',
         "บิลที่จับคู่": j.fuelMatch ? j.fuelMatch.fills.join(', ') : '',
         "อัตราสิ้นเปลือง (km/L)": j.kmPerLiter,

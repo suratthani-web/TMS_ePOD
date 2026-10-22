@@ -91,7 +91,7 @@ export function ExportCSVButton({ data }: ExportCSVButtonProps) {
                     t.fuel_liters || 0,
                     t.fuel_real || 0,
                     t.fuel_source === 'bill' ? "บิลจริง" : t.fuel_source === 'subcontract' ? "รถร่วม" : "ประมาณ (ยังไม่มีบิลจบงาน)",
-                    t.fuel_match ? ({ high: 'สูง', medium: 'ปานกลาง', low: 'ต่ำ' } as const)[t.fuel_match.confidence] : '-',
+                    t.fuel_match ? ({ confirmed: 'ยืนยันแล้ว', high: 'สูง', medium: 'ปานกลาง', low: 'ต่ำ' } as const)[t.fuel_match.confidence] : '-',
                     t.fuel_match && t.fuel_match.ratio > 0 ? Math.round(t.fuel_match.ratio * 100) : '-',
                     t.fuel_match ? t.fuel_match.fills.join(' / ') : '-',
                     t.maint_real || 0,

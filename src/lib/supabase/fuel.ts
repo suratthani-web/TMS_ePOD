@@ -19,6 +19,8 @@ export type FuelLog = {
   Branch_ID: string | null
   Status: string | null
   Trip_Fill_Type?: 'end' | 'enroute' | null
+  /** Job this end fill closes (set by admin); null = auto-matched */
+  Closes_Job_ID?: string | null
   Fuel_Type?: string
   Driver_Name?: string
   Efficiency_Status?: 'Normal' | 'Warning' | 'Critical'

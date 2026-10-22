@@ -205,6 +205,63 @@ export async function updateFuelLogStatus(logId: string, status: string) {
   return { success: true, message: 'Status updated successfully' }
 }
 
+/** Admin links an end fill to the job it closes (null = back to auto-match). */
+export async function setFuelLogClosingJob(logId: string, jobId: string | null) {
+  const { isAdmin } = await import('@/lib/permissions')
+  if (!(await isAdmin())) return { success: false, message: 'ไม่มีสิทธิ์' }
+
+  const supabase = createAdminClient()
+  const { error } = await supabase
+    .from('Fuel_Logs')
+    .update({ Closes_Job_ID: jobId || null })
+    .eq('Log_ID', logId)
+
+  if (error) {
+    const missing = /Closes_Job_ID|schema cache|column/i.test(error.message || '')
+    return { success: false, message: missing ? 'ยังไม่ได้รัน SQL 20261022_fuel_closes_job.sql' : 'บันทึกไม่สำเร็จ' }
+  }
+
+  await logActivity({
+    module: 'Fuel',
+    action_type: 'UPDATE',
+    target_id: logId,
+    details: { closes_job: jobId || 'auto' }
+  })
+
+  revalidatePath('/fuel')
+  revalidatePath('/reports/cost-per-trip')
+  return { success: true, message: jobId ? `ผูกกับ ${jobId} แล้ว` : 'กลับเป็นให้ระบบเลือกเอง' }
+}
+
+/** Jobs an end fill could close: same truck, Plan_Date within 14 days up to the fill. */
+export async function getFuelClosingCandidates(logs: { Vehicle_Plate?: string | null; Date_Time?: string | null }[]) {
+  const plates = Array.from(new Set(logs.map(l => l.Vehicle_Plate).filter(Boolean))) as string[]
+  const dates = logs.map(l => (l.Date_Time || '').slice(0, 10)).filter(Boolean).sort()
+  if (!plates.length || !dates.length) return [] as FuelClosingCandidate[]
+
+  const from = new Date(Date.parse(dates[0]) - 14 * 864e5).toISOString().slice(0, 10)
+  const { FUEL_RUN_STATUSES } = await import('@/lib/fuel/bill-allocation')
+  const supabase = createAdminClient()
+  const { data } = await supabase
+    .from('Jobs_Main')
+    .select('Job_ID, Plan_Date, Vehicle_Plate, Customer_Name, Dest_Location, Est_Distance_KM')
+    .in('Vehicle_Plate', plates)
+    .in('Job_Status', FUEL_RUN_STATUSES)
+    .gte('Plan_Date', from)
+    .lte('Plan_Date', dates[dates.length - 1])
+    .order('Plan_Date', { ascending: false })
+  return (data || []) as FuelClosingCandidate[]
+}
+
+export type FuelClosingCandidate = {
+  Job_ID: string
+  Plan_Date: string | null
+  Vehicle_Plate: string | null
+  Customer_Name: string | null
+  Dest_Location: string | null
+  Est_Distance_KM: number | null
+}
+
 export async function deleteFuelLog(logId: string) {
   const supabase = createAdminClient()
 

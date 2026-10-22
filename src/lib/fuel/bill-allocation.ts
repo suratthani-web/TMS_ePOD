@@ -29,6 +29,8 @@ export type FuelBillLog = {
   Odometer: number | null
   /** "enroute" = mid-trip top-up (doesn't close a cycle); "end"/unset closes it */
   Trip_Fill_Type?: string | null
+  /** Admin link: the job this end fill closes (overrides the auto rule) */
+  Closes_Job_ID?: string | null
 }
 
 export type RunJob = {
@@ -51,7 +53,8 @@ export type VehicleBillTotals = {
   jobKm: number
 }
 
-export type FuelConfidence = 'high' | 'medium' | 'low'
+/** confirmed = closing fill linked to the job by an admin */
+export type FuelConfidence = 'confirmed' | 'high' | 'medium' | 'low'
 
 export type JobBillShare = {
   fuelCost: number
@@ -69,7 +72,7 @@ export type JobBillShare = {
   open: boolean
 }
 
-export type FuelFlagKind = 'end_mid_trip' | 'no_job' | 'km_mismatch' | 'no_odometer'
+export type FuelFlagKind = 'end_mid_trip' | 'no_job' | 'km_mismatch' | 'no_odometer' | 'link_conflict'
 
 export type FuelFlag = {
   plate: string
@@ -109,8 +112,10 @@ const fmtFill = (stamp: string, type?: string | null) =>
 const emptyPool = (): Pool => ({ cost: 0, liters: 0, km: 0, count: 0 })
 
 type Job = { id: string; date: string; km: number }
-type Cycle = Pool & { bills: FuelBillLog[]; stamps: string[]; closed: boolean }
+type Cycle = Pool & { bills: FuelBillLog[]; stamps: string[]; closed: boolean; linkedJob: string | null }
+/** leading = closes a job from before the period (not a no-job run) */
 type Group = { cycles: Cycle[]; jobs: Job[]; leading: boolean }
+const isLinked = (g: Group) => g.cycles.some(c => !!c.linkedJob)
 
 const groupKm = (g: Group) => g.cycles.reduce((s, c) => s + c.km, 0)
 const groupExpected = (g: Group) => g.jobs.reduce((s, j) => s + j.km * ROUND_TRIP, 0)
@@ -159,7 +164,7 @@ export function allocateFuelBills(logs: FuelBillLog[], priorLogs: FuelBillLog[],
     // 1. fill cycles
     const cycles: Cycle[] = []
     let prevOdo = Number(anchor.get(plate)?.Odometer) || 0
-    let cur: Cycle = { ...emptyPool(), bills: [], stamps: [], closed: false }
+    let cur: Cycle = { ...emptyPool(), bills: [], stamps: [], closed: false, linkedJob: null }
     for (const b of bills) {
       const odo = Number(b.Odometer) || 0
       cur.cost += Number(b.Price_Total) || 0
@@ -170,22 +175,46 @@ export function allocateFuelBills(logs: FuelBillLog[], priorLogs: FuelBillLog[],
       cur.stamps.push(localStamp(b.Date_Time))
       if (odo > 0) prevOdo = odo // a bill without odometer can't anchor the next span
       else flags.push({ plate, at: localStamp(b.Date_Time), logId: b.Log_ID ?? null, kind: 'no_odometer', message: 'บิลไม่มีเลขไมล์ — ระยะของรอบนี้ไปรวมกับรอบถัดไป', jobIds: [] })
-      if (b.Trip_Fill_Type !== 'enroute') { cur.closed = true; cycles.push(cur); cur = { ...emptyPool(), bills: [], stamps: [], closed: false } }
+      if (b.Trip_Fill_Type !== 'enroute') { cur.closed = true; cur.linkedJob = b.Closes_Job_ID || null; cycles.push(cur); cur = { ...emptyPool(), bills: [], stamps: [], closed: false, linkedJob: null } }
     }
     if (cur.count) cycles.push(cur) // trailing enroute fills, no end fill yet
 
-    // 2. each end fill closes the latest not-yet-closed jobs
+    // 2. each end fill closes the latest not-yet-closed jobs.
+    //    An admin link (Closes_Job_ID) is a hard boundary: that fill closes every
+    //    unclosed job up to and including the linked one, and earlier auto-matched
+    //    fills may not take the linked job (or anything after it).
+    const jobIndex = new Map(jobs.map((j, i) => [j.id, i]))
+    const linkedAt = new Map<number, number>() // job index → cycle index that links it
+    cycles.forEach((c, ci) => { const k = c.linkedJob ? jobIndex.get(c.linkedJob) : undefined; if (k !== undefined && !linkedAt.has(k)) linkedAt.set(k, ci) })
+
     const groups: Group[] = []
     let ji = 0
-    for (const c of cycles) {
+    cycles.forEach((c, ci) => {
       const last = c.stamps[c.stamps.length - 1]
-      const fillDate = last.slice(0, 10)
-      const hour = Number(last.slice(11, 13)) || 0
-      const ranBefore = (d: string) => d < fillDate || (d === fillDate && (hour >= MORNING_CUTOFF_HOUR || !c.closed))
+      const endBill = c.bills[c.bills.length - 1]
       const taken: Job[] = []
-      while (ji < jobs.length && ranBefore(jobs[ji].date)) taken.push(jobs[ji++])
-      groups.push({ cycles: [c], jobs: taken, leading: groups.length === 0 && taken.length === 0 })
-    }
+      let leading = false
+
+      if (c.linkedJob) {
+        const k = jobIndex.get(c.linkedJob)
+        if (k === undefined) {
+          // linked to a job outside this period (e.g. the day before it starts) — the fill belongs to it, not to jobs here
+          leading = true
+        } else if (k < ji) {
+          flags.push({ plate, at: last, logId: endBill.Log_ID ?? null, kind: 'link_conflict', message: `ผูกกับ ${c.linkedJob} แต่งานนี้ถูกบิลก่อนหน้าตัดไปแล้ว — ตรวจลำดับการผูก`, jobIds: [c.linkedJob] })
+        } else {
+          while (ji <= k) taken.push(jobs[ji++])
+        }
+      } else {
+        const fillDate = last.slice(0, 10)
+        const hour = Number(last.slice(11, 13)) || 0
+        const ranBefore = (d: string) => d < fillDate || (d === fillDate && (hour >= MORNING_CUTOFF_HOUR || !c.closed))
+        const reservedLater = (i: number) => { const at = linkedAt.get(i); return at !== undefined && at > ci }
+        while (ji < jobs.length && ranBefore(jobs[ji].date) && !reservedLater(ji)) taken.push(jobs[ji++])
+        leading = groups.length === 0 && taken.length === 0
+      }
+      groups.push({ cycles: [c], jobs: taken, leading })
+    })
     // jobs after the last fill have no closing bill yet → caller estimates them
 
     // 3. merge adjacent over/under neighbours while it clearly improves the km fit
@@ -193,7 +222,8 @@ export function allocateFuelBills(logs: FuelBillLog[], priorLogs: FuelBillLog[],
       let bestIdx = -1, bestGain = 0
       for (let i = 0; i < groups.length - 1; i++) {
         const a = groups[i], b = groups[i + 1]
-        if (a.leading || !isOff(a) || !isOff(b)) continue
+        // admin-linked groups are ground truth — never re-grouped
+        if (a.leading || isLinked(a) || isLinked(b) || !isOff(a) || !isOff(b)) continue
         if (a.cycles.length + b.cycles.length > MAX_GROUP_CYCLES) continue
         const merged: Group = { cycles: [...a.cycles, ...b.cycles], jobs: [...a.jobs, ...b.jobs], leading: false }
         if (!merged.jobs.length) continue
@@ -233,7 +263,8 @@ export function allocateFuelBills(logs: FuelBillLog[], priorLogs: FuelBillLog[],
       const ratio = round2(ratioOf(g))
       const open = !g.cycles[g.cycles.length - 1].closed
       const merged = g.cycles.length > 1 && g.cycles.some((c, i) => i < g.cycles.length - 1 && c.closed)
-      const confidence: FuelConfidence = open ? 'low'
+      const confidence: FuelConfidence = isLinked(g) && !open ? 'confirmed'
+        : open ? 'low'
         : fits(g, FIT.high) && !merged && g.jobs.length === 1 ? 'high'
         : fits(g, FIT.medium) ? 'medium' : 'low'
       if (!open && ratio > 0 && !fits(g, FIT.medium)) {
