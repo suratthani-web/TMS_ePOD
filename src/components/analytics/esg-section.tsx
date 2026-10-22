@@ -9,13 +9,22 @@ import { useLanguage } from "@/components/providers/language-provider"
 export function ESGSection({ data }: { data: ESGStats }) {
   const { t } = useLanguage()
 
-  const dt = data.dataTiering
+  const EMPTY_TIERING = {
+    exactVolume: { count: 0, co2Kg: 0, pct: 0 },
+    tonneKm: { count: 0, co2Kg: 0, pct: 0 },
+    distanceEstimated: { count: 0, co2Kg: 0, pct: 0 },
+  }
+  const dt = data?.dataTiering || EMPTY_TIERING
+  const exactVolume = dt.exactVolume || EMPTY_TIERING.exactVolume
+  const tonneKm = dt.tonneKm || EMPTY_TIERING.tonneKm
+  const distanceEstimated = dt.distanceEstimated || EMPTY_TIERING.distanceEstimated
+
   const tierRows = [
-    { key: 'primary', label: 'ข้อมูลปฐมภูมิ (Exact Volume)', sub: 'Scope 1 · ลิตรน้ำมันจริง', color: 'emerald', ...dt.exactVolume },
-    { key: 'tonnekm', label: 'GLEC Tonne-KM', sub: 'Scope 3 · น้ำหนักสินค้าจริง', color: 'sky', ...dt.tonneKm },
-    { key: 'estimated', label: 'ประเมินจากพิกัดรถ (Estimated)', sub: 'Scope 3 · Secondary Data', color: 'amber', ...dt.distanceEstimated },
+    { key: 'primary', label: 'ข้อมูลปฐมภูมิ (Exact Volume)', sub: 'Scope 1 · ลิตรน้ำมันจริง', color: 'emerald', ...exactVolume },
+    { key: 'tonnekm', label: 'GLEC Tonne-KM', sub: 'Scope 3 · น้ำหนักสินค้าจริง', color: 'sky', ...tonneKm },
+    { key: 'estimated', label: 'ประเมินจากพิกัดรถ (Estimated)', sub: 'Scope 3 · Secondary Data', color: 'amber', ...distanceEstimated },
   ]
-  const totalTierJobs = dt.exactVolume.count + dt.tonneKm.count + dt.distanceEstimated.count
+  const totalTierJobs = (exactVolume.count || 0) + (tonneKm.count || 0) + (distanceEstimated.count || 0)
 
   return (
     <div className="space-y-6">

@@ -227,7 +227,10 @@ export async function getExecutiveDashboardUnified(branchId?: string, startDate?
             }
         })
         const trend = Object.entries(trendMap)
-            .map(([date, counts]) => ({ date, ...counts }))
+            .map(([date, counts]) => {
+                const count = Math.max(counts.total || 0, counts.completed || 0)
+                return { date, ...counts, jobCount: count }
+            })
             .sort((a, b) => a.date.localeCompare(b.date))
 
         // Ensure we always have at least a few points for the chart even if data is sparse
@@ -427,10 +430,12 @@ export async function getExecutiveDashboardUnified(branchId?: string, startDate?
             trend: (currentData?.trend || []).map((t: { date: string, job_count?: number, completed_count?: number, total_count?: number, total_jobs?: number, completed_jobs?: number, total?: number, completed?: number, revenue?: number, cost?: number }) => {
                 const completed = Number(t.completed ?? t.completed_count ?? t.completed_jobs ?? t.job_count) || 0
                 const total = Number(t.total ?? t.total_count ?? t.total_jobs ?? t.job_count) || 0
+                const count = Math.max(total, completed)
                 return {
                     date: t.date,
-                    total: Math.max(total, completed),
+                    total: count,
                     completed: completed,
+                    jobCount: count,
                     revenue: 0,
                     cost: 0
                 }
@@ -467,10 +472,12 @@ export async function getExecutiveDashboardUnified(branchId?: string, startDate?
         trend: (currentData?.trend || []).map((t: { date: string, job_count?: number, completed_count?: number, total_count?: number, total_jobs?: number, completed_jobs?: number, total?: number, completed?: number, revenue?: number, cost?: number }) => {
             const completed = Number(t.completed ?? t.completed_count ?? t.completed_jobs ?? t.job_count) || 0
             const total = Number(t.total ?? t.total_count ?? t.total_jobs ?? t.job_count) || 0
+            const count = Math.max(total, completed)
             return {
                 date: t.date,
-                total: Math.max(total, completed),
+                total: count,
                 completed: completed,
+                jobCount: count,
                 revenue: Number(t.revenue) || 0,
                 cost: Number(t.cost) || 0
             }

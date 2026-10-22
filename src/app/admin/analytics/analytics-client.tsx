@@ -2,7 +2,7 @@
 
 import { useLanguage } from "@/components/providers/language-provider"
 import Link from "next/link"
-import { AlertTriangle, ArrowLeft, ShieldAlert, BarChart3, Zap } from "lucide-react"
+import { AlertTriangle, ArrowLeft, ShieldAlert, BarChart3, Zap, Building2, Users, MessageSquare, BrainCircuit } from "lucide-react"
 import { PremiumButton } from "@/components/ui/premium-button"
 import { MonthFilter } from "@/components/analytics/month-filter"
 import { Suspense } from "react"
@@ -87,6 +87,27 @@ export function AnalyticsClient({ overdueCount, isSuperAdmin }: AnalyticsClientP
               <span className="text-xs font-medium text-muted-foreground">{t('analytics.live_feed')}</span>
             </div>
           </div>
+        </div>
+
+        {/* Specialized Analytics Sub-modules */}
+        <div className="relative z-10 pt-5 mt-6 border-t border-border flex flex-wrap items-center gap-2">
+          <span className="text-xs font-semibold text-muted-foreground mr-1">รายงานเฉพาะทาง:</span>
+          <Link href="/admin/analytics/regional" className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-muted/60 hover:bg-muted text-foreground border border-border transition-colors">
+            <Building2 size={13} className="text-emerald-500" />
+            <span>วิเคราะห์รายสาขา</span>
+          </Link>
+          <Link href="/admin/analytics/drivers" className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-muted/60 hover:bg-muted text-foreground border border-border transition-colors">
+            <Users size={13} className="text-indigo-500" />
+            <span>ผลงานคนขับเชิงลึก</span>
+          </Link>
+          <Link href="/admin/analytics/feedback" className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-muted/60 hover:bg-muted text-foreground border border-border transition-colors">
+            <MessageSquare size={13} className="text-amber-500" />
+            <span>ความพึงพอใจลูกค้า</span>
+          </Link>
+          <Link href="/admin/analytics/intelligence" className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-muted/60 hover:bg-muted text-foreground border border-border transition-colors">
+            <BrainCircuit size={13} className="text-purple-500" />
+            <span>วิเคราะห์ความเสี่ยง AI</span>
+          </Link>
         </div>
       </div>
     </div>

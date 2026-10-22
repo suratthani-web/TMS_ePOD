@@ -15,15 +15,20 @@ import { ChartContainer } from "@/components/ui/chart-container"
 import { TrendingUp, Target, BarChart3 } from "lucide-react"
 import { useLanguage } from "@/components/providers/language-provider"
 
-export function EfficiencyCharts({ data }: { data: { date: string; revenue: number; cost: number; jobCount: number }[] }) {
+export function EfficiencyCharts({ data }: { data: { date: string; revenue: number; cost: number; jobCount?: number; job_count?: number; total?: number; completed?: number }[] }) {
   const { t } = useLanguage()
   // Process data for correlation (Revenue vs Cost per Job)
-  const correlationData = data.filter(d => d.jobCount > 0).map(d => ({
-    name: d.date,
-    revenuePerJob: d.revenue / d.jobCount,
-    costPerJob: d.cost / d.jobCount,
-    jobCount: d.jobCount
-  }))
+  const correlationData = (data || [])
+    .map(d => {
+      const count = Number(d.jobCount ?? d.job_count ?? d.completed ?? d.total ?? 0)
+      return {
+        name: d.date,
+        revenuePerJob: count > 0 ? (Number(d.revenue) || 0) / count : 0,
+        costPerJob: count > 0 ? (Number(d.cost) || 0) / count : 0,
+        jobCount: count
+      }
+    })
+    .filter(d => d.jobCount > 0)
 
   const avgMargin = correlationData.length > 0 
     ? (correlationData.reduce((acc, curr) => acc + (curr.revenuePerJob - curr.costPerJob), 0) / correlationData.length) / 

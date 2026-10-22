@@ -1,5 +1,7 @@
 "use client"
 
+import Link from "next/link"
+
 import { 
   getFinancialStats, 
   getRevenueTrend, 
@@ -36,6 +38,7 @@ import { MaintenanceSection } from "@/components/analytics/maintenance-section"
 import { SafetySection } from "@/components/analytics/safety-section"
 import { WorkforceSection } from "@/components/analytics/workforce-section"
 import { CustomerRouteSection } from "@/components/analytics/customer-route-section"
+import { SubcontractorPerformance } from "@/components/analytics/subcontractor-performance"
 import { ExportAllButton } from "@/components/analytics/export-all-button"
 import { ProfitabilitySection } from "@/components/analytics/profitability-section"
 import { DelayAnalysis } from "@/components/analytics/delay-analysis"
@@ -110,6 +113,14 @@ export function DashboardContent({
   const { t } = useLanguage()
   const [activeTab, setActiveTab] = useState("overview")
 
+  const now = new Date()
+  const defaultStartDate = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-01`
+  const lastDay = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate()
+  const defaultEndDate = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(lastDay).padStart(2, '0')}`
+
+  const effectiveStartDate = startDate || defaultStartDate
+  const effectiveEndDate = endDate || defaultEndDate
+
   const [priority, setPriority] = useState<PriorityData | null>(null)
   const [secondary, setSecondary] = useState<SecondaryData | null>(null)
   const [loadingPrimary, setLoadingPrimary] = useState(true)
@@ -124,12 +135,12 @@ export function DashboardContent({
         setLoadingPrimary(true)
         try {
             const [unifiedData, forecastData, opStats, driverLeaderboard, vehicleProfitability, branchPerf] = await Promise.all([
-              getExecutiveDashboardUnified(branchId, startDate, endDate),
+              getExecutiveDashboardUnified(branchId, effectiveStartDate, effectiveEndDate),
               getRevenueForecast(branchId),
-              getOperationalStats(branchId, startDate, endDate),
-              getDriverLeaderboard(startDate, endDate, branchId),
-              getVehicleProfitability(startDate, endDate, branchId),
-              getBranchPerformance(startDate, endDate),
+              getOperationalStats(branchId, effectiveStartDate, effectiveEndDate),
+              getDriverLeaderboard(effectiveStartDate, effectiveEndDate, branchId),
+              getVehicleProfitability(effectiveStartDate, effectiveEndDate, branchId),
+              getBranchPerformance(effectiveStartDate, effectiveEndDate),
             ])
 
             setPriority({ 
@@ -164,29 +175,31 @@ export function DashboardContent({
             // Only fetch data relevant to the active tab to speed up loading
             let results: Partial<SecondaryData> = {}
             if (tab === 'financial') {
-              const [topCustomers, billing] = await Promise.all([
-                getTopCustomers(startDate, endDate, branchId),
-                getBillingAnalytics(startDate, endDate, branchId)
+              const [topCustomers, billing, routes] = await Promise.all([
+                getTopCustomers(effectiveStartDate, effectiveEndDate, branchId),
+                getBillingAnalytics(effectiveStartDate, effectiveEndDate, branchId),
+                getRouteEfficiency(effectiveStartDate, effectiveEndDate, branchId)
               ])
-              results = { topCustomers, billing }
+              results = { topCustomers, billing, routes: routes as unknown as SecondaryData['routes'] }
             } else if (tab === 'operations') {
-              const [fuel, routes, delayRootCause, maintenance] = await Promise.all([
-                getFuelAnalytics(startDate, endDate),
-                getRouteEfficiency(startDate, endDate, branchId),
-                getDelayRootCause(startDate, endDate, branchId),
-                getMaintenanceSchedule()
+              const [fuel, routes, delayRootCause, maintenance, subPerf] = await Promise.all([
+                getFuelAnalytics(effectiveStartDate, effectiveEndDate, branchId),
+                getRouteEfficiency(effectiveStartDate, effectiveEndDate, branchId),
+                getDelayRootCause(effectiveStartDate, effectiveEndDate, branchId),
+                getMaintenanceSchedule(),
+                getSubcontractorPerformance(effectiveStartDate, effectiveEndDate, branchId)
               ])
-              results = { fuel, routes: routes as unknown as SecondaryData['routes'], delayRootCause, maintenance }
+              results = { fuel, routes: routes as unknown as SecondaryData['routes'], delayRootCause, maintenance, subPerf: (subPerf || []) as unknown as SecondaryData['subPerf'] }
             } else if (tab === 'drivers') {
               const [workforce, driverLeaderboard] = await Promise.all([
-                getWorkforceAnalytics(startDate, endDate, branchId),
-                getDriverLeaderboard(startDate, endDate, branchId)
+                getWorkforceAnalytics(effectiveStartDate, effectiveEndDate, branchId),
+                getDriverLeaderboard(effectiveStartDate, effectiveEndDate, branchId)
               ])
               results = { workforce, driverLeaderboard: driverLeaderboard as unknown as PriorityData['driverLeaderboard'] }
             } else if (tab === 'safety') {
               const [safety, esgStats] = await Promise.all([
-                getSafetyAnalytics(startDate, endDate, branchId),
-                getESGStats(startDate, endDate, branchId)
+                getSafetyAnalytics(effectiveStartDate, effectiveEndDate, branchId),
+                getESGStats(effectiveStartDate, effectiveEndDate, branchId)
               ])
               results = { safety, esgStats }
             }
@@ -197,14 +210,14 @@ export function DashboardContent({
     }
 
     setLoadedTabs(prev => new Set(prev).add(tab))
-  }, [startDate, endDate, branchId, priority, loadedTabs])
+  }, [effectiveStartDate, effectiveEndDate, branchId, priority, loadedTabs])
 
   useEffect(() => {
     setLoadedTabs(new Set())
     setPriority(null)
     setSecondary(null)
     loadTabData("overview")
-  }, [startDate, endDate, branchId])
+  }, [effectiveStartDate, effectiveEndDate, branchId])
 
   useEffect(() => {
     loadTabData(activeTab)
@@ -253,14 +266,37 @@ export function DashboardContent({
       topPerformers: [],
       driversWithIssues: []
     } as unknown as SecondaryData['workforce'],
-    esgStats = { co2SavedKg: 0, treesSaved: 0, totalSavedKm: 0, efficiencyRate: 0, historicalData: [] } as unknown as SecondaryData['esgStats'],
+    esgStats = { 
+      validJobsCount: 0,
+      incompleteJobsCount: 0,
+      co2EmissionsKg: 0,
+      co2SavedKg: 0, 
+      treesSaved: 0, 
+      fuelConsumedLiters: 0,
+      fuelSavedLiters: 0,
+      totalSavedKm: 0, 
+      efficiencyRate: 0, 
+      scope1EmissionsKg: 0,
+      scope3EmissionsKg: 0,
+      dataTiering: {
+        exactVolume: { count: 0, co2Kg: 0, pct: 0 },
+        tonneKm: { count: 0, co2Kg: 0, pct: 0 },
+        distanceEstimated: { count: 0, co2Kg: 0, pct: 0 },
+      },
+      tgoMetadata: {} as any,
+      historicalData: [] 
+    } as unknown as SecondaryData['esgStats'],
     delayRootCause = [],
   } = secondary ?? {}
+
+  const currentDriverLeaderboard = (secondary?.driverLeaderboard && secondary.driverLeaderboard.length > 0)
+    ? secondary.driverLeaderboard
+    : (driverLeaderboard || [])
 
   const allData = {
     financials, revenueTrend, topCustomers, statusDist,
     branchPerf, subPerf, billing, fuel, maintenance,
-    safety, workforce, routes, driverLeaderboard, vehicleProfitability,
+    safety, workforce, routes, driverLeaderboard: currentDriverLeaderboard, vehicleProfitability,
     esgStats, opStats, delayRootCause
   }
 
@@ -422,7 +458,7 @@ export function DashboardContent({
                                         <Users size={32} strokeWidth={1} className="mx-auto mb-3 text-muted-foreground/30" />
                                         <p className="text-xs font-medium text-muted-foreground">{t('dashboard.performance_data_recalibrating')}</p>
                                     </div>
-                                ) : (driverLeaderboard || []).filter(Boolean).slice(0, 5).map((d: {name?: string; driverName?: string; jobCount?: number; trips?: number; revenue?: number; earnings?: number}, i: number) => (
+                                ) : (driverLeaderboard || []).filter(Boolean).slice(0, 5).map((d: {name?: string; driverName?: string; jobCount?: number; trips?: number; revenue?: number; earnings?: number; completedJobs?: number}, i: number) => (
                                     <div key={i} className="px-5 py-3 flex items-center justify-between group hover:bg-muted/20 transition-colors border-l-2 border-transparent hover:border-amber-500/50">
                                         <div className="flex items-center gap-3 min-w-0">
                                             <div className={cn(
@@ -432,7 +468,7 @@ export function DashboardContent({
                                             <div className="min-w-0">
                                                 <p className="text-sm font-semibold text-foreground truncate">{d.name || d.driverName || 'Driver'}</p>
                                                 <p className="text-[9px] text-emerald-400 font-semibold truncate">
-                                                    {d.jobCount || d.trips || 0} {t('dashboard.missions_completed_prefix')}
+                                                    {(d.completedJobs ?? d.jobCount ?? d.trips ?? 0)} {t('dashboard.missions_completed_prefix')}
                                                 </p>
                                             </div>
                                         </div>
@@ -520,7 +556,7 @@ export function DashboardContent({
                         <FinancialSummaryCards data={exeKPIs} />
                     </div>
 
-                    <PremiumCard className="col-span-12 lg:col-span-8 overflow-hidden p-0 bg-background border border-border shadow-xl rounded-2xl">
+                    <PremiumCard className="col-span-12 overflow-hidden p-0 bg-background border border-border shadow-xl rounded-2xl">
                         <div className="p-5 border-b border-border bg-muted/30 flex items-center justify-between">
                             <h3 className="text-sm font-semibold text-foreground flex items-center gap-2">
                                 <div className="w-1 h-4 bg-emerald-500 rounded-full" />
@@ -528,10 +564,10 @@ export function DashboardContent({
                             </h3>
                             <BarChart3 className="text-primary/40" size={16} />
                         </div>
-                        <div className="p-6 h-[350px]"><RevenueTrendChart data={revenueTrend} /></div>
+                        <div className="p-6 min-h-[420px]"><RevenueTrendChart data={revenueTrend} /></div>
                     </PremiumCard>
 
-                    <div className="col-span-12 lg:col-span-4">
+                    <div className="col-span-12">
                         {loadingSecondary ? <SectionSkeleton /> : <BillingSection data={billing} />}
                     </div>
 
@@ -564,11 +600,28 @@ export function DashboardContent({
                     </div>
 
                     <div className="col-span-12">
-                        <ProfitabilitySection data={vehicleProfitability} financials={financials} />
+                        <ProfitabilitySection data={vehicleProfitability} financials={financials} startDate={effectiveStartDate} endDate={effectiveEndDate} />
                     </div>
 
-                    <div className="col-span-12 lg:col-span-5">
+                    <div className="col-span-12 lg:col-span-6">
                         {loadingSecondary ? <SectionSkeleton /> : <DelayAnalysis data={delayRootCause} />}
+                    </div>
+
+                    <div className="col-span-12 lg:col-span-6">
+                        {loadingSecondary ? <SectionSkeleton /> : (
+                            <PremiumCard className="h-full bg-card border border-border p-6 rounded-2xl shadow-sm">
+                                <div className="flex items-center gap-3 mb-6">
+                                    <div className="p-2 bg-blue-500/10 rounded-xl text-blue-500 border border-blue-500/20">
+                                        <Truck size={18} />
+                                    </div>
+                                    <div>
+                                        <h3 className="text-base font-semibold text-foreground">สัดส่วนรถบริษัท vs รถร่วม</h3>
+                                        <p className="text-xs text-muted-foreground">Fleet Distribution: Internal vs Subcontractor</p>
+                                    </div>
+                                </div>
+                                <SubcontractorPerformance data={(subPerf || []) as any} />
+                            </PremiumCard>
+                        )}
                     </div>
 
                     <div className="col-span-12">
@@ -595,34 +648,39 @@ export function DashboardContent({
                         </div>
                     </div>
 
-                    <div className="col-span-12 lg:col-span-4">
+                    <div className="col-span-12">
                         {loadingSecondary ? <SectionSkeleton /> : <WorkforceSection data={workforce} />}
                     </div>
 
-                    <PremiumCard className="col-span-12 lg:col-span-8 overflow-hidden p-0 bg-background border border-border shadow-xl rounded-2xl group/leaderboard">
+                    <PremiumCard className="col-span-12 overflow-hidden p-0 bg-background border border-border shadow-xl rounded-2xl group/leaderboard">
                         <div className="p-5 border-b border-border bg-muted/30 flex items-center justify-between">
-                            <h3 className="text-sm font-semibold text-foreground flex items-center gap-2">
+                            <div className="flex items-center gap-2">
                                 <div className="w-1 h-4 bg-indigo-500 rounded-full" />
-                                {t('analytics.elite_asset_registry')}
-                            </h3>
-                            <Star className="text-amber-500" size={16} />
+                                <div>
+                                    <h3 className="text-sm font-semibold text-foreground">{t('analytics.elite_asset_registry')}</h3>
+                                    <p className="text-xs text-muted-foreground">{t('analytics.operator_intelligence_sub')}</p>
+                                </div>
+                            </div>
+                            <Link href="/admin/analytics/drivers" className="text-xs font-semibold text-primary hover:underline flex items-center gap-1">
+                                {t('common.view_details') || 'ดูรายงานเชิงลึก'} &rarr;
+                            </Link>
                         </div>
-                        <div className="divide-y divide-white/[0.03]">
-                            {driverLeaderboard.length === 0 ? (
-                                <div className="py-20 text-center text-xs font-medium text-muted-foreground opacity-60">{t('analytics.no_operator_data')}</div>
-                            ) : ((driverLeaderboard || []).slice(0, 8) as DriverStats[]).map((driver: DriverStats, idx: number) => (
-                                <div key={driver.name} className="px-6 py-3.5 flex items-center justify-between hover:bg-muted/30 transition-all group/item">
+                        <div className="divide-y divide-border">
+                            {currentDriverLeaderboard.length === 0 ? (
+                                <div className="py-16 text-center text-xs font-medium text-muted-foreground opacity-60">{t('analytics.no_operator_data')}</div>
+                            ) : (currentDriverLeaderboard.slice(0, 10) as unknown as DriverStats[]).map((driver: DriverStats, idx: number) => (
+                                <div key={driver.name || idx} className="px-6 py-4 flex items-center justify-between hover:bg-muted/30 transition-all group/item">
                                     <div className="flex items-center gap-4">
                                         <div className="w-8 h-8 rounded-lg bg-muted flex items-center justify-center font-semibold text-[11px] border border-border transition-transform group-hover/item:scale-110">
                                             {idx + 1}
                                         </div>
                                         <div>
                                             <p className="text-sm font-semibold text-foreground leading-tight">{driver.name}</p>
-                                            <p className="text-[10px] font-medium text-muted-foreground">{driver.completedJobs} {t('dashboard.missions_completed_prefix')} • {driver.onTimeRate?.toFixed(0) || 0}%</p>
+                                            <p className="text-[11px] font-medium text-muted-foreground">{(driver.completedJobs ?? (driver as any).jobCount ?? (driver as any).trips ?? 0)} {t('dashboard.missions_completed_prefix')} • {driver.onTimeRate?.toFixed(0) || 0}% ตรงเวลา</p>
                                         </div>
                                     </div>
                                     <div className="text-right">
-                                        <span className="text-xs font-semibold text-primary bg-primary/10 px-2 py-0.5 rounded-md border border-primary/20">฿{Math.round((driver.revenue || 0) / 1000)}K</span>
+                                        <span className="text-xs font-semibold text-primary bg-primary/10 px-2.5 py-1 rounded-md border border-primary/20">฿{Math.round((driver.revenue || 0) / 1000)}K</span>
                                     </div>
                                 </div>
                             ))}
