@@ -114,10 +114,15 @@ type CostTripSourceRow = {
   Driver_Payment_ID?: string | null
 }
 
-export async function getCostPerTrip(startDate?: string, endDate?: string, customerNames?: string[]): Promise<{ trips: TripCost[], summary: CostSummary }> {
-  const isUserAdmin = await isAdmin()
-  const branchId = await getUserBranchId()
-  const customerId = await getCustomerId()
+export async function getCostPerTrip(
+  startDate?: string, 
+  endDate?: string, 
+  customerNames?: string[],
+  options?: { isUserAdmin?: boolean; branchId?: string | null; customerId?: string | null }
+): Promise<{ trips: TripCost[], summary: CostSummary }> {
+  const isUserAdmin = options?.isUserAdmin !== undefined ? options.isUserAdmin : await isAdmin()
+  const branchId = options?.branchId !== undefined ? options.branchId : await getUserBranchId()
+  const customerId = options?.customerId !== undefined ? options.customerId : await getCustomerId()
 
   // Use Admin Client to bypass RLS if user is an Admin, otherwise they get 0 rows!
   const supabase = isUserAdmin ? createAdminClient() : await createClient()

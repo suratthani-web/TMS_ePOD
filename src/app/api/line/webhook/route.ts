@@ -414,6 +414,11 @@ async function buildAIContext(branchId?: string, userName: string = 'ผู้�
 2. สามารถเรียกใช้เครื่องมือเพื่อดึงข้อมูลเชิงลึกจากฐานข้อมูล (query_tms_database, get_fuel_efficiency_report, get_customer_insights, get_driver_performance ฯลฯ)
 3. [Admin Only] ช่วยเหลือในการ "สร้างใบงานใหม่" (Draft/New) และ "ปล่อยงานเข้าแอป" (notify_jobs_by_date)
 4. สรุปข้อมูลให้กระชับ ชัดเจน ใช้ภาษาไทยที่เป็นมิตร และจัดข้อความด้วย Emoji ให้อ่านง่ายบนหน้าจอ LINE
+5. [Admin Only] รายงานผลประกอบการรายเที่ยว (Trip Performance):
+   - เมื่อ Admin ขอรายงานผลประกอบการ, ต้นทุนรายเที่ยว, กำไร/ขาดทุน หรือขอไฟล์ Trip Performance ให้เรียกใช้เครื่องมือ get_trip_performance_report
+   - สรุปตัวเลขทางการเงินที่สำคัญ (รายได้, ต้นทุนรวม, ค่าน้ำมัน, กำไร/ขาดทุน, Margin, ข้อสังเกต) ให้อ่านง่าย
+   - นำลิงก์ downloadUrl ที่ได้จากเครื่องมือมาวางให้อยู่ในข้อความตอบกลับอย่างชัดเจน เพื่อให้ผู้บริหารแตะดาวน์โหลดไฟล์ Excel รายงานตัวเต็มได้ทันที
+   - หากผู้ใช้ที่ไม่ใช่ Admin หรือ Super Admin ขอข้อมูลนี้ ให้ปฏิเสธอย่างสุภาพทันทีว่าข้อมูลทางการเงินสงวนสิทธิ์เฉพาะผู้บริหารเท่านั้น
 
 กฎความปลอดภัย:
 - เฉพาะผู้ที่มีบทบาท "Admin" หรือ "Super Admin" เท่านั้นที่สามารถสร้างงาน, แก้ไขงาน, หรือปล่อยงานได้
@@ -1741,7 +1746,7 @@ export async function POST(req: NextRequest) {
                     }
 
                     // --- 4.2 Financial (Admin only) ---
-                    if ((text.includes('รายได้') || text.includes('กำไร') || text.includes('เงิน')) && boundAdmin) {
+                    if ((text.includes('รายได้') || text.includes('กำไร') || text.includes('เงิน')) && boundAdmin && !text.includes('trip') && !text.includes('performance') && !text.includes('ผลประกอบการ') && !text.includes('ไฟล์') && !text.includes('excel')) {
                         let startDate: string | undefined = undefined
                         let endDate: string | undefined = undefined
                         let periodName = 'เดือนปัจจุบัน'
@@ -1954,7 +1959,7 @@ export async function POST(req: NextRequest) {
                     }
 
                     // --- 4.4 Fuel ---
-                    if (text.includes('น้ำมัน')) {
+                    if (text.includes('น้ำมัน') && !text.includes('ผลประกอบการ') && !text.includes('trip') && !text.includes('performance') && !text.includes('รายงาน') && !text.includes('ไฟล์') && !text.includes('excel')) {
                         const fuel = await aiToolExecutors.get_fuel_analytics()
                         await replyToUser(replyToken, [
                             '⛽ สรุปการใช้พลังงาน (Fleet)',

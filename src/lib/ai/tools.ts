@@ -16,6 +16,8 @@ import { fetchAllRows } from '@/lib/supabase/analytics-helpers'
 import { scheduleFuelCycleSync } from '@/lib/fuel/fuel-cycles'
 import { geocodeAddress } from '@/lib/ai/geocoding'
 import { logAction, type ActionRef } from '@/lib/ai/audit-log'
+import { getCostPerTrip } from "@/app/reports/cost-per-trip/actions"
+import { createTripPerformanceDownloadToken } from "@/lib/reports/trip-performance-token"
 
 /**
  * Tool Executors - all system data accessible to the AI
@@ -196,6 +198,102 @@ export const aiToolExecutors = {
   },
 
   // ---- FINANCIAL ----
+    get_trip_performance_report: async (args: { 
+    startDate?: string
+    endDate?: string
+    customerName?: string
+    branchId?: string
+  }) => {
+    const now = new Date()
+    const defaultStart = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split('T')[0]
+    const defaultEnd = now.toISOString().split('T')[0]
+    const start = args.startDate || defaultStart
+    const end = args.endDate || defaultEnd
+
+    let customerNames: string[] | undefined = undefined
+    if (args.customerName) {
+      const trimmed = args.customerName.trim()
+      const supabase = createAdminClient()
+      const { data: matchedCust } = await supabase
+        .from('Master_Customers')
+        .select('Customer_Name')
+        .or(`Customer_Name.ilike.%${trimmed}%,Customer_ID.ilike.%${trimmed}%`)
+        .limit(5)
+      if (matchedCust && matchedCust.length > 0) {
+        customerNames = matchedCust.map(c => c.Customer_Name).filter(Boolean) as string[]
+      } else {
+        customerNames = [trimmed]
+      }
+    }
+
+    const { trips, summary } = await getCostPerTrip(start, end, customerNames, {
+      isUserAdmin: true,
+      branchId: args.branchId || null
+    })
+
+    if (!trips.length) {
+      return {
+        message: `ไม่พบข้อมูลงานขนส่งในช่วงวันที่ ${start} ถึง ${end}${args.customerName ? ` สำหรับลูกค้า ${args.customerName}` : ''}`,
+        tripsCount: 0
+      }
+    }
+
+    const token = await createTripPerformanceDownloadToken({
+      start,
+      end,
+      customerNames,
+      branchId: args.branchId || null,
+      requestedBy: 'LINE_BOT'
+    })
+    const baseUrl = process.env.NEXT_PUBLIC_APP_URL || process.env.NEXT_PUBLIC_SITE_URL || 'https://tms-e-pod.vercel.app'
+    const downloadUrl = `${baseUrl}/api/reports/trip-performance/xlsx?token=${token}`
+
+    const profitTrips = trips.filter(t => t.profit >= 0)
+    const lossTrips = trips.filter(t => t.profit < 0)
+    const marginPct = summary.totalRevenue > 0 ? (summary.totalProfit / summary.totalRevenue) * 100 : 0
+    const fuelPct = summary.totalRevenue > 0 ? (summary.totalFuelCost / summary.totalRevenue) * 100 : 0
+    const driverPct = summary.totalRevenue > 0 ? (summary.totalDriverCost / summary.totalRevenue) * 100 : 0
+    const revPerKm = summary.totalDistance > 0 ? summary.totalRevenue / summary.totalDistance : 0
+    const costPerKm = summary.totalDistance > 0 ? summary.totalCost / summary.totalDistance : 0
+
+    const sortedByProfit = [...trips].sort((a, b) => b.profit - a.profit)
+    const bestTrip = sortedByProfit[0]
+    const worstTrip = sortedByProfit[sortedByProfit.length - 1]
+
+    return {
+      period: `${start} ถึง ${end}`,
+      scopeCustomer: customerNames ? customerNames.join(', ') : 'ทุกลูกค้า',
+      branch: args.branchId || 'ทุกสาขา',
+      summary: {
+        totalTrips: summary.totalTrips,
+        totalDrops: summary.totalDrops,
+        profitTripsCount: profitTrips.length,
+        lossTripsCount: lossTrips.length,
+        totalRevenue: summary.totalRevenue,
+        totalCost: summary.totalCost,
+        totalProfit: summary.totalProfit,
+        marginPct: marginPct.toFixed(1) + '%',
+        driverCost: summary.totalDriverCost,
+        driverPct: driverPct.toFixed(1) + '%',
+        fuelCost: summary.totalFuelCost,
+        fuelPct: fuelPct.toFixed(1) + '%',
+        wearCost: summary.totalWearCost,
+        totalDistanceKm: summary.totalDistance,
+        estDistanceKm: summary.totalEstKm,
+        kmRatio: summary.totalEstKm > 0 ? (summary.totalDistance / summary.totalEstKm).toFixed(2) : '1.0',
+        revPerKm: revPerKm.toFixed(2),
+        costPerKm: costPerKm.toFixed(2)
+      },
+      highlights: {
+        bestTrip: bestTrip ? `${bestTrip.Plan_Date} ${bestTrip.Job_ID} (กำไร ฿${bestTrip.profit.toLocaleString()})` : null,
+        worstTrip: worstTrip && worstTrip.profit < 0 ? `${worstTrip.Plan_Date} ${worstTrip.Job_ID} (ขาดทุน ฿${worstTrip.profit.toLocaleString()})` : null,
+        documentWarningsCount: summary.documentChecks?.length || 0,
+        fuelFlagsCount: summary.fuelFlags?.length || 0
+      },
+      downloadUrl,
+      downloadNote: 'ลิงก์มีอายุ 24 ชั่วโมง สามารถแตะเพื่อดาวน์โหลดไฟล์ Excel รายงานผลประกอบการรายเที่ยว (3 แท็บ) ตัวเต็มได้ทันที'
+    }
+  },
   get_financial_summary: async (args: { branchId?: string, startDate?: string, endDate?: string }) => {
     const stats = await getFinancialStats(args.startDate, args.endDate, args.branchId)
     return {
@@ -1500,7 +1598,21 @@ export const geminiToolDefinitions = [
             required: ["day"]
         }
     },
-    {
+        {
+        name: "get_trip_performance_report",
+        description: "ดึงรายงานผลประกอบการและต้นทุนรายเที่ยว (Trip Performance) รวมถึงรายได้ ต้นทุนค่าน้ำมัน ค่าคนขับ ค่าสึกหรอ และกำไรสุทธิ พร้อมลิงก์ดาวน์โหลดไฟล์ Excel ตัวเต็มสำหรับผู้บริหาร (เฉพาะ Admin/Super Admin)",
+        parameters: {
+            type: "object",
+            properties: {
+                startDate: { type: "string", description: "วันที่เริ่มต้น (YYYY-MM-DD) เช่น '2026-08-01'" },
+                endDate: { type: "string", description: "วันที่สิ้นสุด (YYYY-MM-DD) เช่น '2026-08-31'" },
+                customerName: { type: "string", description: "ชื่อหรือตัวย่อลูกค้า เช่น 'PCG' หรือ 'เพอร์เฟค' (ถ้าไม่ระบุจะดึงทุกลูกค้า)" },
+                branchId: { type: "string", description: "รหัสสาขา เช่น 'URT'" }
+            },
+            required: ["startDate", "endDate"]
+        }
+    },
+{
         name: "get_financial_summary",
         description: "สรุปรายได้ กำไร และต้นทุน (ใช้ได้เฉพาะแอดมิน)",
         parameters: {
