@@ -69,8 +69,8 @@ export async function sendWmsStatusWebhook(
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
-                'Authorization': `Bearer ${process.env.WMS_WEBHOOK_SECRET || ''}`,
-                'x-wms-secret': process.env.WMS_WEBHOOK_SECRET || ''
+                'Authorization': `Bearer ${webhookSecret}`,
+                'x-wms-secret': webhookSecret
             },
             body: JSON.stringify(payload),
             signal: controller.signal
