@@ -9,10 +9,11 @@ export async function sendWmsStatusWebhook(
     jobId: string,
     event: 'job.completed' | 'job.status_updated' = 'job.completed'
 ) {
-    const webhookUrl = process.env.WMS_WEBHOOK_URL
-    if (!webhookUrl) {
-        return { skipped: true, reason: 'WMS_WEBHOOK_URL not configured' }
+    let webhookUrl = process.env.WMS_WEBHOOK_URL
+    if (!webhookUrl || (process.env.NODE_ENV === 'production' && webhookUrl.includes('localhost'))) {
+        webhookUrl = 'https://nexus-wms-phi.vercel.app/api/webhooks/tms'
     }
+    const webhookSecret = process.env.WMS_WEBHOOK_SECRET || 'nexus_wms_tms_secret_2026'
 
     try {
         const supabase = createAdminClient()
