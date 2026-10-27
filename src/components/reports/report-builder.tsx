@@ -110,7 +110,7 @@ function exportToExcel(data: Record<string, unknown>[], columns: string[], fileN
   // Calculate summary row
   const summaryRow = columns.map((col, index) => {
     if (index === 0) return 'รวม'
-    const isNumeric = col.toLowerCase().includes('cost') || col === 'amount' || col === 'Price_Cust_Total' || col.startsWith('Extra_') || col === 'Liters' || col === 'liters';
+    const isNumeric = col.toLowerCase().includes('cost') || col === 'amount' || col === 'Price_Cust_Total' || col.startsWith('Extra_') || col === 'Liters' || col === 'liters' || col === 'Distance_Km' || col === 'Est_Distance_KM';
     if (!isNumeric) return ''
     const total = data.reduce((sum, row) => sum + (Number(row[col]) || 0), 0)
     return total
@@ -481,6 +481,8 @@ export function ReportBuilder() {
                                     <StatusBadge status={String(row[col])} />
                                   ) : (col.toLowerCase().includes('cost') || col === 'amount' || col === 'Price_Cust_Total' || col.startsWith('Extra_')) ? (
                                     <span>฿{Number(row[col] || 0).toLocaleString()}</span>
+                                  ) : (col === 'Distance_Km' || col === 'Est_Distance_KM') ? (
+                                    <span>{row[col] != null && row[col] !== '' ? `${Number(row[col]).toLocaleString(undefined, { maximumFractionDigits: 1 })} กม.` : '—'}</span>
                                   ) : (
                                     <span className="line-clamp-1">{String(row[col] ?? '—')}</span>
                                   )}
@@ -493,13 +495,14 @@ export function ReportBuilder() {
                             <tr>
                                 <td className="px-4 py-3 text-sm font-semibold text-foreground">รวม</td>
                                 {columns.map(col => {
-                                    const isNumeric = col.toLowerCase().includes('cost') || col === 'amount' || col === 'Price_Cust_Total' || col.startsWith('Extra_') || col === 'Liters';
+                                    const isDistance = col === 'Distance_Km' || col === 'Est_Distance_KM';
+                                    const isNumeric = col.toLowerCase().includes('cost') || col === 'amount' || col === 'Price_Cust_Total' || col.startsWith('Extra_') || col === 'Liters' || isDistance;
                                     if (!isNumeric) return <td key={col} className="px-4 py-3"></td>;
                                     
                                     const total = filteredData.reduce((sum, row) => sum + (Number(row[col]) || 0), 0);
                                     return (
                                         <td key={col} className="px-4 py-3 text-primary">
-                                            {col === 'Liters' ? `${total.toLocaleString()} ลิตร` : `฿${total.toLocaleString()}`}
+                                            {col === 'Liters' ? `${total.toLocaleString()} ลิตร` : isDistance ? `${total.toLocaleString(undefined, { maximumFractionDigits: 1 })} กม.` : `฿${total.toLocaleString()}`}
                                         </td>
                                     );
                                 })}

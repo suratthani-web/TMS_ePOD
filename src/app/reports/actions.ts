@@ -73,25 +73,40 @@ export async function getFilteredReportData(filters: ReportFilters): Promise<{
 
         const processedData = rawData.map((job: Record<string, unknown>) => {
           const row: Record<string, unknown> = { ...job }
+
+          // แมประยะทางจริงจาก Est_Distance_KM
+          const dist = job.Est_Distance_KM != null 
+            ? Number(job.Est_Distance_KM) 
+            : (job.Distance_Km != null ? Number(job.Distance_Km) : null)
+          row.Distance_Km = dist
+          row.Est_Distance_KM = dist
+          row.Price_Cust_Total = Number(job.Price_Cust_Total) || 0
+          row.Cost_Driver_Total = Number(job.Cost_Driver_Total) || 0
+
           // Initialize all extra columns with 0
           sortedExtraTypes.forEach(type => {
             row[type] = 0
           })
 
-          // Fill in extra costs
+          let extraSum = (Number(job.Cost_Driver_Extra) || 0) + (Number(job.Price_Cust_Extra) || 0)
+
+          // Fill in extra costs (ดึงค่าทั้งฝั่งคนขับ cost_driver และฝั่งลูกค้า charge_cust)
           if (job.extra_costs_json) {
             try {
               const costs = typeof job.extra_costs_json === 'string' ? JSON.parse(job.extra_costs_json) : job.extra_costs_json
               if (Array.isArray(costs)) {
                 costs.forEach((c: Record<string, unknown>) => {
-                  if (c.type) {
+                  if (c && c.type) {
                     const colName = `Extra_${c.type}`
-                    row[colName] = (Number(row[colName]) || 0) + (Number(c.charge_base) || Number(c.amount) || 0)
+                    const val = (Number(c.cost_driver) || 0) + (Number(c.charge_cust) || 0) || (Number(c.charge_base) || Number(c.amount) || 0)
+                    row[colName] = (Number(row[colName]) || 0) + val
+                    extraSum += val
                   }
                 })
               }
             } catch {}
           }
+          row.Extra_Cost_Amount = extraSum
           return row
         })
 
@@ -101,7 +116,7 @@ export async function getFilteredReportData(filters: ReportFilters): Promise<{
             'Job_ID', 'Plan_Date', 'Customer_Name', 
             'Origin_Location', 'Dest_Location', 
             'Driver_Name', 'Vehicle_Plate', 'Job_Status', 
-            'Price_Cust_Total', 'Extra_Cost_Amount', 'Toll_Amount', 'Distance_Km',
+            'Price_Cust_Total', 'Cost_Driver_Total', 'Distance_Km', 'Extra_Cost_Amount',
             ...sortedExtraTypes
           ],
           debug: { admin, effectiveBranch, count: rawData.length }
