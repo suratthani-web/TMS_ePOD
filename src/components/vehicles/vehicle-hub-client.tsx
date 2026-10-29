@@ -163,8 +163,14 @@ export function VehicleHubClient({ vehicle }: { vehicle: Vehicle }) {
                 <TabsContent value="checks" className="pt-4">
                     <List rows={checks} empty="ยังไม่มีบันทึกตรวจรถ" icon={<CheckCircle2 size={14} />}
                         render={(r) => {
-                            const passed = r.Passed_Items && typeof r.Passed_Items === 'object' ? Object.values(r.Passed_Items as Record<string, unknown>).filter(v => v === true).length : 0
-                            const total = r.Passed_Items && typeof r.Passed_Items === 'object' ? Object.keys(r.Passed_Items as Record<string, unknown>).length : 0
+                            let items: Record<string, unknown> = {}
+                            if (typeof r.Passed_Items === 'string') {
+                                try { items = JSON.parse(r.Passed_Items) } catch {}
+                            } else if (r.Passed_Items && typeof r.Passed_Items === 'object') {
+                                items = r.Passed_Items as Record<string, unknown>
+                            }
+                            const passed = Object.values(items).filter(v => v === true).length
+                            const total = Object.keys(items).length
                             return `${String(r.Check_Date ?? '').slice(0, 10)} • ${r.Driver_Name ?? '-'} • ผ่าน ${passed}/${total}`
                         }} />
                 </TabsContent>

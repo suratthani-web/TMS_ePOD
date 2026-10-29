@@ -8,7 +8,6 @@ import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
 import { Activity, MapPin, Truck, Clock } from "lucide-react"
 import { MobileHeader } from "@/components/mobile/mobile-header"
-import { BottomNav } from "@/components/mobile/bottom-nav"
 import { submitBid, getMyBidsForJobs } from "@/lib/actions/marketplace-actions"
 import { toast } from "sonner"
 import type { Job } from "@/lib/supabase/jobs"
@@ -87,8 +86,7 @@ export function MarketplaceClient({ initialJobs, driverId, driverName }: Marketp
                     <h2 className="text-xl font-bold text-gray-900 mb-2">ข้อมูลบัญชีไม่สมบูรณ์</h2>
                     <p className="text-muted-foreground">บัญชีนี้ยังไม่ถูกตั้งค่าเป็นพนักงานขับรถ ไม่สามารถเสนอราคางานได้</p>
                 </div>
-                <BottomNav />
-            </div>
+                            </div>
         )
     }
 
@@ -265,7 +263,6 @@ export function MarketplaceClient({ initialJobs, driverId, driverName }: Marketp
                 )}
             </div>
 
-            <BottomNav />
-        </div>
+                    </div>
     )
 }

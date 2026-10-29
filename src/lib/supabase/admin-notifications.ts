@@ -130,9 +130,14 @@ export async function getAdminAlerts(): Promise<AdminAlert[]> {
 
     const CHECKLIST = ["น้ำมันเครื่อง", "น้ำในหม้อน้ำ", "ลมยาง", "ไฟเบรค/ไฟเลี้ยว", "สภาพยางรถยนต์", "อุปกรณ์ฉุกเฉิน", "เอกสารประจำรถ"]
 
-    checks?.forEach((check: { id: string, Passed_Items?: Record<string, boolean>, Vehicle_Plate: string, Check_Date: string, Driver_Name: string }) => {
-      const items = (check.Passed_Items || {}) as Record<string, boolean>
-      const failedItems = CHECKLIST.filter(item => !items[item])
+    checks?.forEach((check: { id: string, Passed_Items?: unknown, Vehicle_Plate: string, Check_Date: string, Driver_Name: string }) => {
+      let items: Record<string, boolean> = {}
+      if (typeof check.Passed_Items === 'string') {
+        try { items = JSON.parse(check.Passed_Items) } catch {}
+      } else if (check.Passed_Items && typeof check.Passed_Items === 'object') {
+        items = check.Passed_Items as Record<string, boolean>
+      }
+      const failedItems = CHECKLIST.filter(item => items[item] !== true)
       if (failedItems.length > 0) {
         alerts.push({
           id: `check-${check.id}`,

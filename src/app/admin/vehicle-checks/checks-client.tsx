@@ -25,6 +25,20 @@ interface ChecksClientProps {
     checks: VehicleCheck[]
 }
 
+function parsePassedItems(raw: unknown): Record<string, boolean> {
+    if (!raw) return {}
+    if (typeof raw === 'object' && !Array.isArray(raw)) return raw as Record<string, boolean>
+    if (typeof raw === 'string') {
+        try {
+            const p = JSON.parse(raw)
+            return (typeof p === 'object' && p !== null && !Array.isArray(p)) ? p : {}
+        } catch {
+            return {}
+        }
+    }
+    return {}
+}
+
 export function ChecksClient({ checks }: ChecksClientProps) {
     const { t } = useLanguage()
 
@@ -128,8 +142,8 @@ export function ChecksClient({ checks }: ChecksClientProps) {
                         </thead>
                         <tbody className="divide-y divide-border/50">
                             {checks?.map((check) => {
-                                const items = (check.Passed_Items || {}) as Record<string, boolean>
-                                const failedItems = STANDARD_CHECKLIST.filter(item => !items[item.dbKey])
+                                const items = parsePassedItems(check.Passed_Items)
+                                const failedItems = STANDARD_CHECKLIST.filter(item => items[item.dbKey] !== true)
                                 const isPass = failedItems.length === 0
 
                                 return (
