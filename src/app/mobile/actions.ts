@@ -159,28 +159,49 @@ export async function submitVehicleCheck(formData: FormData) {
 }
 
 /**
- * งานของคนขับที่ "ยังต้องทำ" วันนี้ — ใช้เตือนเป็นระยะในแอป
- *  - notStarted: จ่ายงานแล้วแต่ยังไม่กดรับ/เริ่ม
- *  - inProgress: เริ่มแล้วแต่ยังไม่ปิดงาน (ยังไม่ส่ง POD)
+ * ข้อมูลแจ้งเตือนงานของคนขับ:
+ *  - backlog: งานค้างส่งจากวันก่อนหน้าที่ยังไม่ปิด (Plan_Date < todayTH)
+ *  - notStarted: งานของวันนี้ที่จ่ายงานแล้วแต่ยังไม่ได้กดรับ (Plan_Date = todayTH)
+ *  - inProgress: งานของวันนี้ที่กำลังดำเนินการ (Plan_Date = todayTH, Accepted / In Transit / ฯลฯ)
+ *  - isLateHours: หลัง 19:00 น. หรือไม่
  */
-export async function getDriverReminder(driverId: string): Promise<{ total: number; notStarted: number; inProgress: number }> {
-  const empty = { total: 0, notStarted: 0, inProgress: 0 }
+export async function getDriverReminder(driverId: string): Promise<{
+  total: number
+  backlog: number
+  notStarted: number
+  inProgress: number
+  isLateHours: boolean
+}> {
+  const empty = { total: 0, backlog: 0, notStarted: 0, inProgress: 0, isLateHours: false }
   try {
     if (!driverId) return empty
     const supabase = createAdminClient()
     const { todayTH } = await import('@/lib/utils/date-th')
+    const today = todayTH()
+
+    const CLOSED = ['Completed', 'Complete', 'Delivered', 'Finished', 'Closed', 'Billed', 'Paid', 'Verified', 'Cancelled', 'Canceled', 'Rejected']
     const NOT_STARTED = ['New', 'Assigned', 'Confirmed']
-    const IN_PROGRESS = ['Accepted', 'Arrived Pickup', 'Picked Up', 'In Transit', 'In Progress', 'Arrived Dropoff']
+
     const { data } = await supabase
       .from('Jobs_Main')
-      .select('Job_Status')
+      .select('Job_ID, Job_Status, Plan_Date')
       .eq('Driver_ID', driverId)
-      .gte('Plan_Date', todayTH())
-      .in('Job_Status', [...NOT_STARTED, ...IN_PROGRESS])
+      .not('Job_Status', 'in', `(${CLOSED.join(',')})`)
+      .lte('Plan_Date', today)
+
     const rows = data || []
-    const notStarted = rows.filter(r => NOT_STARTED.includes(r.Job_Status as string)).length
-    const inProgress = rows.length - notStarted
-    return { total: rows.length, notStarted, inProgress }
+    const backlog = rows.filter(r => r.Plan_Date && r.Plan_Date < today).length
+    const todayRows = rows.filter(r => r.Plan_Date === today)
+    const notStarted = todayRows.filter(r => NOT_STARTED.includes(r.Job_Status as string)).length
+    const inProgress = todayRows.length - notStarted
+
+    const currentHour = parseInt(
+      new Intl.DateTimeFormat('th-TH', { timeZone: 'Asia/Bangkok', hour: 'numeric', hour12: false }).format(new Date()),
+      10
+    )
+    const isLateHours = currentHour >= 19
+
+    return { total: rows.length, backlog, notStarted, inProgress, isLateHours }
   } catch (e) {
     console.error('[getDriverReminder]', e)
     return empty

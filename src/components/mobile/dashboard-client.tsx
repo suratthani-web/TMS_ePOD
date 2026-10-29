@@ -190,7 +190,7 @@ export function DashboardClient({ session, currentJob, activeJobs = [], gamifica
             >
                 <div className="p-3.5" style={{ borderRight: '1px solid var(--pd-line-2)' }}>
                     <p className="text-muted-foreground text-[9.5px] font-semibold uppercase tracking-wider mb-1.5 flex items-center gap-1">
-                        <Truck size={11} /> งานค้าง
+                        <Truck size={11} /> งานวันนี้
                     </p>
                     <p className="text-[22px] font-bold text-foreground leading-none pd-num">{activeJobs.length}</p>
                 </div>
@@ -301,7 +301,7 @@ export function DashboardClient({ session, currentJob, activeJobs = [], gamifica
                              <CheckCircle2 size={26} style={{ color: 'var(--pd-go)' }} />
                          </div>
                          <h3 className="text-foreground font-bold text-base mb-1">เคลียร์งานหมดแล้ว</h3>
-                         <p className="text-muted-foreground text-xs">ยังไม่มีงานค้างในระบบ รอแอดมินจ่ายงานถัดไป</p>
+                         <p className="text-muted-foreground text-xs">ไม่มีงานที่ต้องส่งในระบบ รอแอดมินจ่ายงานถัดไป</p>
                     </motion.div>
                 )}
                 </AnimatePresence>

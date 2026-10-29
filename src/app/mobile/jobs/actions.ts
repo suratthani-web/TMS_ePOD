@@ -124,35 +124,31 @@ export async function updateJobStatus(
   try {
     const supabase = createAdminClient()
 
-    // 0. One-job-at-a-time guard (driver path only — admins on web are not
-    // affected). Block STARTING/advancing a queued job while an OLDER job of the
-    // same driver is still open (not closed via POD). Keeps the driver working in
-    // order; closing the current job clears the block.
-    const START_WORK_STATUSES = ['Accepted', 'Arrived Pickup', 'Picked Up', 'In Transit', 'In Progress', 'Arrived Dropoff']
-    if (START_WORK_STATUSES.includes(status)) {
-      const CLOSED_JOB_STATUSES = ['Completed', 'Complete', 'Delivered', 'Verified', 'Billed', 'Paid', 'Cancelled', 'Draft', 'Rejected']
+    // 0. Active driving guard (driver path only):
+    // Prevent starting physical transport (Picked Up / In Transit) if the driver
+    // is currently in the middle of delivering another job on the road.
+    // NOTE: 'Accepted' (กดรับงาน) must NEVER be blocked — drivers can accept assigned work freely.
+    const DRIVING_DELIVERY_STATUSES = ['Picked Up', 'In Transit', 'Arrived Dropoff']
+    if (DRIVING_DELIVERY_STATUSES.includes(status)) {
       const { data: thisJob } = await supabase
         .from('Jobs_Main')
-        .select('Driver_ID, Plan_Date, Created_At')
+        .select('Driver_ID, Plan_Date')
         .eq('Job_ID', jobId)
         .single()
       const did = driverId || thisJob?.Driver_ID
       if (did && thisJob) {
-        const { data: openJobs } = await supabase
+        const { data: activeDrivingJobs } = await supabase
           .from('Jobs_Main')
-          .select('Job_ID, Plan_Date, Created_At')
+          .select('Job_ID')
           .eq('Driver_ID', did)
-          .not('Job_Status', 'in', `(${CLOSED_JOB_STATUSES.join(',')})`)
-        const isOlder = (a: { Plan_Date?: string | null; Created_At?: string | null }) => {
-          const pa = a.Plan_Date || '', pb = thisJob.Plan_Date || ''
-          if (pa !== pb) return pa < pb
-          return (a.Created_At || '') < (thisJob.Created_At || '')
-        }
-        const older = (openJobs || []).find((j: { Job_ID: string; Plan_Date?: string | null; Created_At?: string | null }) => j.Job_ID !== jobId && isOlder(j))
-        if (older) {
+          .neq('Job_ID', jobId)
+          .in('Job_Status', DRIVING_DELIVERY_STATUSES)
+
+        const activeJob = activeDrivingJobs?.[0]
+        if (activeJob) {
           return {
             success: false,
-            message: `ยังมีงานก่อนหน้า (#${String(older.Job_ID).slice(-6).toUpperCase()}) ที่ยังไม่ปิด — ปิดงานนั้นให้เสร็จก่อนจึงจะเริ่มงานนี้ได้`,
+            message: `กำลังส่งงาน #${String(activeJob.Job_ID).slice(-6).toUpperCase()} อยู่ — กรุณาส่งมอบงานนั้นให้เสร็จก่อนเริ่มงานถัดไป`,
           }
         }
       }
