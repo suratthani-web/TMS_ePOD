@@ -79,6 +79,7 @@ type JobDialogProps = {
   canAssign?: boolean
   canDelete?: boolean
   defaultDate?: string
+  userBranchId?: string
 }
 
 
@@ -138,7 +139,8 @@ export function JobDialog({
   canViewExpense = true,
   canAssign = true,
   canDelete = false,
-  defaultDate
+  defaultDate,
+  userBranchId
 }: JobDialogProps) {
   const { branches, isAdmin, selectedBranch } = useBranch()
   const { t, language } = useLanguage()
@@ -334,6 +336,16 @@ export function JobDialog({
           Price_Cust_Total: job?.Price_Cust_Total ? Number(job.Price_Cust_Total) : 0
         }]
   )
+
+  // Determine active operating branch:
+  const effectiveBranch = 
+    (formData.Branch_ID && formData.Branch_ID !== 'All')
+      ? formData.Branch_ID
+      : (userBranchId && userBranchId !== 'All')
+        ? userBranchId
+        : (selectedBranch && selectedBranch !== 'All')
+          ? selectedBranch
+          : (!isAdmin && branches && branches.length > 0 ? branches[0].Branch_ID : '')
 
   // Extra costs
   const [extraCosts, setExtraCosts] = useState<ExtraCost[]>(
@@ -2387,11 +2399,13 @@ export function JobDialog({
                                 <VehicleAutocomplete
                                     value={assignment.Vehicle_Plate}
                                     onChange={(val) => updateAssignment(index, 'Vehicle_Plate', val)}
-                                    currentBranchId={formData.Branch_ID || selectedBranch}
+                                    currentBranchId={effectiveBranch}
                                     vehicles={vehicles.filter((v) => {
-                                        const curBranch = formData.Branch_ID || selectedBranch
-                                        if (!includeCrossBranch && curBranch && curBranch !== 'All') {
-                                            if (v.Branch_ID && v.Branch_ID !== 'All' && v.Branch_ID !== curBranch && v.Vehicle_Plate !== assignment.Vehicle_Plate) {
+                                        // If NOT checked, ONLY show vehicles of admin's branch
+                                        if (!includeCrossBranch && effectiveBranch) {
+                                            const isMyBranch = !v.Branch_ID || v.Branch_ID === 'All' || v.Branch_ID === effectiveBranch
+                                            const isCurrentPlate = assignment.Vehicle_Plate && v.Vehicle_Plate === assignment.Vehicle_Plate
+                                            if (!isMyBranch && !isCurrentPlate) {
                                                 return false
                                             }
                                         }
@@ -2468,11 +2482,13 @@ export function JobDialog({
                                 <DriverAutocomplete
                                     value={assignment.Driver_ID}
                                     onChange={(val) => updateAssignment(index, 'Driver_ID', val)}
-                                    currentBranchId={formData.Branch_ID || selectedBranch}
+                                    currentBranchId={effectiveBranch}
                                     drivers={drivers.filter((d) => {
-                                        const curBranch = formData.Branch_ID || selectedBranch
-                                        if (!includeCrossBranch && curBranch && curBranch !== 'All') {
-                                            if (d.Branch_ID && d.Branch_ID !== 'All' && d.Branch_ID !== curBranch && d.Driver_ID !== assignment.Driver_ID) {
+                                        // If NOT checked, ONLY show drivers of admin's branch
+                                        if (!includeCrossBranch && effectiveBranch) {
+                                            const isMyBranch = !d.Branch_ID || d.Branch_ID === 'All' || d.Branch_ID === effectiveBranch
+                                            const isCurrentDriver = assignment.Driver_ID && d.Driver_ID === assignment.Driver_ID
+                                            if (!isMyBranch && !isCurrentDriver) {
                                                 return false
                                             }
                                         }

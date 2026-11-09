@@ -495,6 +495,7 @@ export function PlanningClient({
                                 }
                             />
                             <JobDialog 
+                                userBranchId={branchId}
                                 drivers={drivers} 
                                 vehicles={vehicles} 
                                 customers={customers}

@@ -68,12 +68,18 @@ export function BranchProvider({ children }: { children: React.ReactNode }) {
         ]) as [Branch[], number]
         
         setBranches(fetchedBranches || [])
-        setIsAdmin(roleId === 1) // Only Super Admin (Role 1) can switch branches
+        const isSuper = roleId === 1
+        setIsAdmin(isSuper)
 
-        // Only sync from cookie if not already set by URL param
-        const savedBranch = Cookies.get("selectedBranch")
-        if (savedBranch && (savedBranch === 'All' || fetchedBranches.some((b: Branch) => b.Branch_ID === savedBranch))) {
-            setSelectedBranchState(prev => prev === 'All' ? savedBranch : prev)
+        // For non-SuperAdmin, fix their selected branch to their assigned branch
+        if (!isSuper && fetchedBranches && fetchedBranches.length > 0) {
+            setSelectedBranchState(fetchedBranches[0].Branch_ID)
+        } else {
+            // Only sync from cookie if not already set by URL param
+            const savedBranch = Cookies.get("selectedBranch")
+            if (savedBranch && (savedBranch === 'All' || fetchedBranches.some((b: Branch) => b.Branch_ID === savedBranch))) {
+                setSelectedBranchState(prev => prev === 'All' ? savedBranch : prev)
+            }
         }
     } catch (error) {
         console.warn("BranchProvider initialization partial failure or timeout:", error)
