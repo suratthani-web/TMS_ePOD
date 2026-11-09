@@ -41,25 +41,27 @@ export type Vehicle = {
   Image_Url?: string | null
 }
 
-export async function getAllVehiclesFromTable(providedBranchId?: string): Promise<Vehicle[]> {
+export async function getAllVehiclesFromTable(providedBranchId?: string, options?: { allowAllBranches?: boolean }): Promise<Vehicle[]> {
   try {
     const isSuper = await isSuperAdmin()
     const isAdminUser = await isAdmin()
     const userBranchId = await getUserBranchId()
     const branchId = (isSuper || isAdminUser) ? (providedBranchId || userBranchId) : userBranchId
-    const supabase = (isSuper || isAdminUser) ? await createAdminClient() : await createClient()
+    const supabase = (isSuper || isAdminUser || options?.allowAllBranches) ? await createAdminClient() : await createClient()
     
     let query = supabase.from('Master_Vehicles').select('*')
     
-    // STRICT ISOLATION
-    if (!isSuper) {
-        if (userBranchId && userBranchId !== 'All') {
-            query = query.eq('Branch_ID', userBranchId)
-        } else {
-            return []
+    // STRICT ISOLATION (unless cross-branch is explicitly allowed)
+    if (!options?.allowAllBranches) {
+        if (!isSuper) {
+            if (userBranchId && userBranchId !== 'All') {
+                query = query.eq('Branch_ID', userBranchId)
+            } else {
+                return []
+            }
+        } else if (branchId && branchId !== 'All') {
+            query = query.eq('Branch_ID', branchId)
         }
-    } else if (branchId && branchId !== 'All') {
-        query = query.eq('Branch_ID', branchId)
     }
 
     const { data, error } = await query

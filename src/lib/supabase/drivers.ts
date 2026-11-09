@@ -34,26 +34,28 @@ export type Driver = {
 }
 
 // Get all drivers from Master_Drivers table
-export async function getAllDriversFromTable(providedBranchId?: string): Promise<Driver[]> {
+export async function getAllDriversFromTable(providedBranchId?: string, options?: { allowAllBranches?: boolean }): Promise<Driver[]> {
   try {
     const isSuper = await isSuperAdmin()
     const isAdminUser = await isAdmin()
     const userBranchId = await getUserBranchId()
     const branchId = (isSuper || isAdminUser) ? (providedBranchId || userBranchId) : userBranchId
-    const supabase = (isSuper || isAdminUser) ? await createAdminClient() : await createClient()
+    const supabase = (isSuper || isAdminUser || options?.allowAllBranches) ? await createAdminClient() : await createClient()
     
     let dbQuery = supabase.from('Master_Drivers').select('*')
-    // Branch Filtering
-    if (!isSuper) {
-        // STRICT ISOLATION: Non-SuperAdmins MUST be filtered by their branch
-        if (userBranchId && userBranchId !== 'All') {
-            dbQuery = dbQuery.eq('Branch_ID', userBranchId)
-        } else {
-            return []
+    // Branch Filtering (unless cross-branch is explicitly allowed)
+    if (!options?.allowAllBranches) {
+        if (!isSuper) {
+            // STRICT ISOLATION: Non-SuperAdmins MUST be filtered by their branch
+            if (userBranchId && userBranchId !== 'All') {
+                dbQuery = dbQuery.eq('Branch_ID', userBranchId)
+            } else {
+                return []
+            }
+        } else if (branchId && branchId !== 'All') {
+            // SuperAdmin can filter by specific branch
+            dbQuery = dbQuery.eq('Branch_ID', branchId)
         }
-    } else if (branchId && branchId !== 'All') {
-        // SuperAdmin can filter by specific branch
-        dbQuery = dbQuery.eq('Branch_ID', branchId)
     }
 
     const { data, error } = await dbQuery

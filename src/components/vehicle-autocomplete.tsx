@@ -17,6 +17,7 @@ interface VehicleAutocompleteProps {
   placeholder?: string
   disabled?: boolean
   customerId?: string | null
+  currentBranchId?: string | null
 }
 
 import { useMemo } from "react"
@@ -29,7 +30,8 @@ export function VehicleAutocomplete({
   className,
   placeholder = "ค้นหาทะเบียนรถ...",
   disabled = false,
-  customerId
+  customerId,
+  currentBranchId
 }: VehicleAutocompleteProps) {
   const [open, setOpen] = useState(false)
   const [query, setQuery] = useState("")
@@ -133,6 +135,15 @@ export function VehicleAutocomplete({
                     <EntityAvatar kind="vehicle" url={vehicle.Image_Url} id={vehicle.Vehicle_Plate} name={vehicle.Vehicle_Plate} className="h-7 w-7 rounded-lg [&_svg]:text-emerald-600" />
                     <span>{vehicle.Vehicle_Plate}</span>
                     <span className="text-lg font-bold text-muted-foreground font-black">({vehicle.Vehicle_Type})</span>
+                    {vehicle.Branch_ID && currentBranchId && currentBranchId !== 'All' && vehicle.Branch_ID !== currentBranchId ? (
+                      <span className="text-[10px] font-black px-2 py-0.5 rounded-full uppercase tracking-widest bg-purple-500/20 text-purple-700 dark:text-purple-300 border border-purple-500/30">
+                        รถสาขา {vehicle.Branch_ID}
+                      </span>
+                    ) : vehicle.Branch_ID && vehicle.Branch_ID !== 'All' ? (
+                      <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded bg-muted text-muted-foreground border border-border/50">
+                        {vehicle.Branch_ID}
+                      </span>
+                    ) : null}
                     {customerId && customerId !== 'All' && (
                       <span className={cn(
                         "text-[10px] font-black px-2 py-0.5 rounded-full uppercase tracking-widest",

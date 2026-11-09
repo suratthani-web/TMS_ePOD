@@ -8,7 +8,7 @@ import { todayTH } from '@/lib/utils/date-th'
 import { getAllVehiclesFromTable } from '@/lib/supabase/vehicles'
 import { logActivity } from '@/lib/supabase/logs'
 import { getUserBranchId, getFixedUserBranchId } from '@/lib/permissions'
-import { notifyDriverNewJob, notifyMarketplaceNewJob, notifyDriverNewBatch, notifyAdminNewRequest, notifyAdminNewRequestBatch } from '@/lib/actions/push-actions'
+import { notifyDriverNewJob, notifyMarketplaceNewJob, notifyDriverNewBatch, notifyAdminNewRequest, notifyAdminNewRequestBatch, notifyAdminCrossBranchDispatch } from '@/lib/actions/push-actions'
 import { getCustomerId, getUserId, isCustomer, isSuperAdmin, isAdmin } from '@/lib/permissions'
 import { sanitizeJobData } from '@/lib/supabase/utils'
 import { getFuelPriceNumber, getSuggestedRate } from '@/lib/actions/fuel-actions'
@@ -168,14 +168,19 @@ export async function createJob(data: JobFormData) {
   }
 
   // If subId still null, try looking up via Vehicle_Plate
-  if (!subId && data.Vehicle_Plate) {
+  let vehicleBranchId: string | null = null
+  if (data.Vehicle_Plate) {
     const { data: vehicle, error: vehicleErr } = await supabase
       .from('Master_Vehicles')
-      .select('Sub_ID')
+      .select('Sub_ID, Branch_ID')
       .eq('Vehicle_Plate', data.Vehicle_Plate)
       .single()
-    if (!vehicleErr && vehicle) subId = vehicle.Sub_ID || null
-    else if (vehicleErr) console.warn('[createJob] Vehicle lookup failed:', vehicleErr.message)
+    if (!vehicleErr && vehicle) {
+      if (!subId) subId = vehicle.Sub_ID || null
+      vehicleBranchId = vehicle.Branch_ID || null
+    } else if (vehicleErr) {
+      console.warn('[createJob] Vehicle lookup failed:', vehicleErr.message)
+    }
   }
 
   // Get Pricing from Engine
@@ -215,6 +220,11 @@ export async function createJob(data: JobFormData) {
               try { await notifyDriverNewJob(data.Driver_ID, data.Job_ID, data.Customer_Name || 'ไม่ระบุ') } catch (e) { console.error(e) }
           } else {
               try { await notifyMarketplaceNewJob(data.Job_ID, data.Customer_Name || 'ไม่ระบุ') } catch (e) { console.error(e) }
+          }
+          if (vehicleBranchId && data.Branch_ID && vehicleBranchId !== data.Branch_ID && data.Vehicle_Plate) {
+              try {
+                  await notifyAdminCrossBranchDispatch(data.Job_ID, data.Vehicle_Plate, data.Branch_ID, vehicleBranchId, data.Dest_Location)
+              } catch (e) { console.error('[createJob] notify cross-branch failed:', e) }
           }
       }
 
@@ -550,13 +560,13 @@ export async function createBulkJobs(
   // Fetch Master Data for lookups
   const [{ data: allDrivers }, { data: allVehicles }, { data: allCustomers }, { data: allRoutes }] = await Promise.all([
     supabase.from('Master_Drivers').select('Driver_ID, Driver_Name, Sub_ID'),
-    supabase.from('Master_Vehicles').select('Vehicle_Plate, Vehicle_Type, Sub_ID'),
+    supabase.from('Master_Vehicles').select('Vehicle_Plate, Vehicle_Type, Sub_ID, Branch_ID'),
     supabase.from('Master_Customers').select('Customer_ID, Customer_Name'),
     supabase.from('Master_Routes').select('*')
   ])
 
   const driverMap = new Map<string, { Driver_ID: string; Driver_Name: string; Sub_ID?: string | null }>(allDrivers?.map((d: { Driver_ID: string; Driver_Name: string; Sub_ID?: string | null }) => [d.Driver_ID, d]) || [])
-  const vehicleMap = new Map<string, { Vehicle_Plate: string; Vehicle_Type?: string | null; Sub_ID?: string | null }>(allVehicles?.map((v: { Vehicle_Plate: string; Vehicle_Type?: string | null; Sub_ID?: string | null }) => [v.Vehicle_Plate, v]) || [])
+  const vehicleMap = new Map<string, { Vehicle_Plate: string; Vehicle_Type?: string | null; Sub_ID?: string | null; Branch_ID?: string | null }>(allVehicles?.map((v: { Vehicle_Plate: string; Vehicle_Type?: string | null; Sub_ID?: string | null; Branch_ID?: string | null }) => [v.Vehicle_Plate, v]) || [])
   const customerMap = new Map<string, string>(
     (allCustomers || [])
       .map((c: { Customer_ID: string; Customer_Name?: string | null }) => [c.Customer_Name?.toLowerCase().trim(), c.Customer_ID] as const)
@@ -1151,6 +1161,17 @@ export async function createBulkJobs(
           
           notiPromises.push(notifyMarketplaceNewJob(broadcastMsg, sampleCustomer))
       }
+
+      // Notify cross-branch owners (Backhaul)
+      finalizedData.forEach(j => {
+          if (j.Job_Status !== 'Draft' && j.Vehicle_Plate) {
+              const v = vehicleMap.get(j.Vehicle_Plate)
+              const opBranch = (j.Branch_ID as string) || effectiveBranchId
+              if (v?.Branch_ID && opBranch && v.Branch_ID !== opBranch) {
+                  notiPromises.push(notifyAdminCrossBranchDispatch(j.Job_ID!, j.Vehicle_Plate, opBranch, v.Branch_ID, j.Dest_Location as string | undefined))
+              }
+          }
+      })
       
       await Promise.allSettled(notiPromises)
   } catch (notiErr) {
@@ -1323,6 +1344,27 @@ export async function updateJob(jobId: string, data: Partial<JobFormData>) {
   // Mirror into the MASTER Google Sheet when this edit set the job to 'Verified'.
   // Dedup lives in appendJobToMaster (ledger check), so it's safe to call every
   // time — matching verifyJob() and adminUpdateJobStatus().
+  // Cross-branch notification if vehicle belongs to another branch
+  const effectivePlate = updateData.Vehicle_Plate || currentJob.Vehicle_Plate
+  const effectiveBranch = updateData.Branch_ID || currentJob.Branch_ID
+  const effectiveStatus = updateData.Job_Status || currentJob.Job_Status
+  if (updateData.Vehicle_Plate && updateData.Vehicle_Plate !== currentJob.Vehicle_Plate && effectiveStatus !== 'Draft' && effectivePlate) {
+    try {
+      const { data: vInfo } = await supabase.from('Master_Vehicles').select('Branch_ID').eq('Vehicle_Plate', effectivePlate).single()
+      if (vInfo?.Branch_ID && effectiveBranch && vInfo.Branch_ID !== effectiveBranch) {
+        await notifyAdminCrossBranchDispatch(
+          jobId,
+          effectivePlate,
+          effectiveBranch,
+          vInfo.Branch_ID,
+          (updateData.Dest_Location || currentJob.Dest_Location) as string | undefined
+        )
+      }
+    } catch (e) {
+      console.warn('[updateJob] notify cross branch error:', e)
+    }
+  }
+
   let sheetSync: { success: boolean; error?: string; skipped?: boolean } | undefined
   if (verifiedViaStatus) {
     sheetSync = await appendJobToMaster(jobId)
@@ -1370,8 +1412,8 @@ export async function getJobCreationData(selectedBranchId?: string) {
   const supabase = (isSuper || isAdminUser) ? createAdminClient() : await createClient()
 
   const [driversResult, vehiclesResult, customersResult, routesResult, subcontractorsResult] = await Promise.all([
-    getAllDriversFromTable(branchId),
-    getAllVehiclesFromTable(branchId),
+    getAllDriversFromTable(branchId, { allowAllBranches: true }),
+    getAllVehiclesFromTable(branchId, { allowAllBranches: true }),
     supabase.from('Master_Customers').select('*').order('Customer_Name', { ascending: true }),
     supabase.from('Master_Routes').select('*').order('Route_Name', { ascending: true }),
     supabase.from('Master_Subcontractors').select('*').order('Sub_Name', { ascending: true })

@@ -734,6 +734,33 @@ export async function notifyAdminNewRequestBatch(
  * Notify: Driver Silent SOS (No Call)
  * Sends alerts to admins with location and driver info.
  */
+/**
+ * Cross-branch vehicle dispatch notification (Backhaul / เที่ยวขากลับ).
+ * แจ้งเตือนแอดมินสาขาเจ้าของรถ เมื่อสาขาอื่นดึงรถไปใช้วิ่งงาน
+ */
+export async function notifyAdminCrossBranchDispatch(
+    jobId: string,
+    vehiclePlate: string,
+    operatingBranchId: string,
+    ownerBranchId: string,
+    dest?: string | null
+) {
+    const bodyLines = [
+        `🚛 ทะเบียน: ${vehiclePlate} (สังกัด ${ownerBranchId})`,
+        `🏢 สาขาที่ใช้งาน: ${operatingBranchId}`,
+        dest ? `📍 ปลายทาง: ${dest}` : '',
+        'บันทึกงาน Backhaul เรียบร้อย',
+    ].filter(Boolean);
+
+    await sendPushToAdmins({
+        title: `🔄 ใช้รถข้ามสาขา (Backhaul) — ${jobId}`,
+        body: bodyLines.join('\n'),
+        url: `/planning?jobId=${jobId}`,
+        type: 'cross_branch_dispatch',
+        tag: `backhaul_${jobId}`,
+    }, ownerBranchId);
+}
+
 export async function notifySilentSOS(
     driverId: string, 
     driverName: string, 

@@ -17,6 +17,7 @@ interface DriverAutocompleteProps {
   placeholder?: string
   disabled?: boolean
   customerId?: string | null
+  currentBranchId?: string | null
 }
 
 import { useMemo } from "react"
@@ -29,7 +30,8 @@ export function DriverAutocomplete({
   className,
   placeholder = "ค้นหาคนขับ...",
   disabled = false,
-  customerId
+  customerId,
+  currentBranchId
 }: DriverAutocompleteProps) {
   const [open, setOpen] = useState(false)
   const [query, setQuery] = useState("")
@@ -145,6 +147,15 @@ export function DriverAutocomplete({
                   <div className="flex items-center gap-2">
                     <EntityAvatar kind="driver" url={driver.Image_Url} id={driver.Driver_ID} name={driver.Driver_Name} className="h-7 w-7 rounded-lg" />
                     <span>{driver.Driver_Name} <span className="text-muted-foreground ml-1">({driver.Vehicle_Plate || '-'})</span></span>
+                    {driver.Branch_ID && currentBranchId && currentBranchId !== 'All' && driver.Branch_ID !== currentBranchId ? (
+                      <span className="text-[10px] font-black px-2 py-0.5 rounded-full uppercase tracking-widest bg-purple-500/20 text-purple-700 dark:text-purple-300 border border-purple-500/30">
+                        สังกัด {driver.Branch_ID}
+                      </span>
+                    ) : driver.Branch_ID && driver.Branch_ID !== 'All' ? (
+                      <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded bg-muted text-muted-foreground border border-border/50">
+                        {driver.Branch_ID}
+                      </span>
+                    ) : null}
                     {customerId && customerId !== 'All' && (
                       <span className={cn(
                         "text-[10px] font-black px-2 py-0.5 rounded-full uppercase tracking-widest",

@@ -204,9 +204,11 @@ export function PlanningClient({
         // Prepare DATA sheet content
         // Routes are not tied to Customer_ID in DB, so we show all branch routes.
         // Filter lists by selected customer's branch if set to prevent showing data from other branches.
-        const filteredRoutes = customerBranchId ? routes.filter(r => r.Branch_ID === customerBranchId) : routes
-        const filteredDrivers = customerBranchId ? drivers.filter(d => d.Branch_ID === customerBranchId) : drivers
-        const filteredVehicles = customerBranchId ? vehicles.filter(v => v.Branch_ID === customerBranchId) : vehicles
+        const activeBranch = (branchId && branchId !== 'All') ? branchId : null
+        const targetBranch = customerBranchId || activeBranch
+        const filteredRoutes = targetBranch ? routes.filter(r => !r.Branch_ID || r.Branch_ID === 'All' || r.Branch_ID === targetBranch) : routes
+        const filteredDrivers = targetBranch ? drivers.filter(d => !d.Branch_ID || d.Branch_ID === targetBranch) : drivers
+        const filteredVehicles = targetBranch ? vehicles.filter(v => !v.Branch_ID || v.Branch_ID === targetBranch) : vehicles
 
         // 1 แถว = 1 คนขับ พร้อม "ทะเบียนที่ตัวเองลงทะเบียนไว้จริง" เท่านั้น
         // ถ้าไม่ได้ลงทะเบียนทะเบียนไว้ (คนขับหลายคัน สลับไปมา) → เว้นว่าง ตามจริง

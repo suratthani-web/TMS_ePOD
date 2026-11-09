@@ -140,7 +140,7 @@ export function JobDialog({
   canDelete = false,
   defaultDate
 }: JobDialogProps) {
-  const { branches, isAdmin } = useBranch()
+  const { branches, isAdmin, selectedBranch } = useBranch()
   const { t, language } = useLanguage()
   const router = useRouter()
   const [loading, setLoading] = useState(false)
@@ -320,6 +320,7 @@ export function JobDialog({
   })
 
   // Multi-Assignment State
+  const [includeCrossBranch, setIncludeCrossBranch] = useState(false)
   const [assignments, setAssignments] = useState<JobAssignment[]>(
     job?.assignments && job.assignments.length > 0
       ? job.assignments
@@ -677,6 +678,16 @@ export function JobDialog({
       setAssignments(initialAssignments)
 
       const firstAssign = initialAssignments[0]
+
+      // Check if target job uses a cross-branch vehicle
+      const initialPlate = firstAssign?.Vehicle_Plate || targetJob.Vehicle_Plate
+      if (initialPlate) {
+        const assignedV = vehicles.find(v => v.Vehicle_Plate === initialPlate)
+        const jobBranch = targetJob.Branch_ID || selectedBranch
+        if (assignedV?.Branch_ID && jobBranch && jobBranch !== 'All' && assignedV.Branch_ID !== jobBranch) {
+          setIncludeCrossBranch(true)
+        }
+      }
       const targetContainer = Array.isArray((targetJob as any)?.container)
         ? (targetJob as any).container[0]
         : (targetJob as any)?.container
@@ -806,6 +817,7 @@ export function JobDialog({
       setDestinations([{ name: '', lat: '', lng: '' }])
       setExtraCosts([])
       setAssignments([{ Vehicle_Type: '4-Wheel', Vehicle_Plate: '', Driver_ID: '', Sub_ID: '', Show_Price_To_Driver: true, Cost_Driver_Total: 0, Price_Cust_Total: 0 }])
+      setIncludeCrossBranch(false)
     }
   }, [show, mode, job, defaultDate])
 
@@ -2357,14 +2369,32 @@ export function JobDialog({
 
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mb-8">
                         <div className="space-y-4">
-                            <Label className="flex items-center gap-2 text-2xl font-black text-primary uppercase tracking-normal">
-                                <Truck className="w-6 h-6" /> {t('jobs.dialog.vehicle_plate')}
-                            </Label>
+                            <div className="flex items-center justify-between">
+                                <Label className="flex items-center gap-2 text-2xl font-black text-primary uppercase tracking-normal">
+                                    <Truck className="w-6 h-6" /> {t('jobs.dialog.vehicle_plate')}
+                                </Label>
+                                <label className="flex items-center gap-2 cursor-pointer text-sm font-semibold text-primary/80 hover:text-primary select-none">
+                                    <input
+                                        type="checkbox"
+                                        checked={includeCrossBranch}
+                                        onChange={(e) => setIncludeCrossBranch(e.target.checked)}
+                                        className="rounded border-input text-primary focus:ring-primary w-4 h-4 cursor-pointer"
+                                    />
+                                    <span>รวมรถต่างสาขา (Backhaul)</span>
+                                </label>
+                            </div>
                             <div className="relative group/field">
                                 <VehicleAutocomplete
                                     value={assignment.Vehicle_Plate}
                                     onChange={(val) => updateAssignment(index, 'Vehicle_Plate', val)}
+                                    currentBranchId={formData.Branch_ID || selectedBranch}
                                     vehicles={vehicles.filter((v) => {
+                                        const curBranch = formData.Branch_ID || selectedBranch
+                                        if (!includeCrossBranch && curBranch && curBranch !== 'All') {
+                                            if (v.Branch_ID && v.Branch_ID !== 'All' && v.Branch_ID !== curBranch && v.Vehicle_Plate !== assignment.Vehicle_Plate) {
+                                                return false
+                                            }
+                                        }
                                         if (assignment.Driver_ID && v.Driver_ID === assignment.Driver_ID) return true
                                         const subMatch = !assignment.Sub_ID || v.Sub_ID === assignment.Sub_ID
                                         const matchVehicleType = (sel?: string | null, vType?: string | null) => {
@@ -2401,13 +2431,28 @@ export function JobDialog({
                                                 Driver_ID: v.Driver_ID || prev.Driver_ID
                                             }))
                                         }
-                                        if (v.Driver_ID) {
+                                        const curBranch = formData.Branch_ID || selectedBranch
+                                        if (v.Branch_ID && curBranch && curBranch !== 'All' && v.Branch_ID !== curBranch) {
+                                            toast.info(`เลือกรถสังกัดสาขา ${v.Branch_ID} (งาน Backhaul)`, { icon: <Truck className="w-4 h-4" /> })
+                                        } else if (v.Driver_ID) {
                                             toast.info(t('jobs.dialog.auto_filled_driver') || 'ดึงข้อมูลคนขับที่ผูกไว้ให้อัตโนมัติ', { icon: <User className="w-4 h-4" /> })
                                         }
                                     }}
                                     placeholder={t('jobs.dialog.vehicle_plate_placeholder')}
                                     className="bg-background border-input text-2xl h-14"
                                 />
+                                {(() => {
+                                    const curBranch = formData.Branch_ID || selectedBranch
+                                    const selV = vehicles.find(v => v.Vehicle_Plate === assignment.Vehicle_Plate)
+                                    if (selV?.Branch_ID && curBranch && curBranch !== 'All' && selV.Branch_ID !== curBranch) {
+                                        return (
+                                            <div className="flex items-center gap-2 text-xs font-bold text-purple-700 dark:text-purple-300 bg-purple-500/10 border border-purple-500/30 px-3 py-1.5 rounded-xl mt-2">
+                                                <span>🔄 <strong>รถข้ามสาขา (Backhaul):</strong> สังกัด {selV.Branch_ID} (ระบบจะแจ้งเตือนสาขาเจ้าของรถเมื่อบันทึกงาน)</span>
+                                            </div>
+                                        )
+                                    }
+                                    return null
+                                })()}
                                 {assignment.Vehicle_Plate && vehicles.find(v => v.Vehicle_Plate === assignment.Vehicle_Plate)?.Driver_ID === assignment.Driver_ID && assignment.Driver_ID && (
                                     <div className="absolute -top-3 right-4 bg-emerald-500 text-white text-[10px] px-2 py-0.5 rounded-full font-black flex items-center gap-1 shadow-sm animate-in zoom-in-50">
                                         <LinkIcon className="w-2.5 h-2.5" /> ผูกทะเบียน
@@ -2423,7 +2468,14 @@ export function JobDialog({
                                 <DriverAutocomplete
                                     value={assignment.Driver_ID}
                                     onChange={(val) => updateAssignment(index, 'Driver_ID', val)}
+                                    currentBranchId={formData.Branch_ID || selectedBranch}
                                     drivers={drivers.filter((d) => {
+                                        const curBranch = formData.Branch_ID || selectedBranch
+                                        if (!includeCrossBranch && curBranch && curBranch !== 'All') {
+                                            if (d.Branch_ID && d.Branch_ID !== 'All' && d.Branch_ID !== curBranch && d.Driver_ID !== assignment.Driver_ID) {
+                                                return false
+                                            }
+                                        }
                                         const subMatch = !assignment.Sub_ID ? (!d.Sub_ID) : d.Sub_ID === assignment.Sub_ID
                                         return subMatch
                                     })}
