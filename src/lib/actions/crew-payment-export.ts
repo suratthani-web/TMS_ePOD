@@ -15,7 +15,7 @@
 
 import ExcelJS from "exceljs"
 import { createAdminClient, createClient } from "@/utils/supabase/server"
-import { isAdmin } from "@/lib/permissions"
+import { isAdmin, getUserBranchId } from "@/lib/permissions"
 
 type JobRow = {
     Job_ID: string
@@ -27,6 +27,7 @@ type JobRow = {
     Cost_Driver_Total: number | null
     extra_costs_json: string | unknown[] | null
     original_destinations_json: string | unknown[] | null
+    Branch_ID?: string | null
 }
 
 type ExtraCost = { type?: string; cost_driver?: number | string }
@@ -118,7 +119,8 @@ function buildDetailSheet(
     ws: ExcelJS.Worksheet,
     jobs: JobRow[],
     payee: CrewPaymentPayee,
-    whtRate: number
+    whtRate: number,
+    isSurat: boolean = false
 ): number {
     ws.addRow(DETAIL_HEADERS)
     const header = ws.getRow(1)
@@ -162,7 +164,7 @@ function buildDetailSheet(
         }
     }
 
-    // ท้ายแท็บตามแม่แบบ: รวม / หัก ณ ที่จ่าย / ค่าโทรศัพท์ (คีย์มือ) / คงเหลือ + บัญชีโอน
+    // ท้ายแท็บตามแม่แบบ: รวม / หัก ณ ที่จ่าย / ค่าโทรศัพท์ (สุราษฎร์ฯ) หรือ ค่าประกันสินค้า (สาขาอื่น) / คงเหลือ + บัญชีโอน
     const totalRow = lastRow + 1
     const label = (row: number, text: string) => {
         ws.mergeCells(`J${row}:K${row}`)
@@ -174,15 +176,18 @@ function buildDetailSheet(
     ws.getCell(`L${totalRow}`).value = jobs.length > 0 ? { formula: `SUM(L2:L${lastRow})` } : 0
     label(totalRow + 1, `หัก ณ ที่จ่าย ${whtRate}%`)
     ws.getCell(`L${totalRow + 1}`).value = { formula: `L${totalRow}*${whtRate}/100` }
-    label(totalRow + 2, 'ค่าโทรศัพท์')
+    const detailDeductionLabel = isSurat ? 'ค่าโทรศัพท์' : 'ค่าประกันสินค้า'
+    label(totalRow + 2, detailDeductionLabel)
     label(totalRow + 3, 'คงเหลือ')
-    ws.getCell(`L${totalRow + 3}`).value = { formula: `L${totalRow}-L${totalRow + 1}+L${totalRow + 2}` }
+    ws.getCell(`L${totalRow + 3}`).value = isSurat
+        ? { formula: `L${totalRow}-L${totalRow + 1}+L${totalRow + 2}` }
+        : { formula: `L${totalRow}-L${totalRow + 1}-L${totalRow + 2}` }
     for (let r = totalRow; r <= totalRow + 3; r++) {
         ws.getCell(`L${r}`).numFmt = MONEY
         ws.getCell(`L${r}`).border = THIN
         ws.getCell(`L${r}`).font = { bold: r === totalRow || r === totalRow + 3 }
     }
-    // ไฮไลต์แบบไฟล์ต้นฉบับ: ยอดรวมพื้นเหลือง, ป้ายค่าโทรศัพท์พื้นแดง (ช่องคีย์มือ), คงเหลือตัวแดง
+    // ไฮไลต์แบบไฟล์ต้นฉบับ: ยอดรวมพื้นเหลือง, ป้ายค่าโทรศัพท์/ค่าประกันสินค้าพื้นแดง (ช่องคีย์มือ), คงเหลือตัวแดง
     ws.getCell(`L${totalRow}`).fill = YELLOW
     ws.getCell(`J${totalRow + 2}`).fill = RED
     ws.getCell(`J${totalRow + 2}`).font = { bold: true, color: { argb: 'FFFFFFFF' } }
@@ -225,15 +230,35 @@ function buildDetailSheet(
     return totalRow
 }
 
+const BRANCH_NAMES: Record<string, string> = {
+    URT: 'สุราษฎร์ธานี',
+    CNX: 'เชียงใหม่',
+    SKN: 'สมุทรสาคร',
+    PTE: 'ปทุมธานี',
+    ESA: 'ระนอง',
+}
+
 /** แท็บสรุปจ่าย — หัวตาราง 2 ชั้น (กลุ่ม "หัก" แตกเป็น 4 คอลัมน์) ตามแม่แบบ */
 function buildSummarySheet(
     ws: ExcelJS.Worksheet,
-    opts: { payee: CrewPaymentPayee; detailSheet: string; detailTotalRow: number; whtRate: number; claimRate: number; period: string }
+    opts: {
+        payee: CrewPaymentPayee
+        detailSheet: string
+        detailTotalRow: number
+        whtRate: number
+        claimRate: number
+        period: string
+        isSurat: boolean
+        branchId?: string | null
+    }
 ) {
-    const { payee, detailSheet, detailTotalRow, whtRate, claimRate, period } = opts
+    const { payee, detailSheet, detailTotalRow, whtRate, claimRate, period, isSurat, branchId } = opts
 
+    const branchName = branchId ? BRANCH_NAMES[branchId.toUpperCase()] || '' : ''
     ws.mergeCells('A1:Q1')
-    ws.getCell('A1').value = 'แบบฟอร์มสรุปการจ่ายเงินรถร่วมสุราษฎร์ธานี'
+    ws.getCell('A1').value = isSurat
+        ? 'แบบฟอร์มสรุปการจ่ายเงินรถร่วมสุราษฎร์ธานี'
+        : (branchName ? `แบบฟอร์มสรุปการจ่ายเงินรถร่วม${branchName}` : 'แบบฟอร์มสรุปการจ่ายเงินรถร่วม')
     ws.getCell('A1').font = { bold: true, size: 14 }
     ws.getCell('A1').alignment = { horizontal: 'center' }
 
@@ -248,7 +273,8 @@ function buildSummarySheet(
     }
     ws.mergeCells('I2:L2')
     ws.getCell('I2').value = 'หัก'
-    ;['ค่าเคลม', 'หักค่ารถ', 'ค่าโทรศัพท์', 'อื่นๆ'].forEach((t, i) => {
+    const col3Label = isSurat ? 'ค่าโทรศัพท์' : 'ค่าประกันสินค้า'
+    ;['ค่าเคลม', 'หักค่ารถ', col3Label, 'อื่นๆ'].forEach((t, i) => {
         ws.getCell(3, 9 + i).value = t
     })
 
@@ -267,10 +293,12 @@ function buildSummarySheet(
         { formula: `${q}!L${detailTotalRow}` },
         claimRate > 0 ? { formula: `ROUND(H${r}*${claimRate}/100,2)` } : null, // ค่าเคลม
         null,                                 // หักค่ารถ (คีย์มือ)
-        // ค่าโทรศัพท์: คีย์มือที่แท็บคนขับจุดเดียว → ดึงมา และ "บวก" เข้ายอด (ไม่อยู่ในฐานหัก ณ ที่จ่าย)
+        // สุราษฎร์ฯ = ค่าโทรศัพท์ (บวกเข้ายอด) / สาขาอื่น = ค่าประกันสินค้า (หักออกจากยอด)
         { formula: `IF(${q}!L${detailTotalRow + 2}="","",${q}!L${detailTotalRow + 2})` },
         null,                                 // อื่นๆ (คีย์มือ)
-        { formula: `H${r}-I${r}-J${r}+N(K${r})-L${r}` },
+        isSurat
+            ? { formula: `H${r}-I${r}-J${r}+N(K${r})-L${r}` }
+            : { formula: `H${r}-I${r}-J${r}-N(K${r})-L${r}` },
         { formula: `H${r}*${whtRate}/100` },
         { formula: `M${r}-N${r}` },
         period,
@@ -301,6 +329,7 @@ export async function generateCrewPaymentXlsx(input: {
     payee: CrewPaymentPayee
     whtRate?: number
     claimRate?: number
+    branchId?: string
 }): Promise<{ success: true; filename: string; base64: string } | { success: false; message: string }> {
     try {
         const { jobIds, payee } = input
@@ -312,12 +341,21 @@ export async function generateCrewPaymentXlsx(input: {
         const supabase = (await isAdmin()) ? await createAdminClient() : await createClient()
         const { data: jobsRaw, error } = await supabase
             .from('Jobs_Main')
-            .select('Job_ID, Plan_Date, Origin_Location, Dest_Location, Route_Name, Est_Distance_KM, Cost_Driver_Total, extra_costs_json, original_destinations_json')
+            .select('Job_ID, Plan_Date, Origin_Location, Dest_Location, Route_Name, Est_Distance_KM, Cost_Driver_Total, extra_costs_json, original_destinations_json, Branch_ID')
             .in('Job_ID', jobIds)
         if (error) return { success: false, message: error.message }
         const jobs = ((jobsRaw || []) as JobRow[]).sort((a, b) =>
             String(a.Plan_Date || '').localeCompare(String(b.Plan_Date || '')))
         if (jobs.length === 0) return { success: false, message: 'ไม่พบงานที่เลือก' }
+
+        const sessionBranch = await getUserBranchId()
+        const resolvedBranchId = input.branchId || jobs.find(j => j.Branch_ID)?.Branch_ID || sessionBranch || null
+        const isSurat = Boolean(
+            resolvedBranchId && (
+                resolvedBranchId.trim().toUpperCase() === 'URT' ||
+                resolvedBranchId.toLowerCase().includes('surat')
+            )
+        )
 
         const period = fmtPeriod(jobs.map(j => j.Plan_Date || ''))
         const wb = new ExcelJS.Workbook()
@@ -325,8 +363,17 @@ export async function generateCrewPaymentXlsx(input: {
         const detailName = detailSheetName(payee.accountName || payee.name)
         const wsDetail = wb.addWorksheet(detailName)
 
-        const detailTotalRow = buildDetailSheet(wsDetail, jobs, payee, whtRate)
-        buildSummarySheet(wsSum, { payee, detailSheet: detailName, detailTotalRow, whtRate, claimRate, period })
+        const detailTotalRow = buildDetailSheet(wsDetail, jobs, payee, whtRate, isSurat)
+        buildSummarySheet(wsSum, {
+            payee,
+            detailSheet: detailName,
+            detailTotalRow,
+            whtRate,
+            claimRate,
+            period,
+            isSurat,
+            branchId: resolvedBranchId,
+        })
 
         const buf = await wb.xlsx.writeBuffer()
         const base64 = Buffer.from(buf).toString('base64')

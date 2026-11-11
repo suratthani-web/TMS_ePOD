@@ -288,6 +288,7 @@ export default function DriverPaymentClient({
         },
         whtRate,
         claimRate,
+        branchId: selectedData[0]?.Branch_ID || undefined,
       })
       if (!res.success) { toast.error(res.message); return }
       const href = `data:application/vnd.openxmlformats-officedocument.spreadsheetml.sheet;base64,${res.base64}`
