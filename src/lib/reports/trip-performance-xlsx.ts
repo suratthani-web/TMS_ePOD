@@ -293,7 +293,7 @@ export async function buildTripPerformanceWorkbook(trips: XlsxTrip[], summary: X
   })
 
   // ───────────────────────── 2. รายละเอียดรายเที่ยว ─────────────────────────
-  const wd = wb.addWorksheet('รายละเอียดรายเที่ยว', { views: [{ state: 'frozen', ySplit: 1, xSplit: 3 }], pageSetup: { paperSize: 9, orientation: 'landscape', fitToPage: true, fitToWidth: 1, fitToHeight: 0 } })
+  const wd = wb.addWorksheet('รายละเอียดรายเที่ยว', { views: [{ state: 'frozen', ySplit: 1, xSplit: 3, topLeftCell: 'D2', activeCell: 'D2' }], pageSetup: { paperSize: 9, orientation: 'landscape', fitToPage: true, fitToWidth: 1, fitToHeight: 0 } })
   const cols: { h: string; w: number; fmt?: string }[] = [
     { h: 'ลำดับ', w: 6 }, { h: 'วันที่', w: 12 }, { h: 'Job ID', w: 22 }, { h: 'ลูกค้า', w: 26 }, { h: 'ทะเบียนรถ', w: 11 }, { h: 'คนขับ', w: 18 },
     { h: 'ดรอป', w: 6 }, { h: 'จุดส่ง', w: 46 }, { h: 'ไมล์จริง (กม.)', w: 10, fmt: '#,##0' }, { h: 'รายได้', w: 11, fmt: BAHT },
@@ -333,7 +333,7 @@ export async function buildTripPerformanceWorkbook(trips: XlsxTrip[], summary: X
   wd.autoFilter = { from: { row: 1, column: 1 }, to: { row: last, column: cols.length } }
 
   // ───────────────────────── 3. ตรวจสอบ (ภายใน) ─────────────────────────
-  const wa = wb.addWorksheet('ตรวจสอบ (ภายใน)', { views: [{ state: 'frozen', ySplit: 1 }] })
+  const wa = wb.addWorksheet('ตรวจสอบ (ภายใน)', { views: [{ state: 'frozen', ySplit: 1, topLeftCell: 'A2', activeCell: 'A2' }] })
   wa.columns = [{ width: 12 }, { width: 22 }, { width: 11 }, { width: 11 }, { width: 11 }, { width: 10 }, { width: 22 }, { width: 10 }, { width: 50 }]
   styleHeaderRow(wa.addRow(['วันที่', 'Job ID', 'ระยะตามงาน (เที่ยวเดียว)', 'ไมล์จริง', 'ไมล์จริง / ระยะงานไป-กลับ', 'ที่มาค่าน้ำมัน', 'ความมั่นใจการจับคู่บิล', 'งานในรอบเดียวกัน', 'บิลที่จับคู่']))
   rows.forEach((t, i) => {

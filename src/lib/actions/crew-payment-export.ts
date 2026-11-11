@@ -222,7 +222,6 @@ function buildDetailSheet(
     ws.getColumn(4).width = 60
     for (const c of [5, 6, 7, 8, 9, 10, 12]) ws.getColumn(c).width = 12
     ws.getColumn(11).width = 16 // ค่าประหยัดน้ำมัน
-    ws.views = [{ state: 'frozen', ySplit: 1 }]
     return totalRow
 }
 
