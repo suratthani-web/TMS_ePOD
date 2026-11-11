@@ -164,7 +164,7 @@ function buildDetailSheet(
         }
     }
 
-    // ท้ายแท็บตามแม่แบบ: รวม / หัก ณ ที่จ่าย / ค่าโทรศัพท์ (สุราษฎร์ฯ) หรือ ค่าประกันสินค้า (สาขาอื่น) / คงเหลือ + บัญชีโอน
+    // ท้ายแท็บตามแม่แบบ: รวม / หัก ณ ที่จ่าย / [ค่าโทรศัพท์เฉพาะสุราษฎร์ฯ] / คงเหลือ + บัญชีโอน
     const totalRow = lastRow + 1
     const label = (row: number, text: string) => {
         ws.mergeCells(`J${row}:K${row}`)
@@ -176,25 +176,35 @@ function buildDetailSheet(
     ws.getCell(`L${totalRow}`).value = jobs.length > 0 ? { formula: `SUM(L2:L${lastRow})` } : 0
     label(totalRow + 1, `หัก ณ ที่จ่าย ${whtRate}%`)
     ws.getCell(`L${totalRow + 1}`).value = { formula: `L${totalRow}*${whtRate}/100` }
-    const detailDeductionLabel = isSurat ? 'ค่าโทรศัพท์' : 'ค่าประกันสินค้า'
-    label(totalRow + 2, detailDeductionLabel)
-    label(totalRow + 3, 'คงเหลือ')
-    ws.getCell(`L${totalRow + 3}`).value = isSurat
-        ? { formula: `L${totalRow}-L${totalRow + 1}+L${totalRow + 2}` }
-        : { formula: `L${totalRow}-L${totalRow + 1}-L${totalRow + 2}` }
-    for (let r = totalRow; r <= totalRow + 3; r++) {
+
+    let netRow: number
+    if (isSurat) {
+        // เฉพาะสาขาสุราษฎร์ธานี มีแถวค่าโทรศัพท์สีแดงสำหรับคีย์มือ
+        label(totalRow + 2, 'ค่าโทรศัพท์')
+        label(totalRow + 3, 'คงเหลือ')
+        ws.getCell(`L${totalRow + 3}`).value = { formula: `L${totalRow}-L${totalRow + 1}+L${totalRow + 2}` }
+        netRow = totalRow + 3
+
+        ws.getCell(`J${totalRow + 2}`).fill = RED
+        ws.getCell(`J${totalRow + 2}`).font = { bold: true, color: { argb: 'FFFFFFFF' } }
+    } else {
+        // สาขาอื่น ไม่มีช่องคีย์มือสีแดง ท้ายแท็บตัดเข้ายอดคงเหลือทันที
+        label(totalRow + 2, 'คงเหลือ')
+        ws.getCell(`L${totalRow + 2}`).value = { formula: `L${totalRow}-L${totalRow + 1}` }
+        netRow = totalRow + 2
+    }
+
+    for (let r = totalRow; r <= netRow; r++) {
         ws.getCell(`L${r}`).numFmt = MONEY
         ws.getCell(`L${r}`).border = THIN
-        ws.getCell(`L${r}`).font = { bold: r === totalRow || r === totalRow + 3 }
+        ws.getCell(`L${r}`).font = { bold: r === totalRow || r === netRow }
     }
-    // ไฮไลต์แบบไฟล์ต้นฉบับ: ยอดรวมพื้นเหลือง, ป้ายค่าโทรศัพท์/ค่าประกันสินค้าพื้นแดง (ช่องคีย์มือ), คงเหลือตัวแดง
+    // ไฮไลต์แบบไฟล์ต้นฉบับ: ยอดรวมพื้นเหลือง, คงเหลือตัวแดง
     ws.getCell(`L${totalRow}`).fill = YELLOW
-    ws.getCell(`J${totalRow + 2}`).fill = RED
-    ws.getCell(`J${totalRow + 2}`).font = { bold: true, color: { argb: 'FFFFFFFF' } }
-    ws.getCell(`L${totalRow + 3}`).font = { bold: true, color: { argb: 'FFFF0000' } }
+    ws.getCell(`L${netRow}`).font = { bold: true, color: { argb: 'FFFF0000' } }
 
     // กล่องบัญชีโอน (เปลี่ยนตามผู้รับเงินที่เลือก): เลขบัญชีแดง + ชื่อบัญชี (ธนาคาร) ตัวใหญ่ พื้นเหลือง
-    const boxTop = totalRow + 2
+    const boxTop = isSurat ? totalRow + 2 : totalRow + 1
     ws.mergeCells(`C${boxTop}:E${boxTop}`)
     ws.mergeCells(`C${boxTop + 1}:E${boxTop + 1}`)
     const holder = stripTitle(payee.accountName || payee.name)
@@ -212,10 +222,10 @@ function buildDetailSheet(
     ws.getRow(boxTop + 1).height = 24
 
     // ยอดโอนสุทธิ ตัวใหญ่ พื้นเหลือง ใต้ตาราง (= คงเหลือ)
-    const payRow = totalRow + 5
+    const payRow = netRow + 2
     ws.mergeCells(`J${payRow}:K${payRow}`)
     const pay = ws.getCell(`J${payRow}`)
-    pay.value = { formula: `L${totalRow + 3}` }
+    pay.value = { formula: `L${netRow}` }
     pay.numFmt = MONEY
     pay.fill = YELLOW
     pay.font = { bold: true, size: 14, color: { argb: 'FFFF0000' } }
@@ -293,8 +303,10 @@ function buildSummarySheet(
         { formula: `${q}!L${detailTotalRow}` },
         claimRate > 0 ? { formula: `ROUND(H${r}*${claimRate}/100,2)` } : null, // ค่าเคลม
         null,                                 // หักค่ารถ (คีย์มือ)
-        // สุราษฎร์ฯ = ค่าโทรศัพท์ (บวกเข้ายอด) / สาขาอื่น = ค่าประกันสินค้า (หักออกจากยอด)
-        { formula: `IF(${q}!L${detailTotalRow + 2}="","",${q}!L${detailTotalRow + 2})` },
+        // สุราษฎร์ฯ = ค่าโทรศัพท์ (ดึงจากแท็บคนขับ) / สาขาอื่น = ค่าประกันสินค้า (คีย์มือในแท็บสรุปจ่ายถ้ามี)
+        isSurat
+            ? { formula: `IF(${q}!L${detailTotalRow + 2}="","",${q}!L${detailTotalRow + 2})` }
+            : null,
         null,                                 // อื่นๆ (คีย์มือ)
         isSurat
             ? { formula: `H${r}-I${r}-J${r}+N(K${r})-L${r}` }
