@@ -155,7 +155,7 @@ export async function getEffectivePermissions() {
         const { data: profile } = await supabase
             .from('Master_Users')
             .select('Role, Permissions')
-            .eq('Username', session.userId)
+            .ilike('Username', session.userId)
             .maybeSingle()
 
         if (!profile) return []

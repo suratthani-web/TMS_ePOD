@@ -1,5 +1,6 @@
 import { Suspense } from "react"
-import { isSuperAdmin, getUserBranchId } from "@/lib/permissions"
+import { isSuperAdmin, getUserBranchId, hasPermission } from "@/lib/permissions"
+import { AnalyticsAccessDenied } from "@/components/analytics/analytics-subpage"
 import { cookies } from "next/headers"
 import { DashboardContent } from "@/components/analytics/dashboard-content"
 import { getMaintenanceSchedule } from "@/lib/supabase/maintenance-schedule"
@@ -9,16 +10,19 @@ export const dynamic = 'force-dynamic'
 
 export default async function AnalyticsPage(props: { searchParams: Promise<{ [key: string]: string | undefined }> }) {
   const searchParams = await props.searchParams
+  const superAdmin = await isSuperAdmin()
+  const canAccess = superAdmin || (await hasPermission('navigation.analytics'))
+  if (!canAccess) return <AnalyticsAccessDenied />
+
   const userBranchId = await getUserBranchId()
   const branchId = (userBranchId && userBranchId !== 'All') ? userBranchId : (searchParams.branch || 'All')
-  const superAdmin = await isSuperAdmin()
   const maintenance = await getMaintenanceSchedule()
 
   return (
     <div className="space-y-12 pb-20 p-4 lg:p-10 bg-background">
         <AnalyticsClient 
             overdueCount={maintenance.overdue.length} 
-            isSuperAdmin={superAdmin} 
+            isSuperAdmin={canAccess} 
         />
 
         {/* Main Intelligence Grid */}

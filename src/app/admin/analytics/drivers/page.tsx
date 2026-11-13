@@ -1,6 +1,6 @@
 import { getDetailedDriverAnalytics } from "@/lib/supabase/analytics"
 import { cookies } from "next/headers"
-import { isSuperAdmin } from "@/lib/permissions"
+import { isSuperAdmin, hasPermission, getUserBranchId } from "@/lib/permissions"
 import { evaluateDriverPerformance } from "@/services/driver-evaluation"
 import { AnalyticsAccessDenied } from "@/components/analytics/analytics-subpage"
 import { getThaiMonthBoundaries, formatDateSafe } from "@/lib/supabase/analytics-helpers"
@@ -13,8 +13,14 @@ export default async function DriverLeaderboardPage(props: {
 }) {
   const searchParams = await props.searchParams
   const cookieStore = await cookies()
-  const branchId = searchParams.branch || cookieStore.get("selectedBranch")?.value || "All"
-  if (!(await isSuperAdmin())) return <AnalyticsAccessDenied />
+  const superAdmin = await isSuperAdmin()
+  const canAccess = superAdmin || (await hasPermission("navigation.analytics"))
+  if (!canAccess) return <AnalyticsAccessDenied />
+
+  const userBranchId = await getUserBranchId()
+  const branchId = !superAdmin && userBranchId && userBranchId !== "All"
+    ? userBranchId
+    : (searchParams.branch || cookieStore.get("selectedBranch")?.value || "All")
 
   // default to the current month (the month filter's default) instead of an open range
   const { start, end } = getThaiMonthBoundaries()

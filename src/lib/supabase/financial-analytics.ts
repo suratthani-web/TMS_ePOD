@@ -618,21 +618,34 @@ export async function getTopCustomers(startDate?: string, endDate?: string, bran
 }
 
 export async function getBranchPerformance(startDate?: string, endDate?: string) {
-    const isAdmin = await isSuperAdmin()
-    if (!isAdmin) return []
+    const isSuper = await isSuperAdmin()
+    const { hasPermission, getUserBranchId } = await import("@/lib/permissions")
+    const canViewAnalytics = isSuper || (await hasPermission('navigation.analytics'))
+    if (!canViewAnalytics) return []
+    const userBranchId = !isSuper ? await getUserBranchId() : null
+
     const supabase = await createAdminClient()
-    const { data: branches } = await supabase.from('Master_Branches').select('Branch_ID, Branch_Name')
+    let branchQuery = supabase.from('Master_Branches').select('Branch_ID, Branch_Name')
+    if (userBranchId && userBranchId !== 'All') {
+        branchQuery = branchQuery.eq('Branch_ID', userBranchId)
+    }
+    const { data: branches } = await branchQuery
     if (!branches) return []
 
     const { start: monthStart, end: monthEnd } = getThaiMonthBoundaries()
     const sDate = formatDateSafe(startDate) || formatDateSafe(monthStart)!
     const eDate = formatDateSafe(endDate) || formatDateSafe(monthEnd)!
-    const jobs = await fetchAllRows<{ Branch_ID?: string | null; Price_Cust_Total?: number | null; Price_Cust_Extra?: number | null; Cost_Driver_Total?: number | null; Cost_Driver_Extra?: number | null; extra_costs_json?: unknown }>(() =>
-        supabase.from('Jobs_Main')
+    const jobs = await fetchAllRows<{ Branch_ID?: string | null; Price_Cust_Total?: number | null; Price_Cust_Extra?: number | null; Cost_Driver_Total?: number | null; Cost_Driver_Extra?: number | null; extra_costs_json?: unknown }>(() => {
+        let q = supabase.from('Jobs_Main')
             .select('Branch_ID, Price_Cust_Total, Price_Cust_Extra, Cost_Driver_Total, Cost_Driver_Extra, extra_costs_json')
             .in('Job_Status', REVENUE_STATUSES)
             .gte('Plan_Date', sDate)
-            .lte('Plan_Date', eDate))
+            .lte('Plan_Date', eDate)
+        if (userBranchId && userBranchId !== 'All') {
+            q = q.eq('Branch_ID', userBranchId)
+        }
+        return q
+    })
 
     // profit = revenue − driver pay (incl. extras) − fuel (real bills matched to the branch's jobs)
     const fuelByBranch = new Map<string, number>()

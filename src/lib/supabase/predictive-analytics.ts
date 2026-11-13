@@ -1,6 +1,6 @@
 "use server"
 
-import { createClient } from '@/utils/supabase/server'
+import { createAdminClient } from '@/utils/supabase/server'
 import { getUserBranchId, isSuperAdmin } from '@/lib/permissions'
 import { cookies } from 'next/headers'
 import { fetchAllRows } from './analytics-helpers'
@@ -27,20 +27,18 @@ export type RouteRisk = {
 }
 
 export async function getVehicleRiskAssessment(branchId?: string): Promise<VehicleRisk[]> {
-  const supabase = await createClient()
+  const supabase = await createAdminClient()
   const userBranchId = await getUserBranchId()
   const isAdmin = await isSuperAdmin()
   const cookieStore = await cookies()
   const selectedBranch = cookieStore.get('selectedBranch')?.value
 
   // Determine effective branch ID
-  let effectiveBranchId = branchId
-  if (!effectiveBranchId) {
-    if (isAdmin && selectedBranch && selectedBranch !== 'All') {
-      effectiveBranchId = selectedBranch
-    } else if (!isAdmin) {
-        effectiveBranchId = userBranchId || undefined
-    }
+  let effectiveBranchId = (branchId && branchId !== 'All') ? branchId : undefined
+  if (!isAdmin) {
+    effectiveBranchId = (userBranchId && userBranchId !== 'All') ? userBranchId : undefined
+  } else if (!effectiveBranchId && selectedBranch && selectedBranch !== 'All') {
+    effectiveBranchId = selectedBranch
   }
 
   // 1. Fetch Vehicles
@@ -166,20 +164,18 @@ export async function getVehicleRiskAssessment(branchId?: string): Promise<Vehic
 }
 
 export async function getRouteRiskProfile(branchId?: string): Promise<RouteRisk[]> {
-  const supabase = await createClient()
+  const supabase = await createAdminClient()
   const userBranchId = await getUserBranchId()
   const isAdmin = await isSuperAdmin()
   const cookieStore = await cookies()
   const selectedBranch = cookieStore.get('selectedBranch')?.value
 
   // Determine effective branch ID
-  let effectiveBranchId = branchId
-  if (!effectiveBranchId) {
-    if (isAdmin && selectedBranch && selectedBranch !== 'All') {
-      effectiveBranchId = selectedBranch
-    } else if (!isAdmin) {
-        effectiveBranchId = userBranchId || undefined
-    }
+  let effectiveBranchId = (branchId && branchId !== 'All') ? branchId : undefined
+  if (!isAdmin) {
+    effectiveBranchId = (userBranchId && userBranchId !== 'All') ? userBranchId : undefined
+  } else if (!effectiveBranchId && selectedBranch && selectedBranch !== 'All') {
+    effectiveBranchId = selectedBranch
   }
 
   // Fetch Jobs (Last 90 Days)
