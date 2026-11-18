@@ -62,8 +62,7 @@ Provide JSON ONLY:
 }
 `.trim();
 
-  // 3.5-flash เร็วกว่า 3.6 มาก (~5s vs ~18s) และแม่นเท่ากันสำหรับใบเสร็จน้ำมัน
-  const modelsToTry = ["gemini-3.5-flash", "gemini-3.1-flash-lite", "gemini-3.6-flash"];
+  const modelsToTry = ["gemini-3-flash-preview", "gemini-3.1-flash-lite", "gemini-3.5-flash"];
 
   for (const modelName of modelsToTry) {
     try {
@@ -80,10 +79,11 @@ Provide JSON ONLY:
           }],
           generationConfig: {
             temperature: 0.0,
-            responseMimeType: 'application/json'
+            responseMimeType: 'application/json',
+            ...(modelName === "gemini-3-flash-preview" ? { thinkingConfig: { thinkingLevel: "LOW" } } : {})
           }
         }),
-        signal: AbortSignal.timeout(20000)
+        signal: AbortSignal.timeout(12000)
       });
 
       if (!res.ok) {
@@ -92,7 +92,9 @@ Provide JSON ONLY:
       }
 
       const json = await res.json();
-      const text = json?.candidates?.[0]?.content?.parts?.[0]?.text;
+      const parts = Array.isArray(json?.candidates?.[0]?.content?.parts) ? json.candidates[0].content.parts : [];
+      const textPart = parts.find((p: Record<string, unknown>) => !p.thought && typeof p.text === 'string') || parts[0];
+      const text = textPart?.text;
       if (text) {
         const jsonStr = text.replace(/```json/g, "").replace(/```/g, "").trim();
         const parsed = JSON.parse(jsonStr) as ParsedFuelReceipt;

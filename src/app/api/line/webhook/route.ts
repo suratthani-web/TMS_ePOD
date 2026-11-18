@@ -307,10 +307,8 @@ async function callGeminiMultimodal(
     const apiKey = process.env.GEMINI_API_KEY || process.env.NEXT_PUBLIC_GEMINI_API_KEY
     if (!apiKey) return null
 
-    // 3.5-flash อ่านรูปแม่นพอๆ กับ 3.6 แต่เร็วกว่ามาก (~5s vs ~18s) — 3.6 ช้าจนชน
-    // AbortSignal timeout ตอนโหลดสูง ทำให้ OCR ใบเสร็จน้ำมันคืน null แล้วตกไป error
-    const DEFAULT_MODEL = "gemini-3.5-flash"
-    const FALLBACK_MODELS = ["gemini-3.5-flash", "gemini-3.1-flash-lite", "gemini-3.6-flash"]
+    const DEFAULT_MODEL = "gemini-3-flash-preview"
+    const FALLBACK_MODELS = ["gemini-3-flash-preview", "gemini-3.1-flash-lite", "gemini-3.5-flash"]
     const modelsToTry = Array.from(new Set([modelOverride || DEFAULT_MODEL, ...FALLBACK_MODELS]))
     const urlFor = (m: string) => `https://generativelanguage.googleapis.com/v1beta/models/${m}:generateContent?key=${apiKey}`
     const tools = options?.disableTools ? undefined : [{ function_declarations: geminiToolDefinitions }]
@@ -333,28 +331,42 @@ async function callGeminiMultimodal(
     }
 
     try {
-        let res: Response | null = null
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        let message: { parts?: any[]; [key: string]: unknown } | null = null
         let usedUrl = ''
         for (const m of modelsToTry) {
             usedUrl = urlFor(m)
+            const modelGenConfig: Record<string, unknown> = { ...generationConfig }
+            if (m === 'gemini-3-flash-preview' && options?.disableTools) {
+                modelGenConfig.thinkingConfig = { thinkingLevel: 'LOW' }
+            }
             const bodyPayload: Record<string, unknown> = { contents }
             if (tools) bodyPayload.tools = tools
-            if (Object.keys(generationConfig).length > 0) bodyPayload.generationConfig = generationConfig
+            if (Object.keys(modelGenConfig).length > 0) bodyPayload.generationConfig = modelGenConfig
 
-            res = await fetch(usedUrl, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(bodyPayload),
-                signal: AbortSignal.timeout(25000)
-            })
-            if (res.ok) break
-            console.warn(`[Line Multimodal] model ${m} failed (${res.status}), trying next`)
+            try {
+                const res = await fetch(usedUrl, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(bodyPayload),
+                    signal: AbortSignal.timeout(12000)
+                })
+                if (!res.ok) {
+                    console.warn(`[Line Multimodal] model ${m} failed (${res.status}), trying next`)
+                    continue
+                }
+                const json = await res.json()
+                const cand = json?.candidates?.[0]?.content
+                if (cand && Array.isArray(cand.parts) && cand.parts.length > 0) {
+                    message = cand
+                    break
+                }
+                console.warn(`[Line Multimodal] model ${m} returned empty candidates, trying next`)
+            } catch (err) {
+                console.warn(`[Line Multimodal] model ${m} error, trying next:`, err)
+            }
         }
-        if (!res) return null
-
-        if (!res.ok) return null
-        const json = await res.json()
-        let message = json?.candidates?.[0]?.content
+        if (!message) return null
 
         // Handle one round of tool calls for multimodal (usually enough for extraction -> create)
         if (tools && message?.parts?.some((p: Record<string, unknown>) => p.functionCall)) {
@@ -383,7 +395,9 @@ async function callGeminiMultimodal(
             }
         }
 
-        return message?.parts?.[0]?.text || null
+        const parts = Array.isArray(message?.parts) ? (message.parts as Record<string, unknown>[]) : []
+        const textPart = parts.find(p => !p.thought && typeof p.text === 'string') || parts[0]
+        return (typeof textPart?.text === 'string' ? textPart.text : null)
     } catch (err) {
         console.error('[Line Multimodal Error]', err)
         return null
@@ -2450,27 +2464,31 @@ Provide JSON ONLY:
 
                         let classification = 'other'
                         let extracted: Record<string, unknown> = {}
-                        try {
-                            const classResText = await callGeminiMultimodal(
-                                "You are an expert OCR and logistics AI coordinator.",
-                                classPrompt,
-                                mimeType,
-                                buffer,
-                                'gemini-3.5-flash',
-                                {
-                                    temperature: 0.0,
-                                    responseMimeType: 'application/json',
-                                    disableTools: true
+                        // In group chats drivers only submit fuel receipts (delivery proof is never processed in groups)
+                        if (!inGroup) {
+                            try {
+                                const classResText = await callGeminiMultimodal(
+                                    "You are an expert OCR and logistics AI coordinator.",
+                                    classPrompt,
+                                    mimeType,
+                                    buffer,
+                                    'gemini-3-flash-preview',
+                                    {
+                                        temperature: 0.0,
+                                        responseMimeType: 'application/json',
+                                        disableTools: true
+                                    }
+                                )
+                                if (classResText) {
+                                    const cleanJson = classResText.replace(/```json/g, '').replace(/```/g, '').trim()
+                                    const parsed = JSON.parse(cleanJson)
+                                    const isFuelDetected = parsed.classification === 'fuel_receipt' || (Number(parsed.liters) > 0 && Number(parsed.priceTotal) > 0)
+                                    classification = isFuelDetected ? 'fuel_receipt' : (parsed.classification || 'other')
+                                    extracted = parsed
                                 }
-                            )
-                            if (classResText) {
-                                const cleanJson = classResText.replace(/```json/g, '').replace(/```/g, '').trim()
-                                const parsed = JSON.parse(cleanJson)
-                                classification = parsed.classification || 'other'
-                                extracted = parsed
+                            } catch (e) {
+                                console.warn('[Line Driver Image Classify Error]', e)
                             }
-                        } catch (e) {
-                            console.warn('[Line Driver Image Classify Error]', e)
                         }
 
                         // 1b. Fuel fallback: the 3-way classifier above under-detects fuel
@@ -2493,12 +2511,12 @@ If it is NOT a fuel receipt, return {"classification":"other"}. No markdown, JSO
                                     fuelOnlyPrompt,
                                     mimeType,
                                     buffer,
-                                    'gemini-3.5-flash',
+                                    'gemini-3-flash-preview',
                                     { temperature: 0.0, responseMimeType: 'application/json', disableTools: true }
                                 )
                                 if (fuelText) {
                                     const parsedFuel = JSON.parse(fuelText.replace(/```json/g, '').replace(/```/g, '').trim())
-                                    if (parsedFuel.classification === 'fuel_receipt') {
+                                    if (parsedFuel.classification === 'fuel_receipt' || (Number(parsedFuel.liters) > 0 && Number(parsedFuel.priceTotal) > 0)) {
                                         classification = 'fuel_receipt'
                                         extracted = parsedFuel
                                     }
@@ -2713,7 +2731,7 @@ If it is NOT a fuel receipt, return {"isFuel": false}. No markdown, JSON only.
                                 fuelPrompt,
                                 mimeType,
                                 buffer,
-                                'gemini-3.5-flash',
+                                'gemini-3-flash-preview',
                                 {
                                     temperature: 0.0,
                                     responseMimeType: 'application/json',
@@ -2723,7 +2741,7 @@ If it is NOT a fuel receipt, return {"isFuel": false}. No markdown, JSON only.
                             if (t) fuel = JSON.parse(t.replace(/```json/g, '').replace(/```/g, '').trim())
                         } catch { /* not fuel */ }
 
-                        if (fuel.isFuel) {
+                        if (fuel.isFuel || (Number(fuel.liters) > 0 && Number(fuel.priceTotal) > 0)) {
                             const validation = await validateFuelSlip(supabase, fuel, {
                                 branchId: adminFuel.Branch_ID
                             })
