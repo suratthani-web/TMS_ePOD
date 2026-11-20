@@ -1,0 +1,1125 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>คู่มือการใช้งาน DRouteMind V1.2.5 สำหรับพนักงานขับรถ</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+Thai:wght@400;500;600;700;800;900&display=swap" rel="stylesheet" />
+  <style>
+    @page {
+      size: 450px 800px;
+      margin: 0;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      -webkit-print-color-adjust: exact !important;
+      print-color-adjust: exact !important;
+    }
+
+    html, body {
+      width: 450px;
+      background: #0a0f1d;
+      font-family: 'Noto Sans Thai', 'Leelawadee UI', 'Tahoma', sans-serif;
+      color: #f8fafc;
+    }
+
+    .slide {
+      width: 450px;
+      height: 800px;
+      position: relative;
+      overflow: hidden;
+      background: linear-gradient(165deg, #17265f 0%, #0f172a 55%, #090d16 100%);
+      padding: 22px 20px 18px 20px;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      page-break-after: always;
+      break-after: page;
+    }
+
+    .slide:last-child {
+      page-break-after: auto;
+      break-after: auto;
+    }
+
+    /* Subtle top glow */
+    .slide::before {
+      content: "";
+      position: absolute;
+      top: -90px;
+      right: -70px;
+      width: 240px;
+      height: 240px;
+      border-radius: 50%;
+      background: radial-gradient(circle, rgba(59, 130, 246, 0.28) 0%, rgba(23, 38, 95, 0) 70%);
+      pointer-events: none;
+    }
+
+    .slide::after {
+      content: "";
+      position: absolute;
+      bottom: -80px;
+      left: -60px;
+      width: 220px;
+      height: 220px;
+      border-radius: 50%;
+      background: radial-gradient(circle, rgba(249, 115, 22, 0.14) 0%, rgba(9, 13, 22, 0) 70%);
+      pointer-events: none;
+    }
+
+    /* Header Bar */
+    .slide-header {
+      position: relative;
+      z-index: 2;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+    }
+
+    .step-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 7px;
+      background: rgba(255, 255, 255, 0.1);
+      border: 1px solid rgba(255, 255, 255, 0.18);
+      border-radius: 999px;
+      padding: 5px 12px 5px 6px;
+      font-size: 12px;
+      font-weight: 800;
+      letter-spacing: 0.02em;
+      color: #ffffff;
+    }
+
+    .step-num {
+      width: 22px;
+      height: 22px;
+      border-radius: 50%;
+      background: #f97316;
+      color: #ffffff;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 12px;
+      font-weight: 900;
+    }
+
+    .step-num.blue { background: #3b82f6; }
+    .step-num.green { background: #10b981; }
+    .step-num.amber { background: #f59e0b; color: #0f172a; }
+
+    .brand-tag {
+      font-size: 10px;
+      font-weight: 800;
+      color: #94a3b8;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+    }
+
+    /* Title block */
+    .title-block {
+      position: relative;
+      z-index: 2;
+      margin-top: 10px;
+    }
+
+    .title-block h1 {
+      font-size: 22px;
+      font-weight: 900;
+      line-height: 1.25;
+      color: #ffffff;
+      margin-bottom: 4px;
+    }
+
+    .title-block p {
+      font-size: 13px;
+      font-weight: 500;
+      line-height: 1.45;
+      color: #cbd5e1;
+    }
+
+    /* Phone stage */
+    .phone-stage {
+      position: relative;
+      z-index: 2;
+      flex: 1;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 12px;
+      margin: 10px 0;
+      min-height: 0;
+    }
+
+    .phone-frame {
+      position: relative;
+      background: #05080f;
+      border: 2.5px solid rgba(255, 255, 255, 0.2);
+      border-radius: 22px;
+      padding: 4px;
+      box-shadow: 0 18px 40px rgba(0, 0, 0, 0.55);
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+
+    .phone-frame.single {
+      height: 490px;
+      width: 222px;
+    }
+
+    .phone-frame.dual {
+      height: 448px;
+      width: 196px;
+    }
+
+    .phone-screen {
+      position: relative;
+      width: 100%;
+      height: 100%;
+      border-radius: 17px;
+      overflow: hidden;
+      background: #111827;
+    }
+
+    .phone-screen img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      object-position: top center;
+      display: block;
+    }
+
+    .dual-col {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .dual-caption {
+      font-size: 11px;
+      font-weight: 800;
+      color: #e2e8f0;
+      background: rgba(255, 255, 255, 0.08);
+      border: 1px solid rgba(255, 255, 255, 0.14);
+      padding: 3px 10px;
+      border-radius: 999px;
+      text-align: center;
+    }
+
+    .flow-arrow {
+      position: absolute;
+      left: 50%;
+      top: 47%;
+      transform: translate(-50%, -50%);
+      z-index: 10;
+      width: 30px;
+      height: 30px;
+      border-radius: 50%;
+      background: #f97316;
+      border: 2px solid #ffffff;
+      color: #ffffff;
+      font-size: 16px;
+      font-weight: 900;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
+    }
+
+    /* Callout highlight overlays on phone screen */
+    .callout-box {
+      position: absolute;
+      border: 2.5px solid #fbbf24;
+      border-radius: 12px;
+      box-shadow: 0 0 0 2px rgba(0, 0, 0, 0.45), 0 0 14px rgba(251, 191, 36, 0.7);
+      pointer-events: none;
+    }
+
+    .callout-box.orange {
+      border-color: #fb923c;
+      box-shadow: 0 0 0 2px rgba(0, 0, 0, 0.45), 0 0 14px rgba(251, 146, 60, 0.75);
+    }
+
+    .callout-box.green {
+      border-color: #34d399;
+      box-shadow: 0 0 0 2px rgba(0, 0, 0, 0.45), 0 0 14px rgba(52, 211, 153, 0.75);
+    }
+
+    .callout-badge {
+      position: absolute;
+      right: -4px;
+      top: -11px;
+      background: #fbbf24;
+      color: #0f172a;
+      font-size: 9px;
+      font-weight: 900;
+      padding: 1px 6px;
+      border-radius: 999px;
+      white-space: nowrap;
+      box-shadow: 0 2px 6px rgba(0, 0, 0, 0.45);
+    }
+
+    .callout-box.green .callout-badge {
+      background: #34d399;
+      color: #064e3b;
+    }
+
+    .callout-box.orange .callout-badge {
+      background: #fb923c;
+      color: #431407;
+    }
+
+    /* Instruction Card at bottom */
+    .action-card {
+      position: relative;
+      z-index: 2;
+      background: rgba(15, 23, 42, 0.88);
+      border: 1px solid rgba(255, 255, 255, 0.14);
+      border-radius: 16px;
+      padding: 12px 14px;
+    }
+
+    .action-list {
+      list-style: none;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    .action-list li {
+      display: flex;
+      align-items: flex-start;
+      gap: 8px;
+      font-size: 12.5px;
+      font-weight: 600;
+      line-height: 1.4;
+      color: #e2e8f0;
+    }
+
+    .dot {
+      width: 18px;
+      height: 18px;
+      border-radius: 6px;
+      background: rgba(59, 130, 246, 0.25);
+      border: 1px solid rgba(96, 165, 250, 0.5);
+      color: #93c5fd;
+      font-size: 10px;
+      font-weight: 900;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+      margin-top: 1px;
+    }
+
+    .dot.orange {
+      background: rgba(249, 115, 22, 0.22);
+      border-color: rgba(251, 146, 60, 0.55);
+      color: #fdba74;
+    }
+
+    .dot.green {
+      background: rgba(16, 185, 129, 0.22);
+      border-color: rgba(52, 211, 153, 0.55);
+      color: #6ee7b7;
+    }
+
+    .hl-blue { color: #60a5fa; font-weight: 800; }
+    .hl-orange { color: #fb923c; font-weight: 800; }
+    .hl-green { color: #34d399; font-weight: 800; }
+    .hl-amber { color: #fbbf24; font-weight: 800; }
+
+    /* Footer */
+    .slide-footer {
+      position: relative;
+      z-index: 2;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-top: 8px;
+      font-size: 10px;
+      font-weight: 700;
+      color: #64748b;
+    }
+
+    /* ================= COVER PAGE (PAGE 1) ================= */
+    .cover-slide {
+      background: linear-gradient(170deg, #17265f 0%, #101b44 45%, #090d16 100%);
+      padding: 28px 24px 22px 24px;
+    }
+
+    .cover-top {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      position: relative;
+      z-index: 2;
+    }
+
+    .cover-org {
+      font-size: 12px;
+      font-weight: 800;
+      color: #93c5fd;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+    }
+
+    .version-chip {
+      background: rgba(249, 115, 22, 0.2);
+      border: 1px solid rgba(251, 146, 60, 0.6);
+      color: #fdba74;
+      font-size: 11px;
+      font-weight: 800;
+      padding: 4px 10px;
+      border-radius: 999px;
+    }
+
+    .cover-hero {
+      position: relative;
+      z-index: 2;
+      text-align: center;
+      margin-top: 16px;
+    }
+
+    .logo-wrap {
+      width: 116px;
+      height: 116px;
+      margin: 0 auto 14px auto;
+      border-radius: 30px;
+      border: 2px solid rgba(255, 255, 255, 0.2);
+      box-shadow: 0 18px 36px rgba(0, 0, 0, 0.45);
+      overflow: hidden;
+      background: #17265f;
+    }
+
+    .logo-wrap img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      display: block;
+    }
+
+    .cover-hero h1 {
+      font-size: 30px;
+      font-weight: 900;
+      letter-spacing: -0.01em;
+      line-height: 1.15;
+      color: #ffffff;
+    }
+
+    .cover-hero .subtitle {
+      font-size: 16px;
+      font-weight: 800;
+      color: #fbbf24;
+      margin-top: 6px;
+    }
+
+    .cover-hero .desc {
+      font-size: 13px;
+      font-weight: 500;
+      color: #cbd5e1;
+      margin-top: 6px;
+      line-height: 1.45;
+    }
+
+    .overview-card {
+      position: relative;
+      z-index: 2;
+      background: rgba(15, 23, 42, 0.85);
+      border: 1px solid rgba(255, 255, 255, 0.14);
+      border-radius: 20px;
+      padding: 16px;
+      margin-top: 14px;
+    }
+
+    .overview-title {
+      font-size: 12px;
+      font-weight: 800;
+      color: #93c5fd;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      margin-bottom: 10px;
+    }
+
+    .flow-steps {
+      display: flex;
+      flex-direction: column;
+      gap: 9px;
+    }
+
+    .flow-item {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      background: rgba(255, 255, 255, 0.04);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      border-radius: 12px;
+      padding: 9px 12px;
+    }
+
+    .flow-badge {
+      width: 26px;
+      height: 26px;
+      border-radius: 8px;
+      background: #1d4ed8;
+      color: #ffffff;
+      font-size: 13px;
+      font-weight: 900;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+    }
+
+    .flow-badge.c2 { background: #ea580c; }
+    .flow-badge.c3 { background: #0284c7; }
+    .flow-badge.c4 { background: #059669; }
+    .flow-badge.c5 { background: #16a34a; }
+
+    .flow-text strong {
+      display: block;
+      font-size: 13.5px;
+      font-weight: 800;
+      color: #ffffff;
+      line-height: 1.25;
+    }
+
+    .flow-text span {
+      display: block;
+      font-size: 11.5px;
+      font-weight: 500;
+      color: #94a3b8;
+    }
+
+    /* ================= CHECKLIST PAGE (PAGE 10) ================= */
+    .checklist-grid {
+      position: relative;
+      z-index: 2;
+      display: flex;
+      flex-direction: column;
+      gap: 11px;
+      margin: 12px 0;
+      flex: 1;
+      justify-content: center;
+    }
+
+    .check-card {
+      background: rgba(15, 23, 42, 0.88);
+      border: 1px solid rgba(255, 255, 255, 0.14);
+      border-left: 4px solid #3b82f6;
+      border-radius: 16px;
+      padding: 13px 14px;
+      display: flex;
+      gap: 12px;
+      align-items: flex-start;
+    }
+
+    .check-card.amber { border-left-color: #f59e0b; }
+    .check-card.green { border-left-color: #10b981; }
+    .check-card.rose { border-left-color: #f43f5e; }
+
+    .check-icon {
+      width: 34px;
+      height: 34px;
+      border-radius: 10px;
+      background: rgba(59, 130, 246, 0.18);
+      color: #93c5fd;
+      font-size: 18px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+      font-weight: 900;
+    }
+
+    .check-card.amber .check-icon { background: rgba(245, 158, 11, 0.18); color: #fcd34d; }
+    .check-card.green .check-icon { background: rgba(16, 185, 129, 0.18); color: #6ee7b7; }
+    .check-card.rose .check-icon { background: rgba(244, 63, 94, 0.18); color: #fda4af; }
+
+    .check-body h3 {
+      font-size: 14.5px;
+      font-weight: 800;
+      color: #ffffff;
+      margin-bottom: 3px;
+    }
+
+    .check-body p {
+      font-size: 12px;
+      font-weight: 500;
+      color: #cbd5e1;
+      line-height: 1.45;
+    }
+
+    .sos-banner {
+      position: relative;
+      z-index: 2;
+      background: linear-gradient(135deg, rgba(225, 29, 72, 0.25), rgba(15, 23, 42, 0.95));
+      border: 1px solid rgba(251, 113, 133, 0.45);
+      border-radius: 16px;
+      padding: 12px 14px;
+      text-align: center;
+    }
+
+    .sos-banner strong {
+      display: block;
+      font-size: 13.5px;
+      font-weight: 800;
+      color: #fda4af;
+      margin-bottom: 2px;
+    }
+
+    .sos-banner span {
+      font-size: 12px;
+      color: #e2e8f0;
+      font-weight: 500;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- ==================== PAGE 1: COVER ==================== -->
+  <section class="slide cover-slide">
+    <div class="cover-top">
+      <span class="cover-org">DD Transport • Driver Guide</span>
+      <span class="version-chip">V1.2.5</span>
+    </div>
+
+    <div class="cover-hero">
+      <div class="logo-wrap">
+        <img src="../public/drouteMind-mark.png" alt="DRouteMind Logo" />
+      </div>
+      <h1>คู่มือการใช้งาน<br/>DRouteMind</h1>
+      <div class="subtitle">สำหรับพนักงานขับรถ (ฉบับพกพา)</div>
+      <p class="desc">สรุปขั้นตอนการใช้งานแอปตั้งแต่เข้าสู่ระบบ<br/>รับสินค้า จนถึงส่งมอบสินค้าสำเร็จ (ePOD)</p>
+    </div>
+
+    <div class="overview-card">
+      <div class="overview-title">ภาพรวม 5 ขั้นตอนหลัก</div>
+      <div class="flow-steps">
+        <div class="flow-item">
+          <div class="flow-badge">1</div>
+          <div class="flow-text">
+            <strong>เข้าสู่ระบบ &amp; กดรับงาน</strong>
+            <span>กรอกรหัสพนักงาน กดปุ่มส้ม "เริ่มจัดการงานนี้" → "เริ่มงาน"</span>
+          </div>
+        </div>
+        <div class="flow-item">
+          <div class="flow-badge c2">2</div>
+          <div class="flow-text">
+            <strong>ถึงจุดรับสินค้า</strong>
+            <span>กด "ถึงจุดรับสินค้า" → กดปุ่มเขียว "รับสินค้าเข้า"</span>
+          </div>
+        </div>
+        <div class="flow-item">
+          <div class="flow-badge c3">3</div>
+          <div class="flow-text">
+            <strong>ถ่ายรูป &amp; เซ็นรับสินค้า</strong>
+            <span>ถ่ายรูป/แนบรูปสินค้า + ลงลายเซ็นผู้ส่งของ → กดยืนยัน</span>
+          </div>
+        </div>
+        <div class="flow-item">
+          <div class="flow-badge c4">4</div>
+          <div class="flow-text">
+            <strong>นำทาง &amp; ถึงจุดส่งสินค้า</strong>
+            <span>กด "นำทาง" → ถึงแล้วกด "ถึงจุดส่งสินค้า" → "บันทึกส่งงาน"</span>
+          </div>
+        </div>
+        <div class="flow-item">
+          <div class="flow-badge c5">5</div>
+          <div class="flow-text">
+            <strong>ส่งมอบ ePOD &amp; ปิดงานสำเร็จ</strong>
+            <span>ถ่ายรูปสินค้า + ลายเซ็นลูกค้า → กด "ยืนยันการส่งงาน"</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="slide-footer">
+      <span>DRouteMind V1.2.5 • DD Transport</span>
+      <span>หน้า 1 / 10</span>
+    </div>
+  </section>
+
+  <!-- ==================== PAGE 2: STEP 1 LOGIN ==================== -->
+  <section class="slide">
+    <div>
+      <div class="slide-header">
+        <div class="step-pill"><span class="step-num blue">1</span> ขั้นตอนที่ 1</div>
+        <span class="brand-tag">DRouteMind V1.2.5</span>
+      </div>
+      <div class="title-block">
+        <h1>เข้าสู่ระบบ (Login)</h1>
+        <p>กรอกรหัสพนักงานหรือเบอร์โทรศัพท์ พร้อมรหัสผ่านเพื่อเริ่มใช้งาน</p>
+      </div>
+    </div>
+
+    <div class="phone-stage">
+      <div class="phone-frame single">
+        <div class="phone-screen">
+          <img src="../public/manual/steps/step-01-login.jpg" alt="หน้าเข้าสู่ระบบ" />
+          <div class="callout-box" style="top: 79%; left: 13%; width: 74%; height: 9%;">
+            <span class="callout-badge">กดที่นี่</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="action-card">
+      <ul class="action-list">
+        <li><span class="dot">1</span><span>กรอก <span class="hl-blue">รหัสพนักงาน / เบอร์โทรศัพท์</span> ในช่องแรก</span></li>
+        <li><span class="dot">2</span><span>กรอก <span class="hl-blue">รหัสผ่านปลอดภัย</span> (หากลืมให้กด "ลืมรหัสผ่าน?")</span></li>
+        <li><span class="dot">3</span><span>กดปุ่มสีน้ำเงิน <span class="hl-amber">"เข้าสู่ระบบ"</span> เพื่อเข้าหน้าหลัก</span></li>
+      </ul>
+    </div>
+
+    <div class="slide-footer">
+      <span>ขั้นตอนที่ 1 : เข้าสู่ระบบ</span>
+      <span>หน้า 2 / 10</span>
+    </div>
+  </section>
+
+  <!-- ==================== PAGE 3: STEP 2 ACCEPT JOB ==================== -->
+  <section class="slide">
+    <div>
+      <div class="slide-header">
+        <div class="step-pill"><span class="step-num">2</span> ขั้นตอนที่ 2</div>
+        <span class="brand-tag">DRouteMind V1.2.5</span>
+      </div>
+      <div class="title-block">
+        <h1>ดูงานและกดรับงาน</h1>
+        <p>ตรวจสอบรายละเอียดลูกค้า จุดรับ-จุดส่ง แล้วกดยืนยันเริ่มงาน</p>
+      </div>
+    </div>
+
+    <div class="phone-stage">
+      <div class="dual-col">
+        <div class="phone-frame dual">
+          <div class="phone-screen">
+            <img src="../public/manual/steps/step-02-home-job.jpg" alt="หน้าแรกมีงาน" />
+            <div class="callout-box orange" style="top: 58.5%; left: 7%; width: 86%; height: 9%;">
+              <span class="callout-badge">1. กดรับงาน</span>
+            </div>
+          </div>
+        </div>
+        <span class="dual-caption">หน้าแรก: ดูคิวงานวันนี้</span>
+      </div>
+
+      <div class="flow-arrow">→</div>
+
+      <div class="dual-col">
+        <div class="phone-frame dual">
+          <div class="phone-screen">
+            <img src="../public/manual/steps/step-03-start-job.jpg" alt="หน้าเริ่มงาน" />
+            <div class="callout-box" style="top: 79.5%; left: 7%; width: 86%; height: 8.5%;">
+              <span class="callout-badge">2. เริ่มงาน</span>
+            </div>
+          </div>
+        </div>
+        <span class="dual-caption">รายละเอียดงาน: กดเริ่มงาน</span>
+      </div>
+    </div>
+
+    <div class="action-card">
+      <ul class="action-list">
+        <li><span class="dot orange">1</span><span>ที่หน้าแรก แตะปุ่มสีส้ม <span class="hl-orange">"เริ่มจัดการงานนี้ ↗"</span></span></li>
+        <li><span class="dot">2</span><span>ตรวจสอบชื่อลูกค้า วันรับ-วันส่ง และปลายทางให้ถูกต้อง</span></li>
+        <li><span class="dot">3</span><span>กดปุ่มสีน้ำเงิน <span class="hl-blue">"เริ่มงาน →"</span> เพื่อเปลี่ยนสถานะเป็นกำลังเดินทาง</span></li>
+      </ul>
+    </div>
+
+    <div class="slide-footer">
+      <span>ขั้นตอนที่ 2 : ดูงานและกดรับงาน</span>
+      <span>หน้า 3 / 10</span>
+    </div>
+  </section>
+
+  <!-- ==================== PAGE 4: STEP 3 ARRIVE PICKUP ==================== -->
+  <section class="slide">
+    <div>
+      <div class="slide-header">
+        <div class="step-pill"><span class="step-num blue">3</span> ขั้นตอนที่ 3</div>
+        <span class="brand-tag">DRouteMind V1.2.5</span>
+      </div>
+      <div class="title-block">
+        <h1>เดินทางและถึงจุดรับสินค้า</h1>
+        <p>ใช้ปุ่มนำทางไปจุดรับของ เมื่อถึงหน้างานให้กดอัปเดตสถานะทันที</p>
+      </div>
+    </div>
+
+    <div class="phone-stage">
+      <div class="dual-col">
+        <div class="phone-frame dual">
+          <div class="phone-screen">
+            <img src="../public/manual/steps/step-04-arrive-pickup.jpg" alt="ถึงจุดรับสินค้า" />
+            <div class="callout-box green" style="top: 37%; left: 57%; width: 29%; height: 8%;">
+              <span class="callout-badge">นำทาง</span>
+            </div>
+            <div class="callout-box" style="top: 79.5%; left: 7%; width: 86%; height: 8.5%;">
+              <span class="callout-badge">1. ถึงจุดรับ</span>
+            </div>
+          </div>
+        </div>
+        <span class="dual-caption">เมื่อถึงโกดัง/จุดรับของ</span>
+      </div>
+
+      <div class="flow-arrow">→</div>
+
+      <div class="dual-col">
+        <div class="phone-frame dual">
+          <div class="phone-screen">
+            <img src="../public/manual/steps/step-05-receive-goods.jpg" alt="รับสินค้าเข้า" />
+            <div class="callout-box green" style="top: 79.5%; left: 7%; width: 86%; height: 8.5%;">
+              <span class="callout-badge">2. รับสินค้าเข้า</span>
+            </div>
+          </div>
+        </div>
+        <span class="dual-caption">เข้าสู่หน้าถ่ายรูปรับสินค้า</span>
+      </div>
+    </div>
+
+    <div class="action-card">
+      <ul class="action-list">
+        <li><span class="dot green">1</span><span>กดปุ่มสีเขียว <span class="hl-green">"นำทาง"</span> เพื่อเปิดแผนที่ไปยังจุดรับสินค้า</span></li>
+        <li><span class="dot">2</span><span>เมื่อถึงจุดรับของ กดปุ่มสีน้ำเงิน <span class="hl-blue">"ถึงจุดรับสินค้า →"</span></span></li>
+        <li><span class="dot green">3</span><span>ขึ้นสินค้าเสร็จแล้ว กดปุ่มสีเขียว <span class="hl-green">"รับสินค้าเข้า →"</span></span></li>
+      </ul>
+    </div>
+
+    <div class="slide-footer">
+      <span>ขั้นตอนที่ 3 : เดินทางและถึงจุดรับสินค้า</span>
+      <span>หน้า 4 / 10</span>
+    </div>
+  </section>
+
+  <!-- ==================== PAGE 5: STEP 4 PICKUP FORM ==================== -->
+  <section class="slide">
+    <div>
+      <div class="slide-header">
+        <div class="step-pill"><span class="step-num blue">4</span> ขั้นตอนที่ 4</div>
+        <span class="brand-tag">DRouteMind V1.2.5</span>
+      </div>
+      <div class="title-block">
+        <h1>ถ่ายรูปและเซ็นชื่อรับสินค้า</h1>
+        <p>บันทึกหลักฐานสภาพสินค้าก่อนออกเดินทาง พร้อมลายเซ็นผู้ส่งของ</p>
+      </div>
+    </div>
+
+    <div class="phone-stage">
+      <div class="dual-col">
+        <div class="phone-frame dual">
+          <div class="phone-screen">
+            <img src="../public/manual/steps/step-06-pickup-form.jpg" alt="ฟอร์มรับสินค้า" />
+            <div class="callout-box" style="top: 37%; left: 4%; width: 92%; height: 14%;">
+              <span class="callout-badge">1. ถ่าย/แนบรูป</span>
+            </div>
+            <div class="callout-box orange" style="top: 67.5%; left: 4%; width: 92%; height: 24.5%;">
+              <span class="callout-badge">2. ลงลายเซ็น</span>
+            </div>
+          </div>
+        </div>
+        <span class="dual-caption">หน้าบันทึกการรับสินค้า</span>
+      </div>
+
+      <div class="flow-arrow">→</div>
+
+      <div class="dual-col">
+        <div class="phone-frame dual">
+          <div class="phone-screen">
+            <img src="../public/manual/steps/step-07-pickup-filled.jpg" alt="กรอกข้อมูลครบแล้ว" />
+          </div>
+        </div>
+        <span class="dual-caption">ตัวอย่างเมื่อถ่ายรูป &amp; เซ็นครบ</span>
+      </div>
+    </div>
+
+    <div class="action-card">
+      <ul class="action-list">
+        <li><span class="dot">1</span><span>กด <span class="hl-blue">"ถ่ายรูปสินค้า"</span> หรือ <span class="hl-blue">"แนบรูปภาพ"</span> ให้เห็นสินค้าชัดเจน</span></li>
+        <li><span class="dot orange">2</span><span>ในช่อง <span class="hl-orange">"ลายเซ็นพนักงาน (ผู้ส่งของ)"</span> ให้ผู้ส่งลงลายเซ็น</span></li>
+        <li><span class="dot">3</span><span>หากเซ็นผิด กดปุ่ม <span class="hl-amber">"ล้าง"</span> ด้านล่างเพื่อเซ็นใหม่ได้</span></li>
+      </ul>
+    </div>
+
+    <div class="slide-footer">
+      <span>ขั้นตอนที่ 4 : ถ่ายรูปและเซ็นชื่อรับสินค้า</span>
+      <span>หน้า 5 / 10</span>
+    </div>
+  </section>
+
+  <!-- ==================== PAGE 6: STEP 5 CONFIRM PICKUP ==================== -->
+  <section class="slide">
+    <div>
+      <div class="slide-header">
+        <div class="step-pill"><span class="step-num blue">5</span> ขั้นตอนที่ 5</div>
+        <span class="brand-tag">DRouteMind V1.2.5</span>
+      </div>
+      <div class="title-block">
+        <h1>ยืนยันการรับของเข้า</h1>
+        <p>ตรวจความเรียบร้อยของรูปถ่ายและลายเซ็น แล้วกดดำเนินการต่อ</p>
+      </div>
+    </div>
+
+    <div class="phone-stage">
+      <div class="phone-frame single">
+        <div class="phone-screen">
+          <img src="../public/manual/steps/step-08-pickup-confirm.jpg" alt="ยืนยันการรับสินค้า" />
+          <div class="callout-box" style="top: 66%; left: 4%; width: 92%; height: 9.5%;">
+            <span class="callout-badge">กดยืนยันรับของ</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="action-card">
+      <ul class="action-list">
+        <li><span class="dot">1</span><span>เลื่อนลงมาด้านล่าง ตรวจสอบความถูกต้องของรูปภาพและลายเซ็น</span></li>
+        <li><span class="dot">2</span><span>กดปุ่มสีน้ำเงิน <span class="hl-blue">"บันทึกและดำเนินการต่อ &gt;"</span></span></li>
+        <li><span class="dot green">3</span><span>ระบบจะบันทึกเวลาและพิกัดรับสินค้า พร้อมเข้าสู่โหมดขนส่ง</span></li>
+      </ul>
+    </div>
+
+    <div class="slide-footer">
+      <span>ขั้นตอนที่ 5 : ยืนยันการรับของเข้า</span>
+      <span>หน้า 6 / 10</span>
+    </div>
+  </section>
+
+  <!-- ==================== PAGE 7: STEP 6 ARRIVE DELIVERY ==================== -->
+  <section class="slide">
+    <div>
+      <div class="slide-header">
+        <div class="step-pill"><span class="step-num green">6</span> ขั้นตอนที่ 6</div>
+        <span class="brand-tag">DRouteMind V1.2.5</span>
+      </div>
+      <div class="title-block">
+        <h1>นำทางไปส่งของ &amp; ถึงจุดหมาย</h1>
+        <p>เดินทางไปยังปลายทาง เมื่อถึงบ้านหรือโกดังลูกค้าให้กดแจ้งถึงจุดส่ง</p>
+      </div>
+    </div>
+
+    <div class="phone-stage">
+      <div class="dual-col">
+        <div class="phone-frame dual">
+          <div class="phone-screen">
+            <img src="../public/manual/steps/step-09-arrive-delivery.jpg" alt="ถึงจุดส่งสินค้า" />
+            <div class="callout-box green" style="top: 37%; left: 57%; width: 29%; height: 8%;">
+              <span class="callout-badge">นำทาง</span>
+            </div>
+            <div class="callout-box" style="top: 79.5%; left: 7%; width: 86%; height: 8.5%;">
+              <span class="callout-badge">1. ถึงจุดส่ง</span>
+            </div>
+          </div>
+        </div>
+        <span class="dual-caption">เมื่อเดินทางถึงปลายทาง</span>
+      </div>
+
+      <div class="flow-arrow">→</div>
+
+      <div class="dual-col">
+        <div class="phone-frame dual">
+          <div class="phone-screen">
+            <img src="../public/manual/steps/step-10-record-delivery.jpg" alt="บันทึกส่งงาน" />
+            <div class="callout-box green" style="top: 79.5%; left: 7%; width: 86%; height: 8.5%;">
+              <span class="callout-badge">2. บันทึกส่งงาน</span>
+            </div>
+          </div>
+        </div>
+        <span class="dual-caption">เปิดหน้าส่งงาน (ePOD)</span>
+      </div>
+    </div>
+
+    <div class="action-card">
+      <ul class="action-list">
+        <li><span class="dot green">1</span><span>กดปุ่มสีเขียว <span class="hl-green">"นำทาง"</span> เพื่อเปิด Google Maps ไปยังปลายทาง</span></li>
+        <li><span class="dot">2</span><span>เมื่อถึงจุดหมาย กดปุ่มสีน้ำเงิน <span class="hl-blue">"ถึงจุดส่งสินค้า →"</span></span></li>
+        <li><span class="dot green">3</span><span>เตรียมส่งมอบสินค้า แล้วกดปุ่มสีเขียว <span class="hl-green">"บันทึกส่งงาน →"</span></span></li>
+      </ul>
+    </div>
+
+    <div class="slide-footer">
+      <span>ขั้นตอนที่ 6 : นำทางไปส่งของและถึงจุดหมาย</span>
+      <span>หน้า 7 / 10</span>
+    </div>
+  </section>
+
+  <!-- ==================== PAGE 8: STEP 7 POD FORM ==================== -->
+  <section class="slide">
+    <div>
+      <div class="slide-header">
+        <div class="step-pill"><span class="step-num blue">7</span> ขั้นตอนที่ 7</div>
+        <span class="brand-tag">DRouteMind V1.2.5</span>
+      </div>
+      <div class="title-block">
+        <h1>ถ่ายรูปส่งของ &amp; ให้ลูกค้าเซ็นชื่อ (ePOD)</h1>
+        <p>เก็บหลักฐานส่งมอบสินค้าให้ครบถ้วนก่อนกดยืนยันปิดงาน</p>
+      </div>
+    </div>
+
+    <div class="phone-stage">
+      <div class="dual-col">
+        <div class="phone-frame dual">
+          <div class="phone-screen">
+            <img src="../public/manual/steps/step-11-pod-form.jpg" alt="หน้าส่งงาน ePOD" />
+            <div class="callout-box" style="top: 17%; left: 3%; width: 94%; height: 13.5%;">
+              <span class="callout-badge">1. ถ่ายรูปส่ง</span>
+            </div>
+            <div class="callout-box orange" style="top: 47.5%; left: 3%; width: 94%; height: 28%;">
+              <span class="callout-badge">2. ลายเซ็นลูกค้า</span>
+            </div>
+          </div>
+        </div>
+        <span class="dual-caption">ถ่ายรูปสินค้า + บิลส่งของ</span>
+      </div>
+
+      <div class="flow-arrow">→</div>
+
+      <div class="dual-col">
+        <div class="phone-frame dual">
+          <div class="phone-screen">
+            <img src="../public/manual/steps/step-12-pod-signed.jpg" alt="ยืนยันการส่งงาน" />
+            <div class="callout-box" style="top: 71.5%; left: 3%; width: 94%; height: 9.5%;">
+              <span class="callout-badge">3. ยืนยันส่งงาน</span>
+            </div>
+          </div>
+        </div>
+        <span class="dual-caption">เซ็นครบแล้ว กดยืนยัน</span>
+      </div>
+    </div>
+
+    <div class="action-card">
+      <ul class="action-list">
+        <li><span class="dot">1</span><span>กด <span class="hl-blue">"ถ่ายรูปสินค้า"</span> ถ่ายสินค้าที่ส่งมอบและเอกสารบิล (ถ้ามี)</span></li>
+        <li><span class="dot orange">2</span><span>ให้ผู้รับสินค้าลงชื่อในช่อง <span class="hl-orange">"2. ลายเซ็นผู้รับ"</span></span></li>
+        <li><span class="dot">3</span><span>กดปุ่มสีน้ำเงิน <span class="hl-blue">"ยืนยันการส่งงาน"</span> เพื่อส่งข้อมูลเข้าระบบ</span></li>
+      </ul>
+    </div>
+
+    <div class="slide-footer">
+      <span>ขั้นตอนที่ 7 : ถ่ายรูปส่งของและเซ็นชื่อลูกค้า</span>
+      <span>หน้า 8 / 10</span>
+    </div>
+  </section>
+
+  <!-- ==================== PAGE 9: STEP 8 COMPLETED ==================== -->
+  <section class="slide">
+    <div>
+      <div class="slide-header">
+        <div class="step-pill"><span class="step-num green">8</span> ขั้นตอนที่ 8</div>
+        <span class="brand-tag">DRouteMind V1.2.5</span>
+      </div>
+      <div class="title-block">
+        <h1>ส่งงานสำเร็จ!</h1>
+        <p>ตรวจสอบหน้าจอยืนยันและสถานะติ๊กถูกสีเขียวครบทั้ง 5 ขั้นตอน</p>
+      </div>
+    </div>
+
+    <div class="phone-stage">
+      <div class="dual-col">
+        <div class="phone-frame dual">
+          <div class="phone-screen">
+            <img src="../public/manual/steps/step-13-success.jpg" alt="ส่งงานสำเร็จ" />
+            <div class="callout-box green" style="top: 55.5%; left: 5%; width: 90%; height: 8%;">
+              <span class="callout-badge" style="top: auto; bottom: -11px; right: 10px;">ปิดงานสำเร็จ</span>
+            </div>
+          </div>
+        </div>
+        <span class="dual-caption">หน้าจอ "ส่งงานสำเร็จ!"</span>
+      </div>
+
+      <div class="flow-arrow">→</div>
+
+      <div class="dual-col">
+        <div class="phone-frame dual">
+          <div class="phone-screen">
+            <img src="../public/manual/steps/step-14-completed.jpg" alt="สถานะงานเสร็จสิ้น" />
+            <div class="callout-box green" style="top: 29.5%; left: 6.5%; width: 17%; height: 47.5%;">
+              <span class="callout-badge" style="top: auto; bottom: -11px; right: auto; left: 0;">ครบ 5 ขั้น</span>
+            </div>
+          </div>
+        </div>
+        <span class="dual-caption">สถานะ "งานเสร็จสิ้นแล้ว"</span>
+      </div>
+    </div>
+
+    <div class="action-card">
+      <ul class="action-list">
+        <li><span class="dot green">1</span><span>ระบบแสดงหน้าจอ <span class="hl-green">"ส่งงานสำเร็จ!"</span> กดกลับหน้ารายละเอียดงานได้</span></li>
+        <li><span class="dot green">2</span><span>เช็กสถานะ: ต้องขึ้น <span class="hl-green">ติ๊กถูกสีเขียวครบ 5 ขั้นตอน</span></span></li>
+        <li><span class="dot">3</span><span>ด้านล่างจะแสดงแถบ <span class="hl-green">"งานเสร็จสิ้นแล้ว"</span> เป็นอันจบงานสมบูรณ์</span></li>
+      </ul>
+    </div>
+
+    <div class="slide-footer">
+      <span>ขั้นตอนที่ 8 : ตรวจสอบสถานะปิดงาน</span>
+      <span>หน้า 9 / 10</span>
+    </div>
+  </section>
+
+  <!-- ==================== PAGE 10: CHECKLIST & TIPS ==================== -->
+  <section class="slide">
+    <div>
+      <div class="slide-header">
+        <div class="step-pill"><span class="step-num amber">!</span> ข้อควรระวังสำคัญ</div>
+        <span class="brand-tag">Checklist คนขับ</span>
+      </div>
+      <div class="title-block">
+        <h1>4 ข้อสำคัญที่ต้องทำทุกเที่ยวงาน</h1>
+        <p>ปฏิบัติตามนี้เพื่อป้องกันงานตกหล่นและให้การเบิกจ่ายราบรื่น</p>
+      </div>
+    </div>
+
+    <div class="checklist-grid">
+      <div class="check-card">
+        <div class="check-icon">📍</div>
+        <div class="check-body">
+          <h3>1. เปิด GPS (ตำแหน่งที่ตั้ง) ตลอดเวลา</h3>
+          <p>อนุญาตให้แอปเข้าถึงตำแหน่งเสมอ เพื่อให้ระบบบันทึกพิกัดและเวลาเข้า-ออกจุดรับ/จุดส่งได้อย่างแม่นยำ</p>
+        </div>
+      </div>
+
+      <div class="check-card amber">
+        <div class="check-icon">📷</div>
+        <div class="check-body">
+          <h3>2. ถ่ายรูปสินค้าและบิลให้คมชัด</h3>
+          <p>รูปถ่ายรับสินค้าและรูปส่งมอบ (ePOD) รวมถึงลายเซ็นลูกค้า เป็นหลักฐานสำคัญในการยืนยันปิดงานและคิดค่าเที่ยว</p>
+        </div>
+      </div>
+
+      <div class="check-card green">
+        <div class="check-icon">✅</div>
+        <div class="check-body">
+          <h3>3. กดอัปเดตสถานะตามจริงทุกจุด</h3>
+          <p>กดตามลำดับจริง: เริ่มงาน → ถึงจุดรับ → รับสินค้าเข้า → ถึงจุดส่ง → บันทึกส่งงาน ห้ามกดข้ามหรือรอกดทีเดียว</p>
+        </div>
+      </div>
+
+      <div class="check-card rose">
+        <div class="check-icon">🚨</div>
+        <div class="check-body">
+          <h3>4. พบปัญหา / สินค้าเสียหาย แจ้งทันที</h3>
+          <p>หากติดต่อลูกค้าไม่ได้ สินค้าชำรุด หรือแอปขัดข้อง ให้ถ่ายรูปเก็บไว้และติดต่อแอดมิน/แจ้งเหตุ SOS ทันที</p>
+        </div>
+      </div>
+    </div>
+
+    <div class="sos-banner">
+      <strong>ติดปัญหาหน้างาน? ติดต่อแอดมิน / ศูนย์ควบคุมทันที</strong>
+      <span>หรือใช้ปุ่ม SOS / แชทภายในแอป DRouteMind ได้ตลอด 24 ชม.</span>
+    </div>
+
+    <div class="slide-footer">
+      <span>DRouteMind V1.2.5 • DD Transport</span>
+      <span>หน้า 10 / 10</span>
+    </div>
+  </section>
+
+</body>
+</html>
