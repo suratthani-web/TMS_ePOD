@@ -55,7 +55,35 @@ export async function getAllLocations(page?: number, limit?: number, query?: str
     // so paging can issue several independent requests.
     const buildQuery = () => {
       let q = supabase.from('Master_Locations').select('*', { count: 'exact' })
-      if (query) q = q.or(`Name.ilike.%${query}%,Phone.ilike.%${query}%`)
+      if (query) {
+        const cleanQuery = query.trim().replace(/[,()]/g, '').trim()
+        if (cleanQuery) {
+          const noSpace = cleanQuery.replace(/\s+/g, '')
+          const wildcardSpaces = cleanQuery.replace(/\s+/g, '%')
+          const conditions = [
+            `Name.ilike.%${cleanQuery}%`,
+            `Phone.ilike.%${cleanQuery}%`,
+            `Address.ilike.%${cleanQuery}%`,
+          ]
+          // Location_ID is a uuid column; PostgREST `.ilike` fails on uuid, so only match exact UUIDs.
+          if (/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(cleanQuery)) {
+            conditions.push(`Location_ID.eq.${cleanQuery}`)
+          }
+          if (noSpace !== cleanQuery && noSpace.length > 0) {
+            conditions.push(
+              `Name.ilike.%${noSpace}%`,
+              `Phone.ilike.%${noSpace}%`,
+            )
+          }
+          if (wildcardSpaces !== cleanQuery && wildcardSpaces.length > 0) {
+            conditions.push(
+              `Name.ilike.%${wildcardSpaces}%`,
+              `Address.ilike.%${wildcardSpaces}%`,
+            )
+          }
+          q = q.or(conditions.join(','))
+        }
+      }
       if (branchFilter) q = q.eq('Branch_ID', branchFilter)
       return q.order('Name', { ascending: true })
     }

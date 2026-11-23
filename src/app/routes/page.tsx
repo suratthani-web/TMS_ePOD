@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect, useCallback } from "react"
+import { useState, useEffect, useCallback, useRef } from "react"
 import { DashboardLayout } from "@/components/layout/dashboard-layout"
 import { PremiumButton } from "@/components/ui/premium-button"
 import { Input } from "@/components/ui/input"
@@ -70,12 +70,16 @@ export default function RoutesPage() {
   const [totalCount, setTotalCount] = useState(0)
   const [branches, setBranches] = useState<Branch[]>([])
   const [searchQuery, setSearchQuery] = useState("")
+  const [debouncedSearch, setDebouncedSearch] = useState("")
 
   const [isDialogOpen, setIsDialogOpen] = useState(false)
   const [editingLocation, setEditingLocation] = useState<Location | null>(null)
   const [loading, setLoading] = useState(true)
+  const [searching, setSearching] = useState(false)
   const [saving, setSaving] = useState(false)
   const [isAdminUser, setIsAdminUser] = useState(false)
+  const isInitialLoadRef = useRef(true)
+  const fetchIdRef = useRef(0)
 
   const emptyForm: Partial<Location> = {
     Name: "",
@@ -99,25 +103,51 @@ export default function RoutesPage() {
     }))
   }
 
-  const fetchData = useCallback(async () => {
-    setLoading(true)
-    const [locData, branchData, adminStatus] = await Promise.all([
-      // No page/limit → fetch ALL matching locations (was capped at 100).
-      getAllLocations(undefined, undefined, searchQuery, selectedBranch),
-      getBranches(),
-      isAdmin()
-    ])
-    setLocations(locData.data)
-    setTotalCount(locData.count)
-    setBranches(branchData)
-    setIsAdminUser(adminStatus)
-    setLoading(false)
-  }, [searchQuery, selectedBranch])
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearch(searchQuery)
+    }, 350)
+    return () => clearTimeout(timer)
+  }, [searchQuery])
 
   useEffect(() => {
-    const timer = setTimeout(() => { fetchData() }, 400)
-    return () => clearTimeout(timer)
-  }, [searchQuery, selectedBranch, fetchData])
+    let active = true
+    Promise.all([
+      getBranches(),
+      isAdmin(),
+    ]).then(([branchData, adminStatus]) => {
+      if (!active) return
+      setBranches(branchData)
+      setIsAdminUser(adminStatus)
+    })
+    return () => { active = false }
+  }, [selectedBranch])
+
+  const fetchData = useCallback(async () => {
+    const fetchId = ++fetchIdRef.current
+    if (isInitialLoadRef.current) {
+      setLoading(true)
+    } else {
+      setSearching(true)
+    }
+    try {
+      // No page/limit → fetch ALL matching locations (was capped at 100).
+      const locData = await getAllLocations(undefined, undefined, debouncedSearch, selectedBranch)
+      if (fetchId !== fetchIdRef.current) return
+      setLocations(locData.data)
+      setTotalCount(locData.count)
+    } finally {
+      if (fetchId === fetchIdRef.current) {
+        setLoading(false)
+        setSearching(false)
+        isInitialLoadRef.current = false
+      }
+    }
+  }, [debouncedSearch, selectedBranch])
+
+  useEffect(() => {
+    fetchData()
+  }, [fetchData])
 
   const updateForm = (field: keyof Location, data: string | number | null) => {
     setFormData(prev => {
@@ -389,13 +419,22 @@ export default function RoutesPage() {
           <div className="absolute inset-x-0 bottom-0 h-1 bg-primary blur-3xl opacity-20 pointer-events-none" />
           <div className="relative glass-panel rounded-2xl p-0.5 border-border/5">
               <div className="flex items-center gap-3 px-4">
-                  <Search className="text-primary opacity-50" size={18} />
+                  {searching ? (
+                      <Loader2 className="text-primary animate-spin shrink-0" size={18} />
+                  ) : (
+                      <Search className="text-primary opacity-50 shrink-0" size={18} />
+                  )}
                   <Input
                       value={searchQuery}
                       onChange={(e) => setSearchQuery(e.target.value)}
                       placeholder={t('routes.search_placeholder')}
                       className="bg-transparent border-none text-base font-black text-foreground px-2 h-12 placeholder:text-muted-foreground tracking-tight uppercase focus-visible:ring-0"
                   />
+                  {searching && (
+                      <span className="text-[10px] font-black uppercase tracking-widest text-primary animate-pulse shrink-0">
+                          กำลังค้นหา...
+                      </span>
+                  )}
               </div>
           </div>
           {!loading && (

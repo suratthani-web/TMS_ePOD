@@ -81,7 +81,31 @@ export async function getAllCustomers(page?: number, limit?: number, query?: str
 
     
     if (query) {
-      queryBuilder = queryBuilder.or(`Customer_Name.ilike.%${query}%,Customer_ID.ilike.%${query}%`)
+      const cleanQuery = query.trim().replace(/[,()]/g, '').trim()
+      if (cleanQuery) {
+        const noSpace = cleanQuery.replace(/\s+/g, '')
+        const wildcardSpaces = cleanQuery.replace(/\s+/g, '%')
+        const conditions = [
+          `Customer_Name.ilike.%${cleanQuery}%`,
+          `Customer_ID.ilike.%${cleanQuery}%`,
+          `Phone.ilike.%${cleanQuery}%`,
+          `Contact_Person.ilike.%${cleanQuery}%`,
+          `Address.ilike.%${cleanQuery}%`,
+        ]
+        if (noSpace !== cleanQuery && noSpace.length > 0) {
+          conditions.push(
+            `Customer_Name.ilike.%${noSpace}%`,
+            `Phone.ilike.%${noSpace}%`,
+          )
+        }
+        if (wildcardSpaces !== cleanQuery && wildcardSpaces.length > 0) {
+          conditions.push(
+            `Customer_Name.ilike.%${wildcardSpaces}%`,
+            `Address.ilike.%${wildcardSpaces}%`,
+          )
+        }
+        queryBuilder = queryBuilder.or(conditions.join(','))
+      }
     }
     
     if (page && limit) {

@@ -68,7 +68,11 @@ export default function CustomersSettingsPage() {
   const fuelMatrixRef = useRef<{ handleSave: () => Promise<{ success: boolean; error?: string }> } | null>(null)
   const [customers, setCustomers] = useState<Customer[]>([])
   const [loading, setLoading] = useState(true)
+  const [searching, setSearching] = useState(false)
   const [searchQuery, setSearchQuery] = useState("")
+  const [debouncedSearch, setDebouncedSearch] = useState("")
+  const isInitialLoadRef = useRef(true)
+  const fetchIdRef = useRef(0)
   const [isDialogOpen, setIsDialogOpen] = useState(false)
   const [editingCustomer, setEditingCustomer] = useState<Customer | null>(null)
   const [kpis, setKpis] = useState<ExecutiveKPIs | null>(null)
@@ -91,18 +95,45 @@ export default function CustomersSettingsPage() {
 
   const router = useRouter()
 
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearch(searchQuery)
+    }, 350)
+    return () => clearTimeout(timer)
+  }, [searchQuery])
+
+  useEffect(() => {
+    let active = true
+    Promise.all([
+      getExecutiveKPIs(undefined, undefined, selectedBranch),
+      isAdmin(),
+    ]).then(([kpiData, adminStatus]) => {
+      if (!active) return
+      setKpis(kpiData as unknown as ExecutiveKPIs)
+      setIsAdminUser(adminStatus)
+    })
+    return () => { active = false }
+  }, [selectedBranch])
+
   const loadCustomers = useCallback(async () => {
-    setLoading(true)
-    const [result, kpiData, adminStatus] = await Promise.all([
-        getAllCustomers(1, 100, searchQuery, selectedBranch),
-        getExecutiveKPIs(undefined, undefined, selectedBranch),
-        isAdmin()
-    ])
-    setCustomers(result.data)
-    setKpis(kpiData as unknown as ExecutiveKPIs)
-    setIsAdminUser(adminStatus)
-    setLoading(false)
-  }, [searchQuery, selectedBranch])
+    const fetchId = ++fetchIdRef.current
+    if (isInitialLoadRef.current) {
+      setLoading(true)
+    } else {
+      setSearching(true)
+    }
+    try {
+      const result = await getAllCustomers(1, 100, debouncedSearch, selectedBranch)
+      if (fetchId !== fetchIdRef.current) return
+      setCustomers(result.data)
+    } finally {
+      if (fetchId === fetchIdRef.current) {
+        setLoading(false)
+        setSearching(false)
+        isInitialLoadRef.current = false
+      }
+    }
+  }, [debouncedSearch, selectedBranch])
 
   useEffect(() => {
     loadCustomers()
@@ -287,13 +318,22 @@ export default function CustomersSettingsPage() {
         <div className="absolute inset-x-0 bottom-0 h-1 bg-primary blur-3xl opacity-20 pointer-events-none" />
         <div className="relative glass-panel rounded-2xl p-0.5 border-border">
             <div className="flex items-center gap-3 px-4">
-                <Search className="text-primary opacity-50" size={18} />
+                {searching ? (
+                    <Loader2 className="text-primary animate-spin shrink-0" size={18} />
+                ) : (
+                    <Search className="text-primary opacity-50 shrink-0" size={18} />
+                )}
                 <Input
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
                     placeholder={t('settings_pages.customers.search_placeholder')}
                     className="bg-transparent border-none text-base font-black text-foreground px-2 h-12 placeholder:text-muted-foreground tracking-tight uppercase focus-visible:ring-0"
                 />
+                {searching && (
+                    <span className="text-[10px] font-black uppercase tracking-widest text-primary animate-pulse shrink-0">
+                        กำลังค้นหา...
+                    </span>
+                )}
             </div>
         </div>
       </div>
