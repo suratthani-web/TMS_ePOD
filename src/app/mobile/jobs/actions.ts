@@ -126,10 +126,14 @@ export async function updateJobStatus(
 
     // 0. Active driving guard (driver path only):
     // Prevent starting physical transport (Picked Up / In Transit) if the driver
-    // is currently in the middle of delivering another job on the road.
-    // NOTE: 'Accepted' (กดรับงาน) must NEVER be blocked — drivers can accept assigned work freely.
-    const DRIVING_DELIVERY_STATUSES = ['Picked Up', 'In Transit', 'Arrived Dropoff']
-    if (DRIVING_DELIVERY_STATUSES.includes(status)) {
+    // still has an uncompleted active driving job from a different Plan_Date.
+    // NOTE:
+    // - 'Accepted' (กดรับงาน) must NEVER be blocked — drivers can accept assigned work freely.
+    // - 'Arrived Dropoff' must NEVER be blocked — arriving at dropoff must not deadlock co-loaded jobs.
+    // - Same-Plan_Date jobs (co-loading) are allowed so multi-order runs don't lock each other out.
+    const STARTING_TRANSPORT_STATUSES = ['Picked Up', 'In Transit']
+    const ACTIVE_DRIVING_STATUSES = ['Picked Up', 'In Transit', 'Arrived Dropoff']
+    if (STARTING_TRANSPORT_STATUSES.includes(status)) {
       const { data: thisJob } = await supabase
         .from('Jobs_Main')
         .select('Driver_ID, Plan_Date')
@@ -139,12 +143,18 @@ export async function updateJobStatus(
       if (did && thisJob) {
         const { data: activeDrivingJobs } = await supabase
           .from('Jobs_Main')
-          .select('Job_ID')
+          .select('Job_ID, Plan_Date')
           .eq('Driver_ID', did)
           .neq('Job_ID', jobId)
-          .in('Job_Status', DRIVING_DELIVERY_STATUSES)
+          .in('Job_Status', ACTIVE_DRIVING_STATUSES)
 
-        const activeJob = activeDrivingJobs?.[0]
+        const toDateKey = (d: string | null | undefined) => (d ? String(d).split('T')[0] : null)
+        const thisPlanDate = toDateKey(thisJob.Plan_Date)
+        const activeJob = activeDrivingJobs?.find((job) => {
+          const activePlanDate = toDateKey(job.Plan_Date)
+          return Boolean(thisPlanDate && activePlanDate && activePlanDate !== thisPlanDate)
+        })
+
         if (activeJob) {
           return {
             success: false,

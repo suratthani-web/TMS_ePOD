@@ -242,7 +242,31 @@ export async function getAllDrivers(page?: number, limit?: number, query?: strin
     }
     
     if (query) {
-      queryBuilder = queryBuilder.or(`Driver_Name.ilike.%${query}%,Mobile_No.ilike.%${query}%,Driver_ID.ilike.%${query}%,Vehicle_Plate.ilike.%${query}%`)
+      const cleanQuery = query.trim().replace(/[,()]/g, '')
+      if (cleanQuery) {
+        const noSpace = cleanQuery.replace(/\s+/g, '')
+        const wildcardSpaces = cleanQuery.replace(/\s+/g, '%')
+        const conditions = [
+          `Driver_Name.ilike.%${cleanQuery}%`,
+          `Mobile_No.ilike.%${cleanQuery}%`,
+          `Driver_ID.ilike.%${cleanQuery}%`,
+          `Vehicle_Plate.ilike.%${cleanQuery}%`
+        ]
+        if (noSpace !== cleanQuery && noSpace.length > 0) {
+          conditions.push(
+            `Driver_Name.ilike.%${noSpace}%`,
+            `Mobile_No.ilike.%${noSpace}%`,
+            `Vehicle_Plate.ilike.%${noSpace}%`
+          )
+        }
+        if (wildcardSpaces !== cleanQuery && wildcardSpaces.length > 0) {
+          conditions.push(
+            `Driver_Name.ilike.%${wildcardSpaces}%`,
+            `Vehicle_Plate.ilike.%${wildcardSpaces}%`
+          )
+        }
+        queryBuilder = queryBuilder.or(conditions.join(','))
+      }
     }
     
     if (page && limit) {

@@ -1,11 +1,11 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useTransition } from "react"
 import { usePathname, useRouter, useSearchParams } from "next/navigation"
 import { Driver } from "@/lib/supabase/drivers"
 import { 
     Search, Plus, Filter, Edit, Trash2, FileSpreadsheet,
-    Users, Truck, Phone, Award
+    Users, Truck, Phone, Award, Loader2
 } from "lucide-react"
 import { deleteDriver } from "@/app/drivers/actions"
 import { toast } from "sonner"
@@ -48,6 +48,7 @@ export function DriversContent({
   const searchParams = useSearchParams()
 
   const [deletingId, setDeletingId] = useState<string | null>(null)
+  const [isPending, startTransition] = useTransition()
   const targetDriverId = searchParams.get("driverId") || searchParams.get("id") || ""
   const urlQuery = searchParams.get("query") || searchParams.get("q") || searchParams.get("search") || (targetDriverId && !searchParams.get("query") ? targetDriverId : "")
   const [searchQuery, setSearchQuery] = useState(urlQuery)
@@ -63,11 +64,12 @@ export function DriversContent({
   useEffect(() => {
     const timer = setTimeout(() => {
       const params = new URLSearchParams(window.location.search)
-      const currentQuery = params.get("query") || params.get("q") || params.get("search") || ""
-      if (currentQuery === searchQuery) return
+      const currentQuery = params.get("query") || params.get("q") || params.get("search") || params.get("driverId") || params.get("id") || ""
+      const trimmed = searchQuery.trim()
+      if (currentQuery === trimmed) return
 
-      if (searchQuery.trim()) {
-        params.set("query", searchQuery.trim())
+      if (trimmed) {
+        params.set("query", trimmed)
         params.delete("q")
         params.delete("search")
       } else {
@@ -78,8 +80,10 @@ export function DriversContent({
         params.delete("id")
       }
       params.set("page", "1")
-      router.push(`${pathname}?${params.toString()}`)
-    }, 400)
+      startTransition(() => {
+        router.push(`${pathname}?${params.toString()}`)
+      })
+    }, 350)
 
     return () => clearTimeout(timer)
   }, [searchQuery, router, pathname])
@@ -96,15 +100,7 @@ export function DriversContent({
     }
   }, [targetDriverId])
 
-  const filteredDrivers = (drivers || []).filter(driver => {
-    if (!searchQuery.trim()) return true
-    const q = searchQuery.toLowerCase().trim()
-    const name = (driver.Driver_Name || '').toLowerCase()
-    const phone = (driver.Mobile_No || '').toLowerCase()
-    const id = (driver.Driver_ID || '').toLowerCase()
-    const plate = (driver.Vehicle_Plate || '').toLowerCase()
-    return name.includes(q) || phone.includes(q) || id.includes(q) || plate.includes(q)
-  })
+  const displayedDrivers = drivers || []
 
   const handleDelete = async (id: string, name: string) => {
     if (!confirm(`${t('common.delete') || 'ต้องการลบ'} ${name}?`)) return
@@ -191,7 +187,11 @@ export function DriversContent({
       <div className="flex flex-col md:flex-row gap-4 items-center justify-between bg-card border border-border p-4 rounded-xl shadow-sm">
         <div className="flex items-center gap-3 w-full md:w-auto">
             <div className="relative flex-1 md:w-72">
-                <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-muted-foreground" size={16} />
+                {isPending ? (
+                  <Loader2 className="absolute left-4 top-1/2 -translate-y-1/2 text-primary animate-spin" size={16} />
+                ) : (
+                  <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-muted-foreground" size={16} />
+                )}
                 <input 
                     type="text" 
                     value={searchQuery}
@@ -242,15 +242,21 @@ export function DriversContent({
       </div>
 
       {/* Driver Grid */}
-      {filteredDrivers.length === 0 ? (
-        <div className="text-center py-12 bg-card border border-border rounded-xl">
+      {displayedDrivers.length === 0 ? (
+        <div className={cn(
+          "text-center py-12 bg-card border border-border rounded-xl transition-opacity duration-200",
+          isPending && "opacity-60"
+        )}>
           <Users className="mx-auto h-12 w-12 text-muted-foreground/40 mb-3" />
           <h3 className="text-sm font-medium text-foreground">ไม่พบข้อมูลพนักงานขับรถ</h3>
           <p className="text-xs text-muted-foreground mt-1">ลองค้นหาด้วยคำอื่น หรือเพิ่มพนักงานขับรถใหม่</p>
         </div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {filteredDrivers.map((driver) => {
+        <div className={cn(
+          "grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 transition-opacity duration-200",
+          isPending && "opacity-60 pointer-events-none"
+        )}>
+          {displayedDrivers.map((driver) => {
             const isTarget = Boolean(targetDriverId && driver.Driver_ID === targetDriverId)
             const expDate = driver.Expire_Date ? new Date(driver.Expire_Date) : null
             const isExpired = expDate ? !isNaN(expDate.getTime()) && expDate.getTime() < Date.now() : false

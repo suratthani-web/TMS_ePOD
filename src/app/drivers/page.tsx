@@ -15,20 +15,25 @@ export const dynamic = 'force-dynamic'
 export const revalidate = 0
 
 export default async function DriversPage(props: Props) {
-  const searchParams = await props.searchParams
-  const isUserAdmin = await isAdmin()
-  const branchesData = isUserAdmin ? await getAllBranches() : []
-  const branches: Branch[] = branchesData || []
+  const [searchParams, isUserAdmin] = await Promise.all([
+    props.searchParams,
+    isAdmin()
+  ])
 
   const page = Number(searchParams.page) || 1
   const query = (searchParams.query as string) || (searchParams.q as string) || (searchParams.search as string) || (searchParams.driverId as string) || ''
-  
-  // Fetch drivers with pagination and search
-  const { data: drivers, count } = await getAllDrivers(page, 12, query, searchParams.branchId as string)
-  
-  // Fetch vehicles and subcontractors for the dialogs
-  const { data: vehicles } = await getAllVehicles()
-  const subcontractors = await getAllSubcontractors()
+
+  // Fetch branches, drivers, vehicles, and subcontractors in parallel
+  const [branchesData, driversResult, vehiclesResult, subcontractors] = await Promise.all([
+    isUserAdmin ? getAllBranches() : Promise.resolve([]),
+    getAllDrivers(page, 12, query, searchParams.branchId as string),
+    getAllVehicles(),
+    getAllSubcontractors()
+  ])
+
+  const branches: Branch[] = branchesData || []
+  const { data: drivers, count } = driversResult
+  const { data: vehicles } = vehiclesResult
 
   return (
     <DashboardLayout>
