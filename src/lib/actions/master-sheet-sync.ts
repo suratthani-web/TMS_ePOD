@@ -846,7 +846,8 @@ const BILLING_LOCKED = ['Billed', 'Paid'] // keep Job_Status; only flag verifica
 export async function verifyAndBackfillHistorical(
   endDate: string,
   startDate?: string,
-  customerId?: string
+  customerId?: string,
+  branchId?: string
 ): Promise<{ success: boolean; verified?: number; appended?: number; jobIdsFilled?: number; error?: string }> {
   try {
     if (!/^\d{4}-\d{2}-\d{2}$/.test(endDate) || (startDate && !/^\d{4}-\d{2}-\d{2}$/.test(startDate))) {
@@ -875,6 +876,7 @@ export async function verifyAndBackfillHistorical(
         .range(from, from + PAGE - 1)
       if (startDate) query = query.gte('Plan_Date', startDate)
       if (customerId && customerId !== 'All') query = query.eq('Customer_ID', customerId)
+      if (branchId && branchId !== 'All') query = query.eq('Branch_ID', branchId)
       
       const { data, error } = await query
       if (error) return { success: false, error: error.message }
@@ -996,7 +998,8 @@ export async function verifyAndBackfillHistorical(
 export async function backfillMasterSheet(
   startDate?: string,
   endDate?: string,
-  customerId?: string
+  customerId?: string,
+  branchId?: string
 ): Promise<{ success: boolean; count?: number; jobIdsFilled?: number; error?: string }> {
   try {
     if ((startDate && !/^\d{4}-\d{2}-\d{2}$/.test(startDate)) || (endDate && !/^\d{4}-\d{2}-\d{2}$/.test(endDate))) {
@@ -1021,6 +1024,7 @@ export async function backfillMasterSheet(
       if (startDate) query = query.gte('Plan_Date', startDate)
       if (endDate) query = query.lte('Plan_Date', endDate)
       if (customerId && customerId !== 'All') query = query.eq('Customer_ID', customerId)
+      if (branchId && branchId !== 'All') query = query.eq('Branch_ID', branchId)
       
       const { data, error } = await query
       if (error) return { success: false, error: error.message }

@@ -53,20 +53,28 @@ function validateDateRange(startDate: string, endDate: string) {
   return null
 }
 
-export async function runMasterBackfillAction(startDate: string, endDate: string, customerId?: string) {
-  await requireAdmin()
-  const validationError = validateDateRange(startDate, endDate)
-  if (validationError) return { success: false, error: validationError }
-  const { backfillMasterSheet } = await import("@/lib/actions/master-sheet-sync")
-  return await backfillMasterSheet(startDate, endDate, customerId)
+async function resolveTargetBranchId(branchId?: string): Promise<string | undefined> {
+  const sessionBranchId = (await getUserBranchId()) || 'All'
+  const effectiveBranchId = sessionBranchId !== 'All' ? sessionBranchId : (branchId || 'All')
+  return effectiveBranchId !== 'All' ? effectiveBranchId : undefined
 }
 
-export async function runVerifyBackfillHistoricalAction(startDate: string, endDate: string, customerId?: string) {
+export async function runMasterBackfillAction(startDate: string, endDate: string, customerId?: string, branchId?: string) {
   await requireAdmin()
   const validationError = validateDateRange(startDate, endDate)
   if (validationError) return { success: false, error: validationError }
+  const targetBranchId = await resolveTargetBranchId(branchId)
+  const { backfillMasterSheet } = await import("@/lib/actions/master-sheet-sync")
+  return await backfillMasterSheet(startDate, endDate, customerId, targetBranchId)
+}
+
+export async function runVerifyBackfillHistoricalAction(startDate: string, endDate: string, customerId?: string, branchId?: string) {
+  await requireAdmin()
+  const validationError = validateDateRange(startDate, endDate)
+  if (validationError) return { success: false, error: validationError }
+  const targetBranchId = await resolveTargetBranchId(branchId)
   const { verifyAndBackfillHistorical } = await import("@/lib/actions/master-sheet-sync")
-  return await verifyAndBackfillHistorical(endDate, startDate, customerId)
+  return await verifyAndBackfillHistorical(endDate, startDate, customerId, targetBranchId)
 }
 
 export async function bypassHealthIssueAction(jobId: string, reason?: string) {

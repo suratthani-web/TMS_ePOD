@@ -139,12 +139,13 @@ export function HealthClient({ initialData }: { initialData: HealthData }) {
     setBackfilling(true)
     try {
       const targetCustId = customerId !== 'All' ? customerId : undefined
+      const targetBranchId = branchId && branchId !== 'All' ? branchId : undefined
       if (backfillMode === 'verified') {
-        const res = await runMasterBackfillAction(backfillStartDate, backfillEndDate, targetCustId)
+        const res = await runMasterBackfillAction(backfillStartDate, backfillEndDate, targetCustId, targetBranchId)
         if (!res.success) throw new Error(res.error || 'unknown error')
         toast.success(`เขียนเพิ่ม ${res.count ?? 0} แถว และเติม Job ID ย้อนหลัง ${res.jobIdsFilled ?? 0} แถว`)
       } else {
-        const res = await runVerifyBackfillHistoricalAction(backfillStartDate, backfillEndDate, targetCustId)
+        const res = await runVerifyBackfillHistoricalAction(backfillStartDate, backfillEndDate, targetCustId, targetBranchId)
         if (!res.success) throw new Error(res.error || 'unknown error')
         toast.success(`ตั้ง Verified ${res.verified ?? 0} งาน · เขียนเพิ่ม ${res.appended ?? 0} แถว · เติม Job ID ${res.jobIdsFilled ?? 0} แถว`)
         fetchHealth()
@@ -155,6 +156,18 @@ export function HealthClient({ initialData }: { initialData: HealthData }) {
     } finally {
       setBackfilling(false)
     }
+  }
+
+  const getSelectedBranchLabel = () => {
+    if (!branchId || branchId === 'All') return 'ทุกสาขา'
+    const branch = initialData.branches.find(b => b.Branch_ID === branchId)
+    return branch?.Branch_Name || branchId
+  }
+
+  const getSelectedCustomerLabel = () => {
+    if (!customerId || customerId === 'All') return 'ลูกค้าทั้งหมด'
+    const cust = initialData.customers.find(c => c.Customer_ID === customerId)
+    return cust?.Customer_Name || customerId
   }
 
   const getTargetSheetName = () => {
@@ -266,6 +279,17 @@ export function HealthClient({ initialData }: { initialData: HealthData }) {
                 : 'เติมเฉพาะงานที่ Verified แล้ว และใส่ Job ID ให้แถวเก่าที่จับคู่ได้แน่นอน'}
             </DialogDescription>
           </DialogHeader>
+
+          <div className="flex flex-wrap gap-2 text-xs">
+            <span className="inline-flex items-center gap-1.5 rounded-md border border-border bg-muted/50 px-2.5 py-1 font-medium">
+              <Building className="h-3.5 w-3.5 text-primary" />
+              สาขาที่เลือก: <span className="font-bold text-foreground">{getSelectedBranchLabel()}</span>
+            </span>
+            <span className="inline-flex items-center gap-1.5 rounded-md border border-border bg-muted/50 px-2.5 py-1 font-medium">
+              <Users className="h-3.5 w-3.5 text-primary" />
+              ลูกค้า: <span className="font-bold text-foreground">{getSelectedCustomerLabel()}</span>
+            </span>
+          </div>
 
           <div className="grid gap-4 py-2 sm:grid-cols-2">
             <div className="space-y-2">
