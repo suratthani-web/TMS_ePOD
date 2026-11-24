@@ -11,22 +11,40 @@ interface PresenceState {
 
 const PresenceContext = createContext<PresenceState>({ user: null, onlineUsers: [] })
 
-type PresenceUser = {
+export type PresenceUser = {
     username?: string
     name?: string
     role?: string
+    role_id?: number | null
     branch?: string | null
+    avatar_url?: string | null
     online_at?: string
     session_id?: string
 }
 
+function resolveRoleLabel(role?: string | null, roleId?: number | null): string {
+    if (role?.trim()) return role.trim()
+    switch (roleId) {
+        case 1: return 'Super Admin'
+        case 2: return 'Admin'
+        case 3: return 'Executive'
+        case 4: return 'Accountant'
+        case 5: return 'Staff'
+        case 6: return 'Driver'
+        case 7: return 'Customer'
+        default: return 'User'
+    }
+}
 
 export function PresenceProvider({ children, user }: { children: React.ReactNode, user: UserData | null }) {
     const [onlineUsers, setOnlineUsers] = useState<PresenceUser[]>([])
     const supabase = useMemo(() => createClient(), [])
 
     useEffect(() => {
-        if (!user) return
+        if (!user) {
+            setOnlineUsers([])
+            return
+        }
 
         // Generate a unique session ID for this tab/instance
         const sessionId = Math.random().toString(36).substring(2, 10)
@@ -60,8 +78,10 @@ export function PresenceProvider({ children, user }: { children: React.ReactNode
                     await channel.track({
                         username: user.Username,
                         name: user.Name,
-                        role: user.Role,
+                        role: resolveRoleLabel(user.Role, user.Role_ID),
+                        role_id: user.Role_ID ?? null,
                         branch: user.Branch_ID,
+                        avatar_url: user.Avatar_Url && !user.Avatar_Url.startsWith('data:') ? user.Avatar_Url : null,
                         online_at: new Date().toISOString(),
                         session_id: sessionId
                     })

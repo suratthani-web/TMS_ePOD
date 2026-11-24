@@ -812,7 +812,7 @@ export async function appendJobToMaster(jobId: string): Promise<{ success: boole
 
     const appendRes = await sheets.spreadsheets.values.append({
       spreadsheetId: SHEET_ID,
-      range: `${qtab}!A:BZ`,
+      range: `${qtab}!A${headerRow}:A`,
       valueInputOption: 'USER_ENTERED',
       insertDataOption: 'INSERT_ROWS',
       requestBody: { values },
@@ -951,7 +951,7 @@ export async function verifyAndBackfillHistorical(
       for (let i = 0; i < rows.length; i += 500) {
         const res = await sheets.spreadsheets.values.append({
           spreadsheetId: SHEET_ID,
-          range: `${qtab}!A:BZ`,
+          range: `${qtab}!A${headerRow}:A`,
           valueInputOption: 'USER_ENTERED',
           insertDataOption: 'INSERT_ROWS',
           requestBody: { values: rows.slice(i, i + 500) },
@@ -1080,7 +1080,7 @@ export async function backfillMasterSheet(
       for (let i = 0; i < rows.length; i += 500) {
         const res = await sheets.spreadsheets.values.append({
           spreadsheetId: SHEET_ID,
-          range: `${qtab}!A:BZ`,
+          range: `${qtab}!A${headerRow}:A`,
           valueInputOption: 'USER_ENTERED',
           insertDataOption: 'INSERT_ROWS',
           requestBody: { values: rows.slice(i, i + 500) },

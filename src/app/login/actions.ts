@@ -198,12 +198,18 @@ export async function login(prevState: LoginFormState | undefined, formData: For
     )
 
     // Log successful login
+    const fallbackRole =
+      roleId === 1 ? 'Super Admin'
+      : roleId === 2 ? 'Admin'
+      : roleId === 6 ? 'Driver'
+      : roleId === 7 ? 'Customer'
+      : 'Staff'
     await logActivity({
       module: 'Auth',
       action_type: 'LOGIN',
       user_id: users.Username,
       username: users.Username,
-      role: users.Role || (roleId === 1 ? 'Super Admin' : roleId === 2 ? 'Admin' : 'Staff'),
+      role: users.Role?.trim() || fallbackRole,
       branch_id: branchId || undefined,
       details: { method: 'credentials', login_time: new Date().toISOString() }
     })

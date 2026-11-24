@@ -2,20 +2,47 @@
 
 import { useState, useEffect } from "react"
 import { DashboardLayout } from "@/components/layout/dashboard-layout"
-import { usePresence } from "@/components/providers/presence-provider"
+import { usePresence, type PresenceUser } from "@/components/providers/presence-provider"
 import { PremiumCard } from "@/components/ui/premium-card"
 import { Activity, Shield, Users, Clock, MapPin, Globe, History } from "lucide-react"
 import { useLanguage } from "@/components/providers/language-provider"
 import { cn } from "@/lib/utils"
 import { getCustomerLoginHistory } from "@/lib/supabase/logs"
+import { getUsers } from "@/lib/actions/user-actions"
 
 type CustomerLogin = { username: string; name: string; branch: string | null; loginAt: string; ip: string | null }
+type DedupedUser = PresenceUser & { tabCount: number }
+
+const isAdminRole = (u: Pick<PresenceUser, 'role' | 'role_id'>) =>
+    u.role_id === 1 ||
+    u.role_id === 2 ||
+    ['super admin', 'admin', 'branch admin', 'branch manager'].includes((u.role || '').trim().toLowerCase())
 
 export default function UserMonitorPage() {
     const { onlineUsers, user } = usePresence()
     const { t } = useLanguage()
     const [currentTime, setCurrentTime] = useState(new Date())
     const [customerLogins, setCustomerLogins] = useState<CustomerLogin[]>([])
+    const [avatarMap, setAvatarMap] = useState<Record<string, string>>({})
+    const [brokenAvatars, setBrokenAvatars] = useState<Record<string, boolean>>({})
+
+    // โหลดรูปโปรไฟล์ของ user ครั้งเดียวเพื่อใช้แสดงผลในตารางออนไลน์และประวัติลูกค้า
+    useEffect(() => {
+        let active = true
+        getUsers()
+            .then((list) => {
+                if (!active || !Array.isArray(list)) return
+                const map: Record<string, string> = {}
+                for (const u of list) {
+                    if (u?.Username && u?.Avatar_Url) {
+                        map[String(u.Username).toLowerCase()] = u.Avatar_Url
+                    }
+                }
+                setAvatarMap(map)
+            })
+            .catch(() => {})
+        return () => { active = false }
+    }, [])
 
     // ประวัติการเข้าใช้งานลูกค้า (จาก log จริง) — เชื่อถือได้ ไม่หายเมื่อปิดแท็บ
     useEffect(() => {
@@ -26,7 +53,7 @@ export default function UserMonitorPage() {
         return () => { active = false; clearInterval(id) }
     }, [])
 
-    const isSuper = user?.Role === 'Super Admin'
+    const isSuper = user?.Role_ID === 1 || (user?.Role || '').trim().toLowerCase() === 'super admin'
     const userBranch = user?.Branch_ID
 
     const filteredUsers = onlineUsers.filter(u => {
@@ -34,6 +61,28 @@ export default function UserMonitorPage() {
         // If not super admin, only show users from the same branch
         return u.branch === userBranch
     })
+
+    const dedupedUsers: DedupedUser[] = []
+    const byKey = new Map<string, DedupedUser>()
+    for (const u of filteredUsers) {
+        const key = u.username ? u.username.trim().toLowerCase() : (u.session_id || `__anon_${dedupedUsers.length}`)
+        const existing = byKey.get(key)
+        if (!existing) {
+            const entry: DedupedUser = { ...u, tabCount: 1 }
+            byKey.set(key, entry)
+            dedupedUsers.push(entry)
+        } else {
+            existing.tabCount += 1
+            if (u.online_at && (!existing.online_at || u.online_at > existing.online_at)) {
+                existing.online_at = u.online_at
+            }
+            if (!existing.avatar_url && u.avatar_url) existing.avatar_url = u.avatar_url
+            if (!existing.name && u.name) existing.name = u.name
+            if ((!existing.role || existing.role === 'User') && u.role) existing.role = u.role
+            if (existing.role_id == null && u.role_id != null) existing.role_id = u.role_id
+            if (!existing.branch && u.branch) existing.branch = u.branch
+        }
+    }
 
     useEffect(() => {
         const timer = setInterval(() => setCurrentTime(new Date()), 1000)
@@ -76,7 +125,7 @@ export default function UserMonitorPage() {
                         <span className="text-[10px] font-black text-primary uppercase tracking-widest animate-pulse">Online</span>
                     </div>
                     <p className="text-muted-foreground text-xs font-black uppercase tracking-widest mb-1">Active Sessions ({isSuper ? 'GLOBAL' : 'BRANCH'})</p>
-                    <p className="text-4xl font-black text-foreground">{filteredUsers.length}</p>
+                    <p className="text-4xl font-black text-foreground">{dedupedUsers.length}</p>
                 </PremiumCard>
 
                 <PremiumCard className="p-6 bg-background/40 border-border/5">
@@ -88,7 +137,7 @@ export default function UserMonitorPage() {
                     </div>
                     <p className="text-muted-foreground text-xs font-black uppercase tracking-widest mb-1">Active Admins</p>
                     <p className="text-4xl font-black text-foreground">
-                        {filteredUsers.filter(u => u.role === 'Super Admin' || u.role === 'Admin').length}
+                        {dedupedUsers.filter(isAdminRole).length}
                     </p>
                 </PremiumCard>
 
@@ -101,7 +150,7 @@ export default function UserMonitorPage() {
                     </div>
                     <p className="text-muted-foreground text-xs font-black uppercase tracking-widest mb-1">Active Branches</p>
                     <p className="text-4xl font-black text-foreground">
-                        {new Set(filteredUsers.map(u => u.branch)).size}
+                        {new Set(dedupedUsers.map(u => u.branch).filter(Boolean)).size}
                     </p>
                 </PremiumCard>
             </div>
@@ -125,26 +174,47 @@ export default function UserMonitorPage() {
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-white/[0.02]">
-                            {filteredUsers.length === 0 ? (
+                            {dedupedUsers.length === 0 ? (
                                 <tr><td colSpan={5} className="text-center py-20 opacity-30 italic font-black text-foreground">NO ACTIVE SESSIONS DETECTED</td></tr>
                             ) : (
-                                filteredUsers.map((session, idx) => (
-                                    <tr key={idx} className="group/row hover:bg-emerald-500/5 transition-all duration-300">
+                                dedupedUsers.map((session, idx) => {
+                                    const displayName = session.name || 'Unknown'
+                                    const avatarKey = (session.username || '').trim().toLowerCase()
+                                    const avatarUrl = session.avatar_url || avatarMap[avatarKey]
+                                    const showAvatar = Boolean(avatarUrl && !brokenAvatars[avatarUrl])
+                                    return (
+                                    <tr key={session.username || session.session_id || idx} className="group/row hover:bg-emerald-500/5 transition-all duration-300">
                                         <td className="px-8 py-6">
                                             <div className="flex items-center gap-4">
-                                                <div className="w-10 h-10 rounded-full bg-gradient-to-br from-emerald-500/20 to-emerald-500/5 border border-emerald-500/20 flex items-center justify-center text-emerald-400 font-black">
-                                                    {(session.name || session.username || '?').charAt(0).toUpperCase()}
+                                                <div className="w-10 h-10 rounded-full overflow-hidden shrink-0 bg-gradient-to-br from-emerald-500/20 to-emerald-500/5 border border-emerald-500/20 flex items-center justify-center text-emerald-400 font-black">
+                                                    {showAvatar && avatarUrl ? (
+                                                        <img
+                                                            src={avatarUrl}
+                                                            alt={displayName}
+                                                            className="w-full h-full object-cover"
+                                                            onError={() => setBrokenAvatars(prev => ({ ...prev, [avatarUrl]: true }))}
+                                                        />
+                                                    ) : (
+                                                        (session.name || session.username || '?').charAt(0).toUpperCase()
+                                                    )}
                                                 </div>
                                                 <div>
-                                                    <div className="font-black text-foreground uppercase italic leading-none">{session.name || 'Unknown'}</div>
-                                                    <div className="text-[10px] font-black text-muted-foreground uppercase tracking-tighter mt-1">@{session.username}</div>
+                                                    <div className="font-black text-foreground uppercase italic leading-none">{displayName}</div>
+                                                    <div className="flex items-center gap-1.5 text-[10px] font-black text-muted-foreground uppercase tracking-tighter mt-1">
+                                                        <span>@{session.username}</span>
+                                                        {session.tabCount > 1 && (
+                                                            <span className="px-1.5 py-0.5 rounded bg-emerald-500/10 border border-emerald-500/20 text-[9px] text-emerald-400 normal-case tracking-normal">
+                                                                {session.tabCount} แท็บ
+                                                            </span>
+                                                        )}
+                                                    </div>
                                                 </div>
                                             </div>
                                         </td>
                                         <td className="px-6 py-4">
                                             <div className={cn(
                                                 "px-3 py-1 rounded-lg border text-[10px] font-black uppercase italic w-fit",
-                                                (session.role === 'Super Admin' || session.role === 'Admin') 
+                                                isAdminRole(session)
                                                     ? 'bg-primary/10 border-primary/20 text-primary shadow-[0_0_10px_rgba(255,30,133,0.1)]'
                                                     : 'bg-muted/50 border-border/10 text-muted-foreground'
                                             )}>
@@ -170,7 +240,8 @@ export default function UserMonitorPage() {
                                             </div>
                                         </td>
                                     </tr>
-                                ))
+                                    )
+                                })
                             )}
                         </tbody>
                     </table>
@@ -202,12 +273,25 @@ export default function UserMonitorPage() {
                             ) : (
                                 customerLogins.map((c, idx) => {
                                     const recent = (Date.now() - new Date(c.loginAt).getTime()) < 15 * 60 * 1000
+                                    const displayName = c.name || c.username || '?'
+                                    const avatarKey = (c.username || '').trim().toLowerCase()
+                                    const avatarUrl = avatarMap[avatarKey]
+                                    const showAvatar = Boolean(avatarUrl && !brokenAvatars[avatarUrl])
                                     return (
                                         <tr key={idx} className="group/row hover:bg-indigo-500/5 transition-all duration-300">
                                             <td className="px-8 py-5">
                                                 <div className="flex items-center gap-4">
-                                                    <div className="w-10 h-10 rounded-full bg-gradient-to-br from-indigo-500/20 to-indigo-500/5 border border-indigo-500/20 flex items-center justify-center text-indigo-400 font-black">
-                                                        {(c.name || c.username || '?').charAt(0).toUpperCase()}
+                                                    <div className="w-10 h-10 rounded-full overflow-hidden shrink-0 bg-gradient-to-br from-indigo-500/20 to-indigo-500/5 border border-indigo-500/20 flex items-center justify-center text-indigo-400 font-black">
+                                                        {showAvatar && avatarUrl ? (
+                                                            <img
+                                                                src={avatarUrl}
+                                                                alt={displayName}
+                                                                className="w-full h-full object-cover"
+                                                                onError={() => setBrokenAvatars(prev => ({ ...prev, [avatarUrl]: true }))}
+                                                            />
+                                                        ) : (
+                                                            displayName.charAt(0).toUpperCase()
+                                                        )}
                                                     </div>
                                                     <div>
                                                         <div className="font-black text-foreground uppercase italic leading-none">{c.name}</div>
