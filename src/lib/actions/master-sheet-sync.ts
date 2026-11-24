@@ -192,15 +192,15 @@ function legacyFingerprint(values: {
 }
 
 function jobLegacyFingerprint(job: MasterJob): string {
-  const drops = parseDestinationItems(job)
-  const qtyOrSo = resolveCustomerQtyOrSo(job, drops[0]?.soNo, false)
+  const firstSpec = expandJobRowSpecs(job)[0]
+  const qtyOrSo = resolveCustomerQtyOrSo(job, firstSpec?.soNo, false)
   const normalizedQtyOrSo = typeof qtyOrSo === 'string' && qtyOrSo.startsWith("'") ? qtyOrSo.slice(1) : qtyOrSo
   return legacyFingerprint({
     date: job.Plan_Date,
     customer: job.Customer_Name,
     quantity: normalizedQtyOrSo || job.Loaded_Qty,
     origin: job.Origin_Location,
-    destination: drops[0]?.name || job.Dest_Location,
+    destination: firstSpec?.name || job.Dest_Location,
     plate: job.Vehicle_Plate,
     customerPrice: job.Price_Cust_Total,
     subcontractorPrice: job.Cost_Driver_Total,
@@ -428,41 +428,100 @@ function formatSheetSoValue(raw: string): string {
     return s
 }
 
-// Resolve 'จำนวนสินค้าลูกค้า': piece count for per-piece / Loaded_Qty>0 jobs
-// (never repeated on child rows), otherwise per-drop SO (with Ref_No fallback
-// on the main/single row).
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-function resolveCustomerQtyOrSo(job: any, dropSoNo?: string, isChildRow = false): string | number {
-    if (isPerPieceCustomer(job) || num(job.Loaded_Qty) > 0) {
-        if (isChildRow) return ''
-        return n(num(job.Loaded_Qty))
+function splitSoNumbers(raw?: string | null): string[] {
+    const trimmed = String(raw ?? '').trim()
+    if (!trimmed) return []
+    return trimmed
+        .split(/(?:[,;\r\n]+|\s+\/\s+)/)
+        .map(s => s.trim())
+        .filter(Boolean)
+}
+
+function expandJobRowSpecs(job: MasterJob): Array<{ name: string; soNo: string }> {
+    const drops = parseDestinationItems(job)
+    const baseDrops = drops.length > 0
+        ? drops
+        : [{ name: String(job.Dest_Location || '').trim(), soNo: '' }]
+
+    if (isPerPieceCustomer(job)) {
+        return baseDrops
     }
-    const trimmedDropSo = (dropSoNo || '').trim()
-    const so = trimmedDropSo || (!isChildRow ? String(job.Ref_No || '').trim() : '')
-    return formatSheetSoValue(so)
+
+    const anyDropHasSo = baseDrops.some(d => Boolean(d.soNo))
+    const refSos = splitSoNumbers(String(job.Ref_No || ''))
+    const specs: Array<{ name: string; soNo: string }> = []
+
+    baseDrops.forEach((drop, idx) => {
+        let soList: string[]
+        if (drop.soNo) {
+            soList = splitSoNumbers(drop.soNo)
+        } else if (!anyDropHasSo && refSos.length > 0) {
+            if (refSos.length === baseDrops.length) {
+                soList = [refSos[idx]]
+            } else if (idx === 0) {
+                soList = refSos
+            } else {
+                soList = ['']
+            }
+        } else {
+            soList = ['']
+        }
+
+        if (soList.length === 0) {
+            specs.push({ name: drop.name, soNo: '' })
+        } else {
+            for (const soNo of soList) {
+                specs.push({ name: drop.name, soNo })
+            }
+        }
+    })
+
+    return specs
+}
+
+// Resolve 'จำนวนสินค้าลูกค้า': piece count for per-piece customers (never
+// repeated on child rows), otherwise SO-first priority with Ref_No fallback
+// on the main/single row and Loaded_Qty fallback when no SO exists.
+function resolveCustomerQtyOrSo(
+    job: MasterJob,
+    dropSoNo?: string,
+    isChildRow = false
+): string | number {
+    if (isPerPieceCustomer(job)) {
+        return isChildRow ? '' : n(num(job.Loaded_Qty))
+    }
+    const rawSo = (dropSoNo ? String(dropSoNo).trim() : '') || (!isChildRow ? (splitSoNumbers(String(job.Ref_No || ''))[0] || '') : '')
+    if (rawSo) return formatSheetSoValue(rawSo)
+    if (!isChildRow && num(job.Loaded_Qty) > 0) return n(num(job.Loaded_Qty))
+    return ''
 }
 
 // Build the MASTER row(s) for a job, keyed by column header name. A single-drop
-// job yields one row; a multi-drop job yields one row per drop, matching the AI
-// OCR MASTER format — the first (main) row carries origin/vehicle/pricing, and
-// each additional drop is a lightweight row with just date, customer and its
-// destination (origin/vehicle/pricing left blank so totals aren't double-counted).
+// job yields one row; a multi-drop / multi-SO job yields one row per spec,
+// matching the AI OCR MASTER format — the first (main) row carries
+// origin/vehicle/pricing, and each additional row is a lightweight row with just
+// date, customer, SO (if any), and its destination (origin/vehicle/pricing left
+// blank so totals aren't double-counted).
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 function buildRowsForJob(job: any, fuel: number | ''): Record<string, string | number>[] {
-    const drops = parseDestinationItems(job)
-    if (drops.length <= 1) return [buildRowValues(job, fuel, drops[0]?.name, drops[0]?.soNo)]
+    const specs = expandJobRowSpecs(job)
+    if (specs.length <= 1) return [buildRowValues(job, fuel, specs[0]?.name, specs[0]?.soNo)]
 
-    const main = buildRowValues(job, fuel, drops[0].name, drops[0].soNo)
+    const main = buildRowValues(job, fuel, specs[0].name, specs[0].soNo)
     const custId = resolveCustId(job)
     const date = fmtDate(job.Plan_Date)
-    const childRows = drops.slice(1).map(drop => ({
-        'วันที่': date,               // keep date + customer so the auto-sort keeps
-        'รหัสลูกค้า': custId,          // the drop rows grouped with their main row
-        'ลูกค้า': job.Customer_Name || '',
-        'จำนวนสินค้าลูกค้า': resolveCustomerQtyOrSo(job, drop.soNo, true),
-        'ปลายทางลูกค้า': drop.name,
-        'ปลายทางรถร่วม': drop.name,
-    })) as Record<string, string | number>[]
+    const childRows = specs.slice(1).map(spec => {
+        const row: Record<string, string | number> = {
+            'วันที่': date,               // keep date + customer so the auto-sort keeps
+            'รหัสลูกค้า': custId,          // the drop rows grouped with their main row
+            'ลูกค้า': job.Customer_Name || '',
+            'ปลายทางลูกค้า': spec.name,
+            'ปลายทางรถร่วม': spec.name,
+        }
+        const qtyOrSo = resolveCustomerQtyOrSo(job, spec.soNo, true)
+        if (qtyOrSo !== '') row['จำนวนสินค้าลูกค้า'] = qtyOrSo
+        return row
+    }) as Record<string, string | number>[]
     return [main, ...childRows]
 }
 
