@@ -21,6 +21,7 @@ import { QuantityStepper } from "@/components/mobile/quantity-stepper"
 import { LabelScanner, type ScannedItem } from "@/components/mobile/label-scanner"
 import { Label } from "@/components/ui/label"
 import { cn } from "@/lib/utils"
+import { formatSoLabel } from "@/lib/utils/so-helpers"
 
 type ContainerReportJob = Job & {
   container?: JobContainer | null
@@ -374,6 +375,14 @@ export default function JobPickupPage() {
                         <div className="space-y-1">
                             <p className="text-sm font-black text-foreground">{job?.Customer_Name || 'ไม่ระบุชื่อลูกค้า'}</p>
                             <p className="text-xs text-muted-foreground">ปลายทาง: {job?.Dest_Location || '-'}</p>
+                            {(() => {
+                                const soLabel = formatSoLabel(job?.original_destinations_json, job?.Ref_No)
+                                return soLabel ? (
+                                    <p className="text-xs font-bold text-emerald-600 dark:text-emerald-400">
+                                        ใบสั่งซื้อ (SO): {soLabel}
+                                    </p>
+                                ) : null
+                            })()}
                         </div>
                         {job?.Cargo_Type && (
                             <div className="p-3 bg-muted/40 rounded-2xl border border-border/50 text-xs font-bold text-foreground">
@@ -421,9 +430,16 @@ export default function JobPickupPage() {
                             </p>
                         )}
                         {dropCount > 1 ? (
-                            drops.map((d: { name?: string; address?: string }, di: number) => (
+                            drops.map((d: { name?: string; address?: string; so_no?: string }, di: number) => (
                                 <div key={di} className="rounded-2xl border border-border p-3 space-y-2">
-                                    <div className="text-xs font-black text-primary">📍 ดรอปที่ {di + 1}{d?.name ? ` · ${d.name}` : ''}</div>
+                                    <div className="flex items-center justify-between gap-2 flex-wrap">
+                                        <div className="text-xs font-black text-primary">📍 ดรอปที่ {di + 1}{d?.name ? ` · ${d.name}` : ''}</div>
+                                        {d?.so_no && (
+                                            <span className="px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20 text-[10px] font-bold">
+                                                SO: {String(d.so_no).trim()}
+                                            </span>
+                                        )}
+                                    </div>
                                     <LabelScanner
                                         items={scannedByDrop[di] || []}
                                         onChange={(items) => setDropItems(di, items)}

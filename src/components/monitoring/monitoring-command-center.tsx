@@ -27,6 +27,7 @@ import { toast } from "sonner"
 import { calculateSafetyScore } from "@/services/safety-scoring"
 import { Button } from "@/components/ui/button"
 import { ExcelExport } from "@/components/ui/excel-export"
+import { extractSoNumbers, formatSoLabel } from "@/lib/utils/so-helpers"
 
 export type DriverWithGPS = Driver & {
     Latitude: number | null
@@ -310,9 +311,11 @@ export function MonitoringCommandCenter({
                 return false
             }
 
-            const matchesSearch = !searchQuery || 
-                j.Job_ID?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                j.Customer_Name?.toLowerCase().includes(searchQuery.toLowerCase())
+            const q = searchQuery.toLowerCase().trim()
+            const matchesSearch = !q || 
+                j.Job_ID?.toLowerCase().includes(q) ||
+                j.Customer_Name?.toLowerCase().includes(q) ||
+                extractSoNumbers(j.original_destinations_json, j.Ref_No).some(so => so.toLowerCase().includes(q))
             
             if (showPinnedOnly && pinnedCustomerNames.length > 0) {
                 return matchesSearch && j.Customer_Name && pinnedCustomerNames.includes(j.Customer_Name)
@@ -456,6 +459,14 @@ export function MonitoringCommandCenter({
                                             )}>
                                                 {job.Customer_Name || t('common.status_pending')}
                                             </p>
+                                            {(() => {
+                                                const soLabel = formatSoLabel(job.original_destinations_json, job.Ref_No)
+                                                return soLabel ? (
+                                                    <span className="inline-block mt-0.5 px-1.5 py-0.5 rounded bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20 text-[9px] font-bold truncate max-w-[160px]" title={`SO: ${soLabel}`}>
+                                                        SO: {soLabel}
+                                                    </span>
+                                                ) : null
+                                            })()}
                                         </div>
                                     </div>
                                     <div className="text-right">
@@ -527,6 +538,14 @@ export function MonitoringCommandCenter({
                                         <div>
                                             <p className="text-sm font-black text-foreground">{job.Job_ID}</p>
                                             <p className="text-[10px] font-bold text-rose-500 uppercase tracking-widest">{job.Job_Status}</p>
+                                            {(() => {
+                                                const soLabel = formatSoLabel(job.original_destinations_json, job.Ref_No)
+                                                return soLabel ? (
+                                                    <span className="inline-block mt-0.5 px-1.5 py-0.5 rounded bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20 text-[9px] font-bold truncate max-w-[160px]" title={`SO: ${soLabel}`}>
+                                                        SO: {soLabel}
+                                                    </span>
+                                                ) : null
+                                            })()}
                                         </div>
                                     </div>
                                     <div className="text-right">

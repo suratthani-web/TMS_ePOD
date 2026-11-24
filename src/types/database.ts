@@ -26,6 +26,8 @@ export interface Job {
     Pickup_Signature_Url?: string | null;
     Cargo_Type?: string | null;
     Notes?: string | null;
+    original_destinations_json?: unknown;
+    Ref_No?: string | null;
     Weight_Kg?: number | null;
     Volume_Cbm?: number | null;
     Loaded_Qty?: number | null;

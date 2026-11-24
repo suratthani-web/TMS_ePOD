@@ -25,6 +25,7 @@ import { DeliveryScanner } from "@/components/mobile/delivery-scanner"
 import type { ScannedItem } from "@/components/mobile/label-scanner"
 import { getJobScans, getScanRequirement, type ReconciledItem } from "@/lib/actions/scan-actions"
 import { notifyTrackingStateChanged } from "@/lib/tracking-state"
+import { formatSoLabel } from "@/lib/utils/so-helpers"
 
 export default function JobCompletePage() {
   const router = useRouter()
@@ -499,6 +500,29 @@ export default function JobCompletePage() {
       )}
 
       <div className="space-y-6">
+        {job && (() => {
+            const currentDrop = (_containerDrops[_doneDrops] as { name?: string; so_no?: string } | undefined)
+            const currentDestName = currentDrop?.name || job.Dest_Location || job.Route_Name || '-'
+            const currentDropSo = (currentDrop?.so_no ? String(currentDrop.so_no).trim() : '') || formatSoLabel(job.original_destinations_json, job.Ref_No)
+            return (
+                <div className="bg-slate-900/70 border border-slate-800 rounded-2xl p-4 space-y-1.5">
+                    <div className="flex items-center justify-between gap-2">
+                        <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">
+                            {_dropCount > 1 ? `จุดส่งที่ ${_doneDrops + 1} / ${_dropCount}` : 'จุดส่งสินค้า'}
+                        </span>
+                        <span className="text-[11px] font-mono text-slate-400">{job.Job_ID}</span>
+                    </div>
+                    <p className="text-sm font-bold text-white leading-snug">{currentDestName}</p>
+                    {currentDropSo && (
+                        <div className="pt-0.5">
+                            <span className="inline-flex items-center px-2.5 py-0.5 rounded-lg bg-emerald-500/15 text-emerald-400 border border-emerald-500/30 text-xs font-bold">
+                                ใบสั่งซื้อ (SO): {currentDropSo}
+                            </span>
+                        </div>
+                    )}
+                </div>
+            )
+        })()}
         <section>
             <h2 className="text-muted-foreground font-bold mb-2">
                 {isContainer ? "1. ถ่ายรูปใบ EIR ขาเข้า (คืนตู้)" : (_currentStopType === 'load' ? "1. ถ่ายรูปสินค้าที่โหลด / เอกสารกำกับ" : "1. ถ่ายรูปสินค้า")}

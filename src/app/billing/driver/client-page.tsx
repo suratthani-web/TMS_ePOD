@@ -25,6 +25,7 @@ import { formatThaiId } from "@/lib/utils/thai-id"
 import { generateCrewPaymentXlsx } from "@/lib/actions/crew-payment-export"
 import { PaymentVoucher, voucherPrintCss } from "./print/[id]/payment-voucher"
 import { cn } from "@/lib/utils"
+import { formatSoLabel, parseDestinationDrops } from "@/lib/utils/so-helpers"
 
 interface ExtraCost { cost_driver: string | number; type: string }
 
@@ -67,15 +68,16 @@ const getDriverExtraBreakdown = (job: Job) => {
 
 // รายชื่อจุดส่งทุกดรอป (ให้สอดคล้องกับ ledger ที่แตกรายดรอป) — ต่อด้วย " → "
 const getAllDrops = (job: Job): string => {
-    try {
-        const raw = (job as unknown as { original_destinations_json?: string | unknown[] }).original_destinations_json
-        const parsed = typeof raw === 'string' ? JSON.parse(raw) : raw
-        if (Array.isArray(parsed)) {
-            const names = parsed.map(d => String((d as { name?: unknown })?.name ?? '').trim()).filter(Boolean)
-            if (names.length > 0) return names.join(' → ')
-        }
-    } catch {}
-    return job.Dest_Location || job.Route_Name || '-'
+    const drops = parseDestinationDrops(job.original_destinations_json)
+    if (drops.length > 0) {
+        const labels = drops
+            .filter(d => d.name)
+            .map(d => d.so_no ? `${d.name} (SO: ${d.so_no})` : d.name)
+        if (labels.length > 0) return labels.join(' → ')
+    }
+    const base = job.Dest_Location || job.Route_Name || '-'
+    const so = formatSoLabel(job.original_destinations_json, job.Ref_No)
+    return so ? `${base} (SO: ${so})` : base
 }
 
 interface DriverPaymentClientProps {
@@ -518,7 +520,10 @@ export default function DriverPaymentClient({
                                     <tr key={item.Job_ID} onClick={() => toggleItem(item.Job_ID)}
                                         className={cn("cursor-pointer transition-colors", checked ? "bg-primary/[0.04]" : "hover:bg-muted/20")}>
                                         <td className="px-6 py-4"><input type="checkbox" className="w-5 h-5 rounded accent-primary cursor-pointer" checked={checked} onChange={() => toggleItem(item.Job_ID)} /></td>
-                                        <td className="px-4 py-4 font-black text-foreground">{item.Job_ID}</td>
+                                        <td className="px-4 py-4">
+                                            <div className="font-black text-foreground">{item.Job_ID}</div>
+                                            <div className="text-xs text-muted-foreground truncate max-w-[260px]">{getAllDrops(item)}</div>
+                                        </td>
                                         <td className="px-4 py-4 text-muted-foreground font-bold">{item.Vehicle_Plate || '-'}</td>
                                         <td className="px-4 py-4 text-muted-foreground text-sm">{item.Plan_Date ? new Date(item.Plan_Date).toLocaleDateString('th-TH') : '-'}</td>
                                         <td className="px-4 py-4 text-right text-muted-foreground">{(item.Cost_Driver_Total || 0).toLocaleString()}</td>

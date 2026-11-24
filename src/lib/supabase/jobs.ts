@@ -58,6 +58,7 @@ export type Job = {
   original_origins_json: string | null
   original_destinations_json: string | null
   extra_costs_json: string | null
+  Ref_No?: string | null
   origins?: unknown
   destinations?: unknown
   extra_costs?: unknown
@@ -288,68 +289,99 @@ export async function getAllJobs(
       .select('*, container:jobs_container(*)', { count: 'exact' })
       .neq('Job_Status', 'Draft') // UI REFINEMENT: Hide Drafts from History (They belong in Planning)
     
-    if (customerId) {
-        dbQuery = dbQuery.eq('Customer_ID', customerId)
-    } else {
-        // STRICT ISOLATION: Apply customer filter first if specific customer(s)
-        // are selected. providedCustomerId may be a single id or a comma-separated
-        // list (multi-select) — one → eq, many → in.
+    const applyBaseFilters = (q: typeof dbQuery) => {
+      if (customerId) {
+        q = q.eq('Customer_ID', customerId)
+      } else {
         const custIds = parseCustomerIds(providedCustomerId)
         if (custIds.length > 0) {
-            dbQuery = custIds.length === 1
-                ? dbQuery.eq('Customer_ID', custIds[0])
-                : dbQuery.in('Customer_ID', custIds)
+          q = custIds.length === 1
+            ? q.eq('Customer_ID', custIds[0])
+            : q.in('Customer_ID', custIds)
         } else if (!isSuper) {
-            // No customer selected — enforce branch isolation for non-super admins
-            if (branchId && branchId !== 'All') {
-                dbQuery = dbQuery.eq('Branch_ID', branchId)
-            } else {
-                return { data: [], count: 0 }
-            }
+          if (branchId && branchId !== 'All') {
+            q = q.eq('Branch_ID', branchId)
+          } else {
+            return null
+          }
         } else if (branchId && branchId !== 'All') {
-            // Super admin with a specific branch selected
-            dbQuery = dbQuery.eq('Branch_ID', branchId)
+          q = q.eq('Branch_ID', branchId)
         }
-    }
-
-    if (startDate) {
-      dbQuery = dbQuery.gte('Plan_Date', startDate)
-    }
-    if (endDate) {
-      dbQuery = dbQuery.lte('Plan_Date', endDate)
-    }
-
-    dbQuery = dbQuery
-      .order('Plan_Date', { ascending: false })
-      .order('Created_At', { ascending: false })
-    if (query) {
-      dbQuery = dbQuery.or(`Job_ID.ilike.%${query}%,Customer_Name.ilike.%${query}%,Route_Name.ilike.%${query}%,Notes.ilike.%${query}%`)
-    }
-
-    if (overdueOnly) {
-      // Jobs past their delivery date that are still not delivered/closed.
-      const excluded = ['Completed', 'Complete', 'Delivered', 'Verified', 'Billed', 'Paid', 'Cancelled', 'Failed', 'Draft', 'Requested']
-      dbQuery = dbQuery
-        .lt('Delivery_Date', todayTH())
-        .not('Job_Status', 'in', `(${excluded.map(s => `"${s}"`).join(',')})`)
-    } else if (status) {
-      // จับคู่ค่าจาก dropdown กับสถานะจริงใน DB (บางป้ายครอบหลายสถานะ)
-      // เดิมใช้ eq ตรงตัวเลยกรองไม่ได้ ยกเว้น 'New' ที่บังเอิญตรง
-      const STATUS_GROUPS: Record<string, string[]> = {
-        'New': ['New', 'Requested', 'Pending'],
-        'Assigned': ['Assigned', 'Confirmed'],
-        'In Progress': ['In Transit', 'In Progress', 'Picked Up', 'Arrived Pickup', 'Arrived Dropoff', 'Arrived', 'SOS'],
-        'Delivered': ['Delivered', 'Completed', 'Complete'],
-        'Verified': ['Verified'],
-        'Paid': ['Paid', 'Billed'],
-        'Failed': ['Failed'],
-        'Cancelled': ['Cancelled'],
       }
-      const group = STATUS_GROUPS[status] || [status]
-      dbQuery = dbQuery.in('Job_Status', group)
+
+      if (startDate) q = q.gte('Plan_Date', startDate)
+      if (endDate) q = q.lte('Plan_Date', endDate)
+
+      q = q
+        .order('Plan_Date', { ascending: false })
+        .order('Created_At', { ascending: false })
+
+      if (overdueOnly) {
+        const excluded = ['Completed', 'Complete', 'Delivered', 'Verified', 'Billed', 'Paid', 'Cancelled', 'Failed', 'Draft', 'Requested']
+        q = q
+          .lt('Delivery_Date', todayTH())
+          .not('Job_Status', 'in', `(${excluded.map(s => `"${s}"`).join(',')})`)
+      } else if (status) {
+        const STATUS_GROUPS: Record<string, string[]> = {
+          'New': ['New', 'Requested', 'Pending'],
+          'Assigned': ['Assigned', 'Confirmed'],
+          'In Progress': ['In Transit', 'In Progress', 'Picked Up', 'Arrived Pickup', 'Arrived Dropoff', 'Arrived', 'SOS'],
+          'Delivered': ['Delivered', 'Completed', 'Complete'],
+          'Verified': ['Verified'],
+          'Paid': ['Paid', 'Billed'],
+          'Failed': ['Failed'],
+          'Cancelled': ['Cancelled'],
+        }
+        const group = STATUS_GROUPS[status] || [status]
+        q = q.in('Job_Status', group)
+      }
+      return q
+    }
+
+    const filteredMain = applyBaseFilters(dbQuery)
+    if (!filteredMain) return { data: [], count: 0 }
+    dbQuery = filteredMain
+
+    const trimmedQuery = query.trim()
+    if (trimmedQuery) {
+      dbQuery = dbQuery.or(`Job_ID.ilike.%${trimmedQuery}%,Customer_Name.ilike.%${trimmedQuery}%,Route_Name.ilike.%${trimmedQuery}%,Notes.ilike.%${trimmedQuery}%`)
     }
 
     const { data, count } = await dbQuery.range(offset, offset + limit - 1)
+
+    if (trimmedQuery && page === 1) {
+      let soBase = supabase
+        .from('Jobs_Main')
+        .select('*, container:jobs_container(*)')
+        .neq('Job_Status', 'Draft')
+        .contains('original_destinations_json', [{ so_no: trimmedQuery }])
+      const filteredSo = applyBaseFilters(soBase as unknown as typeof dbQuery)
+      if (filteredSo) {
+        const { data: soContains, error: soContainsErr } = await filteredSo.limit(limit)
+        let soData = soContains
+        if (soContainsErr || !soData || soData.length === 0) {
+          const ilikeBase = supabase
+            .from('Jobs_Main')
+            .select('*, container:jobs_container(*)')
+            .neq('Job_Status', 'Draft')
+            .ilike('original_destinations_json', `%${trimmedQuery}%`)
+          const filteredIlike = applyBaseFilters(ilikeBase as unknown as typeof dbQuery)
+          if (filteredIlike) {
+            const { data: ilikeData } = await filteredIlike.limit(limit)
+            if (ilikeData && ilikeData.length > 0) soData = ilikeData
+          }
+        }
+        if (soData && soData.length > 0) {
+          const baseList = data || []
+          const seen = new Set(baseList.map((j: Job) => j.Job_ID))
+          const extra = (soData as Job[]).filter(j => !seen.has(j.Job_ID))
+          if (extra.length > 0) {
+            const merged = [...extra, ...baseList].slice(0, limit)
+            return { data: merged, count: (count || 0) + extra.length }
+          }
+        }
+      }
+    }
     
     if (data === null) {
       return { data: [], count: 0 }
@@ -539,7 +571,7 @@ export async function getDriverJobs(
     
     let query = supabase
       .from('Jobs_Main')
-      .select('Job_ID, Customer_Name, Job_Status, Pickup_Date:Plan_Date, Delivery_Date, Plan_Date, Created_At, Origin_Location, Dest_Location, Route_Name, Show_Price_To_Driver, Cost_Driver_Total, Total_Drop, Signature_Url, Photo_Proof_Url')
+      .select('Job_ID, Customer_Name, Job_Status, Pickup_Date:Plan_Date, Delivery_Date, Plan_Date, Created_At, Origin_Location, Dest_Location, Route_Name, Show_Price_To_Driver, Cost_Driver_Total, Total_Drop, Signature_Url, Photo_Proof_Url, original_destinations_json')
       .eq('Driver_ID', driverId)
 
     // Filter out drafts - driver shouldn't see them yet
@@ -1034,7 +1066,7 @@ export async function getJobsForBilling(
         const buildQuery = () => {
             let q = supabase
                 .from('Jobs_Main')
-                .select('Job_ID, Job_Status, Plan_Date, Customer_ID, Customer_Name, Route_Name, Vehicle_Plate, Vehicle_Type, Origin_Location, Dest_Location, Price_Cust_Total, Price_Per_Unit, Loaded_Qty, Created_At, Branch_ID, Driver_ID, Driver_Name, Cost_Driver_Total, extra_costs_json, Driver_Payment_ID, Billing_Note_ID, Invoice_ID')
+                .select('Job_ID, Job_Status, Plan_Date, Customer_ID, Customer_Name, Route_Name, Vehicle_Plate, Vehicle_Type, Origin_Location, Dest_Location, Price_Cust_Total, Price_Per_Unit, Loaded_Qty, Created_At, Branch_ID, Driver_ID, Driver_Name, Cost_Driver_Total, extra_costs_json, original_destinations_json, Driver_Payment_ID, Billing_Note_ID, Invoice_ID')
                 .in('Job_Status', ['Completed', 'Delivered', 'Verified'])
             if (mode === 'driver') {
                 q = q.is('Driver_Payment_ID', null)
@@ -1165,7 +1197,7 @@ export async function getDriverDashboardStats(driverId: string) {
       // 1. Jobs query (Active or Today)
       supabase
         .from('Jobs_Main')
-        .select('Job_ID, Customer_Name, Job_Status, Origin_Location, Dest_Location, Route_Name, Plan_Date, Pickup_Date, Delivery_Date, Cost_Driver_Total, Show_Price_To_Driver, Total_Drop, Signature_Url, Photo_Proof_Url')
+        .select('Job_ID, Customer_Name, Job_Status, Origin_Location, Dest_Location, Route_Name, Plan_Date, Pickup_Date, Delivery_Date, Cost_Driver_Total, Show_Price_To_Driver, Total_Drop, Signature_Url, Photo_Proof_Url, original_destinations_json')
         .eq('Driver_ID', driverId)
         .neq('Job_Status', 'Cancelled')
         .neq('Job_Status', 'Draft')

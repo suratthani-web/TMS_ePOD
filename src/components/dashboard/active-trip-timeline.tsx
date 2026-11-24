@@ -11,6 +11,7 @@ import {
 } from "lucide-react"
 import { Job } from "@/lib/supabase/jobs"
 import { cn } from "@/lib/utils"
+import { formatSoLabel } from "@/lib/utils/so-helpers"
 
 interface TimelineStep {
     id: string
@@ -142,10 +143,11 @@ export function ActiveTripTimeline({ job }: ActiveTripTimelineProps) {
     }
 
     // Arrived at Final Destination
+    const jobSoLabel = formatSoLabel(job.original_destinations_json, job.Ref_No)
     steps.push({
         id: "arrived",
         title: "Arrived",
-        description: `ถึงจุดหมายปลายทาง: ${job.Dest_Location || 'N/A'}`,
+        description: `ถึงจุดหมายปลายทาง: ${job.Dest_Location || 'N/A'}${!isMultiStop && jobSoLabel ? ` (SO: ${jobSoLabel})` : ''}`,
         time: currentWeight >= 4 ? "Arrived" : "Pending",
         status: currentWeight > 4 ? 'completed' : (currentWeight === 4 ? 'current' : 'upcoming'),
         icon: MapPin
@@ -170,6 +172,11 @@ export function ActiveTripTimeline({ job }: ActiveTripTimelineProps) {
                         Job Status
                     </h3>
                     <p className="text-gray-800 font-bold text-lg font-bold uppercase tracking-widest">Job ID: {job.Job_ID}</p>
+                    {jobSoLabel && (
+                        <span className="inline-flex items-center mt-1 px-2.5 py-0.5 rounded-lg bg-emerald-50 text-emerald-700 border border-emerald-200 text-xs font-bold">
+                            SO: {jobSoLabel}
+                        </span>
+                    )}
                 </div>
                 <div className="bg-emerald-50 px-3 py-1 rounded-full border border-emerald-100 flex items-center gap-2">
                     <div className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-pulse" />

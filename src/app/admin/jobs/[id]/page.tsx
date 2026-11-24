@@ -5,6 +5,7 @@ import { ArrowLeft, MapPin, Route, Navigation, CheckCircle2, AlertTriangle, Exte
 import Link from "next/link"
 import { DropReorder } from "@/components/mobile/drop-reorder"
 import { getJobScanSummary } from "@/lib/actions/scan-actions"
+import { formatSoLabel, parseDestinationDrops } from "@/lib/utils/so-helpers"
 
 export const dynamic = 'force-dynamic'
 
@@ -26,13 +27,12 @@ export default async function AdminJobDetailPage({
   const scanSummary = await getJobScanSummary(id)
 
   // รายการจุดส่งทั้งหมด (multi-drop + จุดย่อยที่คนขับเพิ่มหน้างาน เช่น โกดัง)
-  const allDrops: { name?: string; so_no?: string }[] = (() => {
-    try {
-      const raw = (job as { original_destinations_json?: string | unknown[] } | null)?.original_destinations_json
-      const parsed = typeof raw === 'string' ? JSON.parse(raw) : raw
-      return Array.isArray(parsed) ? parsed : []
-    } catch { return [] }
-  })()
+  const parsedDrops = parseDestinationDrops((job as { original_destinations_json?: unknown } | null)?.original_destinations_json)
+  const allDrops: { name?: string; so_no?: string }[] = parsedDrops.map(d => ({ name: d.name, so_no: d.so_no || undefined }))
+  const soLabel = formatSoLabel(
+    (job as { original_destinations_json?: unknown } | null)?.original_destinations_json,
+    (job as { Ref_No?: unknown } | null)?.Ref_No
+  )
 
   // จุดที่ส่งแล้ว = จำนวนลายเซ็น (ล็อกไว้ ห้ามจัดลำดับ)
   const completedDrops = (job as { Signature_Url?: string | null } | null)?.Signature_Url
@@ -51,7 +51,14 @@ export default async function AdminJobDetailPage({
           <div className="flex items-center gap-3 mb-4">
             <div className="p-3 bg-primary/10 rounded-2xl text-primary"><Navigation size={24} /></div>
             <div>
-              <h1 className="text-2xl font-black text-foreground">{job?.Job_ID || id}</h1>
+              <div className="flex items-center gap-2.5 flex-wrap">
+                <h1 className="text-2xl font-black text-foreground">{job?.Job_ID || id}</h1>
+                {soLabel && (
+                  <span className="inline-flex items-center px-2.5 py-0.5 rounded-lg bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20 text-xs font-bold">
+                    SO: {soLabel}
+                  </span>
+                )}
+              </div>
               <p className="text-sm text-muted-foreground font-bold">{job?.Customer_Name || '-'} · {job?.Job_Status || '-'}</p>
             </div>
           </div>
@@ -61,6 +68,21 @@ export default async function AdminJobDetailPage({
             <div><span className="text-muted-foreground text-xs font-bold block">เส้นทาง</span><span className="font-bold">{job?.Route_Name || `${job?.Origin_Location || '?'} → ${job?.Dest_Location || '?'}`}</span></div>
             <div><span className="text-muted-foreground text-xs font-bold block">วันที่</span><span className="font-bold">{job?.Plan_Date ? new Date(job.Plan_Date).toLocaleDateString('th-TH') : '-'}</span></div>
           </div>
+
+          {allDrops.length === 1 && (allDrops[0]?.name || allDrops[0]?.so_no) && (
+            <div className="mt-5 pt-4 border-t border-border/10 flex items-center justify-between gap-3 flex-wrap">
+              <div className="flex items-center gap-2 text-sm">
+                <MapPin size={14} className="text-primary shrink-0" />
+                <span className="text-muted-foreground font-bold text-xs">จุดส่ง:</span>
+                <span className="font-bold text-foreground">{allDrops[0].name || job?.Dest_Location || '-'}</span>
+              </div>
+              {(allDrops[0].so_no || soLabel) && (
+                <span className="inline-flex items-center px-2.5 py-0.5 rounded-lg bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20 text-xs font-bold">
+                  SO: {allDrops[0].so_no || soLabel}
+                </span>
+              )}
+            </div>
+          )}
 
           {/* จุดส่งทั้งหมด (multi-drop) — แอดมินจัดลำดับใหม่ได้ */}
           {allDrops.length > 1 && (

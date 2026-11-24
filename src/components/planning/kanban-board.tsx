@@ -44,6 +44,7 @@ import { fmtDateTH } from "@/lib/utils/date-th"
 import { updateJob } from "@/app/planning/actions"
 import { toast } from "sonner"
 import { JobDialog } from "./job-dialog"
+import { formatSoLabel } from "@/lib/utils/so-helpers"
 
 interface KanbanBoardProps {
   jobs: Job[]
@@ -410,7 +411,16 @@ function JobCard({ job, isOverlay }: { job: Job; isOverlay?: boolean }) {
                     </div>
                     <div>
                         <p className="text-base font-bold font-black text-foreground tracking-tighter uppercase font-display leading-none group-hover/card:text-primary transition-colors">{job.Job_ID}</p>
-                        <p className="text-base font-bold font-black text-muted-foreground uppercase tracking-widest mt-1 italic">Mission Node</p>
+                        {(() => {
+                            const soLabel = formatSoLabel(job.original_destinations_json, job.Ref_No)
+                            return soLabel ? (
+                                <span className="inline-block mt-1 px-2 py-0.5 rounded-md bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20 text-[10px] font-bold tracking-normal truncate max-w-[160px]" title={`SO: ${soLabel}`}>
+                                    SO: {soLabel}
+                                </span>
+                            ) : (
+                                <p className="text-base font-bold font-black text-muted-foreground uppercase tracking-widest mt-1 italic">Mission Node</p>
+                            )
+                        })()}
                     </div>
                 </div>
                 <Badge className={cn(

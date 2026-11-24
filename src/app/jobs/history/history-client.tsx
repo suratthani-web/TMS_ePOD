@@ -57,6 +57,7 @@ import { Customer } from "@/lib/supabase/customers"
 import { Route } from "@/lib/supabase/routes"
 import { Subcontractor } from "@/types/subcontractor"
 import { EntityAvatar } from "@/components/ui/entity-avatar"
+import { formatSoLabel, parseDestinationDrops } from "@/lib/utils/so-helpers"
 
 // รวมค่าคนขับ + ค่าใช้จ่ายอื่นๆ (Cost_Driver_Extra + รายการใน extra_costs_json)
 // ให้ตรงกับที่คำนวณในหน้าแก้ไขงานและรายงาน Trip Performance
@@ -209,7 +210,7 @@ export function HistoryClient({
             return parts.join(' | ')
         }
 
-        const HEADERS = ['Job ID', 'Plan Date', 'Customer', 'Origin', 'Destination', 'Vehicle', 'Driver', 'Total Qty', 'Distance (KM)', 'Verification', 'หมายเหตุ/ปัญหา'] as const
+        const HEADERS = ['Job ID', 'SO No.', 'Plan Date', 'Customer', 'Origin', 'Destination', 'Vehicle', 'Driver', 'Total Qty', 'Distance (KM)', 'Verification', 'หมายเหตุ/ปัญหา'] as const
         type Row = Record<(typeof HEADERS)[number], string | number>
         const blankRow = (): Row => Object.fromEntries(HEADERS.map(h => [h, ''])) as Row
 
@@ -219,12 +220,14 @@ export function HistoryClient({
         // double-counted — matching the MASTER sheet writer's multi-drop format.
         const exportData: Row[] = []
         for (const job of allJobs) {
+            const parsedDrops = parseDestinationDrops(job.original_destinations_json)
             const drops = parseDrops(job)
             const origin = parseOrigin(job)
             const firstDrop = drops[0] || (job.Dest_Location || '').trim()
 
             exportData.push({
                 'Job ID': job.Job_ID,
+                'SO No.': formatSoLabel(job.original_destinations_json, job.Ref_No),
                 'Plan Date': job.Plan_Date || '',
                 'Customer': job.Customer_Name || '',
                 'Origin': origin,
@@ -240,6 +243,7 @@ export function HistoryClient({
             // Sub-rows for the remaining drops
             for (let i = 1; i < drops.length; i++) {
                 const sub = blankRow()
+                sub['SO No.'] = parsedDrops[i]?.so_no || ''
                 sub['Plan Date'] = job.Plan_Date || ''
                 sub['Customer'] = job.Customer_Name || ''
                 sub['Destination'] = drops[i]
@@ -634,7 +638,7 @@ export function HistoryClient({
                                     <Package size={16} strokeWidth={2.5} />
                                 </div>
                                 <div className="min-w-0 flex-1">
-                                    <div className="flex items-center gap-1.5">
+                                    <div className="flex items-center gap-1.5 flex-wrap">
                                         <Link 
                                             href={customerMode ? `/dashboard/tracking?q=${job.Job_ID}` : `/admin/tracking?q=${job.Job_ID}`}
                                             className="text-foreground font-semibold text-sm tracking-tight hover:text-primary transition-colors font-display uppercase truncate hover:underline"
@@ -642,6 +646,14 @@ export function HistoryClient({
                                             {job.Job_ID}
                                         </Link>
                                     </div>
+                                    {(() => {
+                                        const soLabel = formatSoLabel(job.original_destinations_json, job.Ref_No)
+                                        return soLabel ? (
+                                            <span className="inline-flex items-center mt-0.5 px-1.5 py-0.5 rounded bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20 text-[9px] font-bold max-w-full truncate" title={`SO: ${soLabel}`}>
+                                                SO: {soLabel}
+                                            </span>
+                                        ) : null
+                                    })()}
                                     <div className="flex flex-col gap-0.5 mt-1">
                                         <span className="inline-flex items-center gap-1 text-[9px] font-black text-emerald-500 uppercase tracking-widest">
                                             <MapPin size={9} className="shrink-0" />

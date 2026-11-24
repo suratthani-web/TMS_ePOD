@@ -41,6 +41,7 @@ import { useLanguage } from "@/components/providers/language-provider"
 import { OrderTimeline } from "@/components/ui/order-timeline"
 import { DriverLocation } from "@/components/maps/leaflet-map"
 import { Route } from "@/lib/supabase/routes"
+import { formatSoLabel } from "@/lib/utils/so-helpers"
 
 const LeafletMap = dynamic(() => import('@/components/maps/leaflet-map'), { 
     ssr: false,
@@ -204,10 +205,18 @@ export function JobSummaryDialog({ open, onOpenChange, job, routes }: JobSummary
                     {t('reports.title_summary')}
                     <span className="h-1 w-1 rounded-full bg-primary/50"></span>
                   </h2>
-                  <div className="flex items-center gap-3">
+                  <div className="flex items-center gap-3 flex-wrap">
                     <h1 className="text-2xl font-black text-foreground tracking-tight">
                       {job.Job_ID}
                     </h1>
+                    {(() => {
+                      const soLabel = formatSoLabel(job.original_destinations_json, (job as { Ref_No?: unknown }).Ref_No)
+                      return soLabel ? (
+                        <span className="px-2.5 py-0.5 rounded-lg text-xs font-bold bg-emerald-500/10 text-emerald-600 border border-emerald-500/20">
+                          SO: {soLabel}
+                        </span>
+                      ) : null
+                    })()}
                     <span className={cn(
                       "px-3 py-1 rounded-full text-base font-bold font-black uppercase tracking-wider border",
                       job.Job_Status === 'Completed' 
@@ -359,9 +368,40 @@ export function JobSummaryDialog({ open, onOpenChange, job, routes }: JobSummary
                         </div>
                         <div className="flex gap-3">
                             <div className="mt-1"><MapPin size={14} className="text-emerald-500" /></div>
-                            <div>
+                            <div className="flex-1 min-w-0">
                                 <p className="text-base font-bold uppercase text-muted-foreground font-bold">{t('jobs.dialog.destination')}</p>
-                                <p className="text-lg font-bold text-muted-foreground font-bold">{displayDest}</p>
+                                {destsList.length > 0 ? (
+                                    <div className="space-y-1.5 mt-1">
+                                        {destsList.map((d, idx) => {
+                                            const dropName = String(d?.name || d?.destination || displayDest || '-')
+                                            const dropSo = d?.so_no ? String(d.so_no).trim() : ''
+                                            return (
+                                                <div key={idx} className="flex items-center gap-2 flex-wrap">
+                                                    <span className="text-base font-bold text-muted-foreground">
+                                                        {destsList.length > 1 ? `${idx + 1}. ` : ''}{dropName}
+                                                    </span>
+                                                    {dropSo && (
+                                                        <span className="px-2 py-0.5 rounded-md bg-emerald-500/10 text-emerald-600 border border-emerald-500/20 text-xs font-bold">
+                                                            SO: {dropSo}
+                                                        </span>
+                                                    )}
+                                                </div>
+                                            )
+                                        })}
+                                    </div>
+                                ) : (
+                                    <div className="flex items-center gap-2 flex-wrap">
+                                        <p className="text-lg font-bold text-muted-foreground font-bold">{displayDest}</p>
+                                        {(() => {
+                                            const soLabel = formatSoLabel(job.original_destinations_json, (job as { Ref_No?: unknown }).Ref_No)
+                                            return soLabel ? (
+                                                <span className="px-2 py-0.5 rounded-md bg-emerald-500/10 text-emerald-600 border border-emerald-500/20 text-xs font-bold">
+                                                    SO: {soLabel}
+                                                </span>
+                                            ) : null
+                                        })()}
+                                    </div>
+                                )}
                             </div>
                         </div>
                     </div>

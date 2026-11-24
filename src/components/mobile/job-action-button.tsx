@@ -22,6 +22,7 @@ import { toast } from "sonner"
 import { notifyTrackingStateChanged } from "@/lib/tracking-state"
 import { saveJobOffline } from "@/lib/utils/offline-storage"
 import { parseISO, isAfter, startOfDay } from "date-fns"
+import { formatSoLabel } from "@/lib/utils/so-helpers"
 
 interface Destination {
     name: string
@@ -65,6 +66,8 @@ export function JobActionButton({ job }: JobActionButtonProps) {
   const currentDestIndex = Math.min(completedDrops, totalDrop - 1)
   const currentDest = Array.isArray(job.original_destinations_json) ? job.original_destinations_json[currentDestIndex] : null
   const currentStopType = currentDest?.stop_type as 'load' | 'return' | 'drop' | undefined
+  const currentDropSo = (currentDest?.so_no ? String(currentDest.so_no).trim() : '') ||
+    (!isMultiDrop ? formatSoLabel(job.original_destinations_json, (job as { Ref_No?: unknown }).Ref_No) : '')
 
   const handleStatusUpdate = async (newStatus: string) => {
     const today = startOfDay(new Date())
@@ -267,7 +270,7 @@ export function JobActionButton({ job }: JobActionButtonProps) {
                                 <span className="text-[10px] font-semibold">{phone ? "โทร" : "ไม่มีเบอร์"}</span>
                             </button>
                         </div>
-                        <h4 className="text-sm font-semibold text-foreground leading-tight mt-1">
+                                <h4 className="text-sm font-semibold text-foreground leading-tight mt-1">
                             {currentStatus === 'Assigned' || currentStatus === 'New' ? 'กรุณากด "เริ่มงาน" เพื่อเริ่มงาน' : 
                                 currentStatus === 'Accepted' ? 'เดินทางไปยังจุดรับสินค้า' :
                                 currentStatus === 'Arrived Pickup' ? (job.job_type === 'container' ? 'ถึงลานตู้แล้ว กรุณาถ่ายรูป EIR และสภาพตู้' : 'ถึงจุดรับแล้ว กรุณาถ่ายรูปรับสินค้า') :
@@ -288,6 +291,12 @@ export function JobActionButton({ job }: JobActionButtonProps) {
                                 ) :
                                 'อยู่ระหว่างดำเนินงาน'}
                         </h4>
+
+                        {currentDropSo && !(currentStatus === 'In Transit' || currentStatus === 'Arrived Dropoff' || currentStatus === 'Picked Up') && (
+                            <p className="mt-1.5 text-xs font-bold text-emerald-600 dark:text-emerald-400">
+                                ใบสั่งซื้อ (SO): {currentDropSo}
+                            </p>
+                        )}
                         
                         {/* Multi-drop Specific Detail */}
                         {isMultiDrop && (currentStatus === 'In Transit' || currentStatus === 'Arrived Dropoff' || currentStatus === 'Picked Up') && (
@@ -324,16 +333,11 @@ export function JobActionButton({ job }: JobActionButtonProps) {
                                         <span className="px-1.5 py-0.5 rounded bg-blue-500/10 text-blue-500 text-[10px] font-bold shrink-0">🚛 คืนตู้</span>
                                     )}
                                 </div>
-                                {(() => {
-                                    const currentSO = isMultiDrop 
-                                        ? (Array.isArray(job.original_destinations_json) ? job.original_destinations_json[currentDropIndex - 1]?.so_no : undefined)
-                                        : (Array.isArray(job.original_destinations_json) ? job.original_destinations_json[0]?.so_no : undefined);
-                                    return currentSO ? (
-                                        <p className="text-xs font-bold text-emerald-400">
-                                            ใบสั่งซื้อ (SO): {currentSO}
-                                        </p>
-                                    ) : null;
-                                })()}
+                                {currentDropSo && (
+                                    <p className="text-xs font-bold text-emerald-500">
+                                        ใบสั่งซื้อ (SO): {currentDropSo}
+                                    </p>
+                                )}
                             </div>
                         )}
                     </div>

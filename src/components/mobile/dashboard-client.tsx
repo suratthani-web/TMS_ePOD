@@ -16,6 +16,7 @@ import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { format, isToday, isTomorrow, parseISO } from "date-fns"
 import { th } from "date-fns/locale"
+import { formatSoLabel } from "@/lib/utils/so-helpers"
 
 type MobileDashboardJob = {
     Job_ID: string
@@ -30,6 +31,8 @@ type MobileDashboardJob = {
     Total_Drop?: number | string | null
     Signature_Url?: string | null
     Photo_Proof_Url?: string | null
+    original_destinations_json?: unknown
+    Ref_No?: string | null
 }
 
 interface DashboardClientProps {
@@ -50,6 +53,8 @@ interface DashboardClientProps {
         Route_Name?: string
         Pickup_Date?: string | null
         Delivery_Date?: string | null
+        original_destinations_json?: unknown
+        Ref_No?: string | null
     } | null
     activeJobs?: MobileDashboardJob[]
     gamification: {
@@ -251,7 +256,17 @@ export function DashboardClient({ session, currentJob, activeJobs = [], gamifica
                             </span>
                         </div>
 
-                        <h4 className="text-[17px] font-bold text-foreground leading-tight mb-2.5">{currentJob.Customer_Name}</h4>
+                        <h4 className="text-[17px] font-bold text-foreground leading-tight mb-2">{currentJob.Customer_Name}</h4>
+                        {(() => {
+                            const soLabel = formatSoLabel(currentJob.original_destinations_json, currentJob.Ref_No)
+                            return soLabel ? (
+                                <div className="mb-2.5">
+                                    <span className="inline-flex items-center px-2 py-0.5 rounded-md bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20 text-[11px] font-bold">
+                                        SO: {soLabel}
+                                    </span>
+                                </div>
+                            ) : null
+                        })()}
 
                         {/* route legs: pickup and dropoff as facts */}
                         <div className="flex gap-2 mb-3">
@@ -332,6 +347,14 @@ export function DashboardClient({ session, currentJob, activeJobs = [], gamifica
                                         <p className="text-muted-foreground text-[11px] truncate pd-num">
                                             #{(job.Job_ID || '').slice(-6).toUpperCase()}{job.Route_Name ? ` · ${job.Route_Name}` : ''}
                                         </p>
+                                        {(() => {
+                                            const soLabel = formatSoLabel(job.original_destinations_json, job.Ref_No)
+                                            return soLabel ? (
+                                                <span className="inline-block mt-0.5 px-1.5 py-0.5 rounded bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20 text-[10px] font-bold truncate max-w-full">
+                                                    SO: {soLabel}
+                                                </span>
+                                            ) : null
+                                        })()}
                                     </div>
                                     {mounted && (() => {
                                         const dateInfo = getJobDateInfo(job.Plan_Date ?? null)

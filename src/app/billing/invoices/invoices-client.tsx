@@ -38,6 +38,7 @@ import { toast } from "sonner"
 import { InvoiceForm } from "@/components/billing/invoice-form"
 import { ExcelExport } from "@/components/ui/excel-export"
 import { FileSpreadsheet } from "lucide-react"
+import { extractSoNumbers, formatSoLabel } from "@/lib/utils/so-helpers"
 
 interface Invoice {
   Invoice_ID: string
@@ -79,9 +80,11 @@ export default function InvoicesClient({ initialInvoices, billableJobs, customer
 
   const filteredJobs = (displayJobs || []).filter(job => {
       if (!job) return false
-      const matchesSearch = !searchQuery || 
-          job.Job_ID.toLowerCase().includes(searchQuery.toLowerCase()) || 
-          (job.Customer_Name && job.Customer_Name.toLowerCase().includes(searchQuery.toLowerCase()))
+      const q = searchQuery.toLowerCase().trim()
+      const matchesSearch = !q || 
+          job.Job_ID.toLowerCase().includes(q) || 
+          (job.Customer_Name && job.Customer_Name.toLowerCase().includes(q)) ||
+          extractSoNumbers(job.original_destinations_json, job.Ref_No).some(so => so.toLowerCase().includes(q))
       
       const matchesCustomer = selectedCustomerId === 'all' || job.Customer_ID === selectedCustomerId
       
@@ -473,7 +476,17 @@ export default function InvoicesClient({ initialInvoices, billableJobs, customer
                                             </div>
                                         </td>
                                         <td className="px-6 py-2">
-                                            <span className="font-black text-foreground text-sm tracking-tighter group-hover/row:text-primary transition-colors font-display uppercase">{job.Job_ID}</span>
+                                            <div className="flex flex-col">
+                                                <span className="font-black text-foreground text-sm tracking-tighter group-hover/row:text-primary transition-colors font-display uppercase">{job.Job_ID}</span>
+                                                {(() => {
+                                                    const soLabel = formatSoLabel(job.original_destinations_json, job.Ref_No)
+                                                    return soLabel ? (
+                                                        <span className="text-[10px] font-bold text-emerald-600 dark:text-emerald-400 truncate max-w-[180px]" title={`SO: ${soLabel}`}>
+                                                            SO: {soLabel}
+                                                        </span>
+                                                    ) : null
+                                                })()}
+                                            </div>
                                         </td>
                                         <td className="px-4 py-2">
                                             <div className="flex items-center gap-3">

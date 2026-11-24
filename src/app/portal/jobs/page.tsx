@@ -7,6 +7,7 @@ import {
   Download, MapPin, Calendar, Search, ChevronRight
 } from "lucide-react"
 import { cn } from "@/lib/utils"
+import { formatSoLabel } from "@/lib/utils/so-helpers"
 
 export const dynamic = 'force-dynamic'
 
@@ -130,6 +131,14 @@ export default async function PortalJobsPage(props: {
                     {/* Job ID + Status */}
                     <div className="flex items-center gap-2 flex-wrap mb-2">
                       <span className="font-black text-slate-900 text-sm">{job.Job_ID}</span>
+                      {(() => {
+                        const soLabel = formatSoLabel((job as { original_destinations_json?: unknown }).original_destinations_json, (job as { Ref_No?: unknown }).Ref_No)
+                        return soLabel ? (
+                          <span className="text-xs font-bold px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200">
+                            SO: {soLabel}
+                          </span>
+                        ) : null
+                      })()}
                       <span className={cn("text-xs font-black px-2 py-0.5 rounded-full", statusInfo.color, statusInfo.bg)}>
                         {statusInfo.label}
                       </span>

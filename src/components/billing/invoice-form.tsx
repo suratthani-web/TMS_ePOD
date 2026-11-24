@@ -33,6 +33,7 @@ import { format } from "date-fns"
 import { th } from "date-fns/locale"
 import { cn } from "@/lib/utils"
 import { useLanguage } from "@/components/providers/language-provider"
+import { formatSoLabel } from "@/lib/utils/so-helpers"
 
 interface InvoiceFormProps {
     customers: { Customer_ID: string; Customer_Name: string }[]
@@ -52,6 +53,8 @@ type BillableJob = {
   Loaded_Qty?: number | string | null
   Price_Per_Unit?: number | string | null
   Price_Cust_Total?: number | string | null
+  original_destinations_json?: unknown
+  Ref_No?: string | null
   [key: string]: unknown
 }
 
@@ -313,7 +316,15 @@ export function InvoiceForm({ customers, initialData, onSuccess }: InvoiceFormPr
                                                 <TableCell className="font-semibold text-muted-foreground text-xs py-1.5">
                                                     <div className="flex flex-col">
                                                         <span>{job.Job_ID}</span>
-                                                        <span className="text-[10px] opacity-60 truncate max-w-[120px]">{job.Route_Name}</span>
+                                                        <span className="text-[10px] opacity-60 truncate max-w-[140px]">{job.Route_Name}</span>
+                                                        {(() => {
+                                                            const soLabel = formatSoLabel(job.original_destinations_json, job.Ref_No)
+                                                            return soLabel ? (
+                                                                <span className="text-[10px] font-bold text-emerald-600 dark:text-emerald-400 truncate max-w-[160px]" title={`SO: ${soLabel}`}>
+                                                                    SO: {soLabel}
+                                                                </span>
+                                                            ) : null
+                                                        })()}
                                                     </div>
                                                 </TableCell>
                                                 <TableCell className="text-muted-foreground font-medium text-xs py-1.5">{job.Plan_Date ? new Date(job.Plan_Date).toLocaleDateString('th-TH') : '-'}</TableCell>

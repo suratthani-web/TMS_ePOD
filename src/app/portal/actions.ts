@@ -59,7 +59,7 @@ export async function getPortalCustomerJobs(page = 1, limit = 20, status?: strin
 
   let query = supabase
     .from('Jobs_Main')
-    .select('Job_ID, Job_Status, Plan_Date, Delivery_Date, Origin_Location, Dest_Location, Route_Name, Vehicle_Plate, Driver_Name, Price_Cust_Total, Photo_Proof_Url, Signature_Url, Cargo_Type, Notes, Customer_Name', { count: 'exact' })
+    .select('Job_ID, Job_Status, Plan_Date, Delivery_Date, Origin_Location, Dest_Location, Route_Name, Vehicle_Plate, Driver_Name, Price_Cust_Total, Photo_Proof_Url, Signature_Url, Cargo_Type, Notes, Customer_Name, original_destinations_json', { count: 'exact' })
     .eq('Customer_ID', session.customerId)
     .order('Plan_Date', { ascending: false })
     .range(offset, offset + limit - 1)
@@ -69,6 +69,39 @@ export async function getPortalCustomerJobs(page = 1, limit = 20, status?: strin
 
   const { data, count, error } = await query
   if (error) return { jobs: [], total: 0 }
+
+  if (search && page === 1) {
+    let soQuery = supabase
+      .from('Jobs_Main')
+      .select('Job_ID, Job_Status, Plan_Date, Delivery_Date, Origin_Location, Dest_Location, Route_Name, Vehicle_Plate, Driver_Name, Price_Cust_Total, Photo_Proof_Url, Signature_Url, Cargo_Type, Notes, Customer_Name, original_destinations_json')
+      .eq('Customer_ID', session.customerId)
+      .contains('original_destinations_json', [{ so_no: search.trim() }])
+      .order('Plan_Date', { ascending: false })
+      .limit(limit)
+    if (status && status !== 'all') soQuery = soQuery.eq('Job_Status', status)
+    const { data: soContains, error: soContainsErr } = await soQuery
+    let soData = soContains
+    if (soContainsErr || !soData || soData.length === 0) {
+      let ilikeQuery = supabase
+        .from('Jobs_Main')
+        .select('Job_ID, Job_Status, Plan_Date, Delivery_Date, Origin_Location, Dest_Location, Route_Name, Vehicle_Plate, Driver_Name, Price_Cust_Total, Photo_Proof_Url, Signature_Url, Cargo_Type, Notes, Customer_Name, original_destinations_json')
+        .eq('Customer_ID', session.customerId)
+        .ilike('original_destinations_json', `%${search.trim()}%`)
+        .order('Plan_Date', { ascending: false })
+        .limit(limit)
+      if (status && status !== 'all') ilikeQuery = ilikeQuery.eq('Job_Status', status)
+      const { data: ilikeData } = await ilikeQuery
+      if (ilikeData && ilikeData.length > 0) soData = ilikeData
+    }
+    if (soData && soData.length > 0) {
+      const base = data || []
+      const seen = new Set(base.map(j => j.Job_ID))
+      const extra = soData.filter(j => !seen.has(j.Job_ID))
+      if (extra.length > 0) {
+        return { jobs: [...extra, ...base].slice(0, limit), total: (count || 0) + extra.length }
+      }
+    }
+  }
 
   return { jobs: data || [], total: count || 0 }
 }

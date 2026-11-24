@@ -1,5 +1,6 @@
 import { bahtText } from "@/lib/utils/baht-text"
 import { formatThaiId } from "@/lib/utils/thai-id"
+import { formatSoLabel, parseDestinationDrops } from "@/lib/utils/so-helpers"
 
 type VoucherJob = {
     Job_ID?: string
@@ -8,6 +9,7 @@ type VoucherJob = {
     Cost_Driver_Total?: number | null
     extra_costs_json?: unknown
     original_destinations_json?: unknown
+    Ref_No?: string | null
 }
 
 type VoucherPayment = {
@@ -53,16 +55,6 @@ function parseExtraCosts(raw: unknown): { type?: string; cost_driver?: number }[
         try { parsed = JSON.parse(parsed) } catch { return [] }
     }
     return Array.isArray(parsed) ? parsed.filter(c => Number(c?.cost_driver) > 0) : []
-}
-
-// ชื่อจุดส่งทั้งหมดของงาน (multi-drop) — Route_Name เก็บแค่ต้นทาง → จุดสุดท้าย
-function dropNames(raw: unknown): string[] {
-    let v = raw
-    for (let i = 0; i < 2 && typeof v === 'string'; i++) {
-        try { v = JSON.parse(v) } catch { return [] }
-    }
-    if (!Array.isArray(v)) return []
-    return v.map(d => String((d as { name?: unknown })?.name ?? '').trim()).filter(Boolean)
 }
 
 /**
@@ -167,10 +159,22 @@ export function PaymentVoucher({ payment: p, jobs, company, bankInfo }: PaymentV
                                         {job.Route_Name || '-'}
                                     </div>
                                     {(() => {
-                                        const drops = dropNames(job.original_destinations_json)
-                                        return drops.length > 1 ? (
-                                            <div className="text-[10.5px] leading-snug text-slate-500 mt-0.5">
-                                                ส่ง {drops.length} จุด: {drops.join(' · ')}
+                                        const drops = parseDestinationDrops(job.original_destinations_json).filter(d => d.name || d.so_no)
+                                        if (drops.length > 1) {
+                                            const dropStr = drops
+                                                .map(d => d.so_no ? `${d.name || `จุด ${d.drop}`} (SO: ${d.so_no})` : d.name)
+                                                .filter(Boolean)
+                                                .join(' · ')
+                                            return (
+                                                <div className="text-[10.5px] leading-snug text-slate-500 mt-0.5">
+                                                    ส่ง {drops.length} จุด: {dropStr}
+                                                </div>
+                                            )
+                                        }
+                                        const soLabel = formatSoLabel(job.original_destinations_json, job.Ref_No)
+                                        return soLabel ? (
+                                            <div className="text-[10.5px] leading-snug text-slate-600 mt-0.5">
+                                                SO: {soLabel}
                                             </div>
                                         ) : null
                                     })()}

@@ -15,6 +15,7 @@ import { Subcontractor } from "@/types/subcontractor"
 import { useLanguage } from "@/components/providers/language-provider"
 import { LineShareButton } from "@/components/admin/line-share-button"
 import { WeatherBadge } from "@/components/weather/weather-badge"
+import { formatSoLabel } from "@/lib/utils/so-helpers"
 
 type Props = {
   job: Job
@@ -75,13 +76,23 @@ export function RecentJobItem({ job, drivers, vehicles, customers, routes, subco
 
         {/* Top Header: ID & Status */}
         <div className="flex items-center justify-between gap-3 relative z-10">
-            <div className="flex items-center gap-3">
-                <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center border border-primary/20 group-hover:bg-primary/20 transition-colors">
+            <div className="flex items-center gap-3 min-w-0">
+                <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center border border-primary/20 group-hover:bg-primary/20 transition-colors shrink-0">
                     <Package size={14} className="text-primary" />
                 </div>
-                <p className="text-primary font-semibold text-sm break-all">
-                    {job.Job_ID}
-                </p>
+                <div className="min-w-0">
+                    <p className="text-primary font-semibold text-sm break-all">
+                        {job.Job_ID}
+                    </p>
+                    {(() => {
+                        const soLabel = formatSoLabel(job.original_destinations_json, job.Ref_No)
+                        return soLabel ? (
+                            <span className="inline-block mt-0.5 px-2 py-0.5 rounded-md bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20 text-[10px] font-bold truncate max-w-[180px]" title={`SO: ${soLabel}`}>
+                                SO: {soLabel}
+                            </span>
+                        ) : null
+                    })()}
+                </div>
             </div>
             <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
                 <LineShareButton job={job} variant="icon" />

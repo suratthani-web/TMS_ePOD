@@ -5,6 +5,7 @@ import { computeTripCarbon } from '@/lib/utils/job-carbon'
 import { getCarbonFactors } from '@/lib/actions/carbon-factors'
 import ExcelJS from 'exceljs'
 import { getSystemSetting } from './system-settings-actions'
+import { formatSoLabel } from '@/lib/utils/so-helpers'
 import { 
     INVOICE_TEMPLATE_LUMP_SUM_BASE64, 
     INVOICE_TEMPLATE_PER_UNIT_BASE64 
@@ -311,8 +312,10 @@ export async function exportInvoiceExcel(invoiceId: string) {
                 return ''
             })()
 
+            const soLabel = formatSoLabel(job.original_destinations_json, job.Ref_No)
+            const baseDestLabel = multiDropDests || dest || asString(job.Route_Name)
             row.getCell(5).value = origin || ''
-            row.getCell(6).value = multiDropDests || dest || asString(job.Route_Name)
+            row.getCell(6).value = soLabel ? `${baseDestLabel} (SO: ${soLabel})` : baseDestLabel
             
             // Carbon Footprint — shared per-trip formula (computeTripCarbon), same as
             // LINE / POD / track. ใบแจ้งหนี้: คิด "1 ขา รถหนัก" ไม่รวมตีเปล่ากลับ; ไม่มีระยะ → 12.5 กม.

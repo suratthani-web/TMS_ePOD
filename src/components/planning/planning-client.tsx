@@ -38,6 +38,7 @@ import { useLanguage } from "@/components/providers/language-provider"
 import { useCustomer } from "@/components/providers/customer-provider"
 import { ExcelImport } from "@/components/ui/excel-import"
 import { PremiumButton } from "../ui/premium-button"
+import { extractSoNumbers } from "@/lib/utils/so-helpers"
 
 interface PlanningClientProps {
     stats: {
@@ -291,7 +292,10 @@ export function PlanningClient({
                 
                 if (matchMain) return true
 
-                // Check deep into original_destinations_json SO numbers
+                // Check deep into original_destinations_json SO numbers & Ref_No
+                if (extractSoNumbers(j.original_destinations_json, j.Ref_No).some(so => so.toLowerCase().includes(q))) {
+                    return true
+                }
                 if (j.original_destinations_json) {
                     try {
                         const dests = typeof j.original_destinations_json === 'string'
@@ -322,7 +326,8 @@ export function PlanningClient({
             const q = searchQuery.toLowerCase()
             base = base.filter(j => 
                 j.Job_ID.toLowerCase().includes(q) || 
-                j.Customer_Name?.toLowerCase().includes(q)
+                j.Customer_Name?.toLowerCase().includes(q) ||
+                extractSoNumbers(j.original_destinations_json, j.Ref_No).some(so => so.toLowerCase().includes(q))
             )
         }
         

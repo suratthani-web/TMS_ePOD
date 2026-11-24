@@ -5,10 +5,13 @@ import Link from "next/link"
 import { Search, MapPin, ChevronRight, Calendar, Truck } from "lucide-react"
 import { cn } from "@/lib/utils"
 import type { Job } from "@/types/database"
+import { extractSoNumbers, formatSoLabel } from "@/lib/utils/so-helpers"
 
 type MobileJobListItem = Pick<Job, "Job_ID" | "Customer_Name" | "Dest_Location" | "Route_Name" | "Job_Status"> & {
   Pickup_Date?: string | null
   Delivery_Date?: string | null
+  original_destinations_json?: unknown
+  Ref_No?: string | null
 }
 
 const fmtDayMonth = (v?: string | null) =>
@@ -43,7 +46,8 @@ export function MobileJobSearchList({ jobs }: { jobs: MobileJobListItem[] }) {
       job.Job_ID.toLowerCase().includes(q) ||
       (job.Customer_Name || "").toLowerCase().includes(q) ||
       (job.Dest_Location || "").toLowerCase().includes(q) ||
-      (job.Route_Name || "").toLowerCase().includes(q)
+      (job.Route_Name || "").toLowerCase().includes(q) ||
+      extractSoNumbers(job.original_destinations_json, job.Ref_No).some(so => so.toLowerCase().includes(q))
     );
   })
 
@@ -86,6 +90,14 @@ export function MobileJobSearchList({ jobs }: { jobs: MobileJobListItem[] }) {
                 <div className="min-w-0">
                   <h3 className="text-[15px] font-bold text-foreground leading-tight truncate">{job.Customer_Name || 'ไม่ระบุลูกค้า'}</h3>
                   <p className="text-[11px] font-medium text-muted-foreground mt-0.5 pd-num">#{job.Job_ID.toUpperCase()}</p>
+                  {(() => {
+                    const soLabel = formatSoLabel(job.original_destinations_json, job.Ref_No)
+                    return soLabel ? (
+                      <span className="inline-block mt-1 px-1.5 py-0.5 rounded bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20 text-[10px] font-bold truncate max-w-full">
+                        SO: {soLabel}
+                      </span>
+                    ) : null
+                  })()}
                 </div>
                 <div className={cn("px-2.5 py-1 rounded-lg text-[10px] font-bold whitespace-nowrap shrink-0", meta.className)}>
                   {meta.label}

@@ -189,12 +189,15 @@ function legacyFingerprint(values: {
 }
 
 function jobLegacyFingerprint(job: MasterJob): string {
+  const drops = parseDestinationItems(job)
+  const qtyOrSo = resolveCustomerQtyOrSo(job, drops[0]?.soNo, false)
+  const normalizedQtyOrSo = typeof qtyOrSo === 'string' && qtyOrSo.startsWith("'") ? qtyOrSo.slice(1) : qtyOrSo
   return legacyFingerprint({
     date: job.Plan_Date,
     customer: job.Customer_Name,
-    quantity: job.Loaded_Qty,
+    quantity: normalizedQtyOrSo || job.Loaded_Qty,
     origin: job.Origin_Location,
-    destination: job.Dest_Location,
+    destination: drops[0]?.name || job.Dest_Location,
     plate: job.Vehicle_Plate,
     customerPrice: job.Price_Cust_Total,
     subcontractorPrice: job.Cost_Driver_Total,
@@ -374,19 +377,66 @@ function resolveCustId(job: any): number | string {
     return code ? Number(code) : 20
 }
 
-// The ordered list of drop (destination) names for a job. Multi-drop jobs keep
-// each stop in original_destinations_json; fall back to splitting the "→"-joined
-// Dest_Location string, then to the single Dest_Location.
+// The ordered list of drop (destination + optional SO) items for a job.
+// Multi-drop jobs keep each stop in original_destinations_json; fall back to
+// splitting the "→"-joined Dest_Location string with empty soNo.
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-function parseDestinations(job: any): string[] {
+function parseDestinationItems(job: any): Array<{ name: string; soNo: string }> {
     let v: unknown = job.original_destinations_json
     if (typeof v === 'string') { try { v = JSON.parse(v) } catch { v = null } }
     if (Array.isArray(v)) {
-        const names = v.map(d => String((d as { name?: unknown })?.name ?? '').trim()).filter(Boolean)
-        if (names.length > 0) return names
+        const items = v
+            .map(d => {
+                const obj = d as { name?: unknown; destination?: unknown; so_no?: unknown } | null
+                return {
+                    name: String(obj?.name ?? obj?.destination ?? '').trim(),
+                    soNo: obj?.so_no ? String(obj.so_no).trim() : '',
+                }
+            })
+            .filter(item => item.name.length > 0)
+        if (items.length > 0) return items
     }
-    if (job.Dest_Location) return String(job.Dest_Location).split('→').map((s: string) => s.trim()).filter(Boolean)
+    if (job.Dest_Location) {
+        return String(job.Dest_Location)
+            .split('→')
+            .map((s: string) => s.trim())
+            .filter(Boolean)
+            .map(name => ({ name, soNo: '' }))
+    }
     return []
+}
+
+// Per-piece customers (e.g. สยามรุ่งเรือง / Siam) report piece count in
+// 'จำนวนสินค้าลูกค้า' rather than SO numbers.
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function isPerPieceCustomer(job: any): boolean {
+    const idStr = String(job.Customer_ID ?? '').toLowerCase()
+    const nameStr = String(job.Customer_Name ?? '').toLowerCase()
+    return idStr.includes('สยามรุ่งเรือง') || idStr.includes('siam')
+        || nameStr.includes('สยามรุ่งเรือง') || nameStr.includes('siam')
+}
+
+// Prefix leading-zero or long numeric SOs with an apostrophe so Google Sheets
+// USER_ENTERED preserves leading zeros and avoids scientific notation.
+function formatSheetSoValue(raw: string): string {
+    const s = raw.trim()
+    if (!s) return ''
+    if (/^0\d+$/.test(s) || /^\d{11,}$/.test(s)) return `'${s}`
+    return s
+}
+
+// Resolve 'จำนวนสินค้าลูกค้า': piece count for per-piece / Loaded_Qty>0 jobs
+// (never repeated on child rows), otherwise per-drop SO (with Ref_No fallback
+// on the main/single row).
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function resolveCustomerQtyOrSo(job: any, dropSoNo?: string, isChildRow = false): string | number {
+    if (isPerPieceCustomer(job) || num(job.Loaded_Qty) > 0) {
+        if (isChildRow) return ''
+        return n(num(job.Loaded_Qty))
+    }
+    const trimmedDropSo = (dropSoNo || '').trim()
+    const so = trimmedDropSo || (!isChildRow ? String(job.Ref_No || '').trim() : '')
+    return formatSheetSoValue(so)
 }
 
 // Build the MASTER row(s) for a job, keyed by column header name. A single-drop
@@ -396,18 +446,19 @@ function parseDestinations(job: any): string[] {
 // destination (origin/vehicle/pricing left blank so totals aren't double-counted).
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 function buildRowsForJob(job: any, fuel: number | ''): Record<string, string | number>[] {
-    const drops = parseDestinations(job)
-    if (drops.length <= 1) return [buildRowValues(job, fuel)]
+    const drops = parseDestinationItems(job)
+    if (drops.length <= 1) return [buildRowValues(job, fuel, drops[0]?.name, drops[0]?.soNo)]
 
-    const main = buildRowValues(job, fuel, drops[0])
+    const main = buildRowValues(job, fuel, drops[0].name, drops[0].soNo)
     const custId = resolveCustId(job)
     const date = fmtDate(job.Plan_Date)
-    const childRows = drops.slice(1).map(dest => ({
+    const childRows = drops.slice(1).map(drop => ({
         'วันที่': date,               // keep date + customer so the auto-sort keeps
         'รหัสลูกค้า': custId,          // the drop rows grouped with their main row
         'ลูกค้า': job.Customer_Name || '',
-        'ปลายทางลูกค้า': dest,
-        'ปลายทางรถร่วม': dest,
+        'จำนวนสินค้าลูกค้า': resolveCustomerQtyOrSo(job, drop.soNo, true),
+        'ปลายทางลูกค้า': drop.name,
+        'ปลายทางรถร่วม': drop.name,
     })) as Record<string, string | number>[]
     return [main, ...childRows]
 }
@@ -415,7 +466,7 @@ function buildRowsForJob(job: any, fuel: number | ''): Record<string, string | n
 // Build the MASTER row for a job, keyed by column header name.
 // `destOverride` sets the destination cell (used to place one drop per row).
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-function buildRowValues(job: any, fuel: number | '', destOverride?: string): Record<string, string | number> {
+function buildRowValues(job: any, fuel: number | '', destOverride?: string, dropSoNo?: string): Record<string, string | number> {
     const extras = parseExtras(job.extra_costs_json)
 
     // Customer-side charges
@@ -451,7 +502,7 @@ function buildRowValues(job: any, fuel: number | '', destOverride?: string): Rec
       'รหัสลูกค้า': custId,
       'ลูกค้า': job.Customer_Name || '',
       'ประเภทรถลูกค้า': job.Vehicle_Type || '',
-      'จำนวนสินค้าลูกค้า': n(num(job.Loaded_Qty)),
+      'จำนวนสินค้าลูกค้า': resolveCustomerQtyOrSo(job, dropSoNo, false),
       'ต้นทางลูกค้า': job.Origin_Location || '',
       'ปลายทางลูกค้า': destination,
       'ระยะทางไป-กลับลูกค้า': n(distanceRoundTrip),   // decision B: ×2

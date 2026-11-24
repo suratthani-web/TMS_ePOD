@@ -24,6 +24,7 @@ import { ContainerTempForm } from "@/components/mobile/container-temp-form"
 import { Dialog, DialogContent } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
 import { confirmLoadedCount } from "@/lib/actions/scan-actions"
+import { formatSoLabel } from "@/lib/utils/so-helpers"
 
 interface JobDetailClientProps {
     job: Job
@@ -83,9 +84,17 @@ export function JobDetailClient({ job, success, initialTab = 'mission', expected
         router.replace(`${pathname}?${params.toString()}`, { scroll: false })
     }
 
-    const destinations = typeof job?.original_destinations_json === 'string' 
-        ? JSON.parse(job.original_destinations_json) 
-        : job?.original_destinations_json || [];
+    const destinations = (() => {
+        try {
+            if (typeof job?.original_destinations_json === 'string') {
+                const parsed = JSON.parse(job.original_destinations_json)
+                return Array.isArray(parsed) ? parsed : []
+            }
+            return Array.isArray(job?.original_destinations_json) ? job.original_destinations_json : []
+        } catch {
+            return []
+        }
+    })();
 
     return (
         <div className="min-h-full bg-background pb-40 pt-14 relative overflow-hidden flex flex-col">
@@ -156,11 +165,22 @@ export function JobDetailClient({ job, success, initialTab = 'mission', expected
                                     {(() => {
                                         const completedDrops = job?.Signature_Url ? job.Signature_Url.split(',').filter(Boolean).length : 0
                                         const totalDrop = Array.isArray(destinations) ? destinations.length : 1
-                                        const currentDropIndex = Math.min(completedDrops, totalDrop - 1)
+                                        const currentDropIndex = Math.min(completedDrops, Math.max(totalDrop - 1, 0))
                                         const stopType = destinations[currentDropIndex]?.stop_type
-                                        if (stopType === 'load') return <span className="px-1.5 py-0.5 rounded bg-amber-500/10 text-amber-500 text-[10px] font-bold">📦 โหลดสินค้า</span>
-                                        if (stopType === 'return') return <span className="px-1.5 py-0.5 rounded bg-blue-500/10 text-blue-500 text-[10px] font-bold">🚛 คืนตู้</span>
-                                        return null
+                                        const currentDropSo = destinations[currentDropIndex]?.so_no
+                                            ? String(destinations[currentDropIndex].so_no).trim()
+                                            : formatSoLabel(job?.original_destinations_json, job?.Ref_No)
+                                        return (
+                                            <>
+                                                {currentDropSo && (
+                                                    <span className="px-2 py-0.5 rounded-md bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20 text-[11px] font-bold">
+                                                        SO: {currentDropSo}
+                                                    </span>
+                                                )}
+                                                {stopType === 'load' && <span className="px-1.5 py-0.5 rounded bg-amber-500/10 text-amber-500 text-[10px] font-bold">📦 โหลดสินค้า</span>}
+                                                {stopType === 'return' && <span className="px-1.5 py-0.5 rounded bg-blue-500/10 text-blue-500 text-[10px] font-bold">🚛 คืนตู้</span>}
+                                            </>
+                                        )
                                     })()}
                                 </div>
                             </div>
@@ -175,7 +195,7 @@ export function JobDetailClient({ job, success, initialTab = 'mission', expected
                                         <Activity size={10} className="group-open:rotate-180 transition-transform" />
                                     </summary>
                                     <div className="mt-3 space-y-2 max-h-32 overflow-y-auto custom-scrollbar pr-2">
-                                        {destinations.map((d: { name?: string; address?: string; stop_type?: string }, i: number) => (
+                                        {destinations.map((d: { name?: string; address?: string; stop_type?: string; so_no?: string }, i: number) => (
                                             <div key={i} className="flex items-center gap-2 text-xs">
                                                 <div className={cn(
                                                     "w-1.5 h-1.5 rounded-full shrink-0",
@@ -185,6 +205,11 @@ export function JobDetailClient({ job, success, initialTab = 'mission', expected
                                                     "truncate flex-1",
                                                     i < (job?.Signature_Url?.split(',').filter(Boolean).length || 0) ? "text-muted-foreground line-through" : "text-foreground font-medium"
                                                 )}>{d.name}</span>
+                                                {d.so_no && (
+                                                    <span className="px-1.5 py-0.5 rounded bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20 text-[9px] font-bold shrink-0">
+                                                        SO: {d.so_no}
+                                                    </span>
+                                                )}
                                                 {d.stop_type === 'load' && (
                                                     <span className="px-1 py-0.5 bg-amber-500/10 text-amber-500 text-[9px] font-bold rounded shrink-0">📦 โหลด</span>
                                                 )}
