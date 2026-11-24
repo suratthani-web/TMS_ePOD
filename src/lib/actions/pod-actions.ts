@@ -12,6 +12,7 @@ import { timeTH } from "@/lib/utils/date-th"
 import { fillDeliveryDateIfEmpty } from "@/lib/supabase/delivery-date"
 import type { SupabaseClient } from "@supabase/supabase-js"
 import { createHash } from "crypto"
+import { parsePinFromFormData, recordDriverLocationPin } from "@/services/location-pin-collector"
 
 /**
  * Helper to update or append quantity remark to notes
@@ -424,6 +425,23 @@ export async function submitJobPOD(jobId: string, formData: FormData) {
         }
     }
 
+    const pin = parsePinFromFormData(formData)
+    const currentDropDest = String(thisDest?.name || jobData?.Dest_Location || '').trim()
+    if (pin && currentDropDest && jobData?.Driver_ID) {
+        await recordDriverLocationPin({
+            jobId,
+            driverId: String(jobData.Driver_ID),
+            branchId: jobData.Branch_ID ? String(jobData.Branch_ID) : null,
+            locationName: currentDropDest,
+            dropIndex,
+            eventType: 'dropoff',
+            pickupLat: jobData.Pickup_Lat != null ? Number(jobData.Pickup_Lat) : null,
+            pickupLng: jobData.Pickup_Lon != null ? Number(jobData.Pickup_Lon) : null,
+            originName: jobData.Origin_Location ? String(jobData.Origin_Location) : null,
+            pin,
+        }).catch(() => {})
+    }
+
     revalidatePath("/mobile/jobs")
     return { success: true }
   } catch (error: unknown) {
@@ -585,6 +603,28 @@ export async function submitJobPickup(jobId: string, formData: FormData) {
         } catch (scanParseErr) {
             console.error('[PICKUP_SCAN_PARSE_ERROR]', scanParseErr)
         }
+    }
+
+    const pin = parsePinFromFormData(formData)
+    if (pin) {
+        try {
+            const { data: jobRow } = await supabase
+                .from('Jobs_Main')
+                .select('Driver_ID, Branch_ID, Origin_Location')
+                .eq('Job_ID', jobId)
+                .single()
+            if (jobRow?.Origin_Location && jobRow?.Driver_ID) {
+                await recordDriverLocationPin({
+                    jobId,
+                    driverId: String(jobRow.Driver_ID),
+                    branchId: jobRow.Branch_ID ? String(jobRow.Branch_ID) : null,
+                    locationName: String(jobRow.Origin_Location).trim(),
+                    dropIndex: 0,
+                    eventType: 'pickup',
+                    pin,
+                })
+            }
+        } catch { /* never fail pickup */ }
     }
 
     revalidatePath(`/mobile/jobs/${jobId}`)

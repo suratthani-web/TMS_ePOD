@@ -22,6 +22,7 @@ import { LabelScanner, type ScannedItem } from "@/components/mobile/label-scanne
 import { Label } from "@/components/ui/label"
 import { cn } from "@/lib/utils"
 import { formatSoLabel } from "@/lib/utils/so-helpers"
+import { captureCurrentPinSilent, appendPinToFormData } from "@/lib/mobile/pin-capture"
 
 type ContainerReportJob = Job & {
   container?: JobContainer | null
@@ -201,6 +202,9 @@ export default function JobPickupPage() {
             if (loadedQty) formData.append("loaded_qty", loadedQty)
         }
         
+        const pin = await captureCurrentPinSilent()
+        appendPinToFormData(formData, pin)
+
         // Cap the round-trip so a stalled iOS connection can't hang the spinner.
         const result = await withTimeout(submitJobPickup(params.id, formData), 120000, 'pickup upload')
 

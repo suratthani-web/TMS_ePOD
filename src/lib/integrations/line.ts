@@ -198,6 +198,61 @@ export async function replyToUser(
   }
 }
 
+const LINE_TRUNCATION_SUFFIX = '\n...(ข้อความยาวเกินขีดจำกัด LINE กรุณาดูรายละเอียดเพิ่มเติมจากลิงก์)';
+
+/**
+ * Splits a long text message into up to `maxChunks` LINE text message objects,
+ * each at most `maxLen` characters, preferring newline boundaries.
+ */
+export function splitLineTextMessages(
+  text: string,
+  maxLen = 4800,
+  maxChunks = 5
+): Array<{ type: 'text'; text: string }> {
+  if (text.length <= maxLen) {
+    return [{ type: 'text', text }];
+  }
+
+  const chunks: string[] = [];
+  let current = '';
+
+  const pushCurrent = () => {
+    if (current) {
+      chunks.push(current);
+      current = '';
+    }
+  };
+
+  for (const line of text.split('\n')) {
+    if (line.length > maxLen) {
+      pushCurrent();
+      for (let i = 0; i < line.length; i += maxLen) {
+        chunks.push(line.slice(i, i + maxLen));
+      }
+      continue;
+    }
+
+    const candidate = current ? `${current}\n${line}` : line;
+    if (candidate.length <= maxLen) {
+      current = candidate;
+    } else {
+      pushCurrent();
+      current = line;
+    }
+  }
+  pushCurrent();
+
+  if (chunks.length > maxChunks) {
+    const capped = chunks.slice(0, maxChunks);
+    const lastIdx = capped.length - 1;
+    const maxPrefixLen = Math.max(0, maxLen - LINE_TRUNCATION_SUFFIX.length);
+    capped[lastIdx] = `${capped[lastIdx].slice(0, maxPrefixLen)}${LINE_TRUNCATION_SUFFIX}`;
+    return capped.map((chunk) => ({ type: 'text', text: chunk }));
+  }
+
+  return chunks.map((chunk) => ({ type: 'text', text: chunk }));
+}
+
 /**
  * Sends a push message to a LINE user via the given bot (default bot 1).
  */
@@ -206,7 +261,7 @@ export async function pushToUser(to: string, text: string, botIndex: BotIndex = 
     const client = getLineClient(botIndex);
     await client.pushMessage({
       to,
-      messages: [{ type: 'text', text }]
+      messages: splitLineTextMessages(text)
     });
     return { success: true };
   } catch (error) {

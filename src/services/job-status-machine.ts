@@ -456,7 +456,7 @@ async function sendDeliveryCompletionNotification(jobId: string) {
       }
     }
 
-    const message = [
+    const assembleCompletionMessage = (dropBody: string, footerLabel: string) => [
       `📦 [ยืนยันการส่งมอบสินค้าสำเร็จ]`,
       `--------------------------------`,
       `📄 เลขที่งาน: ${job.Job_ID}`,
@@ -465,13 +465,36 @@ async function sendDeliveryCompletionNotification(jobId: string) {
       `⏰ เวลาส่งสำเร็จ: ${deliveryTime}`,
       ``,
       `📦 รายการจุดส่ง (${dropCount} ดรอป):`,
-      dropText + flatPhotoText,
+      dropBody,
       ...(containerText ? [containerText] : []),
       ...(carbonText ? [carbonText] : []),
       ``,
-      `🌐 ติดตามสถานะและเอกสารเพิ่มเติม:`,
+      footerLabel,
       `🔗 ${appUrl}/track/${job.Job_ID}`
     ].join('\n');
+
+    let message = assembleCompletionMessage(dropText + flatPhotoText, '🌐 ติดตามสถานะและเอกสารเพิ่มเติม:');
+    if (message.length > 4500 && (drops.length > 0 || destsFallback.length > 0)) {
+      let compactDropText: string;
+      if (drops.length > 0) {
+        compactDropText = drops.map((d, i) => {
+          const so = String(d?.so_no || '').trim();
+          const name = String(d?.destination || '').trim() || `จุดส่งที่ ${i + 1}`;
+          const photoCount = Array.isArray(d?.photos) ? d.photos.filter(Boolean).length : 0;
+          const sigLabel = d?.signature ? '✍️ เซ็นแล้ว' : '✍️ —';
+          const meta = [photoCount > 0 ? `📸 ${photoCount} รูป` : '', sigLabel].filter(Boolean).join(' · ');
+          return `📍 ดรอปที่ ${d?.drop || i + 1}${so ? ` — SO: ${so}` : ''} | ${name} (${meta})`;
+        }).join('\n');
+      } else {
+        compactDropText = destsFallback.map((d, i) => {
+          const so = String(d?.so_no || '').trim();
+          const name = String(d?.name || '').trim() || `จุดส่งที่ ${i + 1}`;
+          const sigLabel = sigFallback[i] ? '✍️ เซ็นแล้ว' : '✍️ —';
+          return `📍 ดรอปที่ ${i + 1}${so ? ` — SO: ${so}` : ''} | ${name} (${sigLabel})`;
+        }).join('\n');
+      }
+      message = assembleCompletionMessage(compactDropText, '📸 ดูรูปถ่ายและลายเซ็นครบทุกดรอปได้ที่ลิงก์นี้:');
+    }
     
     // Find recipient customers. Each target carries both LINE ids (one per bot);
     // pushToCustomerActive picks the right id for whichever bot is active now.

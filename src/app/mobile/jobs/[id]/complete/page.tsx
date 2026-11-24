@@ -26,6 +26,7 @@ import type { ScannedItem } from "@/components/mobile/label-scanner"
 import { getJobScans, getScanRequirement, type ReconciledItem } from "@/lib/actions/scan-actions"
 import { notifyTrackingStateChanged } from "@/lib/tracking-state"
 import { formatSoLabel } from "@/lib/utils/so-helpers"
+import { captureCurrentPinSilent, appendPinToFormData } from "@/lib/mobile/pin-capture"
 
 export default function JobCompletePage() {
   const router = useRouter()
@@ -310,6 +311,9 @@ export default function JobCompletePage() {
             formData.append("job_type", "container")
         }
         
+        const pin = await captureCurrentPinSilent()
+        appendPinToFormData(formData, pin)
+
         // Cap the round-trip so a stalled iOS connection can't hang the spinner
         // forever. On timeout we throw → fall to the offline-save path, which is
         // the right behaviour for a genuinely stuck network. If the request did

@@ -20,6 +20,9 @@ import {
   Activity,
   Target,
   AlertTriangle,
+  Check,
+  X,
+  ExternalLink,
 } from "lucide-react"
 import {
   Dialog,
@@ -59,6 +62,12 @@ import { useBranch } from "@/components/providers/branch-provider"
 import { isAdmin } from "@/lib/permissions"
 import { useLanguage } from "@/components/providers/language-provider"
 import { toast } from "sonner"
+import {
+  getPendingPinCandidates,
+  approvePinCandidateGroup,
+  rejectPinCandidateGroup,
+  type PendingPinSuggestion,
+} from "@/lib/actions/pin-candidate-actions"
 
 type Branch = { Branch_ID: string; Branch_Name: string }
 
@@ -92,6 +101,54 @@ export default function RoutesPage() {
   const [formData, setFormData] = useState<Partial<Location>>(emptyForm)
   const [pickerOpen, setPickerOpen] = useState(false)
   const [viewMode, setViewMode] = useState<'list' | 'map'>('list')
+  const [pendingPins, setPendingPins] = useState<PendingPinSuggestion[]>([])
+  const [pinDialogOpen, setPinDialogOpen] = useState(false)
+  const [pinActionKey, setPinActionKey] = useState<string | null>(null)
+
+  const fetchPendingPins = useCallback(async () => {
+    const list = await getPendingPinCandidates(selectedBranch)
+    setPendingPins(list)
+  }, [selectedBranch])
+
+  useEffect(() => {
+    fetchPendingPins()
+  }, [fetchPendingPins])
+
+  const handleApprovePin = async (s: PendingPinSuggestion) => {
+    setPinActionKey(s.normalizedName)
+    try {
+      const res = await approvePinCandidateGroup(
+        s.candidateIds,
+        s.locationName,
+        s.latestLat,
+        s.latestLng,
+        s.branchId
+      )
+      if (!res.success) {
+        toast.error(res.error || "อนุมัติพิกัดไม่สำเร็จ")
+        return
+      }
+      toast.success(`อัปเดตพิกัด "${s.locationName}" แล้ว`)
+      await Promise.all([fetchData(), fetchPendingPins()])
+    } finally {
+      setPinActionKey(null)
+    }
+  }
+
+  const handleRejectPin = async (s: PendingPinSuggestion) => {
+    setPinActionKey(s.normalizedName)
+    try {
+      const res = await rejectPinCandidateGroup(s.candidateIds)
+      if (!res.success) {
+        toast.error(res.error || "ปฏิเสธพิกัดไม่สำเร็จ")
+        return
+      }
+      toast.success(`ปฏิเสธพิกัดแนะนำ "${s.locationName}" แล้ว`)
+      await fetchPendingPins()
+    } finally {
+      setPinActionKey(null)
+    }
+  }
 
   const handlePickerConfirm = (loc: PickedLocation) => {
     setFormData(prev => ({
@@ -375,6 +432,15 @@ export default function RoutesPage() {
         <div className="flex flex-wrap gap-3 relative z-10">
             {isAdminUser && (
               <>
+                {pendingPins.length > 0 && (
+                  <PremiumButton
+                    variant="outline"
+                    onClick={() => setPinDialogOpen(true)}
+                    className="h-11 px-5 rounded-xl border-amber-500/30 bg-amber-500/10 text-amber-400 hover:bg-amber-500 hover:text-white transition-all text-[10px] font-black uppercase tracking-widest"
+                  >
+                    📍 พิกัดแนะนำจากหน้างาน ({pendingPins.length})
+                  </PremiumButton>
+                )}
                 <ExcelExport
                     data={locations}
                     filename="droutemind_locations_export"
@@ -734,6 +800,90 @@ export default function RoutesPage() {
             <ShieldCheck size={14} className="text-primary" /> GIS Neural Grid Core v6.0 • Tactical Nodal Routing
         </div>
       </div>
+
+      <Dialog open={pinDialogOpen} onOpenChange={setPinDialogOpen}>
+        <DialogContent className="bg-background border border-border/10 text-foreground max-w-2xl rounded-3xl shadow-2xl p-0 overflow-hidden">
+          <div className="px-6 py-5 bg-card border-b border-border/10">
+            <DialogHeader>
+              <DialogTitle className="text-xl font-black tracking-tight flex items-center gap-2.5 text-foreground">
+                <MapPin className="w-5 h-5 text-amber-400" />
+                พิกัดแนะนำจากหน้างาน ({pendingPins.length})
+              </DialogTitle>
+            </DialogHeader>
+          </div>
+          <div className="p-6 max-h-[70vh] overflow-y-auto space-y-3">
+            {pendingPins.length === 0 ? (
+              <p className="text-sm text-muted-foreground text-center py-8">ไม่มีพิกัดรอตรวจสอบ</p>
+            ) : (
+              pendingPins.map((s) => {
+                const busy = pinActionKey === s.normalizedName
+                return (
+                  <div
+                    key={s.normalizedName}
+                    className="p-4 rounded-2xl border border-border/10 bg-muted/30 flex flex-col sm:flex-row sm:items-center justify-between gap-4"
+                  >
+                    <div className="space-y-1.5 min-w-0">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <span className="font-bold text-foreground text-sm">{s.locationName}</span>
+                        {s.branchId && (
+                          <span className="px-2 py-0.5 rounded-full bg-primary/10 border border-primary/20 text-[11px] font-bold text-primary">
+                            {s.branchId}
+                          </span>
+                        )}
+                        <span
+                          className={cn(
+                            "px-2 py-0.5 rounded-full border text-[11px] font-bold",
+                            s.existingLat != null
+                              ? "bg-amber-500/10 border-amber-500/30 text-amber-400"
+                              : "bg-emerald-500/10 border-emerald-500/30 text-emerald-400"
+                          )}
+                        >
+                          {s.existingLat != null
+                            ? `ห่างหมุดเดิม ${s.distanceFromExistingMeters ?? "?"} ม.`
+                            : "ยังไม่มีพิกัดเดิม"}
+                        </span>
+                      </div>
+                      <div className="text-xs text-muted-foreground">
+                        {s.distinctDrivers} คนขับ / {s.distinctDevices} เครื่อง ({s.sampleCount} ครั้ง)
+                      </div>
+                      <div className="text-[11px] font-mono text-muted-foreground">
+                        {s.latestLat.toFixed(6)}, {s.latestLng.toFixed(6)}
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2 shrink-0">
+                      <a
+                        href={`https://www.google.com/maps?q=${s.latestLat},${s.latestLng}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="h-9 px-3 rounded-xl border border-border/10 bg-background/60 hover:bg-background text-xs font-bold text-foreground inline-flex items-center gap-1"
+                      >
+                        <ExternalLink className="w-3.5 h-3.5" />
+                        ดูแผนที่
+                      </a>
+                      <button
+                        onClick={() => handleApprovePin(s)}
+                        disabled={busy}
+                        className="h-9 px-3 rounded-xl bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 text-white text-xs font-bold inline-flex items-center gap-1 cursor-pointer"
+                      >
+                        {busy ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Check className="w-3.5 h-3.5" />}
+                        อนุมัติ
+                      </button>
+                      <button
+                        onClick={() => handleRejectPin(s)}
+                        disabled={busy}
+                        className="h-9 px-3 rounded-xl bg-rose-500/10 hover:bg-rose-500/20 border border-rose-500/30 disabled:opacity-50 text-rose-400 text-xs font-bold inline-flex items-center gap-1 cursor-pointer"
+                      >
+                        <X className="w-3.5 h-3.5" />
+                        ปฏิเสธ
+                      </button>
+                    </div>
+                  </div>
+                )
+              })
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
     </DashboardLayout>
   )
 }
