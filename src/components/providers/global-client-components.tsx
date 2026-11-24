@@ -1,12 +1,15 @@
 "use client"
 
 import { useState, useEffect } from "react"
+import { usePathname } from "next/navigation"
 import { PWAInstallHint } from "@/components/mobile/pwa-install-hint"
 import { Toaster } from "sonner"
 import { AdminPushRequester } from "@/components/layout/admin-push-requester"
 import { AdminGlobalNotifier } from "@/components/notifications/admin-global-notifier"
 
 export function GlobalClientComponents() {
+  const pathname = usePathname()
+  const isMobileDriver = pathname?.startsWith("/mobile") ?? false
   const [adminUserId, setAdminUserId] = useState<string | null>(null)
   const [adminBranchId, setAdminBranchId] = useState<string | null>(null)
   const [isAdmin, setIsAdmin] = useState<boolean>(false)
@@ -43,7 +46,24 @@ export function GlobalClientComponents() {
   return (
     <>
       <PWAInstallHint />
-      <Toaster />
+      <Toaster
+        position={isMobileDriver ? "top-center" : "bottom-right"}
+        theme={isMobileDriver ? "dark" : "light"}
+        richColors
+        duration={isMobileDriver ? 2200 : 4000}
+        offset={isMobileDriver ? 16 : undefined}
+        toastOptions={
+          isMobileDriver
+            ? {
+                style: {
+                  borderRadius: "14px",
+                  padding: "10px 14px",
+                  fontSize: "13px",
+                },
+              }
+            : undefined
+        }
+      />
       <AdminPushRequester userId={adminUserId} />
       <AdminGlobalNotifier branchId={adminBranchId} isAdmin={isAdmin} />
     </>
