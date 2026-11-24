@@ -13,10 +13,10 @@ let sheetMapCache: SheetMapEntry[] = []
 let sheetMapCacheAt = 0
 const SHEET_MAP_TTL_MS = 60_000
 
-async function ensureSheetMap(): Promise<void> {
-  if (Date.now() - sheetMapCacheAt < SHEET_MAP_TTL_MS && sheetMapCache.length > 0) return
+async function ensureSheetMap(forceRefresh = false): Promise<void> {
+  if (!forceRefresh && Date.now() - sheetMapCacheAt < SHEET_MAP_TTL_MS && sheetMapCache.length > 0) return
   const rows = await getActiveSheetMappings()
-  if (rows.length > 0) {
+  if (rows.length > 0 || forceRefresh) {
     sheetMapCache = rows
     sheetMapCacheAt = Date.now()
   }
@@ -27,7 +27,10 @@ function matchSheetMap(job: { Customer_ID?: unknown; Customer_Name?: unknown }):
   const idStr = String(job.Customer_ID || '').toLowerCase()
   const nameStr = String(job.Customer_Name || '').toLowerCase()
   for (const m of sheetMapCache) {
-    const kws = m.keywords.split(',').map(k => k.trim().toLowerCase()).filter(Boolean)
+    let kws = m.keywords.split(',').map(k => k.trim().toLowerCase()).filter(Boolean)
+    if (kws.length === 0 && m.label.trim()) {
+      kws = [m.label.trim().toLowerCase()]
+    }
     if (kws.some(k => idStr.includes(k) || nameStr.includes(k))) return m
   }
   return null
@@ -536,6 +539,126 @@ function buildRowValues(job: any, fuel: number | '', destOverride?: string, drop
     return byName
 }
 
+function resolveJobTab(
+  job: { Customer_ID?: unknown; Customer_Name?: unknown },
+  existingTabs: string[]
+): { tab: string } | { error: string } {
+  const custName = String(job.Customer_Name ?? '').trim()
+  const custId = String(job.Customer_ID ?? '').trim()
+
+  if (custName || custId) {
+    // Step A — DB mapping
+    const mapped = matchSheetMap(job)
+    if (mapped?.sheetTab?.trim()) {
+      const wanted = mapped.sheetTab.trim().toLowerCase()
+      const exactTab = existingTabs.find(t => t.trim().toLowerCase() === wanted)
+      if (exactTab) return { tab: exactTab }
+      const looseTab = existingTabs.find(t => {
+        const tl = t.trim().toLowerCase()
+        return Boolean(tl) && (tl.includes(wanted) || wanted.includes(tl))
+      })
+      if (looseTab) return { tab: looseTab }
+      return {
+        error: `ลูกค้า "${mapped.label}" ตั้งค่าแท็บ "${mapped.sheetTab.trim()}" แต่ไม่พบแท็บนี้ใน Google Sheet`,
+      }
+    }
+
+    // Step B — Legacy fallbacks (only when matching tab actually exists in existingTabs)
+    const cleanStr = (s: string) => {
+      return s.toLowerCase()
+        .replace(/บริษัท|จำกัด\(มหาชน\)|จำกัด|ห้างหุ้นส่วนจำกัด|หจก\./g, '')
+        .replace(/[\s\(\)\-\.,_]/g, '')
+        .trim()
+    }
+
+    const normCustName = custName ? cleanStr(custName) : ''
+    const normCustId = custId ? cleanStr(custId) : ''
+
+    const matchedTab = existingTabs.find(tab => {
+      const normTab = cleanStr(tab)
+      if (!normTab) return false
+
+      if (normCustName === normTab || normCustId === normTab) return true
+      if (normCustName && normTab && (normCustName.includes(normTab) || normTab.includes(normCustName))) return true
+      if (normCustId && normTab && (normCustId.includes(normTab) || normTab.includes(normCustId))) return true
+
+      return false
+    })
+
+    if (matchedTab) return { tab: matchedTab }
+
+    // Siam Rungrueng tab — the default customer (id 20) plus these extra customer
+    // codes that share the "สยามรุ่งเรือง" ledger tab.
+    const SIAM_CUSTOMER_IDS = new Set([
+      '20',
+      '9910', // บริษัท เคเอสแอล.อะโกร แอนด์ เทรดดิ้ง จำกัด
+      '9909', // บริษัท สยามโคลทติ้ง ซัพพลายเออร์ จำกัด
+      '9914', // บริษัท ยูนิคอร์น คอนซูมเมอร์ กรุ๊ป จำกัด
+      '9908', // บริษัท มาร์เก็ต คอนเน็กชั่นส์ เอเชีย จำกัด
+    ])
+    const custCode = masterCustomerCode(job.Customer_ID)
+    if (normCustName.includes('สยามรุ่งเรือง') || normCustName.includes('siam')
+        || (custCode && SIAM_CUSTOMER_IDS.has(custCode))
+        || SIAM_CUSTOMER_IDS.has(normCustId)) {
+      const siamTab = existingTabs.find(t => t.includes('สยามรุ่งเรือง'))
+      if (siamTab) return { tab: siamTab }
+    }
+
+    // PCG customer (รหัสลูกค้า 125) -> dedicated "PCG" tab.
+    const PCG_CUSTOMER_IDS = new Set(['125'])
+    if (normCustName.includes('pcg')
+        || (custCode && PCG_CUSTOMER_IDS.has(custCode))
+        || PCG_CUSTOMER_IDS.has(normCustId)) {
+      // Exact "PCG" is the ledger tab; never the "DASH_PCG" dashboard tab.
+      const pcgTab = existingTabs.find(t => t.trim().toUpperCase() === 'PCG')
+      if (pcgTab) return { tab: pcgTab }
+    }
+
+    // Multi-customer tab (Unicord + 4 new customers) -> "ยูนิคอร์ด" tab
+    const unicordTab = existingTabs.find(t => t.includes('ยูนิคอร์ด'))
+    if (unicordTab) return { tab: unicordTab }
+  }
+
+  // Step C — Default TAB check
+  const defaultTab = existingTabs.find(t => t.trim().toLowerCase() === TAB.trim().toLowerCase())
+  if (defaultTab) return { tab: defaultTab }
+
+  // Step D — No valid tab found
+  const custLabel = custName && custId ? `${custName} (${custId})` : (custName || custId || 'ไม่ระบุ')
+  return { error: `ลูกค้า "${custLabel}" ยังไม่ได้ผูกแท็บในหน้าตั้งค่า` }
+}
+
+function groupJobsByResolvedTab(
+  jobs: MasterJob[],
+  existingTabs: string[]
+): { jobsByTab: Map<string, MasterJob[]> } | { error: string } {
+  const jobsByTab = new Map<string, MasterJob[]>()
+  const unmappedErrors = new Set<string>()
+
+  for (const job of jobs) {
+    if (isTestCustomer(job)) continue // TILOG demo jobs never hit a ledger tab
+    const resolved = resolveJobTab(job, existingTabs)
+    if ('error' in resolved) {
+      unmappedErrors.add(resolved.error)
+      continue
+    }
+    if (!jobsByTab.has(resolved.tab)) {
+      jobsByTab.set(resolved.tab, [])
+    }
+    jobsByTab.get(resolved.tab)!.push(job)
+  }
+
+  if (unmappedErrors.size > 0) {
+    const errors = Array.from(unmappedErrors)
+    const head = errors.slice(0, 5).join(', ')
+    const tail = errors.length > 5 ? ` และอีก ${errors.length - 5} รายการ` : ''
+    const summary = `${head}${tail} | แท็บที่มีในชีต: ${existingTabs.join(', ')}`
+    return { error: `ไม่สามารถ Backfill ได้: ${summary} — กรุณาตรวจสอบหน้า "การเชื่อมชีต MASTER"` }
+  }
+
+  return { jobsByTab }
+}
+
 /**
  * Helper to match a job's customer name or ID to an existing Google Sheet tab title.
  */
@@ -543,77 +666,8 @@ export function getJobTabName(
   job: { Customer_Name?: unknown; Customer_ID?: unknown },
   existingTabs: string[]
 ): string {
-  if (!job.Customer_Name && !job.Customer_ID) return TAB
-
-  const cleanStr = (s: string) => {
-    return s.toLowerCase()
-      .replace(/บริษัท|จำกัด\(มหาชน\)|จำกัด|ห้างหุ้นส่วนจำกัด|หจก\./g, '')
-      .replace(/[\s\(\)\-\.,_]/g, '')
-      .trim()
-  }
-
-  // DB mapping wins: if this customer maps to a Sheet_Tab, route there (matching
-  // the real tab by loose includes so "ยูนิคอร์ด" matches "ยูนิคอร์ด (รวม)").
-  const mapped = matchSheetMap(job)
-  if (mapped?.sheetTab) {
-    const wanted = mapped.sheetTab.toLowerCase()
-    const dbTab = existingTabs.find(t => t.toLowerCase().includes(wanted) || wanted.includes(t.toLowerCase()))
-    if (dbTab) return dbTab
-  }
-
-  const normCustName = job.Customer_Name ? cleanStr(String(job.Customer_Name)) : ''
-  const normCustId = job.Customer_ID ? cleanStr(String(job.Customer_ID)) : ''
-
-  const matchedTab = existingTabs.find(tab => {
-    const normTab = cleanStr(tab)
-    if (!normTab) return false
-    
-    if (normCustName === normTab || normCustId === normTab) return true
-    if (normCustName && normTab && (normCustName.includes(normTab) || normTab.includes(normCustName))) return true
-    if (normCustId && normTab && (normCustId.includes(normTab) || normTab.includes(normCustId))) return true
-    
-    return false
-  })
-
-  if (matchedTab) return matchedTab
-
-  // If no exact dedicated tab exists for this customer:
-  // Siam Rungrueng tab — the default customer (id 20) plus these extra customer
-  // codes that share the "สยามรุ่งเรือง" ledger tab. Add new codes here to route
-  // more customers into it.
-  const SIAM_CUSTOMER_IDS = new Set([
-    '20',
-    '9910', // บริษัท เคเอสแอล.อะโกร แอนด์ เทรดดิ้ง จำกัด
-    '9909', // บริษัท สยามโคลทติ้ง ซัพพลายเออร์ จำกัด
-    '9914', // บริษัท ยูนิคอร์น คอนซูมเมอร์ กรุ๊ป จำกัด
-    '9908', // บริษัท มาร์เก็ต คอนเน็กชั่นส์ เอเชีย จำกัด
-  ])
-  // Match by the plain numeric code stripped from "CUST-9910" (system prepends
-  // the prefix to the number entered), falling back to the raw/cleaned id.
-  const custCode = masterCustomerCode(job.Customer_ID)
-  if (normCustName.includes('สยามรุ่งเรือง') || normCustName.includes('siam')
-      || (custCode && SIAM_CUSTOMER_IDS.has(custCode))
-      || SIAM_CUSTOMER_IDS.has(normCustId)) {
-    const siamTab = existingTabs.find(t => t.includes('สยามรุ่งเรือง'))
-    if (siamTab) return siamTab
-  }
-
-  // PCG customer (รหัสลูกค้า 125) -> dedicated "PCG" tab. Must come before the
-  // Unicord fallback below, which otherwise swallows every unmatched customer.
-  const PCG_CUSTOMER_IDS = new Set(['125'])
-  if (normCustName.includes('pcg')
-      || (custCode && PCG_CUSTOMER_IDS.has(custCode))
-      || PCG_CUSTOMER_IDS.has(normCustId)) {
-    // Exact "PCG" is the ledger tab; never the "DASH_PCG" dashboard tab.
-    const pcgTab = existingTabs.find(t => t.trim().toUpperCase() === 'PCG')
-    if (pcgTab) return pcgTab
-  }
-
-  // Multi-customer tab (Unicord + 4 new customers) -> "ยูนิคอร์ด" tab
-  const unicordTab = existingTabs.find(t => t.includes('ยูนิคอร์ด'))
-  if (unicordTab) return unicordTab
-
-  return TAB
+  const res = resolveJobTab(job, existingTabs)
+  return 'tab' in res ? res.tab : TAB
 }
 
 /**
@@ -728,7 +782,7 @@ async function applyMasterRowFormat(sheets: SheetsClient, updatedRange: string |
 
 export async function appendJobToMaster(jobId: string): Promise<{ success: boolean; error?: string; skipped?: boolean }> {
   try {
-    await ensureSheetMap()
+    await ensureSheetMap(true)
     const supabase = createAdminClient()
     const { data: job, error } = await supabase.from('Jobs_Main').select('*').eq('Job_ID', jobId).single()
     if (error || !job) return { success: false, error: 'Job not found' }
@@ -742,16 +796,13 @@ export async function appendJobToMaster(jobId: string): Promise<{ success: boole
     const rowObjects = buildRowsForJob(job, fuel)
     const sheets = getSheetsClient()
 
-    let tabOverride = TAB
-    if (job.Customer_Name || job.Customer_ID) {
-      try {
-        const meta = await sheets.spreadsheets.get({ spreadsheetId: SHEET_ID, fields: 'sheets.properties(title)' })
-        const existingTabs = meta.data.sheets?.map(s => s.properties?.title || '') || []
-        tabOverride = getJobTabName(job, existingTabs)
-      } catch (e) {
-        console.warn('[MASTER_SHEET] failed to fetch sheet metadata, using default tab:', e)
-      }
+    const meta = await sheets.spreadsheets.get({ spreadsheetId: SHEET_ID, fields: 'sheets.properties(title)' })
+    const existingTabs = meta.data.sheets?.map(s => s.properties?.title || '').filter(Boolean) || []
+    const resolved = resolveJobTab(job, existingTabs)
+    if ('error' in resolved) {
+      return { success: false, error: `${resolved.error} (แท็บที่มีในชีต: ${existingTabs.join(', ')})` }
     }
+    const tabOverride = resolved.tab
 
     const { qtab, order, headerRow } = await resolveOrder(sheets, tabOverride)
     const ledger = await readLedgerState(sheets, qtab, order, headerRow)
@@ -805,7 +856,7 @@ export async function verifyAndBackfillHistorical(
       return { success: false, error: 'Start date must not be after end date' }
     }
 
-    await ensureSheetMap()
+    await ensureSheetMap(true)
     const supabase = createAdminClient()
 
     // Supabase caps a single request at ~1000 rows (server max-rows), so page
@@ -857,17 +908,13 @@ export async function verifyAndBackfillHistorical(
     
     // Fetch all existing tabs from Google Sheets to group properly
     const meta = await sheets.spreadsheets.get({ spreadsheetId: SHEET_ID, fields: 'sheets.properties(title)' })
-    const existingTabs = meta.data.sheets?.map(s => s.properties?.title || '') || []
+    const existingTabs = meta.data.sheets?.map(s => s.properties?.title || '').filter(Boolean) || []
 
-    const jobsByTab = new Map<string, MasterJob[]>()
-    for (const job of jobs) {
-      if (isTestCustomer(job)) continue // TILOG demo jobs never hit a ledger tab
-      const tabName = getJobTabName(job, existingTabs)
-      if (!jobsByTab.has(tabName)) {
-        jobsByTab.set(tabName, [])
-      }
-      jobsByTab.get(tabName)!.push(job)
+    const grouped = groupJobsByResolvedTab(jobs, existingTabs)
+    if ('error' in grouped) {
+      return { success: false, error: grouped.error }
     }
+    const { jobsByTab } = grouped
 
     const fuelCache = new Map<string, number | ''>()
     let totalAppended = 0
@@ -959,7 +1006,7 @@ export async function backfillMasterSheet(
       return { success: false, error: 'Start date must not be after end date' }
     }
 
-    await ensureSheetMap()
+    await ensureSheetMap(true)
     const supabase = createAdminClient()
     const PAGE = 1000
     const jobs: MasterJob[] = []
@@ -988,17 +1035,13 @@ export async function backfillMasterSheet(
     
     // Fetch all existing tabs from Google Sheets to group properly
     const meta = await sheets.spreadsheets.get({ spreadsheetId: SHEET_ID, fields: 'sheets.properties(title)' })
-    const existingTabs = meta.data.sheets?.map(s => s.properties?.title || '') || []
+    const existingTabs = meta.data.sheets?.map(s => s.properties?.title || '').filter(Boolean) || []
 
-    const jobsByTab = new Map<string, MasterJob[]>()
-    for (const job of jobs) {
-      if (isTestCustomer(job)) continue // TILOG demo jobs never hit a ledger tab
-      const tabName = getJobTabName(job, existingTabs)
-      if (!jobsByTab.has(tabName)) {
-        jobsByTab.set(tabName, [])
-      }
-      jobsByTab.get(tabName)!.push(job)
+    const grouped = groupJobsByResolvedTab(jobs, existingTabs)
+    if ('error' in grouped) {
+      return { success: false, error: grouped.error }
     }
+    const { jobsByTab } = grouped
 
     const fuelCache = new Map<string, number | ''>()
     let totalAppended = 0
