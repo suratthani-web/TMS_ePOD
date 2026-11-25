@@ -167,6 +167,7 @@ export async function confirmPayslips(
       }
 
       records.push({
+        id: randomUUID(),
         Driver_ID: m.driverId,
         driver_name: nameById.get(m.driverId) || m.sheetName,
         sheet_name: m.sheetName,
@@ -343,6 +344,7 @@ export async function confirmPayslipsClient(input: {
       const subId = it.subId || (isSub ? rawId : null)
 
       return {
+        id: randomUUID(),
         Driver_ID: isSub ? (subId || rawId) : rawId,
         Sub_ID: subId,
         driver_name: it.driverName || it.sheetName,
@@ -475,7 +477,7 @@ export async function pushDriverPaymentToApp(
 
     const { error } = existing?.id
       ? await supabase.from(TABLE).update(record).eq("id", existing.id)
-      : await supabase.from(TABLE).insert(record)
+      : await supabase.from(TABLE).insert({ id: randomUUID(), ...record })
     if (error) return { ok: false, error: "บันทึกไม่สำเร็จ: " + error.message }
 
     return { ok: true, driverName: payment.Driver_Name }
