@@ -22,6 +22,18 @@ import { revalidatePath } from "next/cache"
 const BUCKET = "company-assets"
 const TABLE = "Driver_Payslips"
 
+function parseJsonField<T>(val: unknown): T | null {
+  if (!val) return null
+  if (typeof val === "string") {
+    try {
+      return JSON.parse(val) as T
+    } catch {
+      return null
+    }
+  }
+  return val as T
+}
+
 async function requireAdmin() {
   const session = await getSession()
   if (!session || !session.userId || (session.roleId !== 1 && session.roleId !== 2)) {
@@ -569,8 +581,8 @@ export async function getMyPayslip(
   return {
     ok: true,
     kind: (data.kind as string) || "excel",
-    grid: (data.grid_json as PayslipGrid) || null,
-    voucher: (data.voucher_json as VoucherData) || null,
+    grid: parseJsonField<PayslipGrid>(data.grid_json),
+    voucher: parseJsonField<VoucherData>(data.voucher_json),
     hasXlsx: !!data.xlsx_url,
     meta: {
       id: data.id,
@@ -607,8 +619,8 @@ export async function getPayslipByPublicToken(token: string): Promise<{
   return {
     ok: true,
     kind: (data.kind as string) || "excel",
-    grid: (data.grid_json as PayslipGrid) || null,
-    voucher: (data.voucher_json as VoucherData) || null,
+    grid: parseJsonField<PayslipGrid>(data.grid_json),
+    voucher: parseJsonField<VoucherData>(data.voucher_json),
     meta: {
       title: data.title,
       period_label: data.period_label,
