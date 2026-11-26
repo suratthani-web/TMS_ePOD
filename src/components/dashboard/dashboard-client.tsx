@@ -8,14 +8,9 @@ import {
   Truck,
   Leaf,
   LayoutGrid,
-  CheckCircle2,
-  AlertTriangle,
   Calendar,
   X,
-  FileSpreadsheet,
-  Users,
-  Star,
-  Check
+  FileSpreadsheet
 } from "lucide-react"
 import { WeeklyShipmentChart } from "@/components/dashboard/charts/weekly-shipment-chart"
 import { DriverTimelineScheduler } from "@/components/dashboard/driver-timeline-scheduler"
@@ -110,7 +105,6 @@ export function DashboardClient({
     weeklyStats, 
     marketplaceJobs,
     activeJobs = [],
-    fleetHealth,
     esg,
     initialStart = "",
     initialEnd = "",
@@ -158,140 +152,102 @@ export function DashboardClient({
     const esgData = esg || { fuelSaved: 285, co2Saved: 1420, treesSaved: 68.2 }
 
     return (
-        <div className="space-y-12 font-sans">
+        <div className="space-y-5 font-sans">
             <RequestShipmentDialog open={isRequestDialogOpen} onOpenChange={setIsRequestDialogOpen} />
-            
-            {/* Date Range Selector - SERVER SYNCED */}
-            <div className="mb-6 flex flex-col md:flex-row items-center justify-between gap-4 bg-background p-3 rounded-2xl border border-border shadow-sm group">
-                
-                <div className="flex items-center gap-3 relative z-10">
-                    <div className="p-2.5 bg-primary/10 rounded-xl border border-primary/20 text-primary">
-                        <Calendar size={18} />
+
+            {/* Row 1: Unified Compact Command Bar (Header + Date Range + Export) */}
+            <div className="bg-card rounded-2xl border border-border shadow-sm px-5 py-3.5 flex flex-col xl:flex-row xl:items-center justify-between gap-4">
+                {/* Left: Icon + Page Title + Branch Pill */}
+                <div className="flex items-center gap-3 min-w-0">
+                    <div className="p-2 bg-primary/10 rounded-xl border border-primary/20 text-primary shrink-0">
+                        <LayoutGrid size={18} />
                     </div>
-                    <div>
-                        <h3 className="text-base font-black text-foreground tracking-widest uppercase leading-none">
-                            {language === 'th' ? "ช่วงเวลาข้อมูล" : "Date Range"}
-                        </h3>
-                        <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-[0.2em] leading-none mt-1">
-                            {language === 'th' ? "วิเคราะห์ข้อมูลประวัติการขนส่ง" : "Analyze historical transit data"}
-                        </p>
+                    <div className="flex flex-wrap items-center gap-2.5 min-w-0">
+                        <h1 className="text-xl sm:text-2xl font-black text-foreground tracking-tight truncate">
+                            {customerMode ? `${t('navigation.dashboard')}: ${userName || 'User'}` : t('dashboard.title')}
+                        </h1>
+                        {!customerMode && (
+                            <span className="px-2.5 py-0.5 rounded-full bg-primary/10 border border-primary/20 text-[10px] font-bold uppercase tracking-wider text-primary whitespace-nowrap">
+                                {branchId || "Global"}
+                            </span>
+                        )}
                     </div>
                 </div>
 
-                <div className="flex items-center gap-3 relative z-10 w-full md:w-auto">
-                    <div className="flex items-center gap-2 w-full sm:w-48 bg-muted/30 border border-border rounded-xl px-3 h-10 hover:border-primary/30 transition-all group/input">
+                {/* Right: Inline Start/End Dates, Reset, Sync & Excel Export */}
+                <div className="flex flex-wrap items-center gap-2.5">
+                    <div className="flex items-center gap-1.5 bg-muted/30 border border-border rounded-xl px-2.5 h-9 hover:border-primary/30 transition-all">
+                        <Calendar size={13} className="text-muted-foreground shrink-0" />
                         <span className="text-[9px] font-black text-muted-foreground uppercase tracking-widest whitespace-nowrap">START:</span>
-                        <input 
+                        <input
                             type="date"
                             value={startDate}
                             onChange={(e) => setStartDate(e.target.value)}
-                            className="bg-transparent border-none focus:ring-0 text-xs font-bold text-foreground w-full cursor-pointer"
+                            className="bg-transparent border-none focus:ring-0 text-xs font-bold text-foreground w-32 cursor-pointer p-0"
                         />
                     </div>
-                    <div className="flex items-center gap-2 w-full sm:w-48 bg-muted/30 border border-border rounded-xl px-3 h-10 hover:border-primary/30 transition-all group/input">
+                    <div className="flex items-center gap-1.5 bg-muted/30 border border-border rounded-xl px-2.5 h-9 hover:border-primary/30 transition-all">
+                        <Calendar size={13} className="text-muted-foreground shrink-0" />
                         <span className="text-[9px] font-black text-muted-foreground uppercase tracking-widest whitespace-nowrap">END:</span>
-                        <input 
+                        <input
                             type="date"
                             value={endDate}
                             onChange={(e) => setEndDate(e.target.value)}
-                            className="bg-transparent border-none focus:ring-0 text-xs font-bold text-foreground w-full cursor-pointer"
+                            className="bg-transparent border-none focus:ring-0 text-xs font-bold text-foreground w-32 cursor-pointer p-0"
                         />
                     </div>
-                    
+
                     {(startDate || endDate) && (
-                        <button 
+                        <button
                             onClick={handleReset}
-                            className="p-2 bg-rose-500/10 text-rose-500 border border-rose-500/20 rounded-xl hover:bg-rose-500 hover:text-white transition-all group/reset"
+                            className="h-9 px-2.5 bg-rose-500/10 text-rose-500 border border-rose-500/20 rounded-xl hover:bg-rose-500 hover:text-white transition-all flex items-center gap-1 text-[10px] font-black uppercase tracking-wider group/reset"
                             title="Reset Range"
                         >
-                            <X size={16} className="group-hover/reset:rotate-90 transition-transform" />
+                            <X size={14} className="group-hover/reset:rotate-90 transition-transform" />
+                            <span>Reset</span>
                         </button>
                     )}
-                    
-                    <button 
+
+                    <button
                         onClick={handleSync}
                         disabled={isSyncing}
                         className={cn(
-                            "px-5 h-10 bg-primary text-primary-foreground font-black uppercase tracking-widest text-[10px] rounded-xl hover:bg-primary/80 transition-all flex items-center gap-2 shadow-sm",
+                            "px-4 h-9 bg-primary text-primary-foreground font-black uppercase tracking-widest text-[10px] rounded-xl hover:bg-primary/80 transition-all flex items-center gap-1.5 shadow-sm whitespace-nowrap",
                             isSyncing && "opacity-50 cursor-not-allowed"
                         )}
                     >
                         <Activity size={12} strokeWidth={3} />
                         {isSyncing ? (language === 'th' ? "กำลังดึงข้อมูล..." : "SYNCING...") : (language === 'th' ? "ดึงข้อมูล" : "SYNC DATA")}
                     </button>
-                </div>
 
-                <ExcelExport 
-                    data={weeklyStats.length ? weeklyStats : [{ message: "No data in selected range" }]}
-                    filename="droutemind_dashboard_summary"
-                    trigger={
-                        <button className="px-5 h-10 bg-emerald-500/10 text-emerald-500 font-black uppercase tracking-widest text-[10px] rounded-xl hover:bg-emerald-500 hover:text-white transition-all flex items-center gap-2 border border-emerald-500/20 shadow-sm">
-                            <FileSpreadsheet size={14} />
-                            EXPORT
-                        </button>
-                    }
-                />
-            </div>
-
-            {/* Command Header */}
-            <div className="flex flex-col lg:flex-row lg:items-end justify-between gap-6">
-                <div className="space-y-3">
-                    <div className="flex items-center gap-2">
-                        <div className="p-1.5 bg-primary/10 rounded-lg">
-                            <LayoutGrid className="text-primary" size={18} />
-                        </div>
-                        <h2 className="text-sm font-bold text-primary uppercase tracking-[0.3em]">{language === 'th' ? "ภาพรวมเครือข่ายการขนส่ง" : "Transport Network Overview"}</h2>
-                    </div>
-                    <h1 className="text-4xl lg:text-5xl font-black text-foreground tracking-tighter uppercase italic leading-none">
-                        {customerMode ? `${t('navigation.dashboard')}: ${userName || 'User'}` : t('dashboard.title')}
-                    </h1>
-                    <div className="flex items-center gap-3">
-                        <div className="px-3 py-1 rounded-full bg-primary/5 border border-primary/10 text-[10px] font-bold uppercase tracking-[0.2em] flex items-center gap-2 text-primary transition-all duration-500">
-                            <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                            {t('dashboard.system_integrity')}
-                        </div>
-                        {!customerMode && (
-                            <p className="text-muted-foreground text-sm font-bold uppercase tracking-widest opacity-60">
-                                {t('dashboard.node_execution')} {branchId || "Global"}
-                            </p>
-                        )}
-                    </div>
-                </div>
-                
-                <div className="flex items-center gap-3">
-                    {/* ปุ่มแจ้งงานใหม่ฝั่งลูกค้า: ปิดตามข้อตกลง — ไม่ให้ลูกค้าสร้างงานเอง
-                        (แอดมินเป็นผู้สร้างงานให้). คงโค้ด dialog ไว้เผื่อเปิดใช้ภายหลัง. */}
-                    {false && customerMode && (
-                        <button
-                            onClick={() => setIsRequestDialogOpen(true)}
-                            className="h-12 px-8 bg-primary hover:bg-primary/90 text-primary-foreground font-black text-sm uppercase tracking-[0.2em] transition-all shadow-sm active:scale-95 border border-primary/30 rounded-xl"
-                        >
-                            {language === 'th' ? "+ แจ้งงานใหม่" : "+ New Request"}
-                        </button>
-                    )}
-                    <div className="h-12 px-6 glass-panel rounded-2xl flex items-center gap-4 border-border/5 shadow-sm">
-                        <div className="text-right">
-                            <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest mb-0.5">{t('dashboard.fleet_utilization')}</p>
-                            <p className="text-primary font-black text-xl leading-none">{fleetHealth || 98}%</p>
-                        </div>
-                        <Activity className="text-primary" size={20} />
-                    </div>
+                    <ExcelExport
+                        data={weeklyStats.length ? weeklyStats : [{ message: "No data in selected range" }]}
+                        filename="droutemind_dashboard_summary"
+                        trigger={
+                            <button className="px-4 h-9 bg-emerald-500/10 text-emerald-500 font-black uppercase tracking-widest text-[10px] rounded-xl hover:bg-emerald-500 hover:text-white transition-all flex items-center gap-1.5 border border-emerald-500/20 shadow-sm whitespace-nowrap">
+                                <FileSpreadsheet size={14} />
+                                {language === 'th' ? "Export Excel" : "EXPORT"}
+                            </button>
+                        }
+                    />
                 </div>
             </div>
 
-            {/* 1. Summary Cards */}
-            <div className="w-full relative">
+            {/* Row 2: KPI Summary Strip (DailySummary) */}
+            <div className="w-full space-y-2.5">
                 {jobStats.total === 0 && (
-                    <div className="absolute -top-10 left-1/2 -translate-x-1/2 z-20 px-4 py-1.5 bg-rose-500/10 border border-rose-500/20 rounded-full animate-pulse">
-                        <p className="text-[10px] font-black text-rose-500 uppercase tracking-widest italic">
-                            {startDate || endDate 
-                                ? (language === 'th' ? "ไม่พบงานในเวลาที่เลือก" : "No missions found for selected range")
-                                : (language === 'th' ? "ไม่มีงานที่กำหนดในวันนี้" : "No missions scheduled for today")}
-                        </p>
+                    <div className="flex justify-center">
+                        <div className="px-4 py-1 bg-rose-500/10 border border-rose-500/20 rounded-full">
+                            <p className="text-[10px] font-black text-rose-500 uppercase tracking-widest italic">
+                                {startDate || endDate
+                                    ? (language === 'th' ? "ไม่พบงานในเวลาที่เลือก" : "No missions found for selected range")
+                                    : (language === 'th' ? "ไม่มีงานที่กำหนดในวันนี้" : "No missions scheduled for today")}
+                            </p>
+                        </div>
                     </div>
                 )}
-                <DailySummary 
-                    stats={jobStats} 
+                <DailySummary
+                    stats={jobStats}
                     driverStats={driverStats}
                     biddingCount={marketplaceJobs.length}
                     sosCount={sosCount}
@@ -300,20 +256,17 @@ export function DashboardClient({
                 />
             </div>
 
-            {/* Ongoing missions (customer) — active jobs that carry across days.
-                These won't appear in "งานวันนี้" when their Plan_Date isn't today,
-                so surface them here so the customer always sees what's on the road. */}
+            {/* Ongoing missions (customer) — active jobs that carry across days */}
             {customerMode && !hideLiveTracking && activeJobs && activeJobs.length > 0 && (
                 <button
                     onClick={() => router.push('/dashboard/tracking')}
-                    className="w-full text-left group relative overflow-hidden rounded-3xl border border-primary/20 bg-primary/5 hover:bg-primary/10 transition-all shadow-sm p-6 flex items-center gap-5"
+                    className="w-full text-left group relative overflow-hidden rounded-2xl border border-primary/20 bg-primary/5 hover:bg-primary/10 transition-all shadow-sm p-4 flex items-center gap-4"
                 >
-                    <div className="absolute top-0 right-0 w-48 h-48 bg-primary/10 blur-[80px] pointer-events-none" />
-                    <div className="relative z-10 shrink-0 w-16 h-16 rounded-2xl bg-primary/15 text-primary flex items-center justify-center shadow-lg">
-                        <Truck size={28} strokeWidth={2.5} />
+                    <div className="relative z-10 shrink-0 w-12 h-12 rounded-xl bg-primary/15 text-primary flex items-center justify-center shadow-sm">
+                        <Truck size={22} strokeWidth={2.5} />
                     </div>
                     <div className="relative z-10 flex-1 min-w-0">
-                        <p className="text-[10px] font-black text-primary uppercase tracking-[0.3em] mb-1 flex items-center gap-2">
+                        <p className="text-[10px] font-black text-primary uppercase tracking-[0.25em] mb-0.5 flex items-center gap-2">
                             <span className="w-1.5 h-1.5 rounded-full bg-primary animate-pulse" />
                             {language === 'th' ? "งานที่กำลังวิ่งอยู่" : "Missions On The Road"}
                         </p>
@@ -324,129 +277,102 @@ export function DashboardClient({
                         </p>
                     </div>
                     <div className="relative z-10 shrink-0 text-right">
-                        <p className="text-4xl font-black text-primary tracking-tighter leading-none">{activeJobs.length}</p>
-                        <p className="text-[9px] font-black text-muted-foreground uppercase tracking-widest mt-1">
+                        <p className="text-3xl font-black text-primary tracking-tighter leading-none">{activeJobs.length}</p>
+                        <p className="text-[9px] font-black text-muted-foreground uppercase tracking-widest mt-0.5">
                             {language === 'th' ? "กำลังวิ่ง" : "Active"}
                         </p>
                     </div>
                 </button>
             )}
 
-            {/* Customer Summary Cards (7 Active Customers Overview) */}
-            {!customerMode && allCustomers && allCustomers.length > 0 && (
-                <CustomerSummaryWidget customers={allCustomers} isAdminUser={isAdminUser} />
-            )}
-
-            {/* Operations Grid */}
-            <motion.div 
+            <motion.div
                 variants={container}
                 initial="hidden"
                 animate="show"
-                className="grid grid-cols-1 lg:grid-cols-12 gap-6"
+                className="space-y-5"
             >
-                {/* 1. Driver Dispatch Timeline Scheduler — hidden for customers with tracking turned off */}
+                {/* Row 3: Hero Workspace — DriverTimelineScheduler Full Width (12 Columns) */}
                 {!hideLiveTracking && (
-                <motion.div variants={item} className="lg:col-span-8 min-h-[500px]">
-                    <DriverTimelineScheduler
-                        branchId={branchId || undefined}
-                        customerId={customerId || undefined}
-                        customerMode={customerMode}
-                        initialJobs={activeJobs as Job[] | undefined}
-                    />
-                </motion.div>
+                    <motion.div variants={item} className="w-full min-h-[500px]">
+                        <DriverTimelineScheduler
+                            branchId={branchId || undefined}
+                            customerId={customerId || undefined}
+                            customerMode={customerMode}
+                            initialJobs={activeJobs as Job[] | undefined}
+                        />
+                    </motion.div>
                 )}
 
-                {/* 2. Operational KPIs (Right) — spans full width when the map is hidden */}
-                <div className={cn("space-y-6 flex flex-col", hideLiveTracking ? "lg:col-span-12" : "lg:col-span-4")}>
-                    {/* Performance Analytics Column */}
-                    <motion.div variants={item} className="flex-1 bg-card rounded-3xl p-8 flex flex-col justify-center items-center text-center border border-border shadow-sm hover:border-primary/30 transition-all">
-                        <div className="w-20 h-20 rounded-2xl bg-emerald-500/10 flex items-center justify-center mb-6 border border-emerald-500/20 group-hover:scale-105 transition-all duration-500">
-                            <CheckCircle2 className="text-emerald-500 w-10 h-10" strokeWidth={2.5} />
-                        </div>
-                        <h3 className="text-muted-foreground font-bold text-sm uppercase tracking-[0.3em] mb-3">{t('dashboard.ops_integrity')}</h3>
-                        <p className="text-7xl font-black text-emerald-500 tracking-tighter leading-none mb-4 uppercase italic">A<span className="text-primary">+</span></p>
-                        <div className="w-full h-1.5 bg-muted rounded-full overflow-hidden mb-4">
-                            <motion.div 
-                                initial={{ width: 0 }}
-                                animate={{ width: '96%' }}
-                                transition={{ duration: 2, ease: "easeOut" }}
-                                className="h-full bg-emerald-500" 
-                            />
-                        </div>
-                        <p className="text-emerald-600/80 text-sm font-black uppercase tracking-[0.15em]">{t('dashboard.efficiency_index')} 96.4%</p>
-                    </motion.div>
- 
-                    {/* Quick Stats Grid */}
-                    <div className="grid grid-cols-2 gap-6">
-                        <motion.div variants={item} className="bg-card rounded-2xl p-6 border border-border flex flex-col justify-between h-36 hover:border-rose-500/20 transition-all shadow-sm">
-                            <p className="text-xs font-bold text-muted-foreground uppercase tracking-widest">{t('monitoring.alerts')}</p>
-                            <div className="flex items-end justify-between">
-                                <p className={cn("text-4xl font-black tracking-tighter", sosCount > 0 ? "text-rose-500" : "text-foreground")}>{sosCount}</p>
-                                <AlertTriangle size={20} className={sosCount > 0 ? "text-rose-500 animate-bounce" : "text-muted-foreground opacity-45"} />
-                            </div>
-                        </motion.div>
-                        <motion.div variants={item} className="bg-card rounded-2xl p-6 border border-border flex flex-col justify-between h-36 hover:border-primary/20 transition-all shadow-sm">
-                            <p className="text-xs font-bold text-muted-foreground uppercase tracking-widest">{t('navigation.planning')}</p>
-                            <div className="flex items-end justify-between">
-                                <p className="text-4xl font-black text-foreground tracking-tighter">{jobStats?.inProgress || 0}</p>
-                                <CheckCircle2 size={20} className="text-primary" />
-                            </div>
-                        </motion.div>
-                    </div>
-                </div>
- 
-                {/* 3. ESG & Brand Vision - Full Width Banner */}
-                <motion.div variants={item} className="lg:col-span-12 bg-card rounded-3xl p-10 border border-border group shadow-sm relative overflow-hidden">
-                    <div className="absolute top-6 right-10 text-emerald-500/5 pointer-events-none group-hover:scale-105 transition-transform duration-700">
-                        <Leaf size={240} />
-                    </div>
-                    <div className="flex flex-col lg:flex-row items-center justify-between gap-10 relative z-10">
-                        <div className="space-y-6">
-                            <div className="inline-flex items-center gap-2 px-4 py-1.5 bg-primary/10 rounded-full text-sm font-bold uppercase tracking-[0.2em] text-primary border border-primary/20">
-                                <Leaf size={14} /> {t('dashboard.esg_intelligence')}
-                            </div>
-                             <h2 className="text-4xl font-black text-foreground tracking-tighter leading-tight uppercase">
-                                {t('dashboard.cleaner_future')}<br/>
-                                <span className="opacity-40">{t('dashboard.carbon_offset')}</span> <span className="text-emerald-500">{esgData.co2Saved.toLocaleString()} KG CO2</span>
-                            </h2>
-                            <p className="text-muted-foreground font-bold text-base max-w-2xl leading-relaxed">
-                                {t('dashboard.esg_description')}
-                            </p>
-                        </div>
-                        <div className="flex gap-12">
-                            <div className="text-center group/stat">
-                                <p className="text-5xl font-black text-emerald-500 tracking-tighter mb-1 group-hover/stat:text-primary transition-colors">{(esgData.treesSaved || 0).toFixed(1)}</p>
-                                <p className="text-sm font-bold text-muted-foreground uppercase tracking-[0.2em]">{t('dashboard.trees_saved')}</p>
-                            </div>
-                            <div className="w-px h-20 bg-muted" />
-                            <div className="text-center group/stat">
-                                <p className="text-5xl font-black text-emerald-500 tracking-tighter mb-1 group-hover/stat:text-primary transition-colors">{esgData.fuelSaved.toLocaleString()}<span className="text-xl text-muted-foreground ml-1">L</span></p>
-                                <p className="text-sm font-bold text-muted-foreground uppercase tracking-[0.2em]">{t('dashboard.fuel_reclaimed')}</p>
-                            </div>
-                        </div>
-                    </div>
-                </motion.div>
- 
-                {/* 4. ANALYTICS & MARKETPLACE */}
-                <motion.div variants={item} className="lg:col-span-12 space-y-6">
+                {/* Row 4: Secondary Actionable Grid (6 + 6 Split) */}
+                <motion.div variants={item} className="grid grid-cols-1 lg:grid-cols-12 gap-5">
                     {!customerMode && (
-                        <div className="bg-card rounded-3xl overflow-hidden p-1 border border-border shadow-sm">
+                        <div className="lg:col-span-6 bg-card rounded-3xl border border-border shadow-sm overflow-hidden p-1">
                             <OrderBidding orders={marketplaceJobs} />
                         </div>
                     )}
- 
-                    <div className="bg-card rounded-3xl border border-border shadow-sm overflow-hidden p-8 group hover:border-primary/25 transition-all">
-                        <div className="flex items-center justify-between mb-8">
-                            <h3 className="text-xl font-black text-foreground tracking-tight flex items-center gap-3">
-                                <div className="p-2.5 bg-primary/10 rounded-xl text-primary border border-primary/20">
-                                    <TrendingUp size={20} />
+
+                    <div className={cn(
+                        "bg-card rounded-3xl border border-border shadow-sm overflow-hidden p-5 sm:p-6 group hover:border-primary/25 transition-all",
+                        customerMode ? "lg:col-span-12" : "lg:col-span-6"
+                    )}>
+                        <div className="flex items-center justify-between gap-3 mb-4">
+                            <h3 className="text-base sm:text-lg font-black text-foreground tracking-tight flex items-center gap-2.5">
+                                <div className="p-2 bg-primary/10 rounded-xl text-primary border border-primary/20">
+                                    <TrendingUp size={18} />
                                 </div>
                                 {t('dashboard.growth_analytics')}
                             </h3>
-                            <span className="text-sm font-bold text-muted-foreground uppercase tracking-[0.2em]">{t('dashboard.performance_spectrum')}</span>
+                            <span className="text-xs font-bold text-muted-foreground uppercase tracking-widest">
+                                {t('dashboard.performance_spectrum')}
+                            </span>
                         </div>
-                        <div className="text-foreground h-[350px]">
+                        <div className="text-foreground h-[260px]">
                             <WeeklyShipmentChart data={weeklyStats} />
+                        </div>
+                    </div>
+                </motion.div>
+
+                {/* Row 5: Tertiary / Bottom Summary */}
+                {!customerMode && allCustomers && allCustomers.length > 0 && (
+                    <motion.div variants={item}>
+                        <CustomerSummaryWidget customers={allCustomers} isAdminUser={isAdminUser} />
+                    </motion.div>
+                )}
+
+                {/* Compact 1-Row ESG Strip */}
+                <motion.div
+                    variants={item}
+                    className="bg-card rounded-2xl border border-border shadow-sm px-5 py-3.5 flex flex-wrap items-center justify-between gap-4"
+                >
+                    <div className="flex items-center gap-2.5">
+                        <div className="p-2 rounded-xl bg-emerald-500/10 text-emerald-500 border border-emerald-500/20">
+                            <Leaf size={16} />
+                        </div>
+                        <span className="text-sm font-black text-foreground tracking-tight">
+                            Green Logistics (ESG)
+                        </span>
+                    </div>
+
+                    <div className="flex flex-wrap items-center gap-5 sm:gap-8">
+                        <div className="flex items-baseline gap-2">
+                            <span className="text-xs font-bold text-muted-foreground uppercase tracking-wider">CO2 Saved</span>
+                            <span className="text-base font-black text-emerald-500 tracking-tight">
+                                {esgData.co2Saved.toLocaleString()} kg
+                            </span>
+                        </div>
+                        <div className="hidden sm:block w-px h-4 bg-border" />
+                        <div className="flex items-baseline gap-2">
+                            <span className="text-xs font-bold text-muted-foreground uppercase tracking-wider">Trees Offset</span>
+                            <span className="text-base font-black text-emerald-500 tracking-tight">
+                                {(esgData.treesSaved || 0).toFixed(1)}
+                            </span>
+                        </div>
+                        <div className="hidden sm:block w-px h-4 bg-border" />
+                        <div className="flex items-baseline gap-2">
+                            <span className="text-xs font-bold text-muted-foreground uppercase tracking-wider">Fuel Saved</span>
+                            <span className="text-base font-black text-emerald-500 tracking-tight">
+                                {esgData.fuelSaved.toLocaleString()} L
+                            </span>
                         </div>
                     </div>
                 </motion.div>
