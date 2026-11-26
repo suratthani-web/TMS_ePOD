@@ -178,6 +178,7 @@ export async function DashboardContent({ searchParams }: DashboardContentProps) 
       <DashboardClient
         branchId={currentBranchId || ""}
         customerMode={customerMode}
+        customerId={customerMode ? (custId || undefined) : (selectedCustomerIds.length > 0 ? selectedCustomerIds.join(',') : undefined)}
         userName={custName}
         jobStats={dailyStats}
         driverStats={driverStats}

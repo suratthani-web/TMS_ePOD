@@ -18,7 +18,7 @@ import {
   Check
 } from "lucide-react"
 import { WeeklyShipmentChart } from "@/components/dashboard/charts/weekly-shipment-chart"
-import { DashboardMap } from "@/components/dashboard/dashboard-map"
+import { DriverTimelineScheduler } from "@/components/dashboard/driver-timeline-scheduler"
 import { OrderBidding } from "@/components/logistics/order-bidding"
 import { DailySummary } from "@/components/dashboard/daily-summary"
 import { Job } from "@/lib/supabase/jobs"
@@ -58,6 +58,7 @@ interface DriverStatus {
 interface DashboardClientProps {
     branchId: string
     customerMode: boolean
+    customerId?: string
     userName?: string | null
     jobStats: {
         total: number
@@ -100,15 +101,14 @@ interface DashboardClientProps {
 export function DashboardClient({ 
     branchId, 
     customerMode, 
+    customerId,
     userName,
     jobStats, 
     driverStats,
     sosCount,
     fleetAlertsCount,
     weeklyStats, 
-    fleetStatus,
     marketplaceJobs,
-    heatmapJobs = [],
     activeJobs = [],
     fleetHealth,
     esg,
@@ -344,18 +344,15 @@ export function DashboardClient({
                 animate="show"
                 className="grid grid-cols-1 lg:grid-cols-12 gap-6"
             >
-                {/* 1. Live Map Tracker — hidden for customers with tracking turned off */}
+                {/* 1. Driver Dispatch Timeline Scheduler — hidden for customers with tracking turned off */}
                 {!hideLiveTracking && (
-                <motion.div variants={item} className="lg:col-span-8 h-[500px] glass-panel rounded-3xl relative group border border-border shadow-sm overflow-hidden transition-all duration-300">
-                    <div className="absolute inset-0 z-0">
-                        <DashboardMap drivers={fleetStatus} allJobs={heatmapJobs} activeJobs={activeJobs} />
-                    </div>
-                    <div className="absolute top-6 left-6 z-10">
-                        <div className="px-5 py-3 bg-card rounded-2xl border border-border shadow-sm">
-                            <p className="text-xs font-bold text-primary uppercase tracking-[0.2em] mb-1">{t('dashboard.live_matrix')}</p>
-                            <h3 className="text-foreground font-black text-lg tracking-tighter">{(fleetStatus || []).length} {t('dashboard.units_deployed')}</h3>
-                        </div>
-                    </div>
+                <motion.div variants={item} className="lg:col-span-8 min-h-[500px]">
+                    <DriverTimelineScheduler
+                        branchId={branchId || undefined}
+                        customerId={customerId || undefined}
+                        customerMode={customerMode}
+                        initialJobs={activeJobs as Job[] | undefined}
+                    />
                 </motion.div>
                 )}
 
