@@ -56,6 +56,9 @@ interface PositionedJob {
   visualStartMin: number
   visualEndMin: number
   hasExplicitSchedule: boolean
+  isCarryOver: boolean
+  origStartMin: number | null
+  origEndMin: number | null
   lane: number
   soNumbers: string[]
 }
@@ -87,7 +90,7 @@ const BUCKET_STYLES: Record<
   }
 > = {
   delayed: {
-    label: "ล่าช้า",
+    label: "ล่าช้า / ค้างส่ง",
     barBg: "bg-rose-500 hover:bg-rose-600",
     barBorder: "border-rose-400/70",
     barText: "text-white",
@@ -144,6 +147,50 @@ function formatThaiHeaderDate(isoDate: string): string {
     year: "numeric",
     timeZone: TH_TZ,
   })
+}
+
+function formatShortThaiDayMonth(isoDate?: string | null): string {
+  if (!isoDate) return ""
+  const datePart = isoDate.slice(0, 10)
+  const d = new Date(`${datePart}T12:00:00+07:00`)
+  if (Number.isNaN(d.getTime())) return datePart
+  return d.toLocaleDateString("th-TH", {
+    day: "numeric",
+    month: "short",
+    timeZone: TH_TZ,
+  })
+}
+
+function diffIsoDays(fromIso?: string | null, toIso?: string | null): number | null {
+  if (!fromIso || !toIso) return null
+  const a = new Date(`${fromIso.slice(0, 10)}T12:00:00+07:00`)
+  const b = new Date(`${toIso.slice(0, 10)}T12:00:00+07:00`)
+  if (Number.isNaN(a.getTime()) || Number.isNaN(b.getTime())) return null
+  return Math.round((b.getTime() - a.getTime()) / 86_400_000)
+}
+
+const CARRY_OVER_EXCLUDED_STATUSES = new Set([
+  "completed",
+  "delivered",
+  "complete",
+  "verified",
+  "billed",
+  "paid",
+  "cancelled",
+])
+
+function isCarryOverJob(
+  job: TimelineJob,
+  isViewingToday: boolean,
+  todayStr: string
+): boolean {
+  if (job.isCarryOver) return true
+  if (!isViewingToday) return false
+  const status = (job.Job_Status || "").trim()
+  if (CARRY_OVER_EXCLUDED_STATUSES.has(status.toLowerCase()) || isDeliveredOrSettled(status)) {
+    return false
+  }
+  return Boolean(job.Plan_Date && job.Plan_Date < todayStr)
 }
 
 function getNowMinutesBKK(): number {
@@ -220,6 +267,10 @@ function classifyJobBucket(
   todayStr: string,
   nowMin: number
 ): Exclude<StatusBucket, "all"> {
+  if (isCarryOverJob(job, selectedDate === todayStr, todayStr)) {
+    return "delayed"
+  }
+
   const status = (job.Job_Status || "").trim()
 
   if (isDeliveredOrSettled(status)) {
@@ -258,18 +309,38 @@ function computeJobPosition(
   todayStr: string,
   nowMin: number
 ): Omit<PositionedJob, "lane"> {
+  const carryOver = isCarryOverJob(job, selectedDate === todayStr, todayStr)
+
   const actualStart = parseTimeToMinutes(job.Actual_Pickup_Time)
   const schedStart = parseTimeToMinutes(job.Scheduled_Pickup_Time)
   const pickupDateTime = parseTimeToMinutes(job.Pickup_Date)
-
   const rawStart = actualStart ?? schedStart ?? pickupDateTime
-  const startMin = Math.max(0, Math.min(23 * 60 + 30, rawStart ?? 8 * 60))
 
   const actualEnd = parseTimeToMinutes(job.Actual_Delivery_Time)
   const schedEnd = parseTimeToMinutes(job.Scheduled_Delivery_Time)
   const deliveryDateTime = parseTimeToMinutes(job.Delivery_Date)
-
   const rawEnd = actualEnd ?? schedEnd ?? deliveryDateTime
+
+  if (carryOver) {
+    const startMin = 0
+    const endMin = Math.min(1440, Math.max(210, nowMin))
+    return {
+      job,
+      bucket,
+      startMin,
+      endMin,
+      visualStartMin: startMin,
+      visualEndMin: endMin,
+      hasExplicitSchedule: rawStart !== null || rawEnd !== null,
+      isCarryOver: true,
+      origStartMin: rawStart,
+      origEndMin: rawEnd,
+      soNumbers: extractSoNumbers(job.original_destinations_json, job.Job_ID),
+    }
+  }
+
+  const startMin = Math.max(0, Math.min(23 * 60 + 30, rawStart ?? 8 * 60))
+
   let endMin: number
   if (rawEnd !== null && rawEnd > startMin) {
     endMin = Math.min(24 * 60, rawEnd)
@@ -290,6 +361,9 @@ function computeJobPosition(
     visualStartMin,
     visualEndMin,
     hasExplicitSchedule: rawStart !== null || rawEnd !== null,
+    isCarryOver: false,
+    origStartMin: rawStart,
+    origEndMin: rawEnd,
     soNumbers: extractSoNumbers(job.original_destinations_json, job.Job_ID),
   }
 }
@@ -404,6 +478,7 @@ export function DriverTimelineScheduler({
 
   const [searchQuery, setSearchQuery] = useState<string>("")
   const [showOnlyWithJobs, setShowOnlyWithJobs] = useState<boolean>(true)
+  const [showCarryOver, setShowCarryOver] = useState<boolean>(true)
   const [statusFilter, setStatusFilter] = useState<StatusBucket>("all")
   const [activePopover, setActivePopover] = useState<ActivePopoverState | null>(null)
 
@@ -486,24 +561,37 @@ export function DriverTimelineScheduler({
     }, 180)
   }, [clearHoverTimer])
 
+  const isViewingToday = selectedDate === todayStr
+  const nowPercent = Math.max(0, Math.min(100, (nowMin / 1440) * 100))
+
+  const carryOverCount = useMemo(
+    () => jobs.filter((job) => isCarryOverJob(job, isViewingToday, todayStr)).length,
+    [jobs, isViewingToday, todayStr]
+  )
+
+  const effectiveJobs = useMemo(() => {
+    if (showCarryOver) return jobs
+    return jobs.filter((job) => !isCarryOverJob(job, isViewingToday, todayStr))
+  }, [jobs, showCarryOver, isViewingToday, todayStr])
+
   // Classify & count all jobs for the selected date
   const classifiedJobs = useMemo(() => {
     const counts: Record<StatusBucket, number> = {
-      all: jobs.length,
+      all: effectiveJobs.length,
       delayed: 0,
       in_progress: 0,
       completed: 0,
       waiting: 0,
     }
 
-    const items = jobs.map((job) => {
+    const items = effectiveJobs.map((job) => {
       const bucket = classifyJobBucket(job, selectedDate, todayStr, nowMin)
       counts[bucket] += 1
       return computeJobPosition(job, bucket, selectedDate, todayStr, nowMin)
     })
 
     return { items, counts }
-  }, [jobs, selectedDate, todayStr, nowMin])
+  }, [effectiveJobs, selectedDate, todayStr, nowMin])
 
   // Group jobs by Driver_ID, apply search & status filter, and compute non-overlapping lanes
   const rows = useMemo(() => {
@@ -597,9 +685,6 @@ export function DriverTimelineScheduler({
 
     return result
   }, [drivers, classifiedJobs.items, searchQuery, showOnlyWithJobs, statusFilter])
-
-  const isViewingToday = selectedDate === todayStr
-  const nowPercent = Math.max(0, Math.min(100, (nowMin / 1440) * 100))
 
   // Compute clamped fixed popover coordinates relative to viewport
   const popoverStyle = useMemo(() => {
@@ -767,7 +852,7 @@ export function DriverTimelineScheduler({
                   statusFilter === "delayed" ? "bg-white" : "bg-rose-500"
                 )}
               />
-              <span>ล่าช้า ({classifiedJobs.counts.delayed})</span>
+              <span>ล่าช้า / ค้างส่ง ({classifiedJobs.counts.delayed})</span>
             </button>
 
             <button
@@ -855,6 +940,24 @@ export function DriverTimelineScheduler({
                 </button>
               )}
             </div>
+
+            {isViewingToday && (
+              <button
+                type="button"
+                onClick={() => setShowCarryOver((v) => !v)}
+                className={cn(
+                  "inline-flex items-center gap-1.5 h-8 px-3 rounded-full text-xs font-semibold border transition-colors cursor-pointer",
+                  showCarryOver
+                    ? carryOverCount > 0
+                      ? "bg-rose-500/15 text-rose-600 dark:text-rose-400 border-rose-500/30 hover:bg-rose-500/20"
+                      : "bg-amber-500/15 text-amber-700 dark:text-amber-300 border-amber-500/30 hover:bg-amber-500/20"
+                    : "bg-muted/50 text-muted-foreground border-border hover:bg-muted hover:text-foreground"
+                )}
+              >
+                <AlertCircle size={12} />
+                <span>รวมงานค้าง ({carryOverCount})</span>
+              </button>
+            )}
 
             {!customerMode && (
               <button
@@ -1048,7 +1151,11 @@ export function DriverTimelineScheduler({
                         const leftPct = (item.visualStartMin / 1440) * 100
                         const widthPct = ((item.visualEndMin - item.visualStartMin) / 1440) * 100
                         const topPx = ROW_PADDING_Y + item.lane * LANE_HEIGHT
-                        const startLabel = formatMinutesHHMM(item.startMin)
+                        const startLabel = item.isCarryOver
+                          ? item.job.Plan_Date
+                            ? `◀ ค้าง ${formatShortThaiDayMonth(item.job.Plan_Date)}`
+                            : "◀ ค้างส่ง"
+                          : formatMinutesHHMM(item.startMin)
                         const barLabel = item.job.Customer_Name || item.job.Job_ID
 
                         return (
@@ -1145,6 +1252,7 @@ export function DriverTimelineScheduler({
             const { job, bucket, startMin, endMin, soNumbers } = item
             const bucketStyle = BUCKET_STYLES[bucket]
             const cleanedNotes = cleanJobNotes(job.Notes)
+            const overdueDays = item.isCarryOver ? diffIsoDays(job.Plan_Date, todayStr) : null
 
             return (
               <div className="space-y-3">
@@ -1155,6 +1263,11 @@ export function DriverTimelineScheduler({
                       <span className="text-sm font-black text-foreground tracking-tight">
                         {job.Job_ID}
                       </span>
+                      {item.isCarryOver && (
+                        <span className="px-2 py-0.5 rounded-full text-[10px] font-bold border bg-rose-500 text-white border-rose-500 shadow-xs">
+                          ค้างจาก {job.Plan_Date ? formatThaiHeaderDate(job.Plan_Date) : "วันก่อนหน้า"}
+                        </span>
+                      )}
                       <span
                         className={cn(
                           "px-2 py-0.5 rounded-full text-[10px] font-bold border",
@@ -1193,18 +1306,49 @@ export function DriverTimelineScheduler({
 
                 {/* Time & Duration */}
                 <div className="flex items-center justify-between gap-2 px-2.5 py-2 rounded-xl bg-muted/50 border border-border text-xs">
-                  <div className="flex items-center gap-1.5 font-bold text-foreground tabular-nums">
-                    <Clock size={13} className="text-primary shrink-0" />
-                    <span>
-                      {formatMinutesHHMM(startMin)} → {formatMinutesHHMM(endMin)}
-                    </span>
-                    {!item.hasExplicitSchedule && (
-                      <span className="text-[10px] font-normal text-muted-foreground">(ประมาณการ)</span>
-                    )}
-                  </div>
-                  <span className="text-[11px] font-bold text-muted-foreground tabular-nums">
-                    {formatDurationTH(startMin, endMin)}
-                  </span>
+                  {item.isCarryOver ? (
+                    <>
+                      <div className="flex flex-col gap-0.5 min-w-0">
+                        <div className="flex items-center gap-1.5 font-bold text-rose-600 dark:text-rose-400 tabular-nums">
+                          <CalendarClock size={13} className="shrink-0" />
+                          <span>
+                            แผนเดิม: {job.Plan_Date ? formatThaiHeaderDate(job.Plan_Date) : "-"}
+                          </span>
+                        </div>
+                        <div className="flex items-center gap-1.5 text-[11px] font-semibold text-muted-foreground tabular-nums pl-[19px]">
+                          <span>
+                            เวลารับ:{" "}
+                            {item.origStartMin !== null
+                              ? formatMinutesHHMM(item.origStartMin)
+                              : "ไม่ระบุ"}
+                            {item.origEndMin !== null
+                              ? ` → ${formatMinutesHHMM(item.origEndMin)}`
+                              : ""}
+                          </span>
+                        </div>
+                      </div>
+                      {overdueDays !== null && overdueDays > 0 && (
+                        <span className="px-2 py-0.5 rounded-full bg-rose-500/15 text-rose-600 dark:text-rose-400 border border-rose-500/30 text-[10px] font-bold tabular-nums shrink-0">
+                          ค้าง {overdueDays} วัน
+                        </span>
+                      )}
+                    </>
+                  ) : (
+                    <>
+                      <div className="flex items-center gap-1.5 font-bold text-foreground tabular-nums">
+                        <Clock size={13} className="text-primary shrink-0" />
+                        <span>
+                          {formatMinutesHHMM(startMin)} → {formatMinutesHHMM(endMin)}
+                        </span>
+                        {!item.hasExplicitSchedule && (
+                          <span className="text-[10px] font-normal text-muted-foreground">(ประมาณการ)</span>
+                        )}
+                      </div>
+                      <span className="text-[11px] font-bold text-muted-foreground tabular-nums">
+                        {formatDurationTH(startMin, endMin)}
+                      </span>
+                    </>
+                  )}
                 </div>
 
                 {/* Metadata */}

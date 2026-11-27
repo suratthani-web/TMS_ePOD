@@ -2,7 +2,7 @@
 
 import { createAdminClient } from "@/utils/supabase/server"
 import { getCustomerId, getUserBranchId, isAdmin, isSuperAdmin } from "@/lib/permissions"
-import { todayTH } from "@/lib/utils/date-th"
+import { TH_TZ, todayTH } from "@/lib/utils/date-th"
 
 export interface TimelineDriver {
   Driver_ID: string
@@ -44,6 +44,7 @@ export interface TimelineJob {
   Sub_ID: string | null
   Verification_Status: string | null
   Est_Distance_KM: number | null
+  isCarryOver?: boolean
 }
 
 export interface DriverTimelineData {
@@ -51,6 +52,7 @@ export interface DriverTimelineData {
   drivers: TimelineDriver[]
   jobs: TimelineJob[]
   cancelledCount: number
+  carryOverCount?: number
 }
 
 // Guaranteed base columns on Jobs_Main in TMS_ePOD
@@ -100,6 +102,23 @@ function isValidIsoDate(value?: string | null): value is string {
   return typeof value === "string" && /^\d{4}-\d{2}-\d{2}$/.test(value.trim())
 }
 
+function shiftIsoDate(isoDate: string, deltaDays: number): string {
+  const d = new Date(`${isoDate}T12:00:00+07:00`)
+  if (Number.isNaN(d.getTime())) return todayTH()
+  d.setUTCDate(d.getUTCDate() + deltaDays)
+  return d.toLocaleDateString("en-CA", { timeZone: TH_TZ })
+}
+
+const CARRY_OVER_EXCLUDED_STATUSES = new Set([
+  "completed",
+  "delivered",
+  "complete",
+  "verified",
+  "billed",
+  "paid",
+  "cancelled",
+])
+
 export async function getDriverTimelineData(params: {
   date: string
   branchId?: string
@@ -117,7 +136,7 @@ export async function getDriverTimelineData(params: {
 
     // Strict tenant/branch authorization guard
     if (!sessionCustomerId && !isSuper && !isAdminUser && (!userBranchId || userBranchId === "All")) {
-      return { date: targetDate, drivers: [], jobs: [], cancelledCount: 0 }
+      return { date: targetDate, drivers: [], jobs: [], cancelledCount: 0, carryOverCount: 0 }
     }
 
     const effectiveCustomerIds = sessionCustomerId
@@ -136,45 +155,76 @@ export async function getDriverTimelineData(params: {
 
     const supabase = createAdminClient()
 
-    const runJobsQuery = async (selectColumns: string) => {
-      let query = supabase
-        .from("Jobs_Main")
-        .select(selectColumns)
-        .or(
-          `Plan_Date.eq.${targetDate},and(Plan_Date.is.null,Delivery_Date.eq.${targetDate}),and(Plan_Date.is.null,Pickup_Date.like.${targetDate}%)`
-        )
+    const queryScopedJobs = async (
+      mode: "today" | "carryOver",
+      lookbackDate: string | null
+    ): Promise<TimelineJob[]> => {
+      const runWithColumns = async (selectColumns: string) => {
+        let query = supabase.from("Jobs_Main").select(selectColumns)
+        if (mode === "today") {
+          query = query.or(
+            `Plan_Date.eq.${targetDate},and(Plan_Date.is.null,Delivery_Date.eq.${targetDate}),and(Plan_Date.is.null,Pickup_Date.like.${targetDate}%)`
+          )
+        } else if (lookbackDate) {
+          query = query.gte("Plan_Date", lookbackDate).lt("Plan_Date", targetDate)
+        }
 
-      if (effectiveCustomerIds.length === 1) {
-        query = query.eq("Customer_ID", effectiveCustomerIds[0])
-      } else if (effectiveCustomerIds.length > 1) {
-        query = query.in("Customer_ID", effectiveCustomerIds)
+        if (effectiveCustomerIds.length === 1) {
+          query = query.eq("Customer_ID", effectiveCustomerIds[0])
+        } else if (effectiveCustomerIds.length > 1) {
+          query = query.in("Customer_ID", effectiveCustomerIds)
+        }
+
+        if (effectiveBranchId) {
+          query = query.eq("Branch_ID", effectiveBranchId)
+        }
+
+        return query.order("Created_At", { ascending: true }).limit(500)
       }
 
-      if (effectiveBranchId) {
-        query = query.eq("Branch_ID", effectiveBranchId)
+      // Try extended columns (includes Scheduled_Pickup_Time / Scheduled_Delivery_Time);
+      // fall back to guaranteed base schema columns if absent.
+      let result = await runWithColumns(TIMELINE_JOB_EXTENDED_COLUMNS)
+      if (result.error) {
+        result = await runWithColumns(TIMELINE_JOB_BASE_COLUMNS)
       }
-
-      return query.order("Created_At", { ascending: true }).limit(500)
+      return (result.data ?? []) as unknown as TimelineJob[]
     }
 
-    // Try extended columns (includes Scheduled_Pickup_Time / Scheduled_Delivery_Time);
-    // fall back to guaranteed base schema columns if absent.
-    let jobsResult = await runJobsQuery(TIMELINE_JOB_EXTENDED_COLUMNS)
-    if (jobsResult.error) {
-      jobsResult = await runJobsQuery(TIMELINE_JOB_BASE_COLUMNS)
-    }
+    const isViewingToday = targetDate === todayTH()
+    const lookbackDate = isViewingToday ? shiftIsoDate(targetDate, -30) : null
 
-    const rawJobs = (jobsResult.data ?? []) as unknown as TimelineJob[]
+    const [rawJobs, rawCarryOverJobs] = await Promise.all([
+      queryScopedJobs("today", null),
+      isViewingToday && lookbackDate
+        ? queryScopedJobs("carryOver", lookbackDate)
+        : Promise.resolve([] as TimelineJob[]),
+    ])
+
     let cancelledCount = 0
     const activeJobs: TimelineJob[] = []
+    const seenJobIds = new Set<string>()
 
     for (const job of rawJobs) {
       const status = (job.Job_Status || "").trim()
-      if (status === "Cancelled") {
+      if (status.toLowerCase() === "cancelled") {
         cancelledCount += 1
         continue
       }
       activeJobs.push(job)
+      seenJobIds.add(job.Job_ID)
+    }
+
+    let carryOverCount = 0
+    for (const job of rawCarryOverJobs) {
+      if (seenJobIds.has(job.Job_ID)) continue
+      const statusLower = (job.Job_Status || "").trim().toLowerCase()
+      if (CARRY_OVER_EXCLUDED_STATUSES.has(statusLower)) {
+        continue
+      }
+      seenJobIds.add(job.Job_ID)
+      activeJobs.push({ ...job, isCarryOver: true })
+      carryOverCount += 1
     }
 
     // Fetch active drivers for admins/staff (customers only see drivers on their own jobs)
@@ -271,6 +321,7 @@ export async function getDriverTimelineData(params: {
       drivers: sortedDrivers,
       jobs: activeJobs,
       cancelledCount,
+      carryOverCount,
     }
   } catch (error) {
     console.error("[getDriverTimelineData] Failed to load timeline data:", error)
@@ -279,6 +330,7 @@ export async function getDriverTimelineData(params: {
       drivers: [],
       jobs: [],
       cancelledCount: 0,
+      carryOverCount: 0,
     }
   }
 }
