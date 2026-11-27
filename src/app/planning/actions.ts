@@ -608,7 +608,7 @@ export async function createBulkJobs(
     normalized.Cost_Driver_Total = getValue(['Cost_Driver_Total', 'cost', 'ต้นทุน', 'ค่ารถ', 'จ่ายคนขับ', 'ค่าเที่ยว'])
     normalized.Cargo_Type = getValue(['Cargo_Type', 'cargo_type', 'ประเภทสินค้า', 'สินค้า', 'ชนิดสินค้า'])
     normalized.Notes = getValue(['Notes', 'remark', 'หมายเหตุ'])
-    normalized.Ref_No = getValue(['Ref_No', 'so', 'do', 'เลขที่อ้างอิง'])
+    normalized.Ref_No = getValue(['Ref_No', 'ref_no', 'เลขที่อ้างอิง', 'reference', 'เลขที่ใบส่งของ', 'so_no', 'so', 'do', 'เลข so', 'เลข_so', 'เลขso'])
     normalized.Branch_ID = getValue(['Branch_ID', 'branch', 'สาขา'])
     normalized.Job_Status = getValue(['Job_Status', 'status', 'สถานะ'])
     
@@ -640,7 +640,7 @@ export async function createBulkJobs(
 
     // Multi-Origin & Destination Detection
     const origins: { name: string, lat: number | null, lng: number | null }[] = []
-    const destinations: { name: string, lat: number | null, lng: number | null }[] = []
+    const destinations: { name: string, lat: number | null, lng: number | null, so_no?: string }[] = []
     const rowKeys = Object.keys(row)
     
     // Parse fallback from Route_Name if Origin/Dest Location fields are missing
@@ -709,22 +709,58 @@ export async function createBulkJobs(
     if (row.original_destinations_json) {
         normalized.original_destinations_json = row.original_destinations_json
     } else {
+        const groupedSos = Array.isArray(rowRec.__groupedDropSos)
+            ? (rowRec.__groupedDropSos as unknown[]).map(v => (v !== undefined && v !== null ? String(v).trim() : ''))
+            : undefined
+
+        const numberedSoMap = new Map<number, string>()
+        for (const key of rowKeys) {
+            const nk = key.toLowerCase().replace(/[\s_-]+/g, '')
+            const match = nk.match(/^(?:sono|so|เลขที่อ้างอิง|เลขso|refno|ref)(\d+)$/)
+            if (match) {
+                const num = parseInt(match[1], 10)
+                const rawVal = rowRec[key]
+                const strVal = rawVal !== undefined && rawVal !== null ? String(rawVal).trim() : ''
+                if (strVal && !numberedSoMap.has(num)) {
+                    numberedSoMap.set(num, strVal)
+                }
+            }
+        }
+
         const primaryDest = normalized.Dest_Location as string
         if (primaryDest) {
             if (primaryDest.includes(' → ')) {
                 const names = primaryDest.split(' → ').map(n => n.trim()).filter(Boolean)
+                let splitRefSos: string[] | undefined
+                if (!groupedSos && normalized.Ref_No) {
+                    const refStr = String(normalized.Ref_No).trim()
+                    if (refStr.includes('→')) {
+                        splitRefSos = refStr.split('→').map(s => s.trim())
+                    } else if (refStr.includes(',')) {
+                        splitRefSos = refStr.split(',').map(s => s.trim())
+                    }
+                }
                 names.forEach((name, i) => {
+                    const soFromGrouped = groupedSos ? groupedSos[i] : undefined
+                    const soFromSplit = splitRefSos && i < splitRefSos.length ? splitRefSos[i] : undefined
+                    const soFromNumbered = numberedSoMap.get(i + 1)
+                    const soNo = (soFromGrouped || soFromSplit || soFromNumbered || '').trim()
                     destinations.push({
                         name,
                         lat: i === names.length - 1 ? (normalized.Delivery_Lat ? Number(normalized.Delivery_Lat) : null) : null,
-                        lng: i === names.length - 1 ? (normalized.Delivery_Lon ? Number(normalized.Delivery_Lon) : null) : null
+                        lng: i === names.length - 1 ? (normalized.Delivery_Lon ? Number(normalized.Delivery_Lon) : null) : null,
+                        ...(soNo ? { so_no: soNo } : {})
                     })
                 })
             } else {
+                const dropSo = groupedSos
+                    ? (groupedSos[0] || '').trim()
+                    : (String(normalized.Ref_No || '').trim() || numberedSoMap.get(1) || '')
                 destinations.push({ 
                     name: primaryDest, 
                     lat: normalized.Delivery_Lat ? Number(normalized.Delivery_Lat) : null,
-                    lng: normalized.Delivery_Lon ? Number(normalized.Delivery_Lon) : null
+                    lng: normalized.Delivery_Lon ? Number(normalized.Delivery_Lon) : null,
+                    ...(dropSo ? { so_no: dropSo } : {})
                 })
             }
         }
@@ -743,12 +779,26 @@ export async function createBulkJobs(
         additionalDestKeys.forEach(key => {
             const val = (row as Record<string, unknown>)[key]
             if (val && String(val).trim()) {
-                destinations.push({ name: String(val).trim(), lat: null, lng: null })
+                const numMatch = key.match(/\d+/)
+                const destNum = numMatch ? parseInt(numMatch[0], 10) : null
+                const soNo = (destNum !== null ? numberedSoMap.get(destNum) : undefined) || ''
+                destinations.push({
+                    name: String(val).trim(),
+                    lat: null,
+                    lng: null,
+                    ...(soNo ? { so_no: soNo } : {})
+                })
             }
         })
 
         if (destinations.length > 0) {
             normalized.original_destinations_json = destinations
+            const destSos = Array.from(
+                new Set(destinations.map(d => d.so_no?.trim()).filter((s): s is string => Boolean(s)))
+            )
+            if (destSos.length > 0 && !String(normalized.Ref_No || '').trim()) {
+                normalized.Ref_No = destSos.join(', ')
+            }
         }
     }
 
@@ -799,6 +849,7 @@ export async function createBulkJobs(
   const groupMasterSheetRows = (rows: Partial<JobFormData>[]): Partial<JobFormData>[] => {
     const DEST_KEYS = ['Dest_Location', 'destination', 'ปลายทาง', 'ส่งที่']
     const ORIGIN_KEYS = ['Origin_Location', 'origin', 'ต้นทาง', 'รับที่']
+    const REF_KEYS = ['Ref_No', 'ref_no', 'เลขที่อ้างอิง', 'reference', 'เลขที่ใบส่งของ', 'so_no', 'so', 'เลข so', 'เลข_so', 'เลขso']
     const IDENTITY_KEYS = ['Job_ID', 'id', 'รหัสงาน', 'Customer_ID', 'cust_id', 'รหัสลูกค้า', 'Customer_Name', 'customer', 'ลูกค้า', 'ชื่อลูกค้า']
 
     const norm = (s: string) => s.toLowerCase().replace(/\s+/g, '_')
@@ -834,13 +885,30 @@ export async function createBulkJobs(
 
       if (!hasIdentity && last && (dest || origin)) {
         // แถวรอง = ดรอปถัดไป: ต่อปลายทาง (และ/หรือ ต้นทาง) เข้ากับ job แถวบน
-        if (dest) appendDrop(last, DEST_KEYS, dest)
+        if (dest) {
+          appendDrop(last, DEST_KEYS, dest)
+          const subSo = rawGet(rec, REF_KEYS)
+          const sos = last.__groupedDropSos as string[] | undefined
+          if (Array.isArray(sos)) {
+            sos.push(subSo || '')
+          }
+          if (subSo) {
+            const existingRef = rawGet(last, REF_KEYS)
+            const existingParts = existingRef
+              ? existingRef.split(',').map(s => s.trim()).filter(Boolean)
+              : []
+            const merged = Array.from(new Set([...existingParts, subSo]))
+            last.Ref_No = merged.join(', ')
+          }
+        }
         if (origin) appendDrop(last, ORIGIN_KEYS, origin)
         continue
       }
       if (!hasIdentity && !dest && !origin) continue // ข้ามแถวว่างล้วน
 
-      const copy = { ...rec }
+      const copy: Record<string, unknown> = { ...rec }
+      const dropSos: string[] = dest ? [rawGet(rec, REF_KEYS) || ''] : []
+      copy.__groupedDropSos = dropSos
       result.push(copy as Partial<JobFormData>)
       last = copy
     }
@@ -912,7 +980,7 @@ export async function createBulkJobs(
       Origin_Location: (data.Origin_Location as string) || route?.Origin || null,
       original_origins_json: data.original_origins_json || (route?.Origin ? [{ name: route.Origin, lat: route.Origin_Lat || null, lng: route.Origin_Lon || null }] : []),
       Dest_Location: (data.Dest_Location as string) || route?.Destination || null,
-      original_destinations_json: data.original_destinations_json || (route?.Destination ? [{ name: route.Destination, lat: route.Dest_Lat || null, lng: route.Dest_Lon || null }] : []),
+      original_destinations_json: data.original_destinations_json || (route?.Destination ? [{ name: route.Destination, lat: route.Dest_Lat || null, lng: route.Dest_Lon || null, ...(data.Ref_No ? { so_no: String(data.Ref_No).trim() } : {}) }] : []),
       Total_Drop: Array.isArray(data.original_destinations_json) 
         ? data.original_destinations_json.length 
         : (route?.Destination ? 1 : 1),

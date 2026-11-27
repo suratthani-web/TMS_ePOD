@@ -182,23 +182,42 @@ export function PlanningClient({
         const selectedCustomer = customers.find(c => c.Customer_ID === templateCustomerId)
         const customerBranchId = selectedCustomer?.Branch_ID
 
-        const templateData = [{
-            "รหัสงาน": "JOB-001",
-            "วันที่แผน": selectedDate || "",
-            "ลูกค้า": templateCustomerId || "CUST-001",
-            "ต้นทาง": "คลังสินค้า สุราษฎร์ธานี",
-            "ปลายทาง": "ท่าเรือ กรุงเทพฯ",
-            "รหัสคนขับ": "DRV-001",
-            "ทะเบียนรถ": "80-1234 กทม.",
-            "น้ำหนักสินค้า": 1500,
-            "ปริมาตร": 10,
-            "ราคาขาย": 5500,
-            "จ่ายคนขับ": 3500,
-            "เลขที่อ้างอิง": "SO-12345",
-            "รอบ": 1,
-            "หมายเหตุ": "ด่วนพิเศษ",
-            "สาขา": customerBranchId || (branchId !== 'All' ? branchId : "HQ")
-        }]
+        const templateData = [
+            {
+                "รหัสงาน": "JOB-001",
+                "วันที่แผน": selectedDate || "",
+                "ลูกค้า": templateCustomerId || "CUST-001",
+                "ต้นทาง": "คลังสินค้า สุราษฎร์ธานี",
+                "ปลายทาง": "ท่าเรือ กรุงเทพฯ",
+                "รหัสคนขับ": "DRV-001",
+                "ทะเบียนรถ": "80-1234 กทม.",
+                "น้ำหนักสินค้า": 1500,
+                "ปริมาตร": 10,
+                "ราคาขาย": 5500,
+                "จ่ายคนขับ": 3500,
+                "เลขที่อ้างอิง": "SO-12345",
+                "รอบ": 1,
+                "หมายเหตุ": "ด่วนพิเศษ",
+                "สาขา": customerBranchId || (branchId !== 'All' ? branchId : "HQ")
+            },
+            {
+                "รหัสงาน": "",
+                "วันที่แผน": "",
+                "ลูกค้า": "",
+                "ต้นทาง": "",
+                "ปลายทาง": "คลังสินค้า บางนา (ดรอป 2 - ถ้ามี)",
+                "รหัสคนขับ": "",
+                "ทะเบียนรถ": "",
+                "น้ำหนักสินค้า": "",
+                "ปริมาตร": "",
+                "ราคาขาย": "",
+                "จ่ายคนขับ": "",
+                "เลขที่อ้างอิง": "SO-12346",
+                "รอบ": "",
+                "หมายเหตุ": "",
+                "สาขา": ""
+            }
+        ]
 
         const ws1 = utils.json_to_sheet(templateData)
         
@@ -475,7 +494,7 @@ export function PlanningClient({
                                 }
                                 title={t('planning.import_title') || 'Import Jobs'}
                                 onImport={(data, options) => createBulkJobs(data, branchId === 'All' ? null : branchId, options)}
-                                groupingLabel="รวมหลายดรอปเป็นงานเดียว (แถวรองใส่แค่ปลายทาง)"
+                                groupingLabel="รวมหลายดรอปเป็นงานเดียว (แถวรองใส่แค่ปลายทาง + เลขที่อ้างอิง/SO)"
                                 showDraftOption={true}
                                 customTemplateButton={
                                     <div className="flex items-center gap-3 bg-muted/30 p-2 rounded-2xl border border-border/10">
