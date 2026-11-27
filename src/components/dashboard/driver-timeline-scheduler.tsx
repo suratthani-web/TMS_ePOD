@@ -59,6 +59,10 @@ interface PositionedJob {
   isCarryOver: boolean
   origStartMin: number | null
   origEndMin: number | null
+  plannedStartMin?: number | null
+  plannedEndMin?: number | null
+  actualStartMin?: number | null
+  actualEndMin?: number | null
   lane: number
   soNumbers: string[]
 }
@@ -302,6 +306,12 @@ function classifyJobBucket(
   return "waiting"
 }
 
+function formatTimeRangeCompact(startMin: number | null, endMin: number | null): string {
+  const s = startMin !== null ? formatMinutesHHMM(startMin) : "--:--"
+  const e = endMin !== null ? formatMinutesHHMM(endMin) : "--:--"
+  return `${s} → ${e}`
+}
+
 function computeJobPosition(
   job: TimelineJob,
   bucket: Exclude<StatusBucket, "all">,
@@ -314,12 +324,16 @@ function computeJobPosition(
   const actualStart = parseTimeToMinutes(job.Actual_Pickup_Time)
   const schedStart = parseTimeToMinutes(job.Scheduled_Pickup_Time)
   const pickupDateTime = parseTimeToMinutes(job.Pickup_Date)
-  const rawStart = actualStart ?? schedStart ?? pickupDateTime
+  const plannedStartMin = schedStart ?? pickupDateTime
 
   const actualEnd = parseTimeToMinutes(job.Actual_Delivery_Time)
   const schedEnd = parseTimeToMinutes(job.Scheduled_Delivery_Time)
   const deliveryDateTime = parseTimeToMinutes(job.Delivery_Date)
-  const rawEnd = actualEnd ?? schedEnd ?? deliveryDateTime
+  const plannedEndMin = schedEnd ?? deliveryDateTime
+
+  const origStartMin = actualStart ?? plannedStartMin
+  const origEndMin = actualEnd ?? plannedEndMin
+  const hasExplicitSchedule = origStartMin !== null || origEndMin !== null
 
   if (carryOver) {
     const startMin = 0
@@ -331,21 +345,35 @@ function computeJobPosition(
       endMin,
       visualStartMin: startMin,
       visualEndMin: endMin,
-      hasExplicitSchedule: rawStart !== null || rawEnd !== null,
+      hasExplicitSchedule,
       isCarryOver: true,
-      origStartMin: rawStart,
-      origEndMin: rawEnd,
+      origStartMin,
+      origEndMin,
+      plannedStartMin,
+      plannedEndMin,
+      actualStartMin: actualStart,
+      actualEndMin: actualEnd,
       soNumbers: extractSoNumbers(job.original_destinations_json, job.Job_ID),
     }
   }
 
-  const startMin = Math.max(0, Math.min(23 * 60 + 30, rawStart ?? 8 * 60))
+  const startMin = Math.max(0, Math.min(23 * 60 + 30, actualStart ?? plannedStartMin ?? 8 * 60))
 
   let endMin: number
-  if (rawEnd !== null && rawEnd > startMin) {
-    endMin = Math.min(24 * 60, rawEnd)
+  if (actualEnd !== null && actualEnd >= startMin) {
+    endMin = Math.min(24 * 60, actualEnd)
   } else if (bucket === "in_progress" && selectedDate === todayStr) {
-    endMin = Math.min(24 * 60, Math.max(nowMin, startMin + 120))
+    endMin = Math.min(24 * 60, Math.max(nowMin, startMin + 90))
+  } else if (bucket === "completed") {
+    if (plannedEndMin !== null && plannedEndMin > startMin) {
+      endMin = Math.min(24 * 60, plannedEndMin)
+    } else if (selectedDate === todayStr && nowMin >= startMin) {
+      endMin = Math.min(24 * 60, Math.max(startMin + 60, nowMin))
+    } else {
+      endMin = Math.min(24 * 60, startMin + 120)
+    }
+  } else if (plannedEndMin !== null && plannedEndMin > startMin) {
+    endMin = Math.min(24 * 60, plannedEndMin)
   } else {
     endMin = Math.min(24 * 60, Math.max(17 * 60, startMin + 120))
   }
@@ -360,10 +388,14 @@ function computeJobPosition(
     endMin,
     visualStartMin,
     visualEndMin,
-    hasExplicitSchedule: rawStart !== null || rawEnd !== null,
+    hasExplicitSchedule,
     isCarryOver: false,
-    origStartMin: rawStart,
-    origEndMin: rawEnd,
+    origStartMin,
+    origEndMin,
+    plannedStartMin,
+    plannedEndMin,
+    actualStartMin: actualStart,
+    actualEndMin: actualEnd,
     soNumbers: extractSoNumbers(job.original_destinations_json, job.Job_ID),
   }
 }
@@ -1253,6 +1285,17 @@ export function DriverTimelineScheduler({
             const bucketStyle = BUCKET_STYLES[bucket]
             const cleanedNotes = cleanJobNotes(job.Notes)
             const overdueDays = item.isCarryOver ? diffIsoDays(job.Plan_Date, todayStr) : null
+            const plannedStartMin = item.plannedStartMin ?? null
+            const plannedEndMin = item.plannedEndMin ?? null
+            const actualStartMin = item.actualStartMin ?? null
+            const actualEndMin = item.actualEndMin ?? null
+            const hasPlannedVsActual =
+              (plannedStartMin !== null || plannedEndMin !== null) &&
+              (actualStartMin !== null || actualEndMin !== null)
+            const endVarianceMin =
+              plannedEndMin !== null && actualEndMin !== null
+                ? Math.round(actualEndMin - plannedEndMin)
+                : null
 
             return (
               <div className="space-y-3">
@@ -1305,49 +1348,87 @@ export function DriverTimelineScheduler({
                 </div>
 
                 {/* Time & Duration */}
-                <div className="flex items-center justify-between gap-2 px-2.5 py-2 rounded-xl bg-muted/50 border border-border text-xs">
-                  {item.isCarryOver ? (
-                    <>
-                      <div className="flex flex-col gap-0.5 min-w-0">
-                        <div className="flex items-center gap-1.5 font-bold text-rose-600 dark:text-rose-400 tabular-nums">
-                          <CalendarClock size={13} className="shrink-0" />
-                          <span>
-                            แผนเดิม: {job.Plan_Date ? formatThaiHeaderDate(job.Plan_Date) : "-"}
-                          </span>
+                <div className="flex flex-col gap-1.5 px-2.5 py-2 rounded-xl bg-muted/50 border border-border text-foreground text-xs">
+                  <div className="flex items-center justify-between gap-2">
+                    {item.isCarryOver ? (
+                      <>
+                        <div className="flex flex-col gap-0.5 min-w-0">
+                          <div className="flex items-center gap-1.5 font-bold text-rose-600 dark:text-rose-400 tabular-nums">
+                            <CalendarClock size={13} className="shrink-0" />
+                            <span>
+                              แผนเดิม: {job.Plan_Date ? formatThaiHeaderDate(job.Plan_Date) : "-"}
+                            </span>
+                          </div>
+                          <div className="flex items-center gap-1.5 text-[11px] font-semibold text-muted-foreground tabular-nums pl-[19px]">
+                            <span>
+                              เวลารับ:{" "}
+                              {item.origStartMin !== null
+                                ? formatMinutesHHMM(item.origStartMin)
+                                : "ไม่ระบุ"}
+                              {item.origEndMin !== null
+                                ? ` → ${formatMinutesHHMM(item.origEndMin)}`
+                                : ""}
+                            </span>
+                          </div>
                         </div>
-                        <div className="flex items-center gap-1.5 text-[11px] font-semibold text-muted-foreground tabular-nums pl-[19px]">
-                          <span>
-                            เวลารับ:{" "}
-                            {item.origStartMin !== null
-                              ? formatMinutesHHMM(item.origStartMin)
-                              : "ไม่ระบุ"}
-                            {item.origEndMin !== null
-                              ? ` → ${formatMinutesHHMM(item.origEndMin)}`
-                              : ""}
+                        {overdueDays !== null && overdueDays > 0 && (
+                          <span className="px-2 py-0.5 rounded-full bg-rose-500/15 text-rose-600 dark:text-rose-400 border border-rose-500/30 text-[10px] font-bold tabular-nums shrink-0">
+                            ค้าง {overdueDays} วัน
                           </span>
+                        )}
+                      </>
+                    ) : (
+                      <>
+                        <div className="flex items-center gap-1.5 font-bold text-foreground tabular-nums">
+                          <Clock size={13} className="text-primary shrink-0" />
+                          <span>
+                            {formatMinutesHHMM(startMin)} → {formatMinutesHHMM(endMin)}
+                          </span>
+                          {!item.hasExplicitSchedule && (
+                            <span className="text-[10px] font-normal text-muted-foreground">(ประมาณการ)</span>
+                          )}
                         </div>
+                        <span className="text-[11px] font-bold text-muted-foreground tabular-nums">
+                          {formatDurationTH(startMin, endMin)}
+                        </span>
+                      </>
+                    )}
+                  </div>
+
+                  {hasPlannedVsActual && (
+                    <div className="pt-1.5 border-t border-border/60 flex flex-wrap items-center justify-between gap-1.5 text-[11px] tabular-nums">
+                      <div className="flex flex-wrap items-center gap-x-2.5 gap-y-0.5 text-muted-foreground">
+                        <span>
+                          ตามแผน:{" "}
+                          <strong className="font-semibold text-foreground/90">
+                            {formatTimeRangeCompact(plannedStartMin, plannedEndMin)}
+                          </strong>
+                        </span>
+                        <span>
+                          จริง:{" "}
+                          <strong className="font-semibold text-foreground">
+                            {formatTimeRangeCompact(actualStartMin, actualEndMin)}
+                          </strong>
+                        </span>
                       </div>
-                      {overdueDays !== null && overdueDays > 0 && (
-                        <span className="px-2 py-0.5 rounded-full bg-rose-500/15 text-rose-600 dark:text-rose-400 border border-rose-500/30 text-[10px] font-bold tabular-nums shrink-0">
-                          ค้าง {overdueDays} วัน
+
+                      {endVarianceMin !== null && (
+                        <span
+                          className={cn(
+                            "px-1.5 py-0.5 rounded-full border text-[10px] font-bold shrink-0",
+                            endVarianceMin <= 0
+                              ? "bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border-emerald-500/30"
+                              : "bg-rose-500/15 text-rose-600 dark:text-rose-400 border-rose-500/30"
+                          )}
+                        >
+                          {endVarianceMin === 0
+                            ? "ตรงตามแผน"
+                            : endVarianceMin < 0
+                              ? `เร็วกว่าแผน ${Math.abs(endVarianceMin)} น.`
+                              : `ช้ากว่าแผน ${endVarianceMin} น.`}
                         </span>
                       )}
-                    </>
-                  ) : (
-                    <>
-                      <div className="flex items-center gap-1.5 font-bold text-foreground tabular-nums">
-                        <Clock size={13} className="text-primary shrink-0" />
-                        <span>
-                          {formatMinutesHHMM(startMin)} → {formatMinutesHHMM(endMin)}
-                        </span>
-                        {!item.hasExplicitSchedule && (
-                          <span className="text-[10px] font-normal text-muted-foreground">(ประมาณการ)</span>
-                        )}
-                      </div>
-                      <span className="text-[11px] font-bold text-muted-foreground tabular-nums">
-                        {formatDurationTH(startMin, endMin)}
-                      </span>
-                    </>
+                    </div>
                   )}
                 </div>
 
