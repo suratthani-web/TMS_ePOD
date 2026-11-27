@@ -3,6 +3,18 @@
 import { createAdminClient } from "@/utils/supabase/server"
 import { getCustomerId, getUserBranchId, isAdmin, isSuperAdmin } from "@/lib/permissions"
 import { TH_TZ, todayTH } from "@/lib/utils/date-th"
+import { COMPLETED_STATUSES, SETTLED_STATUSES } from "@/lib/constants/job-status"
+
+const CARRY_OVER_SQL_EXCLUDED = `(${[
+  ...COMPLETED_STATUSES,
+  ...SETTLED_STATUSES,
+  "Cancelled",
+  "Failed",
+  "Draft",
+  "Requested",
+]
+  .map((s) => `"${s}"`)
+  .join(",")})`
 
 export interface TimelineDriver {
   Driver_ID: string
@@ -166,7 +178,11 @@ export async function getDriverTimelineData(params: {
             `Plan_Date.eq.${targetDate},and(Plan_Date.is.null,Delivery_Date.eq.${targetDate}),and(Plan_Date.is.null,Pickup_Date.like.${targetDate}%)`
           )
         } else if (lookbackDate) {
-          query = query.gte("Plan_Date", lookbackDate).lt("Plan_Date", targetDate)
+          query = query
+            .or(
+              `and(Delivery_Date.gte.${lookbackDate},Delivery_Date.lt.${targetDate}),and(Plan_Date.gte.${lookbackDate},Plan_Date.lt.${targetDate})`
+            )
+            .not("Job_Status", "in", CARRY_OVER_SQL_EXCLUDED)
         }
 
         if (effectiveCustomerIds.length === 1) {
